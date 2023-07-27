@@ -9,12 +9,9 @@ mechanized in the [Coq proof assistant](https://coq.inria.fr/).
 
 - [`trillium/`](trillium/): The Trillium program logic framework
 
-- [`fairness/`](fairness/): The Fairis instantiation of Trillium for reasoning
+- [`fairis/`](fairis/): The Fairis instantiation of Trillium for reasoning
   about fair termination of concurrent programs.
-  * [`examples/`](fairness/examples/): examples and case studies
-
-- [`aneris/`](aneris/): The Aneris instantiation of Trillium
-  * [`examples/`](aneris/examples/): examples and case studies
+  * [`examples/`](fairis/examples/): Examples and case studies
 
 - [`external/`](external/): External dependencies
 
@@ -32,16 +29,6 @@ CPU cores.
 
 Note that the compilation of the external dependencies is known to print
 a lot of warning messages when compiled with Coq 8.17.
-
-## Directory Structure
-
-- [`trillium/`](trillium/): The Trillium program logic framework
-
-- [`fairness/`](fairness/): The Fairis instantiation of Trillium for reasoning
-  about fair termination of concurrent programs.
-  * [`examples/`](fairness/examples/): examples and case studies
-
-- [`external/`](external/): External dependencies
 
 ## Git submodule dependencies
 
