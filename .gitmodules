@@ -1,0 +1,9 @@
+[submodule "external/stdpp"]
+	path = external/stdpp
+	url = https://gitlab.mpi-sws.org/iris/stdpp.git
+[submodule "external/iris"]
+	path = external/iris
+	url = https://gitlab.mpi-sws.org/iris/iris.git
+[submodule "external/paco"]
+	path = external/paco
+	url = https://github.com/snu-sf/paco.git
