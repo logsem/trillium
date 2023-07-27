@@ -1066,7 +1066,7 @@ Qed.
 (* WIP solution for generic fuel-handling *)
 Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
   match to_val e1 with
-  | Some v => |={E}=> Φ (of_val v)
+  | Some v => |={E}=> (Φ (of_val v))
   | None => ∀ σ1,
       gen_heap_interp σ1.(heap) ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
@@ -1094,7 +1094,85 @@ Proof.
   inv_head_step. iFrame. done.
 Qed.
 
-Lemma wp_nostep s tid E e fs Φ :
+Lemma has_fuels_decr E tid fs :
+  has_fuels_S tid fs -∗ |~{E}~| has_fuels tid fs.
+Proof. Admitted.
+
+Lemma has_fuels_delete E tid fs ρ δ :
+  ρ ∉ live_roles _ δ →
+  frag_model_is δ -∗
+  has_fuels tid fs -∗
+  |~{E}~| frag_model_is δ ∗ has_fuels tid (delete ρ fs).
+Proof. Admitted.
+
+Lemma wp_step_singlerole s tid ρ (f1 f2: nat) fr s1 s2 E e Φ :
+  TCEq (to_val e) None →
+  f2 ≤ LM.(lm_fl) s2 -> fmtrans M s1 (Some ρ) s2 ->
+  live_roles _ s2 ⊆ live_roles _ s1 ->
+  ▷ frag_model_is s1 -∗ ▷ has_fuel tid ρ f1 -∗ ▷ frag_free_roles_are fr -∗
+  sswp s E e (λ e', frag_model_is s2 -∗ frag_free_roles_are fr -∗
+                    (if decide (ρ ∈ live_roles M s2)
+                     then has_fuel tid ρ f2 else tid ↦M ∅ ) -∗
+                    WP e' @ s; tid; E {{ Φ }} ) -∗
+  WP e @ s; tid; E {{ Φ }}.
+Proof.
+  iIntros (Hval Hfl Htrans ?) ">Hst >Hfuel1 >Hfr Hwp".
+  rewrite wp_unfold /wp_pre.
+  rewrite /sswp. simpl. rewrite Hval.
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hexend) "(% & Hsi & Hmi)".
+  iMod ("Hwp" with "Hsi") as (Hred) "Hwp".
+  iIntros "!>".
+  iSplitR; [by rewrite Hexend in Hred|].
+  iIntros (????).
+  rewrite Hexend.
+  iMod ("Hwp" with "[//]") as "Hwp". iIntros "!>!>". iMod "Hwp". iIntros "!>".
+  iApply step_fupdN_intro; [done|]. iIntros "!>".
+  iMod "Hwp" as "[Hσ [Hwp ->]]".
+  iDestruct (model_agree' with "Hmi Hst") as %Hmeq.
+  rewrite has_fuel_fuels. iFrame.
+  iMod (update_step_still_alive _ _ _ _ _ _ _ _ _
+            (if decide (ρ ∈ live_roles M s2) then {[ ρ := f2 ]} else ∅)
+            with "Hfuel1 Hst Hmi Hfr") as
+        (δ2 ℓ) "([%Hlab [%Hvse [% %]]] & Hfuel & Hst & Hfr & Hmod)"; eauto.
+  - set_solver.
+  - rewrite -Hloc.
+    eapply locale_step_atomic; eauto.
+    by apply fill_step.
+  - destruct (decide (ρ ∈ live_roles M s2)).
+    + split; first by intros _; rewrite lookup_singleton /=; lia.
+      split; first set_solver.
+      split; first set_solver.
+      split; first (intros ρ' Hin; set_solver).
+      split; set_solver.
+    + repeat (split; set_solver).
+  - iModIntro; iExists δ2, ℓ.
+    replace (fr ∖ (live_roles M s2 ∖ live_roles M s1))
+      with fr; [iFrame|set_solver].
+    rewrite big_sepL_nil.
+    iSplit.
+    { iPureIntro. simpl in *. split =>//. }
+    destruct (decide (ρ ∈ live_roles M s2)).
+    + rewrite has_fuel_fuels.
+      iDestruct ("Hwp" with "Hst Hmod Hfuel") as "Hwp". by iFrame.
+    + iDestruct "Hfuel" as "[Hfuel _]". rewrite dom_empty_L //.
+      iDestruct ("Hwp" with "Hst Hmod Hfuel") as "Hwp". by iFrame.
+Qed.
+
+Lemma wp_fuel_dealloc s tid E e fs ρ δ Φ :
+  ρ ∉ live_roles _ δ →
+  frag_model_is δ -∗
+  has_fuels tid fs -∗
+  (frag_model_is δ -∗ has_fuels tid (delete ρ fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
+  WP e @ s; tid; E {{ Φ }}.
+Proof.
+  iIntros (Hnin) "HM Hfuels Hwp".
+  (* TODO: add typeclass to allow iMod'ing pre_step mods under WP's *)
+  iApply pre_step_wp.
+  iMod (has_fuels_delete with "HM Hfuels") as "[HM Hfuels]"; [done|].
+  iIntros "!>". by iApply ("Hwp" with "HM Hfuels").
+Qed.
+
+Lemma wp_fuel_step_no_val s tid E e fs Φ :
   TCEq (to_val e) None →
   fs ≠ ∅ →
   sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
@@ -1123,12 +1201,50 @@ Proof.
   iDestruct ("Hwp" with "Hfuel") as "Hwp". iFrame. done.
 Qed.
 
+Lemma wp_fuel_step s tid E e fs Φ :
+  fs ≠ ∅ →
+  sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
+  has_fuels_S tid fs -∗
+  WP e @ s; tid; E {{ Φ }}.
+Proof.
+  iIntros (?) "Hwp HfuelS".
+  rewrite wp_unfold /wp_pre /sswp /=.
+  destruct (to_val e).
+  { (* This should be possible without fupd_pre_step? Probably import stuff. *)
+    iMod (has_fuels_decr with "HfuelS") as "Hfuel".
+    iDestruct ("Hwp" with "Hfuel") as "Hwp".
+    iDestruct (wp_value_inv with "Hwp") as "Hwp".
+    iApply fupd_pre_step. iMod "Hwp". by iIntros "!>!>". }
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)".
+  rewrite Hends.
+  iMod ("Hwp" with "Hsi") as (Hred) "Hwp".
+  iModIntro. iSplit; [done|].
+  iIntros (e2 σ2 efs Hstep).
+  iMod ("Hwp" with "[//]") as "Hwp".
+  iIntros "!>!>". iMod "Hwp". iIntros "!>".
+  iApply step_fupdN_intro; [done|]. iIntros "!>".
+  iMod "Hwp".
+  iMod (update_no_step_enough_fuel extr atr ∅ with "HfuelS [Hmi]") as (δ2 ℓ) "([%Hlabels %Hvse] & Hfuel & Hmod)" =>//.
+  { by intros ?%dom_empty_inv_L. }
+  { set_solver. }
+  { rewrite Hends -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
+  { by rewrite Hends. }
+  iIntros "!>".
+  iDestruct "Hwp" as "[Hsi [Hwp ->]]".
+  iExists _, _. iFrame. iSplit; [done|].
+  rewrite map_filter_id //; [|intros ???%elem_of_dom_2; set_solver].
+  iDestruct ("Hwp" with "Hfuel") as "Hwp". iSplit; [|done].
+  iApply (wp_wand with "Hwp").
+  iIntros (v) "HΦ'". iFrame.
+Qed.
+
 Lemma sswp_wand s e E (Φ Ψ : expr → iProp Σ) :
   (∀ e, Φ e -∗ Ψ e) -∗ sswp s E e Φ -∗ sswp s E e Ψ.
 Proof.
   iIntros "HΦΨ HΦ".
   rewrite /sswp.
-  destruct (to_val e); [by iApply "HΦΨ"|].
+  destruct (to_val e).
+  { iMod "HΦ". by iApply "HΦΨ". }
   iIntros (?) "H".
   iMod ("HΦ" with "H") as "[%Hs HΦ]".
   iModIntro. iSplit; [done|].
@@ -1147,7 +1263,7 @@ Lemma wp_store_nostep_alt s tid E l v' v fs:
     {{ λ w, ⌜w = LitV LitUnit⌝ ∗ l ↦ v ∗ has_fuels tid fs}}.
 Proof.
   iIntros (?) ">Hl Hf".
-  iApply (wp_nostep with "[Hl]"); [done| |].
+  iApply (wp_fuel_step with "[Hl]"); [done| |].
   { iApply sswp_wand; [|by iApply wp_store].
     iIntros (e) "[-> Hl] Hf". iApply wp_value. by iFrame. }
   iFrame.
