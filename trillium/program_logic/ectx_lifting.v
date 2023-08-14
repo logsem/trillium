@@ -25,10 +25,10 @@ Lemma wp_lift_head_step_fupd {s E Φ} e1 ζ:
     ⌜locale_of tp1 (ectx_fill K e1) = ζ⌝ -∗
     state_interp extr atr ={E,∅}=∗
     ⌜head_reducible e1 σ1⌝ ∗
-    ∀ e2 σ2 efs, ⌜head_step e1 σ1 e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
+    ∀ α e2 σ2 efs, ⌜head_step e1 σ1 α e2 σ2 efs⌝ ={∅}=∗ ▷ |={∅,E}=>
       ∃ δ2 ℓ,
         state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl (ζ,α)) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       WP e2 @ s; ζ; E {{ Φ }} ∗
       [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
@@ -40,7 +40,7 @@ Proof.
   iMod ("H" with "[//] [//] [//] Hsi") as "[% H]".
   iModIntro.
   iSplit; first by destruct s; eauto.
-  iIntros (e2 σ2 efs ?).
+  iIntros (α e2 σ2 efs ?).
   iApply "H"; eauto.
 Qed.
 
@@ -51,10 +51,10 @@ Lemma wp_lift_head_step {s E Φ} e1 ζ:
     ⌜trace_ends_in extr (tp1 ++ fill K e1 :: tp2, σ1)⌝ →
     state_interp extr atr ={E,∅}=∗
     ⌜head_reducible e1 σ1⌝ ∗
-    ▷ ∀ e2 σ2 efs, ⌜head_step e1 σ1 e2 σ2 efs⌝ ={∅,E}=∗
+    ▷ ∀ α e2 σ2 efs, ⌜head_step e1 σ1 α e2 σ2 efs⌝ ={∅,E}=∗
       ∃ δ2 ℓ, 
         state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl (ζ,α)) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       WP e2 @ s; ζ; E {{ Φ }} ∗
       [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
@@ -63,7 +63,7 @@ Lemma wp_lift_head_step {s E Φ} e1 ζ:
 Proof.
   iIntros (?) "H". iApply wp_lift_head_step_fupd; [done|]. iIntros (?????????) "?".
   iMod ("H" with "[//] [//] [$]") as "[$ H]".
-  iIntros "!>" (e2 σ2 efs ?) "!> !>".
+  iIntros "!>" (α e2 σ2 efs ?) "!> !>".
   iApply "H"; done.
 Qed.
 
@@ -99,10 +99,10 @@ Lemma wp_lift_atomic_head_step_fupd {s E1 E2 Φ} e1 ζ:
     ⌜locale_of tp1 e1 = ζ⌝ →
     state_interp extr atr ={E1}=∗
     ⌜head_reducible e1 σ1⌝ ∗
-    ∀ e2 σ2 efs, ⌜head_step e1 σ1 e2 σ2 efs⌝ ={E1}[E2]▷=∗
+    ∀ α e2 σ2 efs, ⌜head_step e1 σ1 α e2 σ2 efs⌝ ={E1}[E2]▷=∗
       ∃ δ2 ℓ,
         state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl (ζ,α)) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       from_option Φ False (to_val e2) ∗
       [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
@@ -113,7 +113,7 @@ Proof.
   iIntros (?????????) "Hsi". iMod ("H" with "[//] [//] [//] Hsi") as "[% H]".
   iModIntro.
   iSplit; first by destruct s; auto.
-  iIntros (e2 σ2 efs Hstep).
+  iIntros (α e2 σ2 efs Hstep).
   iApply "H"; eauto.
 Qed.
 
@@ -125,10 +125,10 @@ Lemma wp_lift_atomic_head_step {s E Φ} e1 ζ:
     ⌜locale_of tp1 e1 = ζ⌝ →
     state_interp extr atr ={E}=∗
     ⌜head_reducible e1 σ1⌝ ∗
-    ▷ ∀ e2 σ2 efs, ⌜head_step e1 σ1 e2 σ2 efs⌝ ={E}=∗
+    ▷ ∀ α e2 σ2 efs, ⌜head_step e1 σ1 α e2 σ2 efs⌝ ={E}=∗
       ∃ δ2 ℓ, 
         state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl (ζ,α)) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       from_option Φ False (to_val e2) ∗
       [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
@@ -138,7 +138,7 @@ Proof.
   iIntros (?) "H". iApply wp_lift_atomic_step; eauto.
   iIntros (?????????) "Hsi". iMod ("H" with "[//] [//] [//] Hsi") as "[% H]".
   iModIntro.
-  iSplit; first by destruct s; auto. iNext. iIntros (e2 σ2 efs Hstep).
+  iSplit; first by destruct s; auto. iNext. iIntros (α e2 σ2 efs Hstep).
   iApply "H"; eauto.
 Qed.
 
@@ -150,11 +150,11 @@ Lemma wp_lift_atomic_head_step_no_fork_fupd {s E1 E2 Φ} e1 ζ:
     ⌜locale_of tp1 e1 = ζ⌝ →
     state_interp extr atr ={E1}=∗
     ⌜head_reducible e1 σ1⌝ ∗
-    ∀ e2 σ2 efs, ⌜head_step e1 σ1 e2 σ2 efs⌝ ={E1}[E2]▷=∗
+    ∀ α e2 σ2 efs, ⌜head_step e1 σ1 α e2 σ2 efs⌝ ={E1}[E2]▷=∗
       ∃ δ2 ℓ,
         ⌜efs = [] ⌝∗
         state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl (ζ,α)) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       from_option Φ False (to_val e2))
   ⊢ WP e1 @ s; ζ; E1 {{ Φ }}.
@@ -163,8 +163,8 @@ Proof.
   iIntros (?????????) "Hsi".
   iMod ("H" with "[//] [//] [//] Hsi") as "[$ H]".
   iModIntro.
-  iIntros (v2 σ2 efs Hstep).
-  iMod ("H" $! v2 σ2 efs with "[# //]") as "H".
+  iIntros (α v2 σ2 efs Hstep).
+  iMod ("H" $! α v2 σ2 efs with "[# //]") as "H".
   iIntros "!> !>". iMod "H" as (st' ℓ) "(-> & ? & ?) /=".
   iModIntro; iExists _, _.
   iFrame.
@@ -178,10 +178,10 @@ Lemma wp_lift_atomic_head_step_no_fork {s E Φ} e1 ζ:
     ⌜locale_of tp1 e1 = ζ⌝ →
     state_interp extr atr ={E}=∗
     ⌜head_reducible e1 σ1⌝ ∗
-    ▷ ∀ e2 σ2 efs, ⌜head_step e1 σ1 e2 σ2 efs⌝ ={E}=∗
+    ▷ ∀ α e2 σ2 efs, ⌜head_step e1 σ1 α e2 σ2 efs⌝ ={E}=∗
        ∃ δ2 ℓ, 
          ⌜efs = []⌝ ∗ state_interp
-          (trace_extend extr (Some ζ) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
+          (trace_extend extr (inl (ζ,α)) (tp1 ++ fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       from_option Φ False (to_val e2))
   ⊢ WP e1 @ s; ζ; E {{ Φ }}.
@@ -190,8 +190,8 @@ Proof.
   iIntros (?????????) "Hsi".
   iMod ("H" with "[//] [//] [//] Hsi") as "[$ H]".
   iModIntro.
-  iNext; iIntros (v2 σ2 efs Hstep).
-  iMod ("H" $! v2 σ2 efs with "[//]") as (st' ℓ) "(-> & ? & ?) /=".
+  iNext; iIntros (α v2 σ2 efs Hstep).
+  iMod ("H" $! α v2 σ2 efs with "[//]") as (st' ℓ) "(-> & ? & ?) /=".
   iModIntro; iExists _, _.
   iFrame.
 Qed.
@@ -200,8 +200,8 @@ Lemma wp_lift_pure_det_head_step_no_fork
       `{!AllowsPureStep M Σ}  {s E E' Φ} e1 e2 ζ:
   to_val e1 = None →
   (∀ σ1, head_reducible e1 σ1) →
-  (∀ σ1 e2' σ2 efs',
-    head_step e1 σ1 e2' σ2 efs' → σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
+  (∀ α σ1 e2' σ2 efs',
+    head_step e1 σ1 α e2' σ2 efs' → σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
   (|={E}[E']▷=> WP e2 @ s; ζ; E {{ Φ }}) ⊢ WP e1 @ s; ζ; E {{ Φ }}.
 Proof using Hinh.
   intros. rewrite -(wp_lift_pure_det_step_no_fork e1 e2); eauto.
@@ -212,8 +212,8 @@ Lemma wp_lift_pure_det_head_step_no_fork'
       `{!AllowsPureStep M Σ} {s E Φ} e1 e2 ζ:
   to_val e1 = None →
   (∀ σ1, head_reducible e1 σ1) →
-  (∀ σ1 e2' σ2 efs',
-    head_step e1 σ1 e2' σ2 efs' → σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
+  (∀ α σ1 e2' σ2 efs',
+    head_step e1 σ1 α e2' σ2 efs' → σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
   ▷ WP e2 @ s; ζ; E {{ Φ }} ⊢ WP e1 @ s; ζ; E {{ Φ }}.
 Proof using Hinh.
   intros. rewrite -[(WP e1 @ s; _; _ {{ _ }})%I]wp_lift_pure_det_head_step_no_fork //.

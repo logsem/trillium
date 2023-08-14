@@ -185,11 +185,11 @@ Definition wp_pre `{!irisG Λ AS Σ} (s : stuckness)
       ⌜trace_ends_in extr (tp1 ++ ectx_fill K e1 :: tp2, σ1)⌝ -∗
       state_interp extr atr ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
-       ∀ e2 σ2 efs,
-         ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
+       ∀ α e2 σ2 efs,
+         ⌜prim_step e1 σ1 α e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
          ∃ δ2 ℓ,
            state_interp
-             (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
+             (trace_extend extr (inl (ζ,α)) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
              (trace_extend atr ℓ δ2) ∗
            wp E ζ e2 Φ ∗
            [∗ list] i ↦ ef ∈ efs,
@@ -200,7 +200,7 @@ Definition wp_pre `{!irisG Λ AS Σ} (s : stuckness)
 #[local] Instance wp_pre_contractive `{!irisG Λ AS Σ} s : Contractive (wp_pre s).
 Proof.
   rewrite /wp_pre=> n wp wp' Hwp E e1 ζ Φ /=.
-  do 26 (f_contractive || f_equiv).
+  do 28 (f_contractive || f_equiv).
   induction trace_length as [|k IH]; simpl.
   - repeat (f_contractive || f_equiv); apply Hwp.
   - by rewrite -IH.
@@ -249,7 +249,7 @@ Qed.
   Proper (pointwise_relation _ (dist_later n) ==> dist n) (wp (PROP:=iProp Σ) s E ζ e).
 Proof.
   intros He Φ Ψ HΦ. rewrite !wp_unfold /wp_pre He /=.
-  do 27 (f_contractive || f_equiv).
+  do 29 (f_contractive || f_equiv).
   induction trace_length as [|k IHk]; simpl; [|by rewrite IHk].
   by repeat f_equiv.
 Qed.
@@ -275,7 +275,7 @@ Proof.
   iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
   iMod ("H" with "[//] [//] [//] [$]") as "[% H]".
   iModIntro. iSplit; [by iPureIntro; destruct s1, s2|].
-  iIntros (e2 σ2 efs Hstep). simpl.
+  iIntros (α e2 σ2 efs Hstep). simpl.
   iMod ("H" with "[//]") as "H". iIntros "!> !>".
   iMod "H" as "H". iIntros "!>".
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
@@ -359,8 +359,8 @@ Proof.
   iMod "Hmsk".
   iModIntro.
   iSplitL "Hnstuck"; first done.
-  iIntros (e2 σ2 efs Hstep).
-  destruct (stutteringatomic _ _ _ _ Hstep) as [(?&?&?)|Hs]; simplify_eq/=.
+  iIntros (α e2 σ2 efs Hstep).
+  destruct (stutteringatomic _ _ _ _ _ Hstep) as [(?&?&?)|Hs]; simplify_eq/=.
   - iModIntro; iNext.
     iMod (allows_stuttering with "Hsi") as "Hsi"; [done|done|done| |].
     { econstructor 1; [done| |by apply fill_step]; by rewrite app_nil_r. }
@@ -389,7 +389,7 @@ Proof.
           apply fill_step; done. }
         { by erewrite <-locale_fill_step. }
         { done. }
-        iDestruct "H" as %(? & ? & ? & ?%Hs); done.
+        iDestruct "H" as %(? & ? & ? & ? & ?%Hs); done.
     + destruct Hs as [v <-%of_to_val].
       rewrite !wp_unfold /wp_pre to_of_val.
       iMod (pre_step_elim with "Hσ H") as "[Hσ >H]".
@@ -411,13 +411,13 @@ Lemma wp_stutteringatomic_take_step
      state_interp extr atr ={E2}=∗
      ∃ Q R,
        state_interp extr atr ∗
-       (∀ c2 δ2 ℓ,
+       (∀ α c2 δ2 ℓ,
            ∃ δ',
            state_interp
-             (trace_extend extr (Some ζ') c2)
+             (trace_extend extr (inl (ζ', α)) c2)
              (trace_extend atr ℓ δ2) ∗ Q ={E2}=∗
            state_interp
-             (trace_extend extr (Some ζ') c2)
+             (trace_extend extr (inl (ζ',α)) c2)
              (trace_extend atr stuttering_label δ') ∗ R) ∗
        (state_interp extr atr ={E2}=∗ state_interp extr atr ∗ Q) ∗
    WP e @ s; ζ; E2 {{ v, R ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; ζ; E1 {{ Φ }}.
@@ -444,7 +444,7 @@ Proof.
     [set_solver|done|].
   iModIntro.
   iSplit; first done.
-  iIntros (e2 σ2 efs Hstep).
+  iIntros (α e2 σ2 efs Hstep).
   pose proof Hstep as  [(?&?&?)|HSA]%stutteringatomic; simplify_eq/=.
   - iModIntro; iNext.
     iMod (allows_stuttering with "Hsi") as "Hsi"; [done|done|done| |].
@@ -466,7 +466,7 @@ Proof.
     iApply (step_fupdN_wand with "[H]"); first by iApply "H".
     iIntros "H".
     iMod "H" as (δ3 ℓ) "(Hsi & H & Hefs)".
-    iDestruct ("Hupdate" $! (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2) δ3 ℓ)
+    iDestruct ("Hupdate" $! α (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2) δ3 ℓ)
       as (δ') "Hupdate".
     iMod ("Hupdate" with "[$HQ $Hsi]") as "(Hsi & HR)".
     destruct s.
@@ -505,8 +505,8 @@ Proof.
   iMod ("H" with "[//] [//] [//] Hsi") as "[% H]".
   iModIntro.
   iSplit; first by iPureIntro.
-  iIntros (e2 σ2 efs Hstep).
-  pose proof (atomic _ _ _ _ Hstep) as Hs; simplify_eq/=.
+  iIntros (α e2 σ2 efs Hstep).
+  pose proof (atomic _ _ _ _ _ Hstep) as Hs; simplify_eq/=.
   iMod ("H" with "[//]") as "H". iIntros "!>!>".
   iMod "H" as "H". iIntros "!>".
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
@@ -522,7 +522,7 @@ Proof.
         econstructor; [done|done|].
         apply fill_step; done. }
       { by erewrite <-locale_fill_step. }
-      iDestruct "H" as %(? & ? & ? & ?%Hs); done.
+      iDestruct "H" as %(? & ? & ? & ? & ?%Hs); done.
   - destruct Hs as [v <-%of_to_val].
     rewrite !wp_unfold /wp_pre to_of_val.
     iMod (pre_step_elim with "Hσ H") as "[Hσ >H]"; iModIntro.
@@ -542,13 +542,13 @@ Lemma wp_atomic_take_step
      state_interp extr atr ={E2}=∗
      ∃ Q R,
        state_interp extr atr ∗
-       (∀ c2 δ2 ℓ,
+       (∀ α c2 δ2 ℓ,
            ∃ δ' ℓ',
            state_interp
-             (trace_extend extr (Some ζ') c2)
+             (trace_extend extr (inl (ζ',α)) c2)
              (trace_extend atr ℓ δ2) ∗ Q ={E2}=∗
            state_interp
-             (trace_extend extr (Some ζ') c2)
+             (trace_extend extr (inl (ζ',α)) c2)
              (trace_extend atr ℓ' δ') ∗ R) ∗
        (state_interp extr atr ={E2}=∗ state_interp extr atr ∗ Q) ∗
    WP e @ s; ζ; E2 {{ v, R ={E2,E1}=∗ Φ v }}) ⊢ WP e @ s; ζ; E1 {{ Φ }}.
@@ -563,14 +563,14 @@ Proof.
   iMod ("H" with "[//] [//] [//] Hsi") as "[% H]".
   iModIntro.
   iSplit; first by iPureIntro.
-  iIntros (e2 σ2 efs Hstep).
-  pose proof (atomic _ _ _ _ Hstep) as Hs; simplify_eq/=.
+  iIntros (α e2 σ2 efs Hstep).
+  pose proof (atomic _ _ _ _ _ Hstep) as Hs; simplify_eq/=.
   iMod ("H" with "[//]") as "H". iIntros "!>!>".
   iMod "H" as "H". iIntros "!>".
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
   iIntros "H".
   iMod "H" as (δ3 ℓ) "(Hsi & H & Hefs)".
-  iDestruct ("Hupdate" $! (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2) δ3 ℓ)
+  iDestruct ("Hupdate" $! α (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2) δ3 ℓ)
       as (δ' ℓ') "Hupdate".
   iMod ("Hupdate" with "[$HQ $Hsi]") as "(Hsi & HR)".
   destruct s.
@@ -621,7 +621,7 @@ Proof.
   { iDestruct "H" as "[Hn _]". iMod ("Hn" with "Hσ") as %?. lia. }
   iDestruct "H" as "[_ [>HP Hwp]]".
   iMod ("Hwp" with "[//] [//] [//] [$]") as "[$ H]". iMod "HP".
-  iIntros "!>" (e2 σ2 efs Hstep). iMod ("H" $! e2 σ2 efs with "[% //]") as "H".
+  iIntros "!>" (α e2 σ2 efs Hstep). iMod ("H" $! α e2 σ2 efs with "[% //]") as "H".
   iIntros "!>!>". iMod "H". iMod "HP". iModIntro.
   revert n Hn. generalize (trace_length extr)=>n0 n Hn.
   iInduction n as [|n] "IH" forall (n0 Hn).
@@ -725,8 +725,8 @@ Proof.
   { rewrite ectx_comp_comp; done. }
   iModIntro; iSplit.
   { iPureIntro. destruct s; first apply reducible_fill; done. }
-  iIntros (e2 σ2 efs Hstep).
-  destruct (fill_step_inv K e σ1 e2 σ2 efs) as (e2'&->&?);
+  iIntros (α e2 σ2 efs Hstep).
+  destruct (fill_step_inv K e σ1 α e2 σ2 efs) as (e2'&->&?);
     [done|done|].
   iMod ("H" with "[//]") as "H". iIntros "!>!>".
   iMod "H" as "H". iIntros "!>".

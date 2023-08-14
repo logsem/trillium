@@ -41,12 +41,12 @@ Notation posts_of t Φs :=
           (zip_with (λ x y, (x, y)) t Φs)), vΦ.2 vΦ.1)%I.
 
 Definition config_wp `{!irisG Λ M Σ} : iProp Σ :=
-  □ ∀ ex atr c1 σ2 ,
+  □ ∀ ex atr c1 lbl σ2 ,
       ⌜valid_exec ex⌝ →
       ⌜trace_ends_in ex c1⌝ →
-      ⌜config_step c1.2 σ2⌝ →
+      ⌜config_step c1.2 lbl σ2⌝ →
       state_interp ex atr ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex) |={∅,⊤}=>
-         ∃ δ2 ℓ, state_interp (trace_extend ex None (c1.1, σ2))
+         ∃ δ2 ℓ, state_interp (trace_extend ex (inr lbl) (c1.1, σ2))
                               (trace_extend atr ℓ δ2).
 
 #[global] Instance config_wp_persistent `{!irisG Λ M Σ} : Persistent config_wp.
@@ -221,7 +221,7 @@ Section locales_helpers.
     locale_step c oζ c' ->
     locales_equiv c.1 (take (length c.1) c'.1).
   Proof.
-    intros H. inversion H as [? ? e1 ? e2 ? efs t1 t2|]; simplify_eq; simpl.
+    intros H. inversion H as [? ? e1 ? ? e2 ? efs t1 t2|]; simplify_eq; simpl.
     - replace (t1 ++ e2 :: t2 ++ efs) with ((t1 ++ e2 :: t2) ++ efs); last by list_simplifier.
       replace (length (t1 ++ e1 :: t2)) with (length (t1 ++ e2 :: t2)); last first.
       { rewrite !app_length //=. }
@@ -399,11 +399,6 @@ Section locales_utils.
   Definition locales_of_list_from tp0 (tp: list $ expr Λ): list $ locale Λ :=
     (λ '(t, e), locale_of t e) <$> (prefixes_from tp0 tp).
   Notation locales_of_list tp := (locales_of_list_from [] tp).
-
-  Lemma locales_of_list_from_cons es' (e : expr Λ) es :
-    locales_of_list_from es' (e :: es) =
-    locale_of es' e :: locales_of_list_from (es' ++ [e]) es.
-  Proof. done. Qed.
 
   Lemma locales_of_list_equiv (tp0 tp0' tp1 tp2 : list $ expr Λ) :
     locales_equiv_from tp0 tp0' tp1 tp2 ↔
@@ -614,16 +609,16 @@ Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
 Section adequacy_helper_lemmas.
   Context `{!irisG Λ M Σ}.
 
-  Lemma wp_take_step s Φ ex atr tp1 e1 tp2 σ1 e2 σ2 efs ζ:
+  Lemma wp_take_step s Φ ex atr tp1 e1 tp2 α σ1 e2 σ2 efs ζ:
     valid_exec ex →
-    prim_step e1 σ1 e2 σ2 efs →
+    prim_step e1 σ1 α e2 σ2 efs →
     trace_ends_in ex (tp1 ++ e1 :: tp2, σ1) →
     locale_of tp1 e1 = ζ ->
     state_interp ex atr -∗
     WP e1 @ s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
                                              |={∅,⊤}=>
     ∃ δ' ℓ,
-      state_interp (trace_extend ex (Some ζ) (tp1 ++ e2 :: tp2 ++ efs, σ2))
+      state_interp (trace_extend ex (inl (ζ,α)) (tp1 ++ e2 :: tp2 ++ efs, σ2))
                    (trace_extend atr ℓ δ') ∗
       WP e2 @ s; ζ; ⊤ {{ v, Φ v } } ∗
       ([∗ list] i↦ef ∈ efs,
@@ -890,7 +885,7 @@ Section adequacy_helper_lemmas.
   Proof.
     iIntros (Hexvalid Hexe Hstep) "config_wp HSI Hc1".
     inversion Hstep as
-        [ρ1 ρ2 e1 σ1 e2 σ2 efs t1 t2 -> -> Hpstep | ρ1 ρ2 σ1 σ2 t -> -> Hcfgstep].
+        [ρ1 ρ2 e1 σ1 α e2 σ2 efs t1 t2 -> -> Hpstep | ρ1 ρ2 σ1 lbl σ2 t -> -> Hcfgstep].
     - rewrite /= !prefixes_from_app.
       iDestruct (big_sepL2_app_inv_l with "Hc1") as
           (Φs1 Φs2') "[-> [Ht1 Het2]]".
@@ -909,7 +904,7 @@ Section adequacy_helper_lemmas.
         iIntros "!#" (i e Hin) "Hwp". list_simplifier.
         erewrite locale_equiv; first by iFrame.
         apply locales_equiv_middle. erewrite locale_step_preserve =>//. }
-      assert (valid_exec (ex :tr[Some (locale_of t1 e1)]: (t1 ++ e2 :: t2 ++ efs, σ2))).
+      assert (valid_exec (ex :tr[inl (locale_of t1 e1,α)]: (t1 ++ e2 :: t2 ++ efs, σ2))).
       { econstructor; eauto. }
       iMod (wptp_not_stuck_same _ _ σ2 _ _ [] with "HSI Hefs") as "[HSI [Hefs %]]"; [done| | ].
       { list_simplifier. done. }
@@ -948,7 +943,7 @@ Section adequacy_helper_lemmas.
       iApply (step_fupdN_wand with "[Hcfg]"); first by iApply "Hcfg".
       iIntros "Hcfg".
       iMod "Hcfg" as (δ2 ℓ) "HSI".
-      assert (valid_exec (ex :tr[None]: ((t, σ1).1, σ2))).
+      assert (valid_exec (ex :tr[inr lbl]: ((t, σ1).1, σ2))).
       { econstructor; eauto. }
       iMod (wptp_not_stuck _ _ σ2 _ _ _ [] with "HSI Hc1") as "[HSI [Hc1 %]]";
         [apply locales_equiv_refl|done|by list_simplifier|].
@@ -1577,7 +1572,7 @@ Proof.
   destruct (decide (Forall (λ e, is_Some (to_val e)) t2)) as [|Ht2]; [by left|].
   apply (not_Forall_Exists _), Exists_exists in Ht2; destruct Ht2 as (e2&?&He2).
   destruct (adequate_not_stuck NotStuck es σ1 φs Had ex t2 σ2 e2)
-    as [?|(e3&σ3&efs&?)];
+    as [?|(α&e3&σ3&efs&?)];
     rewrite ?eq_None_not_Some; auto.
   { exfalso. eauto. }
   destruct (elem_of_list_split t2 e2) as (t2'&t2''&->); auto.

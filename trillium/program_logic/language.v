@@ -57,14 +57,17 @@ Notation prefixes l := (prefixes_from [] l).
 Section language_mixin.
   Context {expr val ectx state : Type}.
   Context {locale : Type}.
+  Context {action : Type}.
+  Context {config_label : Type}.
 
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
 
-  Context (prim_step : expr → state → expr → state → list expr → Prop).
-  Context (config_step : state → state → Prop).
+  Context (prim_step : expr → state → action → expr → state → list expr → Prop).
+  Context (config_step : state → config_label → state → Prop).
 
   Context (locale_of : list expr -> expr -> locale).
+  (* Context (config_enabled : config_label → state → Prop). *)
 
   (** Evaluation contexts: we need to include them in the definition of the
       language because they are used in the program logic for forming
@@ -79,15 +82,15 @@ Section language_mixin.
   Record LanguageMixin := {
     mixin_to_of_val v : to_val (of_val v) = Some v;
     mixin_of_to_val e v : to_val e = Some v → of_val v = e;
-    mixin_val_stuck e σ e' σ' efs : prim_step e σ e' σ' efs → to_val e = None;
+    mixin_val_stuck e σ α e' σ' efs : prim_step e σ α e' σ' efs → to_val e = None;
     mixin_is_eval_ctx K :
       (∀ e, to_val e = None → to_val (ectx_fill K e) = None) ∧
-      (∀ e1 σ1 e2 σ2 efs,
-        prim_step e1 σ1 e2 σ2 efs →
-        prim_step (ectx_fill K e1) σ1 (ectx_fill K e2) σ2 efs) ∧
-      (∀ e1' σ1 e2 σ2 efs,
-        to_val e1' = None → prim_step (ectx_fill K e1') σ1 e2 σ2 efs →
-        ∃ e2', e2 = ectx_fill K e2' ∧ prim_step e1' σ1 e2' σ2 efs);
+      (∀ e1 σ1 α e2 σ2 efs,
+        prim_step e1 σ1 α e2 σ2 efs →
+        prim_step (ectx_fill K e1) σ1 α (ectx_fill K e2) σ2 efs) ∧
+      (∀ e1' σ1 α e2 σ2 efs,
+        to_val e1' = None → prim_step (ectx_fill K e1') σ1 α e2 σ2 efs →
+        ∃ e2', e2 = ectx_fill K e2' ∧ prim_step e1' σ1 α e2' σ2 efs);
     mixin_ectx_fill_emp e : ectx_fill ectx_emp e = e;
     mixin_ectx_comp_comp K K' e :
       ectx_fill (ectx_comp K K') e = ectx_fill K (ectx_fill K' e);
@@ -96,15 +99,18 @@ Section language_mixin.
       to_val e = None → to_val e' = None →
       ectx_fill K e = ectx_fill K' e' →
       (∃ K'', K' = ectx_comp K K'') ∨ (∃ K'', K = ectx_comp K' K'');
-    mixin_locale_step e1 e2 t1 σ1 σ2 efs: prim_step e1 σ1 e2 σ2 efs ->
-                                         locale_of t1 e1 = locale_of t1 e2;
+    mixin_locale_step e1 α e2 t1 σ1 σ2 efs: prim_step e1 σ1 α e2 σ2 efs ->
+                                          locale_of t1 e1 = locale_of t1 e2;
     mixin_locale_fill e K t1: locale_of t1 (ectx_fill K e) = locale_of t1 e;
     mixin_locale_equiv t t' e: locales_equiv t t' -> locale_of t e = locale_of t' e;
     mixin_locale_injective tp0 e0 tp1 tp e:
-      (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e;
+      (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e;    
+  (* Might need something like this to prove fair derivation for generic
+     programs and models *)
+  (*   mixin_config_enabled σ lbl : *)
+  (*     (∃ σ', config_step σ lbl σ') ↔ config_enabled lbl σ; *)
   }.
 End language_mixin.
-
 
 Structure language := Language {
   expr : Type;
@@ -112,16 +118,19 @@ Structure language := Language {
   ectx : Type;
   state : Type;
   locale : Type;
+  action : Type;
+  config_label : Type;
   of_val : val → expr;
   to_val : expr → option val;
-  prim_step : expr → state → expr → state → list expr → Prop;
-  config_step : state → state → Prop;
-  locale_of : list expr -> expr -> locale;
+  prim_step : expr → state → action → expr → state → list expr → Prop;
+  config_step : state → config_label → state → Prop;
+  locale_of : list expr → expr → locale;
+  (* config_enabled : config_label → state → Prop; *)
   ectx_comp : ectx → ectx → ectx;
   ectx_emp : ectx;
   ectx_fill : ectx → expr → expr;
   language_mixin :
-    LanguageMixin of_val to_val prim_step locale_of ectx_comp ectx_emp ectx_fill
+    LanguageMixin of_val to_val prim_step (* config_step*) locale_of (* config_enabled *) ectx_comp ectx_emp ectx_fill
 }.
 
 Declare Scope expr_scope.
@@ -132,15 +141,16 @@ Declare Scope val_scope.
 Delimit Scope val_scope with V.
 Bind Scope val_scope with val.
 
-Arguments Language {_ _ _ _ _ _ _} _ {_ _ _} _.
+Arguments Language {_ _ _ _ _ _ _ _ _} prim_step config_step {_ _ (* _ *)} _ _ _.
 Arguments of_val {_} _.
 Arguments to_val {_} _.
 Arguments prim_step {_} _ _ _ _ _.
-Arguments config_step {_} _ _.
+Arguments config_step {_} _ _ _.
 Arguments ectx_comp {_} _ _.
 Arguments ectx_emp {_}.
 Arguments ectx_fill {_} _ _.
 Arguments locale_of {_} _ _.
+(* Arguments config_enabled {_} _ _. *)
 
 Notation locales_equiv t0 t0' :=
   (Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0')).
@@ -156,12 +166,12 @@ Inductive atomicity := StronglyAtomic | WeaklyAtomic.
 Record is_an_eval_ctx {Λ : language} (K : expr Λ → expr Λ) := {
   is_an_eval_ctx_fill_not_val e :
     to_val e = None → to_val (K e) = None;
-  is_an_eval_ctx_fill_step e1 σ1 e2 σ2 efs :
-    prim_step e1 σ1 e2 σ2 efs →
-    prim_step (K e1) σ1 (K e2) σ2 efs;
-  is_an_eval_ctx_fill_step_inv e1' σ1 e2 σ2 efs :
-    to_val e1' = None → prim_step (K e1') σ1 e2 σ2 efs →
-    ∃ e2', e2 = K e2' ∧ prim_step e1' σ1 e2' σ2 efs
+  is_an_eval_ctx_fill_step e1 σ1 α e2 σ2 efs :
+    prim_step e1 σ1 α e2 σ2 efs →
+    prim_step (K e1) σ1 α (K e2) σ2 efs;
+  is_an_eval_ctx_fill_step_inv e1' σ1 α e2 σ2 efs :
+    to_val e1' = None → prim_step (K e1') σ1 α e2 σ2 efs →
+    ∃ e2', e2 = K e2' ∧ prim_step e1' σ1 α e2' σ2 efs
 }.
 
 Global Arguments is_an_eval_ctx_fill_not_val {_ _} _.
@@ -178,7 +188,7 @@ Section language.
   Proof. apply language_mixin. Qed.
   Lemma of_to_val e v : to_val e = Some v → of_val v = e.
   Proof. apply language_mixin. Qed.
-  Lemma val_stuck e σ e' σ' efs : prim_step e σ e' σ' efs → to_val e = None.
+  Lemma val_stuck e σ α e' σ' efs : prim_step e σ α e' σ' efs → to_val e = None.
   Proof. apply language_mixin. Qed.
   Lemma is_eval_ctx K : is_an_eval_ctx (ectx_fill K).
   Proof. split; apply language_mixin. Qed.
@@ -198,13 +208,13 @@ Section language.
   Lemma fill_not_val K e :
     to_val e = None → to_val (ectx_fill K e) = None.
   Proof. apply is_an_eval_ctx_fill_not_val, is_eval_ctx. Qed.
-  Lemma fill_step K e1 σ1 e2 σ2 efs :
-    prim_step e1 σ1 e2 σ2 efs →
-    prim_step (ectx_fill K e1) σ1 (ectx_fill K e2) σ2 efs.
+  Lemma fill_step K e1 σ1 α e2 σ2 efs :
+    prim_step e1 σ1 α e2 σ2 efs →
+    prim_step (ectx_fill K e1) σ1 α (ectx_fill K e2) σ2 efs.
   Proof. apply is_an_eval_ctx_fill_step, is_eval_ctx. Qed.
-  Lemma fill_step_inv K e1' σ1 e2 σ2 efs :
-    to_val e1' = None → prim_step (ectx_fill K e1') σ1 e2 σ2 efs →
-    ∃ e2', e2 = ectx_fill K e2' ∧ prim_step e1' σ1 e2' σ2 efs.
+  Lemma fill_step_inv K e1' σ1 α e2 σ2 efs :
+    to_val e1' = None → prim_step (ectx_fill K e1') σ1 α e2 σ2 efs →
+    ∃ e2', e2 = ectx_fill K e2' ∧ prim_step e1' σ1 α e2' σ2 efs.
   Proof. apply is_an_eval_ctx_fill_step_inv, is_eval_ctx. Qed.
 
 
@@ -213,14 +223,14 @@ Section language.
   Proof.
     erewrite !mixin_locale_fill; [done | apply language_mixin].
   Qed.
-  Lemma locale_step_preserve e1 e2 σ1 σ2 t1 efs:
-    prim_step e1 σ1 e2 σ2 efs ->
+  Lemma locale_step_preserve e1 e2 α σ1 σ2 t1 efs:
+    prim_step e1 σ1 α e2 σ2 efs ->
     locale_of t1 e1 = locale_of t1 e2.
   Proof.
     intros ?. eapply mixin_locale_step; [apply language_mixin|done].
   Qed.
-  Lemma locale_fill_step e1 e2 σ1 σ2 t1 efs K:
-    prim_step e1 σ1 e2 σ2 efs ->
+  Lemma locale_fill_step e1 e2 α σ1 σ2 t1 efs K:
+    prim_step e1 σ1 α e2 σ2 efs ->
     locale_of t1 (ectx_fill K e1) = locale_of t1 (ectx_fill K e2).
   Proof.
     erewrite !locale_fill. intros ?. by eapply locale_step_preserve.
@@ -232,9 +242,9 @@ Section language.
   Proof. eapply language_mixin. Qed.  
 
   Definition reducible (e : expr Λ) (σ : state Λ) :=
-    ∃ e' σ' efs, prim_step e σ e' σ' efs.
+    ∃ α e' σ' efs, prim_step e σ α e' σ' efs.
   Definition irreducible (e : expr Λ) (σ : state Λ) :=
-    ∀ e' σ' efs, ¬prim_step e σ e' σ' efs.
+    ∀ α e' σ' efs, ¬prim_step e σ α e' σ' efs.
   Definition stuck (e : expr Λ) (σ : state Λ) :=
     to_val e = None ∧ irreducible e σ.
   Definition not_stuck (e : expr Λ) (σ : state Λ) :=
@@ -252,13 +262,13 @@ Section language.
      in case `e` reduces to a stuck non-value, there is no proof that the
      invariants have been established again. *)
   Class Atomic (a : atomicity) (e : expr Λ) : Prop :=
-    atomic σ e' σ' efs :
-      prim_step e σ e' σ' efs →
+    atomic σ α e' σ' efs :
+      prim_step e σ α e' σ' efs →
       if a is WeaklyAtomic then irreducible e' σ' else is_Some (to_val e').
 
   Class StutteringAtomic (a : atomicity) (e : expr Λ) : Prop :=
-    stutteringatomic σ e' σ' efs :
-      prim_step e σ e' σ' efs →
+    stutteringatomic σ α e' σ' efs :
+      prim_step e σ α e' σ' efs →
       (e' = e ∧ σ' = σ ∧ efs = [])
       ∨
       if a is WeaklyAtomic then irreducible e' σ' else is_Some (to_val e').
@@ -271,29 +281,31 @@ Section language.
   Qed.
 
   Inductive step (ρ1 : cfg Λ) (ρ2 : cfg Λ) : Prop :=
-    | step_atomic e1 σ1 e2 σ2 efs t1 t2 :
+    | step_atomic e1 σ1 α e2 σ2 efs t1 t2 :
        ρ1 = (t1 ++ e1 :: t2, σ1) →
        ρ2 = (t1 ++ e2 :: t2 ++ efs, σ2) →
-       prim_step e1 σ1 e2 σ2 efs →
+       prim_step e1 σ1 α e2 σ2 efs →
        step ρ1 ρ2
-    | step_state σ1 σ2 t :
+    | step_state σ1 lbl σ2 t :
        ρ1 = (t, σ1) →
        ρ2 = (t, σ2) →
-       config_step σ1 σ2 →
+       config_step σ1 lbl σ2 →
        step ρ1 ρ2.
   Hint Constructors step : core.
 
-  Inductive locale_step: cfg Λ -> option(locale Λ) -> cfg Λ -> Prop :=
-  | locale_step_atomic ρ1 ρ2 e1 σ1 e2 σ2 efs t1 t2 :
+  Definition locale_label Λ : Type := locale Λ * action Λ.
+
+  Inductive locale_step: cfg Λ -> (locale_label Λ + config_label Λ) -> cfg Λ -> Prop :=
+  | locale_step_atomic ρ1 ρ2 e1 σ1 α e2 σ2 efs t1 t2 :
       ρ1 = (t1 ++ e1 :: t2, σ1) →
       ρ2 = (t1 ++ e2 :: t2 ++ efs, σ2) →
-      prim_step e1 σ1 e2 σ2 efs →
-      locale_step ρ1 (Some $ locale_of t1 e1) ρ2
-  | locale_step_state ρ1 ρ2 σ1 σ2 t :
+      prim_step e1 σ1 α e2 σ2 efs →
+      locale_step ρ1 (inl $ (locale_of t1 e1, α)) ρ2
+  | locale_step_state ρ1 ρ2 σ1 lbl σ2 t :
       ρ1 = (t, σ1) →
       ρ2 = (t, σ2) →
-      config_step σ1 σ2 →
-      locale_step ρ1 None ρ2.
+      config_step σ1 lbl σ2 →
+      locale_step ρ1 (inr $ lbl) ρ2.
   Hint Constructors locale_step : core.
 
   Inductive nsteps : nat → cfg Λ → cfg Λ → Prop :=
@@ -318,9 +330,9 @@ Section language.
   Lemma not_reducible e σ : ¬reducible e σ ↔ irreducible e σ.
   Proof. unfold reducible, irreducible. naive_solver. Qed.
   Lemma reducible_not_val e σ : reducible e σ → to_val e = None.
-  Proof. intros (?&?&?&?); eauto using val_stuck. Qed.
+  Proof. intros (?&?&?&?&?); eauto using val_stuck. Qed.
   Lemma val_irreducible e σ : is_Some (to_val e) → irreducible e σ.
-  Proof. intros [??] ??? ?%val_stuck. by destruct (to_val e). Qed.
+  Proof. intros [??] ???? ?%val_stuck. by destruct (to_val e). Qed.
   Global Instance of_val_inj : Inj (=) (=) (@of_val Λ).
   Proof. by intros v v' Hv; apply (inj Some); rewrite -!to_of_val Hv. Qed.
   Lemma not_not_stuck e σ : ¬not_stuck e σ ↔ stuck e σ.
@@ -338,7 +350,7 @@ Section language.
   Proof.
     unfold StutteringAtomic.
     destruct a; intros Hat; first tauto.
-    intros ? ? ? ? [|]%Hat; auto using val_irreducible.
+    intros ? ? ? ? ? [|]%Hat; auto using val_irreducible.
   Qed.
   Lemma reducible_fill K e σ :
     reducible e σ → reducible (ectx_fill K e) σ.
@@ -349,7 +361,7 @@ Section language.
   Lemma reducible_fill_inv K e σ :
     to_val e = None → reducible (ectx_fill K e) σ → reducible e σ.
   Proof.
-    intros ? (e'&σ'&efs&Hstep); unfold reducible.
+    intros ? (α&e'&σ'&efs&Hstep); unfold reducible.
     apply fill_step_inv in Hstep as (e2' & _ & Hstep); eauto.
   Qed.
   Lemma irreducible_fill K e σ :
@@ -377,7 +389,7 @@ Section language.
     t1 ≡ₚ t1' → step (t1,σ1) (t2,σ2) → ∃ t2', t2 ≡ₚ t2' ∧ step (t1',σ1) (t2',σ2).
   Proof.
     intros Ht Hs.
-    inversion Hs as [e1 σ1' e2 σ2' efs tl tr ?? Hstep|]; simplify_eq /=.
+    inversion Hs as [e1 σ1' α e2 σ2' efs tl tr ?? Hstep|]; simplify_eq /=.
     - move: Ht. rewrite -Permutation_middle (symmetry_iff (≡ₚ)).
       intros (tl'&tr'&->&Ht)%Permutation_cons_inv_r.
       exists (tl' ++ e2 :: tr' ++ efs); split; [|by econstructor].
@@ -386,9 +398,9 @@ Section language.
       econstructor 2; eauto.
   Qed.
 
-  Lemma step_insert i t2 σ2 e e' σ3 efs :
+  Lemma step_insert i t2 σ2 e α e' σ3 efs :
     t2 !! i = Some e →
-    prim_step e σ2 e' σ3 efs →
+    prim_step e σ2 α e' σ3 efs →
     step (t2, σ2) (<[i:=e']>t2 ++ efs, σ3).
   Proof.
     intros.
@@ -400,8 +412,8 @@ Section language.
 
   Record pure_step (e1 e2 : expr Λ) := {
     pure_step_safe σ1 : reducible e1 σ1;
-    pure_step_det σ1 e2' σ2 efs :
-      prim_step e1 σ1 e2' σ2 efs → σ2 = σ1 ∧ e2' = e2 ∧ efs = []
+    pure_step_det σ1 α e2' σ2 efs :
+      prim_step e1 σ1 α e2' σ2 efs → σ2 = σ1 ∧ e2' = e2 ∧ efs = []
   }.
 
   Notation pure_steps_tp := (Forall2 (rtc pure_step)).
@@ -418,11 +430,11 @@ Section language.
     intros [Hred Hstep]. split.
     - unfold reducible in *.
       naive_solver eauto using fill_step.
-    - intros σ1 e2' σ2 efs Hpstep.
-      destruct (fill_step_inv K e1 σ1 e2' σ2 efs)
+    - intros σ1 α e2' σ2 efs Hpstep.
+      destruct (fill_step_inv K e1 σ1 α e2' σ2 efs)
         as (e2'' & -> & ?); [|exact Hpstep|].
-      + destruct (Hred σ1) as (? & ? & ? & ?); eauto using val_stuck.
-      + edestruct (Hstep σ1 e2'' σ2 efs) as (-> & -> & ->); auto.
+      + destruct (Hred σ1) as (? & ? & ? & ? & ?); eauto using val_stuck.
+      + edestruct (Hstep σ1 α e2'' σ2 efs) as (-> & -> & ->); auto.
   Qed.
 
   Lemma pure_step_nsteps_ctx K n e1 e2 :
@@ -457,8 +469,8 @@ Section language.
     (∃ v, of_val v = e) → is_Some (to_val e).
   Proof. intros [v <-]. rewrite to_of_val. eauto. Qed.
 
-  Lemma prim_step_not_stuck e σ e' σ' efs :
-    prim_step e σ e' σ' efs → not_stuck e σ.
+  Lemma prim_step_not_stuck e σ α e' σ' efs :
+    prim_step e σ α e' σ' efs → not_stuck e σ.
   Proof. rewrite /not_stuck /reducible. eauto 10. Qed.
 
   Lemma rtc_pure_step_val `{!Inhabited (state Λ)} v e :
@@ -467,7 +479,7 @@ Section language.
     intros ?; rewrite <- to_of_val.
     f_equal; symmetry; eapply rtc_nf; first done.
     intros [e' [Hstep _]].
-    destruct (Hstep inhabitant) as (?&?&?&Hval%val_stuck).
+    destruct (Hstep inhabitant) as (?&?&?&?&Hval%val_stuck).
     by rewrite to_of_val in Hval.
   Qed.
   (* FIXME: add a new case *)
@@ -483,18 +495,18 @@ Section language.
     step (t1, σ1) (t2, σ2) →
     pure_steps_tp t1 t3 →
     (σ1 = σ2 ∧ pure_steps_tp t2 t3) ∨
-    (∃ i e efs e',
+    (∃ i e α efs e',
       t1 !! i = Some e ∧ t3 !! i = Some e ∧
       t2 = <[i:=e']>t1 ++ efs ∧
-      prim_step e σ1 e' σ2 efs) ∨ config_step σ1 σ2.
+      prim_step e σ1 α e' σ2 efs) ∨ (∃ lbl, config_step σ1 lbl σ2).
   Proof.
     intros Ht Hps.
-    inversion Ht as [e σ e' σ' efs t11 t12 ?? Hstep|]; simplify_eq/=.
+    inversion Ht as [e σ α e' σ' efs t11 t12 ?? Hstep|]; simplify_eq/=.
     -  apply Forall2_app_inv_l in Hps
         as (t31&?&Hpsteps&(e''&t32&Hps&?&->)%Forall2_cons_inv_l&->).
        destruct Hps as [e|e1 e2 e3 [_ Hprs]].
        + right; left.
-         exists (length t11), e, efs, e'; split_and!; last done.
+         exists (length t11), e, α, efs, e'; split_and!; last done.
          * by rewrite lookup_app_r // Nat.sub_diag.
          * apply Forall2_length in Hpsteps.
              by rewrite lookup_app_r Hpsteps // Nat.sub_diag.

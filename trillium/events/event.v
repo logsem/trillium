@@ -307,7 +307,7 @@ Section properties.
       eapply extend_not_observed; [eauto|eauto|by apply trace_has_events_of_trace].
   Qed.
 
-  Lemma events_of_trace_app (ex : execution_trace Λ) (l : list (olocale Λ * cfg Λ)) :
+  Lemma events_of_trace_app (ex : execution_trace Λ) (l : list (ex_label Λ * cfg Λ)) :
     valid_exec (ex +trl+ l) →
     ∃ evs,
       length evs ≤ length l ∧
@@ -347,7 +347,11 @@ Section properties.
         rewrite Nat.sub_diag //.
   Qed.
 
-  Lemma events_of_trace_app_map (ex : execution_trace Λ) (l : list (olocale Λ * cfg Λ)) :
+  (* TODO: Move this *)
+  Global Instance ex_label_inhabited : Inhabited (ex_label Λ).
+  Proof. Admitted.
+
+  Lemma events_of_trace_app_map (ex : execution_trace Λ) (l : list (ex_label Λ * cfg Λ)) :
     valid_exec (ex +trl+ l) →
     ∃ evs,
       length evs ≤ length l ∧
@@ -378,10 +382,10 @@ Section properties.
   Implicit Types obs : EventObservation Λ.
   Implicit Types ex : execution_trace Λ.
 
-  Lemma events_of_trace_extend_triggered ex tp1 tp2 K e1 e2 efs σ1 σ2 oζ :
+  Lemma events_of_trace_extend_triggered ex tp1 tp2 K e1 e2 α efs σ1 σ2 oζ :
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     EV e1 σ1 e2 σ2 →
     events_of_trace EV (ex :tr[oζ]: (tp1 ++ fill K e2 :: tp2 ++ efs, σ2)) =
     events_of_trace EV ex ++ [mkEventObservation e1 σ1 e2 σ2].
@@ -408,10 +412,10 @@ Section properties.
       exfalso; eapply HnEV; eauto.
   Qed.
 
-  Lemma events_of_trace_extend_not_triggered ex tp1 tp2 K e1 e2 efs σ1 σ2 oζ:
+  Lemma events_of_trace_extend_not_triggered ex tp1 tp2 K e1 e2 α efs σ1 σ2 oζ:
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     ¬ EV e1 σ1 e2 σ2 →
     events_of_trace EV (ex :tr[oζ]: (tp1 ++ fill K e2 :: tp2 ++ efs, σ2)) =
     events_of_trace EV ex.
