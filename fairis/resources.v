@@ -1178,7 +1178,7 @@ Section model_state_lemmas.
     ls_fuel δ1 = (S <$> m1) ∪ m2 ∪ m3 →
     ls_fuel δ2 = m1 ∪ m2 →
     (∀ ρ, ρ ∈ dom m2 → δ1.(ls_mapping) !! ρ ≠ Some ζ) →
-    ls_mapping δ2 ⊆ ls_mapping δ1 → (* TODO: This needs to be relaxed *)
+    ls_mapping δ2 ⊆ ls_mapping δ1 →
     m1 ##ₘ m2 → m2 ##ₘ m3 → m1 ##ₘ m3 →
     fuel_decr (Some ζ) None δ1 δ2.
   Proof.
@@ -1207,10 +1207,13 @@ Section model_state_lemmas.
           set_solver. }
         rewrite lookup_fmap.
         apply elem_of_dom in H1 as [? ->]=> /=. lia. }
-    (* This requires a proper proof. *)
-    - (* Should be provable from Hle *)
-      admit.
-  Admitted.
+    - destruct Hissome as [? Heq].
+      rewrite Heq in Hneqtid.
+      specialize (Hle ρ).
+      destruct (ls_mapping δ2 !! ρ); [|done].
+      destruct (ls_mapping δ1 !! ρ); [naive_solver|].
+      simpl in *. done.
+  Qed.
 
   (* OBS: Might need requirement that nothing is forked *)
   Lemma update_fuel_step extr (auxtr : auxiliary_trace LM) c2 fs ζ :
