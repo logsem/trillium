@@ -1439,10 +1439,34 @@ Section model_state_lemmas.
 
     iMod (has_fuels_decr with "Hfm Hfuel") as "[Hfm Hfuel]"; [done|].
     (* Need lemma. *)
-    iAssert (auth_mapping_is ({[ζ := dom (S <$> fs)]} ∪ rm') ∗
-             has_fuels ζ fs)%I with "[Hrm Hfuel]" as "[Hrm Hfuel]".
-    { admit. }
-
+    iAssert (|==> auth_mapping_is ({[ζ := dom (S <$> fs)]} ∪ rm') ∗
+             has_fuels ζ fs)%I with "[Hrm Hfuel]" as ">[Hrm Hfuel]".
+    { 
+      iDestruct "Hfuel" as (fsf Hfsf) "[Hf1 Hf2]".
+      rewrite dom_union_L.
+      rewrite !dom_fmap_L.
+      rewrite -dom_union_L.
+      apply subseteq_disjoint_union_L in Hfsf as [fsf' [-> Hdisj']].
+      iDestruct (frag_mapping_same with "Hrm Hf1") as %Hsame.
+      rewrite lookup_union_l in Hsame; [|by apply not_elem_of_dom in Hζ].
+      rewrite lookup_insert in Hsame.
+      simplify_eq.
+      assert (dom fs'' = fsf') as Heq'.
+      { rewrite dom_union_L in Hsame.
+        apply map_disjoint_dom in Hdisj13'.
+        set_solver. }
+      rewrite !dom_union_L. rewrite Heq'.
+      iMod (update_mapping_delete _ fsf' with "Hrm Hf1") as "[Hrm Hf1]".
+      iModIntro. iFrame.
+      rewrite -!insert_union_singleton_l.
+      rewrite insert_insert.
+      rewrite difference_union_distr_l_L.
+      rewrite difference_diag_L.
+      rewrite union_empty_r_L.
+      rewrite difference_disjoint_L; [|done].
+      iFrame.
+      iExists _. iFrame. iPureIntro. done. }
+      
     iModIntro.
     iSplitR.
     { iPureIntro.
@@ -1567,7 +1591,7 @@ Section model_state_lemmas.
       apply not_elem_of_dom in Hζ''.
       apply not_elem_of_dom. set_solver.
     - simpl. rewrite Heq in Hfr. set_solver.
-  Admitted.
+  Qed.
 
   Lemma update_model_step
         (extr : execution_trace Λ)
