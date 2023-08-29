@@ -22,9 +22,9 @@ End gmap.
 Section finitary.
   Context `{M: FairModel}.
   Context `{Λ: language}.
+  Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
   Context `{EqDecision M}.
-  Context `{EqDecision (locale Λ)}.
 
   Context `{HPI0: forall s x, ProofIrrel ((let '(s', ℓ) := x in M.(fmtrans) s ℓ s'): Prop) }.
 
@@ -41,8 +41,8 @@ Section finitary.
     Finite (sig (λ '(δ', ℓ), ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'))).
   Proof.
     intros ex atr c' oζ.
-    pose proof (model_finitary ex atr c' oζ).
-    by apply smaller_card_nat_finite in H.
+    pose proof (model_finitary ex atr c' oζ) as Hfin.
+    by apply smaller_card_nat_finite in Hfin.
   Qed.
 
   Definition enum_inner extr fmodtr c' oζ : list (M * option M.(fmrole)) :=
@@ -51,8 +51,8 @@ Section finitary.
   Lemma enum_inner_spec (δ' : M) ℓ extr atr c' oζ :
     ξ (extr :tr[oζ]: c') (atr :tr[ℓ]: δ') → (δ', ℓ) ∈ enum_inner extr atr c' oζ.
   Proof.
-    intros H. unfold enum_inner. rewrite elem_of_list_fmap.
-    exists (exist _ (δ', ℓ) H). split =>//. apply elem_of_enum.
+    intros Hxi. unfold enum_inner. rewrite elem_of_list_fmap.
+    exists (exist _ (δ', ℓ) Hxi). split =>//. apply elem_of_enum.
   Qed.
 
   (* TODO: move *)
@@ -166,7 +166,7 @@ Section finitary.
         assert (ρ ∈ dom $ ls_fuel (trace_last atr)) as Hin.
         { apply elem_of_dom_2 in Hsome. set_solver. }
         specialize (Hleq Hin ltac:(done)) as [Hleq|Hleq].
-        + rewrite Hsome in Hleq. destruct (ls_fuel (trace_last atr) !! ρ) as [f'|] eqn:Heqn. 
+        + rewrite Hsome in Hleq. destruct (ls_fuel (trace_last atr) !! ρ) as [f'|] eqn:Heqn.
           * pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
             rewrite Heqn in Hleq.
             lia.
