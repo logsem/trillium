@@ -11,19 +11,75 @@ Section fairness.
   Record LiveState := MkLiveState {
     ls_under:> M.(fmstate);
 
-    ls_fuel: gmap M.(fmrole) nat;
-    ls_fuel_dom: M.(live_roles) ls_under ⊆ dom ls_fuel;
+    ls_data: gmap (locale Λ) (gmap M.(fmrole) nat);
+    ls_data_disj: ∀ ζ ζ' fs fs', ζ ≠ ζ' → ls_data !! ζ = Some fs → ls_data !! ζ' = Some fs' → fs ##ₘ fs';
+    ls_data_live: ∀ ρ, ρ ∈ M.(live_roles) ls_under → ∃ ζ fs, ls_data !! ζ = Some fs ∧ ρ ∈ dom fs;
 
-    ls_mapping: gmap M.(fmrole) (locale Λ); (* maps roles to thread id *)
 
-    ls_same_doms: dom ls_mapping = dom ls_fuel;
+    (* ls_fuel: gmap M.(fmrole) nat; *)
+    (* ls_fuel_dom: M.(live_roles) ls_under ⊆ dom ls_fuel; *)
+
+    (* ls_mapping: gmap M.(fmrole) (locale Λ); (* maps roles to thread id *) *)
+
+    (* ls_same_doms: dom ls_mapping = dom ls_fuel; *)
   }.
 
   Arguments ls_under {_}.
-  Arguments ls_fuel {_}.
-  Arguments ls_fuel_dom {_}.
-  Arguments ls_mapping {_}.
-  Arguments ls_same_doms {_}.
+  Arguments ls_data {_}.
+
+  Definition ls_fuel (δ: LiveState) : gmap M.(fmrole) nat :=
+    map_fold (λ _ m fs, m ∪ fs) ∅ δ.(ls_data).
+  Definition add_stuff ζ (m: gmap M.(fmrole) (locale Λ)) (rs: gset M.(fmrole)) :=
+    set_fold (λ ρ m, <[ρ := ζ]> m) m rs.
+  Definition ls_mapping (δ: LiveState) : gmap M.(fmrole) (locale Λ) :=
+    map_fold (λ ζ fs m, add_stuff ζ m (dom fs)) (∅: gmap M.(fmrole) (locale Λ)) δ.(ls_data).
+
+  (* Lemma ls_fuel_dom δ ρ: ρ ∈ dom $ ls_mapping δ = dom $ ls_fuel δ. *)
+  Lemma dom_add_stuff ζ m rs : dom $ add_stuff ζ m rs = rs ∪ dom m.
+  Proof.
+    rewrite /add_stuff.
+    revert m. induction rs using set_ind_L; first set_solver; intros m.
+    rewrite set_fold_disj_union_strong; last set_solver.
+    - rewrite IHrs. rewrite set_fold_singleton. set_solver.
+    - intros. rewrite insert_commute //.
+  Qed.
+
+  Lemma add_stuff_commute ζ1 ζ2 m s1 s2 :
+    s1 ## s2 →
+    add_stuff ζ2 (add_stuff ζ1 m s1) s2 = add_stuff ζ1 (add_stuff ζ2 m s2) s1.
+  Proof.
+    rewrite /add_stuff.
+    revert m. induction s1 using set_ind_L; first set_solver; intros m.
+    intros Hdisj.
+    rewrite set_fold_disj_union_strong; last set_solver; last first.
+    { intros. rewrite insert_commute //. }
+    rewrite IHs1; last set_solver.
+    rewrite set_fold_singleton.
+    rewrite set_fold_disj_union_strong; last set_solver; last first.
+    { intros. rewrite insert_commute //. }
+    rewrite set_fold_singleton //. f_equal.
+    rewrite (set_fold_comm_acc_strong _ _ (λ m, <[x := ζ1]> m)) //.
+    intros z m' Hin. rewrite insert_commute //. set_solver.
+  Qed.
+
+  (*TODO: why commute above and comm below? *)
+
+  Lemma ls_same_doms δ: dom $ ls_mapping δ = dom $ ls_fuel δ.
+  Proof.
+    rewrite /ls_mapping /ls_fuel.
+    generalize (ls_data_disj δ).
+    induction δ.(ls_data) as [|ζ fs m Hnotin IH] using map_ind ; first set_solver.
+    intros Hdisj.
+    rewrite map_fold_insert_L //; last first.
+    { intros. apply add_stuff_commute. eapply map_disjoint_dom. rewrite comm in H0. eapply Hdisj; eauto. }
+    rewrite map_fold_insert_L //; last first.
+    { intros. rewrite !assoc. rewrite (map_union_comm z1 z2) //. eapply Hdisj; eauto. }
+    rewrite dom_add_stuff !dom_union_L.
+    rewrite IH //. intros. eapply Hdisj; eauto; rewrite lookup_insert_ne //; naive_solver.
+  Qed.
+
+  Lemma ls_fuel_dom δ: M.(live_roles) δ.(ls_under) ⊆ dom $ ls_fuel δ.
+  Proof. Admitted.
 
   Lemma ls_mapping_dom (m: LiveState):
     M.(live_roles) m.(ls_under) ⊆ dom m.(ls_mapping).
@@ -94,7 +150,7 @@ Section fairness.
       lm_lbl := FairLabel M.(fmrole);
       lm_ls_trans := ls_trans lm_fl;
     }.
-  
+
   Definition fair_model_model `(LM : LiveModel) : Model := {|
     mstate := lm_ls LM;
     mlabel := lm_lbl LM;
