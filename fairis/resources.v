@@ -6,14 +6,14 @@ Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
 Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
-Class fairnessGpreS `(LM: LiveModel Λ M) Σ `{Countable (locale Λ)} := {
+Class fairnessGpreS `{Countable (locale Λ)} `(LM: LiveModel Λ M) Σ := {
   fairnessGpreS_model :> inG Σ (authUR (optionUR (exclR (ModelO M))));
   fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
   fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO)));
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
-Class fairnessGS `(LM : LiveModel Λ M) Σ `{Countable (locale Λ)} := FairnessGS {
+Class fairnessGS `{Countable (locale Λ)} `(LM : LiveModel Λ M) Σ := FairnessGS {
   fairness_inG :> fairnessGpreS LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
@@ -25,12 +25,11 @@ Class fairnessGS `(LM : LiveModel Λ M) Σ `{Countable (locale Λ)} := FairnessG
   fairness_model_free_roles_name : gname;
 }.
 
-Global Arguments fairnessGS {_ _} LM Σ {_ _}.
-Global Arguments FairnessGS {_ _} LM Σ {_ _ _} _ _ _.
-Global Arguments fairness_model_name {_ _ LM Σ _ _} _.
-Global Arguments fairness_model_mapping_name {Λ M LM Σ _ _} _ : assert.
-Global Arguments fairness_model_fuel_name {Λ M LM Σ _ _} _ : assert.
-Global Arguments fairness_model_free_roles_name {Λ M LM Σ _ _} _ : assert.
+Global Arguments fairnessGS {_ _ _ _} LM Σ.
+Global Arguments fairness_model_name {_ _ _ _ LM Σ} _.
+Global Arguments fairness_model_mapping_name {Λ _ _ M LM Σ} _ : assert.
+Global Arguments fairness_model_fuel_name {Λ _ _ M LM Σ} _ : assert.
+Global Arguments fairness_model_free_roles_name {Λ _ _ M LM Σ} _ : assert.
 
 Definition fairnessΣ Λ M `{Countable (locale Λ)} : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO M))));
@@ -39,8 +38,8 @@ Definition fairnessΣ Λ M `{Countable (locale Λ)} : gFunctors := #[
    GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
-Global Instance subG_fairnessGpreS {Σ} `{LM : LiveModel Λ M}
-       `{Countable (locale Λ)} :
+Global Instance subG_fairnessGpreS {Σ} `{Countable (locale Λ)} `{LM : LiveModel Λ M}
+       :
   subG (fairnessΣ Λ M) Σ -> fairnessGpreS LM Σ.
 Proof. solve_inG. Qed.
 
@@ -166,8 +165,8 @@ Section map_imap.
 End map_imap.
 
 Section model_state_interp.
-  Context `{LM: LiveModel Λ M}.
   Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -206,10 +205,10 @@ Section model_state_interp.
     own (fairness_model_free_roles_name fG) (◯ (GSet FR)).
 
   Definition model_state_interp (tp: list $ expr Λ) (δ: LiveState Λ M): iProp Σ :=
-    ∃ M FR, auth_fuel_is δ.(ls_fuel) ∗ auth_mapping_is M ∗ auth_free_roles_are FR ∗
-      ⌜maps_inverse_match δ.(ls_mapping) M⌝ ∗
+    ∃ M FR, auth_fuel_is (ls_fuel δ) ∗ auth_mapping_is M ∗ auth_free_roles_are FR ∗
+      ⌜maps_inverse_match (ls_mapping δ) M⌝ ∗
       ⌜ ∀ ζ, ζ ∉ locales_of_list tp → M !! ζ = None ⌝ ∗
-      auth_model_is δ ∗ ⌜ FR ∩ dom δ.(ls_fuel) = ∅ ⌝.
+      auth_model_is δ ∗ ⌜ FR ∩ dom (ls_fuel δ) = ∅ ⌝.
 
   Lemma model_state_interp_tids_smaller δ tp :
     model_state_interp tp δ -∗ ⌜ tids_smaller tp δ ⌝.
@@ -243,8 +242,8 @@ Notation "tid ↦m ρ" := (frag_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
 Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
 
 Section model_state_lemmas.
-  Context `{LM: LiveModel Λ M}.
   Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
@@ -331,8 +330,8 @@ Section model_state_lemmas.
 End model_state_lemmas.
 
 Section adequacy.
-  Context `{LM: LiveModel Λ M}.
   Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGpreS LM Σ}.
 
@@ -386,8 +385,8 @@ Section adequacy.
 End adequacy.
 
 Section model_state_lemmas.
-  Context `{LM: LiveModel Λ M}.
   Context `{Countable (locale Λ)}.
+  Context `{LM: LiveModel Λ M}.
   Context `{EqDecision (expr Λ)}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
@@ -479,7 +478,7 @@ Section model_state_lemmas.
     gmap (fmrole M) nat :=
 
 
-    fuel_apply fs2 (δ1.(ls_fuel (Λ := Λ))) (((dom $ ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
+    fuel_apply fs2 (ls_fuel δ1) (((dom $ ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
 
   Lemma elem_of_frame_excl_map
         (fs F: gmap (fmrole M) nat)
@@ -745,7 +744,7 @@ Section model_state_lemmas.
   Qed.
 
   Lemma has_fuel_fuel ζ δ fs n:
-    has_fuels ζ fs -∗ model_state_interp n δ -∗ 
+    has_fuels ζ fs -∗ model_state_interp n δ -∗
     ⌜ ∀ ρ, ρ ∈ dom fs -> ls_fuel δ !! ρ = fs !! ρ ⌝.
   Proof.
     unfold has_fuels, model_state_interp, auth_fuel_is.
@@ -801,7 +800,7 @@ Section model_state_lemmas.
                                        (ls_fuel (trace_last auxtr))
                                        ((dom (ls_fuel (trace_last auxtr)) ∪ dom fs) ∖ rem))).
     { rewrite /new_mapping /new_dom. unfold fuel_apply.
-      assert (dom fs ⊆ dom (trace_last auxtr).(ls_fuel)) as Hdom_le.
+      assert (dom fs ⊆ dom (ls_fuel $ trace_last auxtr)) as Hdom_le.
       { intros ρ Hin. rewrite elem_of_dom Hfuel; last set_solver.
         apply elem_of_dom in Hin as [? Hin]. rewrite lookup_fmap Hin //=. }
       rewrite map_imap_dom_eq; last first.
@@ -867,7 +866,7 @@ Section model_state_lemmas.
           assert (locale_of t1 e1 ∈ locales_of_list (t1 ++ e1 :: t2));
             last by eauto.
           apply locales_of_list_from_locale_from.
-          rewrite from_locale_from_Some //. 
+          rewrite from_locale_from_Some //.
           eapply prefixes_from_spec.
           eexists _,_. by list_simplifier.
       - rewrite Hnewdom /new_dom. apply elem_of_equiv_empty_L. intros ρ [Hin1 Hin2]%elem_of_intersection.
@@ -896,7 +895,7 @@ Section model_state_lemmas.
     - intros ρ' Hin _. simpl. destruct (decide (ρ' ∈ rem)) as [Hin'|Hnin'].
       + right; split; last set_solver -Hnewdom Hsamedoms Hfueldom.
         rewrite /fuel_apply map_imap_dom_eq ?dom_gset_to_gmap; first set_solver.
-        intros ρ0 _ Hin0. 
+        intros ρ0 _ Hin0.
         case_decide as Hnin; [by apply elem_of_dom|].
         apply elem_of_difference in Hin0 as [Hin1 ?].
         apply elem_of_union in Hin1 as [?|Hin2]; first by apply elem_of_dom.
@@ -1033,7 +1032,7 @@ Section model_state_lemmas.
         { intros ζ' Hζ'. rewrite lookup_insert_ne; last first.
           { pose proof (locales_of_list_step_incl _ _ _ _ _ Hstep).
             clear Hfueldom Hsamedoms.
-            assert (ζ' ∉ locales_of_list tp1) by eauto.            
+            assert (ζ' ∉ locales_of_list tp1) by eauto.
             intros contra. simplify_eq.
             destruct Htlen as [tp1' [-> Hlen]].
             inversion Hstep as [? ? e1 ? e2 ? efs t1 t2 Hf1 YY Hprimstep |].
