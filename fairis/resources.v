@@ -476,8 +476,6 @@ Section model_state_lemmas.
 
   Definition update_fuel_resource (δ1: LiveState Λ M) (fs1 fs2: gmap (fmrole M) nat) (s2: M):
     gmap (fmrole M) nat :=
-
-
     fuel_apply fs2 (ls_fuel δ1) (((dom $ ls_fuel δ1) ∪ dom fs2) ∖ (dom fs1 ∖ dom fs2)).
 
   Lemma elem_of_frame_excl_map

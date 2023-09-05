@@ -8,31 +8,25 @@ Section fairness.
   Context {M: FairModel}.
   Context `{Countable (locale Λ)}.
 
-  Record LiveState := MkLiveState {
+  Record LiveStateData := MkLiveStateData {
     ls_under:> M.(fmstate);
+    ls_map: gmap (locale Λ) (gmap M.(fmrole) nat);
+  }.
+  Record LiveState := MkLiveState {
+    ls_data :> LiveStateData;
 
-    ls_data: gmap (locale Λ) (gmap M.(fmrole) nat);
-    ls_data_disj: ∀ ζ ζ' fs fs', ζ ≠ ζ' → ls_data !! ζ = Some fs → ls_data !! ζ' = Some fs' → fs ##ₘ fs';
-    ls_data_live: ∀ ρ, ρ ∈ M.(live_roles) ls_under → ∃ ζ fs, ls_data !! ζ = Some fs ∧ ρ ∈ dom fs;
-
-
-    (* ls_fuel: gmap M.(fmrole) nat; *)
-    (* ls_fuel_dom: M.(live_roles) ls_under ⊆ dom ls_fuel; *)
-
-    (* ls_mapping: gmap M.(fmrole) (locale Λ); (* maps roles to thread id *) *)
-
-    (* ls_same_doms: dom ls_mapping = dom ls_fuel; *)
+    ls_map_disj: ∀ ζ ζ' fs fs', ζ ≠ ζ' → ls_data.(ls_map) !! ζ = Some fs → ls_data.(ls_map) !! ζ' = Some fs' → fs ##ₘ fs';
+    ls_map_live: ∀ ρ, ρ ∈ M.(live_roles) ls_data.(ls_under) → ∃ ζ fs, ls_data.(ls_map) !! ζ = Some fs ∧ ρ ∈ dom fs;
   }.
 
-  Arguments ls_under {_}.
-  Arguments ls_data {_}.
+  Implicit Type δ : LiveState.
 
-  Definition ls_fuel (δ: LiveState) : gmap M.(fmrole) nat :=
-    map_fold (λ _ m fs, m ∪ fs) ∅ δ.(ls_data).
+  Definition ls_fuel (δ: LiveStateData) : gmap M.(fmrole) nat :=
+    map_fold (λ _ m fs, m ∪ fs) ∅ δ.(ls_map).
   Definition add_stuff ζ (m: gmap M.(fmrole) (locale Λ)) (rs: gset M.(fmrole)) :=
     set_fold (λ ρ m, <[ρ := ζ]> m) m rs.
-  Definition ls_mapping (δ: LiveState) : gmap M.(fmrole) (locale Λ) :=
-    map_fold (λ ζ fs m, add_stuff ζ m (dom fs)) (∅: gmap M.(fmrole) (locale Λ)) δ.(ls_data).
+  Definition ls_mapping (δ: LiveStateData) : gmap M.(fmrole) (locale Λ) :=
+    map_fold (λ ζ fs m, add_stuff ζ m (dom fs)) (∅: gmap M.(fmrole) (locale Λ)) δ.(ls_map).
 
   (* Lemma ls_fuel_dom δ ρ: ρ ∈ dom $ ls_mapping δ = dom $ ls_fuel δ. *)
   Lemma dom_add_stuff ζ m rs : dom $ add_stuff ζ m rs = rs ∪ dom m.
@@ -67,8 +61,8 @@ Section fairness.
   Lemma ls_same_doms δ: dom $ ls_mapping δ = dom $ ls_fuel δ.
   Proof.
     rewrite /ls_mapping /ls_fuel.
-    generalize (ls_data_disj δ).
-    induction δ.(ls_data) as [|ζ fs m Hnotin IH] using map_ind ; first set_solver.
+    generalize (ls_map_disj δ).
+    induction δ.(ls_map) as [|ζ fs m Hnotin IH] using map_ind ; first set_solver.
     intros Hdisj.
     rewrite map_fold_insert_L //; last first.
     { intros. apply add_stuff_commute. eapply map_disjoint_dom. rewrite comm in H0. eapply Hdisj; eauto. }
@@ -78,11 +72,11 @@ Section fairness.
     rewrite IH //. intros. eapply Hdisj; eauto; rewrite lookup_insert_ne //; naive_solver.
   Qed.
 
-  Lemma ls_fuel_dom_data ρ δ ζ fs: δ.(ls_data) !! ζ = Some fs → ρ ∈ dom fs → ρ ∈ dom $ ls_fuel δ.
+  Lemma ls_fuel_dom_data ρ δ ζ fs: δ.(ls_map) !! ζ = Some fs → ρ ∈ dom fs → ρ ∈ dom $ ls_fuel δ.
   Proof.
     rewrite /ls_fuel. revert ρ ζ fs.
-    generalize (ls_data_disj δ).
-    induction δ.(ls_data) as [|ζ' fs' m Hnotin IH] using map_ind ; first set_solver.
+    generalize (ls_map_disj δ).
+    induction δ.(ls_map) as [|ζ' fs' m Hnotin IH] using map_ind ; first set_solver.
     intros Hdisj ρ ζ fs Hsome Hin.
     rewrite map_fold_insert_L //; last first.
     { intros. rewrite !assoc. rewrite (map_union_comm z1 z2) //. eapply Hdisj; eauto. }
@@ -94,7 +88,7 @@ Section fairness.
 
   Lemma ls_fuel_dom δ: M.(live_roles) δ.(ls_under) ⊆ dom $ ls_fuel δ.
   Proof.
-    generalize (ls_data_live δ).
+    generalize (ls_map_live δ).
     induction (live_roles M δ) as [|ρ ρs Hnotin IH] using set_ind_L ; first set_solver.
     intros Hlive. apply union_subseteq; split; last first.
     { apply IH. intros. apply Hlive. set_solver. }
@@ -166,6 +160,39 @@ Section fairness.
       ∧ False (* TODO: add support for config steps later! *)
     end.
 
+  Lemma silent_step_suff fl (δ: LiveState) (fs fs' fs'': gmap _ nat) ζ (oζ' : option $ locale Λ) :
+    δ.(ls_map) !! ζ = Some fs →
+    (∀ ρ f', fs' !! ρ = Some f' → ∃ f, fs !! ρ = Some f → f' < f) →
+    (∀ ρ f', fs'' !! ρ = Some f' → ∃ f, fs !! ρ = Some f → f' < f) →
+    (dom fs ∖ (dom fs' ∪ dom fs'') ∩ M.(live_roles) δ = ∅) →
+    (dom fs' ∩ dom fs' = ∅) →
+    (∀ ζ', oζ' = Some ζ' → ζ' ∉ dom δ.(ls_map)) →
+    let data' :=
+          match oζ' with
+          | None => δ.(ls_map)
+          | Some ζ' => <[ζ' := fs'']> δ.(ls_map)
+          end
+    in
+    let data'' := <[ζ := fs']> data' in
+    ∃ δ',
+      δ.(ls_under) = δ'.(ls_under) ∧
+      δ.(ls_map) = data'' ∧
+        ls_trans fl δ (Silent_step ζ) δ'.
+  Proof.
+    (* intros Hζ Hfs' Hfs'' Hlives Hdisj Hnlocale data' data''. *)
+    (* unshelve refine (ex_intro _ {| ls_under := δ; ls_map := data'' |} _). *)
+    (* { intros z1 z2 fs1 fs2 Hneq Hkl1 Hlk2. admit. } *)
+    (* { intros ρ Hlive. destruct (ls_map_live δ ρ Hlive) as (ζ0&fs0&?&?). *)
+    (*   destruct (decide (ζ = ζ0)) as [->|]. *)
+    (*   - exists ζ0, fs'. split=>//. rewrite /data' /data''. *)
+    (*     rewrite lookup_insert; admit. admit. *)
+    (*   - exists ζ0, fs0. split=>//. rewrite /data''. *)
+    (*     rewrite lookup_insert_ne // /data'. *)
+    (*     destruct oζ' as [ζ'|]; last done. rewrite lookup_insert_ne //. *)
+    (*     specialize (Hnlocale ζ' ltac:(done)). *)
+    (*     apply elem_of_dom_2 in H0. naive_solver. } *)
+    Admitted.
+
   Record LiveModel := {
       lm_fl : M → nat;
       lm_ls := LiveState;
@@ -184,11 +211,11 @@ Section fairness.
 
   Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: locale Λ)
     : LM.(lm_ls) :=
-    {| ls_under := s0;
-      ls_data := {[ζ0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0)]};
-    |}.
+    {| ls_data := {| ls_under := s0;
+      ls_map := {[ζ0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0)]};
+    |} |}.
   Next Obligation.
-    intros ???????? Hlk1 Hlk2. exfalso.
+    intros ???????? Hlk1 Hlk2. simpl in *. exfalso.
     apply lookup_singleton_Some in Hlk1.
     apply lookup_singleton_Some in Hlk2.
     naive_solver.
@@ -209,6 +236,7 @@ Section fairness.
 End fairness.
 
 Arguments LiveState _ _ {_ _}.
+Arguments LiveStateData _ _ {_ _}.
 Arguments LiveModel _ _ {_ _}.
 Arguments fair_model_model _ {_ _ _} _.
 
@@ -284,6 +312,7 @@ Definition exaux_traces_match  `{Countable (locale Λ)} `{LM:LiveModel Λ M} :
 Section fairness_preserved.
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
+  Implicit Type δ : LiveState Λ M.
 
   Lemma exaux_preserves_validity extr (auxtr : auxtrace LM):
     exaux_traces_match extr auxtr ->
@@ -592,7 +621,7 @@ Section fairness_preserved.
     exec_trace_match atr iatr auxtr ->
     valid_inf_system_trace φ ex atr iex iatr ->
     traces_match labels_match
-                 (λ σ δ, live_tids σ δ ∧ ψ σ δ)
+                 (λ σ δ, live_tids (LM := LM) σ δ ∧ ψ σ δ)
                  locale_step
                  LM.(lm_ls_trans) progtr auxtr.
   Proof.
@@ -658,6 +687,7 @@ End fairness_preserved.
 Section fuel_dec_unless.
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ Mdl}.
+  Implicit Type δ : LiveState Λ Mdl.
 
   Definition Ul (ℓ: LM.(mlabel)) :=
     match ℓ with
@@ -670,7 +700,7 @@ Section fuel_dec_unless.
 
   Lemma fuel_dec_unless (auxtr: auxtrace LM) :
     auxtrace_valid auxtr ->
-    dec_unless ls_under Ul Ψ auxtr.
+    dec_unless (λ x, ls_under (ls_data x)) Ul Ψ auxtr.
   Proof.
     intros Hval n. revert auxtr Hval. induction n; intros auxtr Hval; last first.
     { edestruct (after (S n) auxtr) as [auxtrn|] eqn:Heq; rewrite Heq =>//.
@@ -696,7 +726,7 @@ Section fuel_dec_unless.
       rewrite /Ψ -!size_dom Hdomeq.
       apply Nat.add_lt_mono_l.
 
-      rewrite /Ψ (big_opM_delete (λ _ f, f) (ls_fuel (trfirst _)) ρ) //.
+      rewrite /Ψ (big_opM_delete (λ _ f, f) (ls_fuel $ ls_data (trfirst _)) ρ) //.
       rewrite (big_opM_delete (λ _ f, f) (ls_fuel  δ) ρ) //.
       apply Nat.add_lt_le_mono.
       { rewrite /fuel_decr in Hdec. specialize (Hdec ρ). rewrite Hf Hf' /= in Hdec.
@@ -723,7 +753,7 @@ Section destuttering_auxtr.
 
   (* Why is [LM] needed here? *)
   Definition upto_stutter_auxtr :=
-    upto_stutter (ls_under (Λ:=Λ) (M:=M)) (Ul (LM := LM)).
+    upto_stutter (λ x, ls_under (Λ:=Λ) (M:=M) (ls_data x)) (Ul (LM := LM)).
 
   Lemma can_destutter_auxtr auxtr:
     auxtrace_valid auxtr →
@@ -740,7 +770,7 @@ Section upto_preserves.
   Context `{LM: LiveModel Λ M}.
 
   Lemma upto_stutter_mono' :
-    monotone2 (upto_stutter_ind (ls_under (Λ:=Λ) (M:=M)) (Ul (LM:=LM))).
+    monotone2 (upto_stutter_ind (λ x, ls_under (Λ:=Λ) (M:=M) (ls_data x)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
@@ -774,10 +804,10 @@ Section upto_stutter_preserves_fairness_and_termination.
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
 
-  Notation upto_stutter_aux := (upto_stutter (ls_under (Λ := Λ)) (Ul (Λ := Λ) (LM := LM))).
+  Notation upto_stutter_aux := (upto_stutter (λ x, ls_under (Λ := Λ) (ls_data x)) (Ul (Λ := Λ) (LM := LM))).
 
   Lemma upto_stutter_mono'' : (* TODO fix this proliferation *)
-    monotone2 (upto_stutter_ind (ls_under (Λ:=Λ) (M:=M)) (Ul (LM:=LM))).
+    monotone2 (upto_stutter_ind (λ x, ls_under (Λ:=Λ) (M:=M) (ls_data x)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.
     induction IN; try (econstructor; eauto; done).
