@@ -24,7 +24,7 @@ Section fairness.
   Definition ls_fuel (δ: LiveStateData) : gmap M.(fmrole) nat :=
     map_fold (λ _ m fs, m ∪ fs) ∅ δ.(ls_map).
   Definition add_stuff ζ (m: gmap M.(fmrole) (locale Λ)) (rs: gset M.(fmrole)) :=
-    set_fold (λ ρ m, <[ρ := ζ]> m) m rs.
+    gset_to_gmap ζ rs ∪ m.
   Definition ls_mapping (δ: LiveStateData) : gmap M.(fmrole) (locale Λ) :=
     map_fold (λ ζ fs m, add_stuff ζ m (dom fs)) (∅: gmap M.(fmrole) (locale Λ)) δ.(ls_map).
 
@@ -33,29 +33,17 @@ Section fairness.
   Proof.
     rewrite /add_stuff.
     revert m. induction rs using set_ind_L; first set_solver; intros m.
-    rewrite set_fold_disj_union_strong; last set_solver.
-    - rewrite IHrs. rewrite set_fold_singleton. set_solver.
-    - intros. rewrite insert_commute //.
+    rewrite  gset_to_gmap_union_singleton !dom_union_L dom_insert_L. set_solver.
   Qed.
 
   Lemma add_stuff_commute ζ1 ζ2 m s1 s2 :
     s1 ## s2 →
     add_stuff ζ2 (add_stuff ζ1 m s1) s2 = add_stuff ζ1 (add_stuff ζ2 m s2) s1.
   Proof.
-    rewrite /add_stuff.
-    revert m. induction s1 using set_ind_L; first set_solver; intros m.
-    intros Hdisj.
-    rewrite set_fold_disj_union_strong; last set_solver; last first.
-    { intros. rewrite insert_commute //. }
-    rewrite IHs1; last set_solver.
-    rewrite set_fold_singleton.
-    rewrite set_fold_disj_union_strong; last set_solver; last first.
-    { intros. rewrite insert_commute //. }
-    rewrite set_fold_singleton //. f_equal.
-    rewrite (set_fold_comm_acc_strong _ _ (λ m, <[x := ζ1]> m)) //.
-    intros z m' Hin. rewrite insert_commute //. set_solver.
+    rewrite /add_stuff. intros Hdisj. rewrite !assoc. f_equal.
+    rewrite map_union_comm //.
+    apply map_disjoint_dom_2. rewrite !dom_gset_to_gmap //.
   Qed.
-
   (*TODO: why commute above and comm below? *)
 
   Lemma ls_same_doms δ: dom $ ls_mapping δ = dom $ ls_fuel δ.
@@ -72,6 +60,44 @@ Section fairness.
     rewrite IH //. intros. eapply Hdisj; eauto; rewrite lookup_insert_ne //; naive_solver.
   Qed.
 
+  Lemma ls_fuel_dom_data ρ δ ζ fs f: δ.(ls_map) !! ζ = Some fs → fs !! ρ = Some f → ls_fuel δ !! ρ = Some f.
+  Proof.
+    rewrite /ls_fuel. revert ρ ζ fs f.
+    generalize (ls_map_disj δ).
+    induction δ.(ls_map) as [|ζ' fs' m Hnotin IH] using map_ind ; first set_solver.
+    intros Hdisj ρ ζ fs f Hsome Hin.
+    rewrite map_fold_insert_L //; last first.
+    { intros. rewrite !assoc. rewrite (map_union_comm z1 z2) //. eapply Hdisj; eauto. }
+    rewrite lookup_union_Some_raw. destruct (decide (ζ = ζ')) as [->|Hneq].
+    - left. rewrite lookup_insert in Hsome. naive_solver.
+    - right. rewrite lookup_insert_ne // in Hsome. split.
+      + assert (fs ##ₘ fs').
+        { eapply Hdisj; eauto; [rewrite lookup_insert_ne // | rewrite lookup_insert //]. }
+        by eapply map_disjoint_Some_l.
+      + eapply IH; eauto. intros.
+        eapply Hdisj; eauto; rewrite lookup_insert_ne //; set_solver.
+  Qed.
+
+  Lemma ls_mapping_dom_data ρ δ ζ fs: δ.(ls_map) !! ζ = Some fs → ρ ∈ dom fs → ls_mapping δ !! ρ = Some ζ.
+  Proof.
+    rewrite /ls_mapping. revert ρ ζ fs.
+    generalize (ls_map_disj δ).
+    induction δ.(ls_map) as [|ζ' fs' m Hnotin IH] using map_ind ; first set_solver.
+    intros Hdisj ρ ζ fs Hsome Hin.
+    rewrite map_fold_insert_L //; last first.
+    { intros. apply add_stuff_commute. eapply map_disjoint_dom. rewrite comm in H0. eapply Hdisj; eauto. }
+    rewrite /add_stuff.
+    rewrite lookup_union_Some_raw. destruct (decide (ζ = ζ')) as [->|Hneq].
+    - left. rewrite lookup_insert in Hsome. rewrite lookup_gset_to_gmap_Some. naive_solver.
+    - right. rewrite lookup_insert_ne // in Hsome. split.
+      + assert (fs ##ₘ fs').
+        { eapply Hdisj; eauto; [rewrite lookup_insert_ne // | rewrite lookup_insert //]. }
+        rewrite lookup_gset_to_gmap_None not_elem_of_dom. apply elem_of_dom in Hin as [??].
+        by eapply map_disjoint_Some_l.
+      + eapply IH; eauto. intros.
+        eapply Hdisj; eauto; rewrite lookup_insert_ne //; set_solver.
+  Qed.
+
   Lemma ls_fuel_dom_data ρ δ ζ fs: δ.(ls_map) !! ζ = Some fs → ρ ∈ dom fs → ρ ∈ dom $ ls_fuel δ.
   Proof.
     rewrite /ls_fuel. revert ρ ζ fs.
@@ -85,6 +111,41 @@ Section fairness.
     - right. rewrite lookup_insert_ne // in Hsome. eapply IH; eauto. intros.
       eapply Hdisj; eauto; rewrite lookup_insert_ne //; set_solver.
   Qed.
+
+  Lemma ls_fuel_dom_data_inv ρ δ: ρ ∈ dom $ ls_fuel δ → ∃ ζ fs, δ.(ls_map) !! ζ = Some fs ∧ ρ ∈ dom fs.
+  Proof.
+    rewrite /ls_fuel. revert ρ.
+    generalize (ls_map_disj δ).
+    induction δ.(ls_map) as [|ζ' fs' m Hnotin IH] using map_ind.
+    { intros ??. rewrite map_fold_empty. set_solver. }
+    intros Hdisj ρ Hin.
+    rewrite map_fold_insert_L // in Hin; last first.
+    { intros. rewrite !assoc. rewrite (map_union_comm z1 z2) //. eapply Hdisj; eauto. }
+    rewrite dom_union in Hin. apply elem_of_union in Hin as [Hin|Hin].
+    - exists ζ', fs'. rewrite lookup_insert. naive_solver.
+    - assert (∃ ζ fs, m !! ζ = Some fs ∧ ρ ∈ dom fs) as [ζ [fs Hζ]].
+      { apply IH; eauto.
+        intros ???????. eapply Hdisj; eauto; rewrite lookup_insert_ne //; set_solver. }
+      exists ζ, fs. rewrite lookup_insert_ne //. naive_solver.
+  Qed.
+
+  Lemma ls_fuel_suff δ ρ ζ fs: ρ ∈ dom $ ls_fuel δ → ∃ ζ fs, δ.(ls_map) !! ζ = Some fs ∧ ρ ∈ dom fs.
+  Proof.
+    rewrite /ls_fuel. revert ρ.
+    generalize (ls_map_disj δ).
+    induction δ.(ls_map) as [|ζ' fs' m Hnotin IH] using map_ind.
+    { intros ??. rewrite map_fold_empty. set_solver. }
+    intros Hdisj ρ Hin.
+    rewrite map_fold_insert_L // in Hin; last first.
+    { intros. rewrite !assoc. rewrite (map_union_comm z1 z2) //. eapply Hdisj; eauto. }
+    rewrite dom_union in Hin. apply elem_of_union in Hin as [Hin|Hin].
+    - exists ζ', fs'. rewrite lookup_insert. naive_solver.
+    - assert (∃ ζ fs, m !! ζ = Some fs ∧ ρ ∈ dom fs) as [ζ [fs Hζ]].
+      { apply IH; eauto.
+        intros ???????. eapply Hdisj; eauto; rewrite lookup_insert_ne //; set_solver. }
+      exists ζ, fs. rewrite lookup_insert_ne //. naive_solver.
+  Qed.
+
 
   Lemma ls_fuel_dom δ: M.(live_roles) δ.(ls_under) ⊆ dom $ ls_fuel δ.
   Proof.
@@ -114,7 +175,7 @@ Section fairness.
     | _, _ => False
     end.
 
-  Inductive must_decrease (ρ': M.(fmrole)) (oρ: option M.(fmrole)) (a b: LiveState):
+  Inductive must_decrease (ρ': M.(fmrole)) (oρ: option M.(fmrole)) (a b: LiveStateData):
     olocale Λ -> Prop :=
   | Same_tid tid (Hneqρ: Some ρ' ≠ oρ) (Hsametid: Some tid = ls_mapping a !! ρ'):
       must_decrease ρ' oρ a b (Some tid)
@@ -126,17 +187,17 @@ Section fairness.
   .
 
   Definition fuel_decr (tid: olocale Λ) (oρ: option M.(fmrole))
-             (a b: LiveState) :=
+    (a b: LiveStateData) :=
     ∀ ρ', ρ' ∈ dom $ ls_fuel a -> ρ' ∈ dom $ ls_fuel b →
           must_decrease ρ' oρ a b tid ->
           oless (ls_fuel b !! ρ') (ls_fuel a !! ρ').
 
-  Definition fuel_must_not_incr oρ (a b: LiveState) :=
+  Definition fuel_must_not_incr oρ (a b: LiveStateData) :=
     ∀ ρ', ρ' ∈ dom $ ls_fuel a -> Some ρ' ≠ oρ ->
           (oleq (ls_fuel b !! ρ') (ls_fuel a !! ρ')
                 ∨ (ρ' ∉ dom $ ls_fuel b ∧ ρ' ∉ M.(live_roles) a.(ls_under))).
 
-  Definition ls_trans fuel_limit (a: LiveState) ℓ (b: LiveState): Prop :=
+  Definition ls_trans fuel_limit (a: LiveStateData) ℓ (b: LiveStateData): Prop :=
     match ℓ with
     | Take_step ρ tid =>
       M.(fmtrans) a (Some ρ) b
@@ -160,8 +221,9 @@ Section fairness.
       ∧ False (* TODO: add support for config steps later! *)
     end.
 
-  Lemma silent_step_suff fl (δ: LiveState) (fs fs' fs'': gmap _ nat) ζ (oζ' : option $ locale Λ) :
+  Lemma silent_step_suff_data fl (δ: LiveState) (fs fs' fs'': gmap _ nat) ζ (oζ' : option $ locale Λ) :
     δ.(ls_map) !! ζ = Some fs →
+    fs ≠ ∅ →
     (∀ ρ f', fs' !! ρ = Some f' → ∃ f, fs !! ρ = Some f → f' < f) →
     (∀ ρ f', fs'' !! ρ = Some f' → ∃ f, fs !! ρ = Some f → f' < f) →
     (dom fs ∖ (dom fs' ∪ dom fs'') ∩ M.(live_roles) δ = ∅) →
@@ -174,12 +236,18 @@ Section fairness.
           end
     in
     let data'' := <[ζ := fs']> data' in
-    ∃ δ',
-      δ.(ls_under) = δ'.(ls_under) ∧
-      δ.(ls_map) = data'' ∧
-        ls_trans fl δ (Silent_step ζ) δ'.
+    ls_trans fl δ (Silent_step ζ) {| ls_under := δ; ls_map := data'' |}.
   Proof.
-    (* intros Hζ Hfs' Hfs'' Hlives Hdisj Hnlocale data' data''. *)
+    intros Hζ Hnemp Hfs' Hfs'' Hlives Hdisj Hnlocale data' data''. constructor.
+    { admit. }
+    split; [|split; [| split; eauto]].
+    - rewrite /fuel_decr /=. intros ρ' ???. admit.
+    - rewrite /fuel_must_not_incr. intros ρ' ??. admit.
+    - admit.
+
+
+
+    (*Useful in a latter lemma *)
     (* unshelve refine (ex_intro _ {| ls_under := δ; ls_map := data'' |} _). *)
     (* { intros z1 z2 fs1 fs2 Hneq Hkl1 Hlk2. admit. } *)
     (* { intros ρ Hlive. destruct (ls_map_live δ ρ Hlive) as (ζ0&fs0&?&?). *)
