@@ -288,8 +288,26 @@ Section fairness.
             ls_trans fl δ (Silent_step ζ) δ'.
   Proof.
     intros Hζ Hnemp Hfs' Hfs'' Hlives Hdisj Hnlocale Hifnone data' data''.
+    have Hincl' : dom fs' ⊆ dom fs.
+    { intros ?[? Hin]%elem_of_dom. by apply Hfs' in Hin as [?[?%elem_of_dom_2 ?]]. }
+    have Hincl'' : dom fs'' ⊆ dom fs.
+    { intros ?[? Hin]%elem_of_dom. by apply Hfs'' in Hin as [?[?%elem_of_dom_2 ?]]. }
     assert (∃ δ', δ'.(ls_data) = {| ls_under := δ; ls_map := data'' |}) as [δ' Hd].
-    { admit. }
+    { unshelve refine (ex_intro _ {| ls_data := {| ls_under := δ; ls_map := data'' |} |} _); last done.
+      { intros z1 z2 fs1 fs2 Hneq Hkl1 Hlk2. admit. }
+      { intros ρ Hlive. destruct (ls_map_live δ ρ Hlive) as (ζ0&fs0&?&?).
+        destruct (decide (ζ = ζ0)) as [->|].
+        - have Hin: ρ ∈ dom fs' ∪ dom fs''.
+          { simpl in Hlive. simplify_eq. clear Hincl' Hincl''.
+            destruct (decide (ρ ∈ dom fs' ∪ dom fs'')); [done|set_solver]. }
+          apply elem_of_union in Hin as [Hin|Hin].
+          + exists ζ0, fs'. rewrite lookup_insert //.
+          + destruct oζ' as [ζn|]; last naive_solver.
+            exists ζn, fs''. split=>//=. rewrite /data'' /data' lookup_insert_ne // ?lookup_insert //.
+            intros ->. eapply Hnlocale; eauto. by eapply elem_of_dom_2.
+        - exists ζ0, fs0. split; last done. rewrite /data'' /data' lookup_insert_ne // ?lookup_insert //.
+          destruct oζ' as [ζn|]; last naive_solver. rewrite lookup_insert_ne //.
+          intros ->. eapply Hnlocale; eauto. by eapply elem_of_dom_2. } }
     exists δ'. split; first done.
     constructor.
     { destruct (map_choose _ Hnemp) as (ρ&?&?). exists ρ. eapply ls_mapping_data; eauto.
@@ -382,51 +400,16 @@ Section fairness.
         rewrite Hd /data'' /= lookup_insert_ne // /data'. destruct oζ' as [ζn|]; last done.
         rewrite lookup_insert_ne //. intros ->. apply (Hnlocale ζ'); eauto.
         by eapply elem_of_dom_2.
-    - admit.
+    - intros ρ Hin. apply ls_fuel_dom_data_inv in Hin as (ζ0&fs0&Hlk0&Hin0).
+      rewrite Hd /data'' /= in Hlk0. destruct (decide (ζ0 = ζ)) as [->|].
+      + rewrite lookup_insert in Hlk0. simplify_eq. eapply ls_fuel_dom_data; eauto.
+      + rewrite lookup_insert_ne // /data' in Hlk0.
+        destruct oζ' as [ζn|].
+        * destruct (decide (ζ0 = ζn)) as [->|].
+          ** rewrite lookup_insert in Hlk0. simplify_eq. eapply ls_fuel_dom_data; eauto.
+          ** rewrite lookup_insert_ne // /data' in Hlk0. eapply ls_fuel_dom_data; eauto.
+        * eapply ls_fuel_dom_data; eauto.
   Admitted.
-
-
-    (*   destruct (decide (ρ' ∈ live_roles M δ)); last first. *)
-    (*   { right. *)
-
-
-    (*     have: Some ζ2 = oζ'. *)
-    (*     have: ls_mapping δ' !! ρ' = Some ζ'. *)
-    (*     { eapply ls_mapping_data; eauto. *)
-    (*       rewrite Hd /data'' /=. *)
-
-    (*       destruct (decide (ζ2 = ζ')). *)
-
-    (*     rewrite (ls_mapping_data ρ' δ ζ' fs0) in Hneqtid; [| done |apply elem_of_dom; naive_solver]. *)
-    (*     rewrite Hd /= /data'' in Hmap'. destruct (decide (ζ = ζ2)) as [->|Hneq]. *)
-    (*     * rewrite lookup_insert in Hmap'. simplify_eq. *)
-    (*       rewrite (ls_mapping_data ρ' δ' ζ' fs2) in Hneqtid; [| |apply elem_of_dom; naive_solver]. *)
-    (*       rewrite Hd /data'' /=. destruct (decide (ζ2 = ζ')). *)
-    (*       ** simplify_eq. rewrite lookup_insert //. *)
-    (*       ** rewrite lookup_insert_ne //. rewrite /data'. destruct oζ' as [ζ''|]. *)
-    (*          *** destruct (decide (ζ' = ζ'')). *)
-    (*              **** simplify_eq. rewrite lookup_insert. exfalso. set_solver. *)
-
-
-
-    (* - rewrite /fuel_must_not_incr. intros ρ' ??. admit. *)
-    (* - admit. *)
-    (* - . *)
-
-
-
-    (*Useful in a latter lemma *)
-    (* unshelve refine (ex_intro _ {| ls_under := δ; ls_map := data'' |} _). *)
-    (* { intros z1 z2 fs1 fs2 Hneq Hkl1 Hlk2. admit. } *)
-    (* { intros ρ Hlive. destruct (ls_map_live δ ρ Hlive) as (ζ0&fs0&?&?). *)
-    (*   destruct (decide (ζ = ζ0)) as [->|]. *)
-    (*   - exists ζ0, fs'. split=>//. rewrite /data' /data''. *)
-    (*     rewrite lookup_insert; admit. admit. *)
-    (*   - exists ζ0, fs0. split=>//. rewrite /data''. *)
-    (*     rewrite lookup_insert_ne // /data'. *)
-    (*     destruct oζ' as [ζ'|]; last done. rewrite lookup_insert_ne //. *)
-    (*     specialize (Hnlocale ζ' ltac:(done)). *)
-    (*     apply elem_of_dom_2 in H0. naive_solver. } *)
 
   Record LiveModel := {
       lm_fl : M → nat;
