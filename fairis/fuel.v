@@ -346,8 +346,45 @@ Section fairness.
     - rewrite /fuel_must_not_incr. intros ρ' Hin' _.
       apply elem_of_dom in Hin' as [f Hf]. rewrite Hf.
       apply ls_fuel_data_inv in Hf as (ζ'&fs0&Hmap&Hlk).
-      destruct (decide (ζ = ζ')) as [->|].
-      + Admitted.
+      destruct (decide (ζ' = ζ)) as [->|].
+      + have ? : fs0 = fs by naive_solver. simplify_eq.
+        destruct (decide (ρ' ∈ dom fs' ∪ dom fs'')) as [[Hin|Hin]%elem_of_union|Hnin].
+        * left. apply elem_of_dom in Hin as [f' Hlk'].
+          destruct (Hfs' _ _ Hlk') as (?&?&?).
+          have -> /= : ls_fuel δ' !! ρ' = Some f'.
+          { eapply (ls_fuel_data _ _ ζ); eauto. rewrite Hd /data'' /= lookup_insert //. }
+          naive_solver lia.
+        * left. apply elem_of_dom in Hin as [f' Hlk'].
+          destruct (Hfs'' _ _ Hlk') as (?&?&?).
+          have -> /= : ls_fuel δ' !! ρ' = Some f'.
+          destruct oζ' as [ζn|]; last set_solver.
+          { eapply (ls_fuel_data _ _ ζn); eauto.
+            rewrite Hd /data'' /= lookup_insert_ne // /data' ?lookup_insert //.
+            intros ->. eapply Hnlocale; eauto. by eapply elem_of_dom_2. }
+          naive_solver lia.
+        * have Hdead: ρ' ∉ live_roles _ δ.
+          { eapply elem_of_dom_2 in Hlk. set_solver. }
+          right. split; last done. intros Habs. apply ls_fuel_dom_data_inv in Habs as (ζa&fsa&Hlka&Hina).
+          rewrite Hd /data'' /= in Hlka.
+          destruct (decide (ζa = ζ)).
+          { simplify_eq. rewrite lookup_insert in Hlka. simplify_eq. set_solver. }
+          rewrite lookup_insert_ne // /data' in Hlka.
+          destruct oζ' as [ζn|].
+          ** destruct (decide (ζa = ζn)).
+             { simplify_eq. rewrite lookup_insert in Hlka. simplify_eq. set_solver. }
+             rewrite lookup_insert_ne // in Hlka.
+             have [??] : ζ = ζa ∧ fs = fsa; last done.
+             eapply ls_map_agree; eauto; apply elem_of_dom; naive_solver.
+          ** have [??] : ζ = ζa ∧ fs = fsa; last done.
+             eapply ls_map_agree; eauto; apply elem_of_dom; naive_solver.
+      + left. have ->: ls_fuel δ' !! ρ' = Some f; last naive_solver.
+        eapply (ls_fuel_data _ _ ζ'); eauto.
+        rewrite Hd /data'' /= lookup_insert_ne // /data'. destruct oζ' as [ζn|]; last done.
+        rewrite lookup_insert_ne //. intros ->. apply (Hnlocale ζ'); eauto.
+        by eapply elem_of_dom_2.
+    - admit.
+  Admitted.
+
 
     (*   destruct (decide (ρ' ∈ live_roles M δ)); last first. *)
     (*   { right. *)
