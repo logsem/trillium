@@ -294,7 +294,45 @@ Section fairness.
     { intros ?[? Hin]%elem_of_dom. by apply Hfs'' in Hin as [?[?%elem_of_dom_2 ?]]. }
     assert (∃ δ', δ'.(ls_data) = {| ls_under := δ; ls_map := data'' |}) as [δ' Hd].
     { unshelve refine (ex_intro _ {| ls_data := {| ls_under := δ; ls_map := data'' |} |} _); last done.
-      { intros z1 z2 fs1 fs2 Hneq Hkl1 Hlk2. admit. }
+      { rewrite /data'' /=. intros z1 z2 fs1 fs2 Hneq Hlk1 Hlk2. apply map_disjoint_dom_2.
+        intros ρ Hin1 Hin2. destruct (decide (z1 = ζ)) as [->|Hneq1].
+        - rewrite lookup_insert in Hlk1. simplify_eq. rewrite lookup_insert_ne // /data' in Hlk2.
+          destruct oζ' as [ζ'|].
+          + destruct (decide (z2 = ζ')) as [->|Hneq2].
+            * rewrite lookup_insert in Hlk2. simplify_eq. set_solver.
+            * rewrite lookup_insert_ne // in Hlk2. have ?: ρ ∈ dom fs by set_solver.
+              apply Hneq. eapply ls_map_agree; eauto.
+          + apply Hneq. eapply ls_map_agree; eauto.
+        - rewrite lookup_insert_ne // /data' in Hlk1.
+          destruct oζ' as [ζ'|].
+          + destruct (decide (z1 = ζ')) as [->|Hneq2].
+            * rewrite lookup_insert in Hlk1. simplify_eq.
+              destruct (decide (z2 = ζ)) as [->|Hneq3].
+              ** rewrite lookup_insert in Hlk2. simplify_eq. set_solver.
+              ** rewrite !lookup_insert_ne // in Hlk2. specialize (Hnlocale _ ltac:(done)).
+                 have ?: ρ ∈ dom fs by set_solver.
+                 have ?: z2 = ζ by eapply ls_map_agree. simplify_eq.
+            * rewrite lookup_insert_ne // in Hlk1.
+              destruct (decide (z2 = ζ)) as [->|Hneq3].
+              ** rewrite lookup_insert in Hlk2. simplify_eq.
+                 have ?: ρ ∈ dom fs by set_solver.
+                 apply Hneq. by eapply ls_map_agree.
+              ** rewrite lookup_insert_ne // /data' in Hlk2.
+                 destruct (decide (z2 = ζ')) as [->|Hneq4].
+                 *** rewrite lookup_insert in Hlk2. simplify_eq.
+                     apply Hneq1. eapply ls_map_agree; eauto.
+                 *** rewrite lookup_insert_ne // in Hlk2.
+                     have Hdone: fs1 ##ₘ fs2 by eapply (ls_map_disj δ z1 z2).
+                     apply map_disjoint_dom in Hdone.
+                     set_solver.
+          + destruct (decide (z2 = ζ)) as [->|Hneq3].
+            ** rewrite lookup_insert in Hlk2. simplify_eq.
+               have ?: ρ ∈ dom fs by set_solver.
+               apply Hneq. by eapply ls_map_agree.
+            ** rewrite lookup_insert_ne // /data' in Hlk2.
+               have Hdone: fs1 ##ₘ fs2 by eapply (ls_map_disj δ z1 z2).
+               apply map_disjoint_dom in Hdone.
+               set_solver. }
       { intros ρ Hlive. destruct (ls_map_live δ ρ Hlive) as (ζ0&fs0&?&?).
         destruct (decide (ζ = ζ0)) as [->|].
         - have Hin: ρ ∈ dom fs' ∪ dom fs''.
@@ -409,7 +447,7 @@ Section fairness.
           ** rewrite lookup_insert in Hlk0. simplify_eq. eapply ls_fuel_dom_data; eauto.
           ** rewrite lookup_insert_ne // /data' in Hlk0. eapply ls_fuel_dom_data; eauto.
         * eapply ls_fuel_dom_data; eauto.
-  Admitted.
+  Qed.
 
   Record LiveModel := {
       lm_fl : M → nat;
