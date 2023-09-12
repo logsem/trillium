@@ -222,11 +222,13 @@ Section model_state_interp.
     own (fairness_model_free_roles_name fG) (◯ (GSet FR)).
 
   Definition fuel_map_le (m1 m2 : gmap (locale Λ) (gmap Role nat)) :=
-    map_included (λ (fs1 fs2 : gmap Role nat), map_included (≤) fs1 fs2) m1 m2.
+    map_included (λ (fs1 fs2 : gmap Role nat),
+                    map_included (≤) fs1 fs2) m1 m2.
   (* Definition fuel_map_preserve_dead (m : gmap (locale Λ) (gmap Role nat)) *)
   (*            (δ : LiveState Λ M) := *)
   (*   ∀ ρ, (∀ ζ fs, m !! ζ = Some fs → ρ ∉ dom fs) → ρ ∉ M.(live_roles) δ. *)
-  Definition fuel_map_preserve_dead (m : gmap (locale Λ) (gmap Role nat))
+  Definition fuel_map_preserve_dead
+             (m : gmap (locale Λ) (gmap Role nat))
              (δ : LiveState Λ M) :=
     ∀ ρ, ρ ∈ M.(live_roles) δ → ∃ ζ fs, m !! ζ = Some fs ∧ ρ ∈ dom fs.
 
@@ -457,28 +459,76 @@ Section model_state_lemmas.
     iApply (model_agree with "Hs1 Hs2").
   Qed.
 
+  Lemma map_included_insert `{Countable K} {A}
+        (R : relation A) (m1 m2 : gmap K A) i x y :
+    R x y →
+    map_included R m1 m2 →
+    map_included R (<[i:=x]>m1) (<[i:=y]>m2).
+  Proof.
+    intros HR Hle.
+    rewrite /map_included /map_relation /option_relation.
+    intros k.
+    destruct (decide (i=k)) as [<-|Hneq].
+    - rewrite !lookup_insert. done.
+    - rewrite lookup_insert_ne; [|done].
+      rewrite lookup_insert_ne; [|done].
+      apply Hle.
+  Qed.
+
+  Lemma map_included_spec `{∀ A, Lookup K A (MAP A)} {A}
+        (R : relation A) (m1 m2 : MAP A) :
+    map_included R m1 m2 ↔
+    (∀ k v1, m1 !! k = Some v1 → ∃ v2, m2 !! k = Some v2 ∧ R v1 v2).
+  Proof.
+    split.
+    - rewrite /map_included /map_relation /option_relation.
+      intros HR.
+      intros k v1 Hv1.
+      specialize (HR k). rewrite Hv1 in HR.
+      destruct (m2 !! k) eqn:Heqn; [|done].
+      exists a. done.
+    - intros HR.
+      rewrite /map_included /map_relation /option_relation.
+      intros k.
+      destruct (m1 !! k) eqn:Heqn.
+      + apply HR in Heqn as [v2 [Hv2 HR']].
+        rewrite Hv2. done.
+      + by destruct (m2 !! k).
+  Qed.
+
+  Lemma map_included_refl `{∀ A, Lookup K A (MAP A)} {A}
+        `{!Reflexive R} (m : MAP A) :
+    map_included R m m.
+  Proof. rewrite map_included_spec. intros. by eauto. Qed.
+
   (* TODO: Move *)
   (* TODO: Generalise to map_included instead of subseteq? *)
   Lemma map_included_subseteq `{∀ A, Lookup K A (MAP A)} {A}
         (R : relation A) (m1 m2 m3 : MAP A) :
     m1 ⊆ m2 → map_included R m2 m3 → map_included R m1 m3.
   Proof.
-    intros Hle Hincluded.
-  Admitted.
+    rewrite /subseteq /map_subseteq !map_included_spec.
+    intros Hle1 Hle2.
+    intros k v1 HSome.
+    apply Hle1 in HSome as [v2 [HSome HR]].
+    apply Hle2 in HSome as [v3 [HSome HR']].
+    exists v3. split; [done|].
+    by subst.
+  Qed.
 
-  (* TODO: Move *)
   Lemma map_included_transitivity `{∀ A, Lookup K A (MAP A)} {A}
-        (R : relation A) (m1 m2 m3 : MAP A) :
+        `{!Transitive R} (m1 m2 m3 : MAP A) :
     map_included R m1 m2 → map_included R m2 m3 → map_included R m1 m3.
   Proof.
-    intros Hle Hincluded.
-  Admitted.
+    rewrite !map_included_spec.
+    intros Hle1 Hle2.
+    intros k v1 HSome.
+    apply Hle1 in HSome as [v2 [HSome HR]].
+    apply Hle2 in HSome as [v3 [HSome HR']].
+    exists v3. split; [done|].
+    by etransitivity.
+  Qed.
 
-  (* TODO: Generalize types *)
-  Lemma map_included_insert `{Countable K} {A}
-        (R : relation A) (m : gmap K A) i x y :
-    R x y → map_included R (<[i:=x]>m) (<[i:=y]>m).
-  Proof. Admitted.
 
   (* TODO: Generalize types *)
   Lemma map_included_fmap `{Countable K} {A}
@@ -489,14 +539,17 @@ Section model_state_lemmas.
     destruct (m !! k); [by apply Hf|done].
   Qed.
 
-  (* (* TODO: Generalize types *) *)
-  (* Lemma map_included_fmap_mono `{Countable K} {A} *)
-  (*       (R : relation A) (m1 m2 : gmap K A) (f : A → A) : *)
-  (*   map_included R (f <$> m1) (f <$> m2) → map_included R (f <$> m1) (f <$> m2). *)
-  (* Proof. *)
-  (*   intros Hf. intros k. rewrite lookup_fmap. *)
-  (*   destruct (m !! k); [by apply Hf|done]. *)
-  (* Qed. *)
+  Lemma map_included_fmap_l `{Countable K} `{Countable A} `{LeibnizEquiv (gmap K A)}
+        (R : relation A) (m1 m2: gmap K A) (f : A → A) :
+    (∀ (x y :A), R (f x) y → R (f x) (f y)) →
+    map_included R (f <$> m1) m2 →
+    ∃ m2', m2 = (f <$> m2').
+  Proof.
+    rewrite map_included_spec.
+    induction m2 using map_ind.
+    { intros. exists ∅. set_solver. }
+    intros.
+  Admitted.
 
   Lemma has_fuels_agree (ζ : locale Λ) (fs : gmap (fmrole M) nat)
         (m : gmap (locale Λ) (gmap (fmrole M) nat)) :
@@ -543,7 +596,8 @@ Section model_state_lemmas.
     iPureIntro. repeat split.
     - eapply map_included_transitivity; [|done].
       rewrite -{2}(insert_id fm tid (S <$> fs)); [|done].
-      apply map_included_insert. apply map_included_fmap. lia.
+      apply map_included_insert; [|apply map_included_refl].
+      apply map_included_fmap. lia.
     - intros ρ Hin. apply Hfmdead in Hin as (ζ'&ρs&HSome&Hρ).
       destruct (decide (tid = ζ')) as [->|Hneq].
       + exists ζ', fs. rewrite lookup_insert.
@@ -585,7 +639,7 @@ Section model_state_lemmas.
     - rewrite /fuel_map_le.
       eapply map_included_transitivity; [|done].
       rewrite -{2}(insert_id fm tid fs); [|done].
-      apply map_included_insert.
+      apply map_included_insert; [|apply map_included_refl].
       eapply map_included_subseteq; [|done].
       apply delete_subseteq.
     - rewrite /fuel_map_preserve_dead.
@@ -610,14 +664,15 @@ Section model_state_lemmas.
   Qed.
 
   Program Definition model_update_locale_fuel
-          (δ : LM) (ζ : locale Λ) (ρs : gset (fmrole M)): LM :=
+          (δ : LM) (ζ : locale Λ) (ρs : gset (fmrole M)) : LM :=
     {|
       ls_data :=
         {| ls_under := δ.(ls_under);
            ls_map :=
              <[ζ:= (λ f, f - 1) <$>
                      (filter
-                       (λ ρf, ρf.1 ∈ M.(live_roles) δ.(ls_under) ∨ ρf.1 ∈ ρs)
+                       (λ ρf, ρf.1 ∈ M.(live_roles) δ.(ls_under) ∨
+                              ρf.1 ∈ ρs)
                        (δ.(ls_map) !!! ζ))]>δ.(ls_map); |};
     |}.
   Next Obligation.
@@ -680,43 +735,7 @@ Section model_state_lemmas.
     - done.
   Admitted.
 
-  Lemma map_included_insert' `{Countable K} {A}
-        (R : relation A) (m1 m2 : gmap K A) i x y :
-    R x y →
-    map_included R m1 m2 →
-    map_included R (<[i:=x]>m1) (<[i:=y]>m2).
-  Proof.
-    intros HR Hle.
-    rewrite /map_included /map_relation /option_relation.
-    intros k.
-    destruct (decide (i=k)) as [<-|Hneq].
-    - rewrite !lookup_insert. done.
-    - rewrite lookup_insert_ne; [|done].
-      rewrite lookup_insert_ne; [|done].
-      apply Hle.
-  Qed.
-
-  Lemma map_included_spec `{∀ A, Lookup K A (MAP A)} {A}
-        (R : relation A) (m1 m2 : MAP A) :
-    (∀ k v1, m1 !! k = Some v1 → ∃ v2, m2 !! k = Some v2 ∧ R v1 v2) ↔
-    map_included R m1 m2.
-  Proof.
-    split.
-    - intros HR.
-      rewrite /map_included /map_relation /option_relation.
-      intros k.
-      destruct (m1 !! k) eqn:Heqn.
-      + apply HR in Heqn as [v2 [Hv2 HR']].
-        rewrite Hv2. done.
-      + by destruct (m2 !! k).
-    - rewrite /map_included /map_relation /option_relation.
-      intros HR.
-      intros k v1 Hv1.
-      specialize (HR k). rewrite Hv1 in HR.
-      destruct (m2 !! k) eqn:Heqn; [|done].
-      exists a. done.
-  Qed.
-
+  (* TODO: Clean this up *)
   Lemma model_state_interp_can_fuel_step es δ ζ fs :
     fs ≠ ∅ → model_state_interp es δ -∗ has_fuels_S ζ fs -∗
     ⌜model_can_fuel_step δ ζ⌝.
@@ -725,21 +744,25 @@ Section model_state_lemmas.
     iDestruct "Hm" as (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
     rewrite /model_can_fuel_step.
     iDestruct (has_fuels_agree with "Hfm Hfs") as %Hagree.
-    rewrite /fuel_map_le -map_included_spec in Hfmle.
+    rewrite /fuel_map_le map_included_spec in Hfmle.
+    pose proof Hagree as Hagree'.
     apply Hfmle in Hagree as [v2 [HSome Hle]].
     iPureIntro.
     assert (∃ ρ, ρ ∈ dom fs) as [ρ Hin].
-    { assert ((∃ ρ, ρ ∈ dom fs) ∨ ¬ (∃ ρ, ρ ∈ dom fs)) as [?|Hnin];
-        [by apply ExcludedMiddle|done|].
-      assert (∀ ρ, ρ ∉ dom fs).
-      { by apply not_exists_forall_not. }
-      admit. }
-    apply elem_of_dom in Hin as [f Hf].
-    rewrite -map_included_spec in Hle.
-
-    assert ((S <$> fs) !! ρ = Some (S f)) as Hf' by admit.
-    apply Hle in Hf' as [v3 [H1 H2]].
-  Admitted.
+    { apply set_choose_L. intros ?%dom_empty_iff_L. set_solver. }
+    pose proof Hle as Hle'.
+    apply map_included_fmap_l in Hle as [v2' ->]; last first.
+    { intros. lia. }
+    exists ρ, v2'.
+    split; [|done].
+    rewrite map_included_spec in Hle'.
+    rewrite -(dom_fmap_L S) in Hin.
+    apply elem_of_dom in Hin as [? Heq].
+    apply Hle' in Heq as [? [? ?]].
+    rewrite elem_of_dom.
+    apply lookup_fmap_Some in H0 as [? [? ?]].
+    set_solver.
+  Qed.
 
   Lemma decr_succ_compose_id :
     (λ f : nat, f - 1) ∘ S = id.
@@ -764,17 +787,17 @@ Section model_state_lemmas.
     iPureIntro.
     repeat split.
     - rewrite /model_update_locale_fuel. simpl.
-      apply map_included_insert'; [|done].
+      apply map_included_insert; [|done].
       assert (map_included le (S <$> fs) ((ls_map δ) !!! ζ)) as Hfs.
       {
         rewrite /fuel_map_le in Hfmle.
-        rewrite -map_included_spec in Hfmle.
+        rewrite map_included_spec in Hfmle.
         apply Hfmle in Hagree as [ρs [HSome Hρs]].
         rewrite lookup_total_alt. simpl. rewrite HSome. done.
       }
       apply map_included_spec.
       intros ρ f1 Hρ.
-      rewrite -map_included_spec in Hfs.
+      rewrite map_included_spec in Hfs.
       assert ((S <$> fs) !! ρ = Some (S f1)) as Hρ'.
       { rewrite lookup_fmap. rewrite Hρ. simpl. done. }
       specialize (Hfs ρ (S f1) Hρ') as [v2 [Hv2 Hle]].
@@ -824,9 +847,8 @@ Section model_state_lemmas.
     iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
     iModIntro.
     iExists (model_update_locale_fuel (trace_last auxtr) ζ (dom fs)).
-    iSplit.
-    - iPureIntro. by apply model_update_locale_spec.
-    - iFrame.
+    iFrame "Hm Hfuel".
+    iPureIntro. by apply model_update_locale_spec.
   Qed.
 
   Lemma free_roles_inclusion FR fr:
