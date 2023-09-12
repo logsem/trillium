@@ -8,8 +8,10 @@ Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
 Class fairnessGpreS `{Countable (locale Λ)} `(LM: LiveModel Λ M) Σ := {
   fairnessGpreS_model :> inG Σ (authUR (optionUR (exclR (ModelO M))));
-  fairnessGpreS_model_mapping :> inG Σ (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
-  fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO)));
+  fairnessGpreS_model_fuel_mapping :>
+    inG Σ (authUR (gmapUR (localeO Λ)
+                          (gmapUR (RoleO M) (exclR natO))));
+  (* fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO))); *)
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
@@ -17,24 +19,24 @@ Class fairnessGS `{Countable (locale Λ)} `(LM : LiveModel Λ M) Σ := FairnessG
   fairness_inG :> fairnessGpreS LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
-  (** Mapping of threads to sets of roles *)
-  fairness_model_mapping_name : gname;
-  (** Mapping of roles to fuel *)
-  fairness_model_fuel_name : gname;
+  (** Mapping of threads to roles with fuel *)
+  fairness_model_fuel_mapping_name : gname;
+  (* (** Mapping of roles to fuel *) *)
+  (* fairness_model_fuel_name : gname; *)
   (** Set of free/availble roles *)
   fairness_model_free_roles_name : gname;
 }.
 
 Global Arguments fairnessGS {_ _ _ _} LM Σ.
 Global Arguments fairness_model_name {_ _ _ _ LM Σ} _.
-Global Arguments fairness_model_mapping_name {Λ _ _ M LM Σ} _ : assert.
-Global Arguments fairness_model_fuel_name {Λ _ _ M LM Σ} _ : assert.
+Global Arguments fairness_model_fuel_mapping_name {Λ _ _ M LM Σ} _ : assert.
 Global Arguments fairness_model_free_roles_name {Λ _ _ M LM Σ} _ : assert.
 
 Definition fairnessΣ Λ M `{Countable (locale Λ)} : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO M))));
-   GFunctor (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M)))));
-   GFunctor (authUR (gmapUR (RoleO M) (exclR natO)));
+   GFunctor (authUR (gmapUR (localeO Λ) (gmapUR (RoleO M) (exclR natO))));
+   (* GFunctor (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M))))); *)
+   (* GFunctor (authUR (gmapUR (RoleO M) (exclR natO))); *)
    GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
@@ -172,25 +174,40 @@ Section model_state_interp.
 
   Notation Role := (M.(fmrole)).
 
-  Definition auth_fuel_is (F: gmap Role nat): iProp Σ :=
-    own (fairness_model_fuel_name fG)
-        (● (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))).
 
-  Definition frag_fuel_is (F: gmap Role nat): iProp Σ :=
-    own (fairness_model_fuel_name fG)
-        (◯ (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))).
+  Definition auth_fuel_mapping_is
+             (m: gmap (locale Λ) (gmap Role nat)) : iProp Σ :=
+    own (fairness_model_fuel_mapping_name fG)
+        (● ( (fmap (λ (rs: gmap M.(fmrole) nat), fmap Excl rs) m) :
+              ucmra_car (gmapUR _ (gmapUR (RoleO M) (exclR natO))
+        ))).
 
-  Definition auth_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ :=
-    own (fairness_model_mapping_name fG)
-        (● ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) :
-              ucmra_car (gmapUR _ (exclR (gsetR (RoleO M))))
-        )).
+  Definition frag_fuel_mapping_is
+             (m: gmap (locale Λ) (gmap Role nat)) : iProp Σ :=
+    own (fairness_model_fuel_mapping_name fG)
+        (◯ ( (fmap (λ (rs: gmap M.(fmrole) nat), fmap Excl rs) m) :
+              ucmra_car (gmapUR _ (gmapUR (RoleO M) (exclR natO))
+        ))).
 
-  Definition frag_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ :=
-    own (fairness_model_mapping_name fG)
-        (◯ ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) :
-              ucmra_car (gmapUR _ (exclR (gsetR (RoleO M))))
-        )).
+  (* Definition auth_fuel_is (F: gmap Role nat): iProp Σ := *)
+  (*   own (fairness_model_fuel_name fG) *)
+  (*       (● (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))). *)
+
+  (* Definition frag_fuel_is (F: gmap Role nat): iProp Σ := *)
+  (*   own (fairness_model_fuel_name fG) *)
+  (*       (◯ (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))). *)
+
+  (* Definition auth_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ := *)
+  (*   own (fairness_model_mapping_name fG) *)
+  (*       (● ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) : *)
+  (*             ucmra_car (gmapUR _ (exclR (gsetR (RoleO M)))) *)
+  (*       )). *)
+
+  (* Definition frag_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ := *)
+  (*   own (fairness_model_mapping_name fG) *)
+  (*       (◯ ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) : *)
+  (*             ucmra_car (gmapUR _ (exclR (gsetR (RoleO M)))) *)
+  (*       )). *)
 
   Definition auth_model_is (fm: M): iProp Σ :=
     own (fairness_model_name fG) (● Excl' fm).
@@ -204,26 +221,38 @@ Section model_state_interp.
   Definition frag_free_roles_are (FR: gset Role): iProp Σ :=
     own (fairness_model_free_roles_name fG) (◯ (GSet FR)).
 
+  Definition fuel_map_le (m1 m2 : gmap (locale Λ) (gmap Role nat)) :=
+    map_included (λ (fs1 fs2 : gmap Role nat), map_included (≤) fs1 fs2) m1 m2.
+  (* Definition fuel_map_preserve_dead (m : gmap (locale Λ) (gmap Role nat)) *)
+  (*            (δ : LiveState Λ M) := *)
+  (*   ∀ ρ, (∀ ζ fs, m !! ζ = Some fs → ρ ∉ dom fs) → ρ ∉ M.(live_roles) δ. *)
+  Definition fuel_map_preserve_dead (m : gmap (locale Λ) (gmap Role nat))
+             (δ : LiveState Λ M) :=
+    ∀ ρ, ρ ∈ M.(live_roles) δ → ∃ ζ fs, m !! ζ = Some fs ∧ ρ ∈ dom fs.
+
   Definition model_state_interp (tp: list $ expr Λ) (δ: LiveState Λ M): iProp Σ :=
-    ∃ M FR, auth_fuel_is (ls_fuel δ) ∗ auth_mapping_is M ∗ auth_free_roles_are FR ∗
-      ⌜maps_inverse_match (ls_mapping δ) M⌝ ∗
-      ⌜ ∀ ζ, ζ ∉ locales_of_list tp → M !! ζ = None ⌝ ∗
-      auth_model_is δ ∗ ⌜ FR ∩ dom (ls_fuel δ) = ∅ ⌝.
+    ∃ fuel_map,
+      ⌜ fuel_map_le fuel_map δ.(ls_map) ⌝ ∗
+      ⌜ fuel_map_preserve_dead fuel_map δ ⌝ ∗
+      ⌜ ∀ ζ, ζ ∉ locales_of_list tp → fuel_map !! ζ = None ⌝ ∗
+      auth_model_is δ ∗ auth_fuel_mapping_is fuel_map.
+
+  (* Definition model_state_interp (tp: list $ expr Λ) (δ: LiveState Λ M): iProp Σ := *)
+  (*   ∃ M FR, auth_fuel_is (ls_fuel δ) ∗ auth_mapping_is M ∗ auth_free_roles_are FR ∗ *)
+  (*     ⌜maps_inverse_match (ls_mapping δ) M⌝ ∗ *)
+  (*     ⌜ ∀ ζ, ζ ∉ locales_of_list tp → M !! ζ = None ⌝ ∗ *)
+  (*     auth_model_is δ ∗ ⌜ FR ∩ dom (ls_fuel δ) = ∅ ⌝. *)
 
   Lemma model_state_interp_tids_smaller δ tp :
     model_state_interp tp δ -∗ ⌜ tids_smaller tp δ ⌝.
   Proof.
-    iIntros "(%m&%FR&_&_&_&%Hminv&%Hbig&_)". iPureIntro.
+    iIntros "(%m&%Hbig&%FR&_)".
+    iPureIntro.
     intros ρ ζ Hin.
     assert (¬ (ζ ∉ locales_of_list tp)).
     - intros contra.
-      apply Hminv in Hin as [? [Hsome _]].
-      specialize (Hbig _ contra).
-      by rewrite Hbig in Hsome.
-    - destruct (decide (ζ ∈ locales_of_list tp)) as [Hin'|] =>//.
-      apply elem_of_list_fmap in Hin' as [[tp' e'] [-> Hin']].
-      unfold from_locale. exists e'. by apply from_locale_from_Some.
-  Qed.
+  Admitted.
+
 End model_state_interp.
 
 Lemma own_proper `{inG Σ X} γ (x y: X):
@@ -231,15 +260,15 @@ Lemma own_proper `{inG Σ X} γ (x y: X):
   own γ x -∗ own γ y.
 Proof. by intros ->. Qed.
 
-Lemma auth_fuel_is_proper `{fairnessGS (LM:=LM) Σ}
-      (x y : gmap (fmrole M) nat):
-  x = y ->
-  auth_fuel_is x -∗ auth_fuel_is y.
-Proof. by intros ->. Qed.
+(* Lemma auth_fuel_is_proper `{fairnessGS (LM:=LM) Σ} *)
+(*       (x y : gmap (fmrole M) nat): *)
+(*   x = y -> *)
+(*   auth_fuel_is x -∗ auth_fuel_is y. *)
+(* Proof. by intros ->. Qed. *)
 
-Notation "tid ↦M R" := (frag_mapping_is {[ tid := R ]}) (at level 33).
-Notation "tid ↦m ρ" := (frag_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33).
-Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33).
+(* Notation "tid ↦M R" := (frag_mapping_is {[ tid := R ]}) (at level 33). *)
+(* Notation "tid ↦m ρ" := (frag_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33). *)
+(* Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33). *)
 
 Section model_state_lemmas.
   Context `{Countable (locale Λ)}.
@@ -249,11 +278,11 @@ Section model_state_lemmas.
 
   Notation Role := (M.(fmrole)).
 
-  Definition has_fuel (ζ: locale Λ) (ρ: Role) (f: nat): iProp Σ :=
-    ζ ↦m ρ ∗ ρ ↦F f.
+  Definition has_fuels (ζ: locale Λ) (fs: gmap Role nat) : iProp Σ :=
+    frag_fuel_mapping_is {[ ζ := fs ]}.
 
-  Definition has_fuels (ζ: locale Λ) (fs: gmap Role nat): iProp Σ :=
-    ζ ↦M dom fs ∗ [∗ set] ρ ∈ dom fs, ∃ f, ⌜fs !! ρ = Some f⌝ ∧ ρ ↦F f.
+  Definition has_fuel (ζ: locale Λ) (ρ: Role) (f: nat): iProp Σ :=
+    has_fuels ζ  {[ρ := f ]}.
 
   #[global] Instance has_fuels_proper :
     Proper ((≡) ==> (≡) ==> (≡)) (has_fuels).
@@ -266,16 +295,10 @@ Section model_state_lemmas.
   Lemma has_fuel_fuels (ζ: locale Λ) (ρ: Role) (f: nat):
     has_fuel ζ ρ f ⊣⊢ has_fuels ζ {[ ρ := f ]}.
   Proof.
-    rewrite /has_fuel /has_fuels. iSplit.
-    - iIntros "[Hζ Hρ]". rewrite dom_singleton_L big_sepS_singleton. iFrame.
-      iExists f. iFrame. iPureIntro. by rewrite lookup_singleton.
-    - iIntros "(?&H)". rewrite dom_singleton_L big_sepS_singleton. iFrame.
-      iDestruct "H" as (?) "H". rewrite lookup_singleton.
-      iDestruct "H" as "[% ?]". by simplify_eq.
-  Qed.
+  Admitted.
 
   Definition has_fuels_S (ζ: locale Λ) (fs: gmap Role nat): iProp Σ :=
-    has_fuels ζ (fmap S fs).
+    has_fuels ζ (S <$> fs).
 
   Definition has_fuels_plus (n: nat) (ζ: locale Λ) (fs: gmap Role nat): iProp Σ :=
     has_fuels ζ (fmap (fun m => n+m) fs).
@@ -309,23 +332,23 @@ Section model_state_lemmas.
     rewrite !lookup_fmap //.
   Qed.
 
-  Lemma frag_mapping_same ζ m R:
-    auth_mapping_is m -∗ ζ ↦M R -∗ ⌜ m !! ζ = Some R ⌝.
-  Proof.
-    iIntros "Ha Hf". iCombine "Ha Hf" as "H". rewrite own_valid.
-    iDestruct "H" as "%Hval". iPureIntro.
-    apply auth_both_valid in Hval as [HA HB].
-    rewrite map_fmap_singleton in HA.
-    specialize (HA 0%nat).
-    apply cmra_discrete_included_iff in HA.
-    apply -> (@singleton_included_l (locale Λ)) in HA. destruct HA as (R' & HA & Hsub).
-    assert (✓ Some R'). by rewrite -HA.
-    destruct R' as [R'|]; last done.
-    apply Excl_included in Hsub. apply leibniz_equiv in Hsub.
-    rewrite Hsub.
-    apply leibniz_equiv in HA. rewrite -> lookup_fmap_Some in HA.
-    destruct HA as (?&?&?). congruence.
-  Qed.
+  (* Lemma frag_mapping_same ζ m R: *)
+  (*   auth_mapping_is m -∗ ζ ↦M R -∗ ⌜ m !! ζ = Some R ⌝. *)
+  (* Proof. *)
+  (*   iIntros "Ha Hf". iCombine "Ha Hf" as "H". rewrite own_valid. *)
+  (*   iDestruct "H" as "%Hval". iPureIntro. *)
+  (*   apply auth_both_valid in Hval as [HA HB]. *)
+  (*   rewrite map_fmap_singleton in HA. *)
+  (*   specialize (HA 0%nat). *)
+  (*   apply cmra_discrete_included_iff in HA. *)
+  (*   apply -> (@singleton_included_l (locale Λ)) in HA. destruct HA as (R' & HA & Hsub). *)
+  (*   assert (✓ Some R'). by rewrite -HA. *)
+  (*   destruct R' as [R'|]; last done. *)
+  (*   apply Excl_included in Hsub. apply leibniz_equiv in Hsub. *)
+  (*   rewrite Hsub. *)
+  (*   apply leibniz_equiv in HA. rewrite -> lookup_fmap_Some in HA. *)
+  (*   destruct HA as (?&?&?). congruence. *)
+  (* Qed. *)
 
 End model_state_lemmas.
 
@@ -345,43 +368,43 @@ Section adequacy.
     iExists _. by iSplitL "Hfl".
   Qed.
 
-  Lemma model_mapping_init (s0: M) (ζ0: locale Λ):
-    ⊢ |==> ∃ γ,
-        own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ
-            (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
-               ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]})).
-  Proof.
-    iMod (own_alloc (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅
-                       ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}))) as (γ) "[Hfl Hfr]".
-    { apply auth_both_valid_2; eauto. by apply singleton_valid. }
-    iExists _. by iSplitL "Hfl".
-  Qed.
+  (* Lemma model_mapping_init (s0: M) (ζ0: locale Λ): *)
+  (*   ⊢ |==> ∃ γ, *)
+  (*       own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ *)
+  (*           (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅ *)
+  (*              ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]})). *)
+  (* Proof. *)
+  (*   iMod (own_alloc (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅ *)
+  (*                      ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}))) as (γ) "[Hfl Hfr]". *)
+  (*   { apply auth_both_valid_2; eauto. by apply singleton_valid. } *)
+  (*   iExists _. by iSplitL "Hfl". *)
+  (* Qed. *)
 
-  Lemma model_fuel_init (s0: M):
-    ⊢ |==> ∃ γ,
-        own (A := authUR (gmapUR (RoleO M) (exclR natO))) γ
-            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0))).
-  Proof.
-    iMod (own_alloc
-            (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅
-               (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)))) as (γ) "[H1 H2]".
-    { apply auth_both_valid_2;eauto. intros ρ.
-      destruct (gset_to_gmap (Excl (LM.(lm_fl) s0)) (live_roles M s0) !! ρ) eqn:Heq;
-        rewrite Heq; last done.
-      apply lookup_gset_to_gmap_Some in Heq.
-      destruct Heq as [?<-]. done. }
-    iExists _. by iSplitL "H1".
-  Qed.
+  (* Lemma model_fuel_init (s0: M): *)
+  (*   ⊢ |==> ∃ γ, *)
+  (*       own (A := authUR (gmapUR (RoleO M) (exclR natO))) γ *)
+  (*           (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅ *)
+  (*              (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0))). *)
+  (* Proof. *)
+  (*   iMod (own_alloc *)
+  (*           (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅ *)
+  (*              (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)))) as (γ) "[H1 H2]". *)
+  (*   { apply auth_both_valid_2;eauto. intros ρ. *)
+  (*     destruct (gset_to_gmap (Excl (LM.(lm_fl) s0)) (live_roles M s0) !! ρ) eqn:Heq; *)
+  (*       rewrite Heq; last done. *)
+  (*     apply lookup_gset_to_gmap_Some in Heq. *)
+  (*     destruct Heq as [?<-]. done. } *)
+  (*   iExists _. by iSplitL "H1". *)
+  (* Qed. *)
 
-  Lemma model_free_roles_init (s0: M) (FR: gset _):
-    ⊢ |==> ∃ γ,
-        own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR).
-  Proof.
-    iMod (own_alloc (● GSet FR  ⋅ ◯ GSet FR)) as (γ) "[H1 H2]".
-    { apply auth_both_valid_2 =>//. }
-    iExists _. by iSplitL "H1".
-  Qed.
+  (* Lemma model_free_roles_init (s0: M) (FR: gset _): *)
+  (*   ⊢ |==> ∃ γ, *)
+  (*       own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR). *)
+  (* Proof. *)
+  (*   iMod (own_alloc (● GSet FR  ⋅ ◯ GSet FR)) as (γ) "[H1 H2]". *)
+  (*   { apply auth_both_valid_2 =>//. } *)
+  (*   iExists _. by iSplitL "H1". *)
+  (* Qed. *)
 End adequacy.
 
 Section model_state_lemmas.
@@ -398,6 +421,412 @@ Section model_state_lemmas.
     iMod (own_update with "H") as "[??]" ; eauto.
     - by apply auth_update, option_local_update, (exclusive_local_update _ (Excl δ)).
     - iModIntro. iFrame.
+  Qed.
+
+  (* Lemma has_fuel_in ζ δ fs n : *)
+  (*   model_state_interp n δ -∗ has_fuels ζ fs -∗ *)
+  (*   ⌜ ∀ ρ, ρ ∈ dom fs → ls_mapping δ !! ρ = Some ζ ⌝. *)
+  (* Proof. Admitted. *)
+
+
+  (* Lemma auth_fuel_is_agree fm ζ fs : *)
+  (*   auth_fuel_is fm -∗ has_fuels ζ fs -∗ *)
+  (*   ∃ fs', ⌜fm = fs ∪ fs'⌝ ∗ ⌜fs ##ₘ fs'⌝. *)
+  (* Proof. *)
+  (*   iIntros "Hfm Hfuel". *)
+  (*   iDestruct "Hfuel" as (fs' Hle) "[Hζ Hfs]". *)
+  (*   iDestruct (auth_fuel_subseteq with "Hfm Hfs") as %Hle'. *)
+  (*   assert (∃ fs'', fm = fs ∪ fs'' ∧ fs ##ₘ fs'') as [fs'' [-> Hdisj]]. *)
+  (*   { by apply map_subseteq_disjoint_union_L in Hle'. } *)
+  (*   iExists fs''. *)
+  (*   iSplit; [done|]. set_solver. *)
+  (* Qed. *)
+
+  Lemma model_agree s1 s2:
+    auth_model_is s1 -∗ frag_model_is s2 -∗ ⌜ s1 = s2 ⌝.
+  Proof.
+    iIntros "Ha Hf".
+      by iDestruct (own_valid_2 with "Ha Hf") as
+          %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete.
+  Qed.
+
+  Lemma model_agree' δ1 s2 n:
+    model_state_interp n δ1 -∗ frag_model_is s2 -∗ ⌜ ls_under δ1 = s2 ⌝.
+  Proof.
+    iIntros "Hsi Hs2". iDestruct "Hsi" as (??) "(_&_&Hs1&_)".
+    iApply (model_agree with "Hs1 Hs2").
+  Qed.
+
+  (* TODO: Move *)
+  (* TODO: Generalise to map_included instead of subseteq? *)
+  Lemma map_included_subseteq `{∀ A, Lookup K A (MAP A)} {A}
+        (R : relation A) (m1 m2 m3 : MAP A) :
+    m1 ⊆ m2 → map_included R m2 m3 → map_included R m1 m3.
+  Proof.
+    intros Hle Hincluded.
+  Admitted.
+
+  (* TODO: Move *)
+  Lemma map_included_transitivity `{∀ A, Lookup K A (MAP A)} {A}
+        (R : relation A) (m1 m2 m3 : MAP A) :
+    map_included R m1 m2 → map_included R m2 m3 → map_included R m1 m3.
+  Proof.
+    intros Hle Hincluded.
+  Admitted.
+
+  (* TODO: Generalize types *)
+  Lemma map_included_insert `{Countable K} {A}
+        (R : relation A) (m : gmap K A) i x y :
+    R x y → map_included R (<[i:=x]>m) (<[i:=y]>m).
+  Proof. Admitted.
+
+  (* TODO: Generalize types *)
+  Lemma map_included_fmap `{Countable K} {A}
+        (R : relation A) (m : gmap K A) (f : A → A) :
+    (∀ x:A, R x (f x)) → map_included R m (f <$> m).
+  Proof.
+    intros Hf. intros k. rewrite lookup_fmap.
+    destruct (m !! k); [by apply Hf|done].
+  Qed.
+
+  (* (* TODO: Generalize types *) *)
+  (* Lemma map_included_fmap_mono `{Countable K} {A} *)
+  (*       (R : relation A) (m1 m2 : gmap K A) (f : A → A) : *)
+  (*   map_included R (f <$> m1) (f <$> m2) → map_included R (f <$> m1) (f <$> m2). *)
+  (* Proof. *)
+  (*   intros Hf. intros k. rewrite lookup_fmap. *)
+  (*   destruct (m !! k); [by apply Hf|done]. *)
+  (* Qed. *)
+
+  Lemma has_fuels_agree (ζ : locale Λ) (fs : gmap (fmrole M) nat)
+        (m : gmap (locale Λ) (gmap (fmrole M) nat)) :
+    auth_fuel_mapping_is m -∗ has_fuels ζ fs -∗ ⌜m !! ζ = Some fs⌝.
+  Proof. Admitted.
+
+  Lemma has_fuels_decr (ζ : locale Λ) (fs : gmap (fmrole M) nat)
+        (m : gmap (locale Λ) (gmap (fmrole M) nat)) :
+    auth_fuel_mapping_is m -∗ has_fuels_S ζ fs ==∗
+    auth_fuel_mapping_is (<[ζ := fs]>m) ∗ has_fuels ζ fs.
+  Proof.
+    iIntros "Hfm Hfs".
+    rewrite /has_fuels_S.
+    iDestruct (has_fuels_agree with "Hfm Hfs") as %Hagree.
+    (* rewrite -{1}(insert_id m ζ (S <$> fs)); [|done]. *)
+    iMod (own_update_2 with "Hfm Hfs") as "[$ $]"; [|done].
+    apply auth_update.
+  Admitted.
+
+  (* Lemma has_fuels_update fm ζ fs fs' : *)
+  (*   auth_fuel_mapping_is fm -∗ has_fuels ζ fs ==∗ *)
+  (*   auth_fuel_mapping_is (<[ζ := fs']>fm) ∗ has_fuels ζ fs'. *)
+  (* Proof. Admitted. *)
+
+  Lemma has_fuels_delete fs ζ ρs ρ :
+    ρ ∈ dom ρs →
+    auth_fuel_mapping_is fs -∗ has_fuels ζ ρs ==∗
+    auth_fuel_mapping_is (<[ζ := delete ρ ρs]>fs) ∗
+    has_fuels ζ (delete ρ ρs).
+  Proof.
+  Admitted.
+
+  Lemma model_state_interp_has_fuels_decr tp δ tid fs :
+    model_state_interp tp δ -∗ has_fuels_S tid fs ==∗
+    model_state_interp tp δ ∗ has_fuels tid fs.
+  Proof.
+    iDestruct 1 as
+      (fm Hfmle Hfmdead Htp) "(Hδ & Hfm)".
+    iIntros "Hfs".
+    iDestruct (has_fuels_agree with "Hfm Hfs") as %Hagree.
+    iMod (has_fuels_decr with "Hfm Hfs") as "[Hfm Hfs]".
+    iModIntro. iFrame "Hfs".
+    iExists _. iFrame.
+    iPureIntro. repeat split.
+    - eapply map_included_transitivity; [|done].
+      rewrite -{2}(insert_id fm tid (S <$> fs)); [|done].
+      apply map_included_insert. apply map_included_fmap. lia.
+    - intros ρ Hin. apply Hfmdead in Hin as (ζ'&ρs&HSome&Hρ).
+      destruct (decide (tid = ζ')) as [->|Hneq].
+      + exists ζ', fs. rewrite lookup_insert.
+        split; [done|]. set_solver.
+      + exists ζ', ρs. rewrite lookup_insert_ne; [|done]. done.
+    - intros ζ Hζ.
+      specialize (Htp ζ Hζ).
+      rewrite -(insert_id fm tid (S <$> fs)) in Htp; [|done].
+      rewrite -not_elem_of_dom.
+      rewrite -not_elem_of_dom in Htp.
+      set_solver.
+  Qed.
+
+  Lemma model_state_interp_has_fuels_dealloc tid fs ρ tp δ δ' :
+    ρ ∉ live_roles _ δ →
+    model_state_interp tp δ' -∗
+    frag_model_is δ -∗
+    has_fuels tid fs ==∗
+    model_state_interp tp δ' ∗ frag_model_is δ ∗ has_fuels tid (delete ρ fs).
+  Proof.
+    intros Hρ.
+    destruct (decide (ρ ∈ dom fs)) as [Hin|Hnin]; last first.
+    { assert (delete ρ fs = fs) as ->.
+      { apply delete_notin. by rewrite -not_elem_of_dom. }
+      by iIntros "$$$". }
+    iDestruct 1 as
+      (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
+    iIntros "Hst Hfs".
+    iDestruct (model_agree with "Hm Hst") as %Heq. rewrite !Heq.
+    assert (is_Some (fs !! ρ)) as [f HSome].
+    { by rewrite -elem_of_dom. }
+    iDestruct (has_fuels_agree with "Hfm Hfs") as %Hagree.
+    iMod (has_fuels_delete with "Hfm Hfs") as "[Hfm Hfs]"; [done|].
+    iModIntro.
+    iFrame "Hst". iFrame "Hfs".
+    iExists _. iFrame. rewrite Heq. iFrame.
+    iPureIntro.
+    repeat split; try done.
+    - rewrite /fuel_map_le.
+      eapply map_included_transitivity; [|done].
+      rewrite -{2}(insert_id fm tid fs); [|done].
+      apply map_included_insert.
+      eapply map_included_subseteq; [|done].
+      apply delete_subseteq.
+    - rewrite /fuel_map_preserve_dead.
+      intros ρ' Hρ'.
+      assert (ρ ≠ ρ') by set_solver.
+      rewrite /fuel_map_preserve_dead in Hfmdead.
+      apply Hfmdead in Hρ' as (ζ&ρs&HSome'&Hρs).
+      destruct (decide (tid = ζ)) as [->|Hneq].
+      + exists ζ, (delete ρ fs).
+        rewrite lookup_insert. set_solver.
+      + exists ζ, ρs. rewrite lookup_insert_ne; [|done].
+        set_solver.
+    - intros ζ Hζ. specialize (Htp ζ Hζ).
+      rewrite -not_elem_of_dom.
+      rewrite -not_elem_of_dom in Htp.
+      assert (ζ ≠ tid).
+      { intros ->.
+        assert (tid ∈ dom fm).
+        { rewrite elem_of_dom. by set_solver. }
+        set_solver. }
+      set_solver.
+  Qed.
+
+  Program Definition model_update_locale_fuel
+          (δ : LM) (ζ : locale Λ) (ρs : gset (fmrole M)): LM :=
+    {|
+      ls_data :=
+        {| ls_under := δ.(ls_under);
+           ls_map :=
+             <[ζ:= (λ f, f - 1) <$>
+                     (filter
+                       (λ ρf, ρf.1 ∈ M.(live_roles) δ.(ls_under) ∨ ρf.1 ∈ ρs)
+                       (δ.(ls_map) !!! ζ))]>δ.(ls_map); |};
+    |}.
+  Next Obligation.
+    intros δ ζ ρs ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2.
+    simpl in *.
+    destruct (ls_map δ !! ζ) eqn:Heqn; last first.
+    { rewrite lookup_total_alt in HSome1.
+      rewrite lookup_total_alt in HSome2.
+      rewrite Heqn in HSome1.
+      rewrite Heqn in HSome2. simpl in *.
+      admit. }
+    admit.
+  Admitted.
+  Next Obligation.
+    intros δ ζ ρs ρ Hlive.
+    simpl in *.
+    pose proof Hlive as Hlive'.
+    apply (ls_map_live δ) in Hlive as (ζ' & fs & HSome & Hdom).
+    destruct (decide (ζ = ζ')) as [<-|Hneq].
+    - eexists ζ, _.
+      rewrite lookup_insert.
+      rewrite lookup_total_alt. rewrite HSome. simpl.
+      split; [done|].
+      rewrite dom_fmap.
+      rewrite map_filter_or.
+      rewrite dom_union_L.
+      apply elem_of_union. left.
+      apply elem_of_dom.
+      apply elem_of_dom in Hdom as [f Heq]. exists f.
+      by apply map_filter_lookup_Some_2.
+    - eexists ζ', fs.
+      rewrite lookup_insert_ne; [|done].
+      done.
+  Qed.
+
+  (* OBS: Definition may need to change *)
+  Definition model_can_fuel_step (δ : LM) (ζ : locale Λ) : Prop :=
+    ∃ ρ fs, ρ ∈ dom fs ∧ δ.(ls_map) !! ζ = Some (S <$> fs).
+
+  Lemma model_update_locale_spec extr (auxtr : auxiliary_trace LM) ζ c2 ρs:
+    model_can_fuel_step (trace_last auxtr) ζ →
+    (* This can probably be relaxed *)
+    tids_smaller c2.1 (model_update_locale_fuel (trace_last auxtr) ζ ρs) →
+    valid_state_evolution_fairness
+      (extr :tr[Some ζ]: c2)
+      (auxtr :tr[Silent_step ζ]:
+          (model_update_locale_fuel (trace_last auxtr) ζ) ρs).
+  Proof.
+    intros Hstep Htids. destruct c2.
+    destruct Hstep as (ρ&fs&Hdom&Hfs).
+    repeat split.
+    - exists ρ. rewrite /ls_mapping.
+      admit.                    (* Need lemma *)
+    - intros ρ' Hdom1 Hdom2 Hdecr.
+      rewrite /oless. rewrite /ls_fuel.
+      admit.                    (* Need lemma *)
+    - intros ρ' Hdom' Hsome'.
+      admit.                    (* Need lemma *)
+    - admit.                    (* Need lemma *)
+    - done.
+  Admitted.
+
+  Lemma map_included_insert' `{Countable K} {A}
+        (R : relation A) (m1 m2 : gmap K A) i x y :
+    R x y →
+    map_included R m1 m2 →
+    map_included R (<[i:=x]>m1) (<[i:=y]>m2).
+  Proof.
+    intros HR Hle.
+    rewrite /map_included /map_relation /option_relation.
+    intros k.
+    destruct (decide (i=k)) as [<-|Hneq].
+    - rewrite !lookup_insert. done.
+    - rewrite lookup_insert_ne; [|done].
+      rewrite lookup_insert_ne; [|done].
+      apply Hle.
+  Qed.
+
+  Lemma map_included_spec `{∀ A, Lookup K A (MAP A)} {A}
+        (R : relation A) (m1 m2 : MAP A) :
+    (∀ k v1, m1 !! k = Some v1 → ∃ v2, m2 !! k = Some v2 ∧ R v1 v2) ↔
+    map_included R m1 m2.
+  Proof.
+    split.
+    - intros HR.
+      rewrite /map_included /map_relation /option_relation.
+      intros k.
+      destruct (m1 !! k) eqn:Heqn.
+      + apply HR in Heqn as [v2 [Hv2 HR']].
+        rewrite Hv2. done.
+      + by destruct (m2 !! k).
+    - rewrite /map_included /map_relation /option_relation.
+      intros HR.
+      intros k v1 Hv1.
+      specialize (HR k). rewrite Hv1 in HR.
+      destruct (m2 !! k) eqn:Heqn; [|done].
+      exists a. done.
+  Qed.
+
+  Lemma model_state_interp_can_fuel_step es δ ζ fs :
+    fs ≠ ∅ → model_state_interp es δ -∗ has_fuels_S ζ fs -∗
+    ⌜model_can_fuel_step δ ζ⌝.
+  Proof.
+    iIntros (Hfs) "Hm Hfs".
+    iDestruct "Hm" as (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
+    rewrite /model_can_fuel_step.
+    iDestruct (has_fuels_agree with "Hfm Hfs") as %Hagree.
+    rewrite /fuel_map_le -map_included_spec in Hfmle.
+    apply Hfmle in Hagree as [v2 [HSome Hle]].
+    iPureIntro.
+    assert (∃ ρ, ρ ∈ dom fs) as [ρ Hin].
+    { assert ((∃ ρ, ρ ∈ dom fs) ∨ ¬ (∃ ρ, ρ ∈ dom fs)) as [?|Hnin];
+        [by apply ExcludedMiddle|done|].
+      assert (∀ ρ, ρ ∉ dom fs).
+      { by apply not_exists_forall_not. }
+      admit. }
+    apply elem_of_dom in Hin as [f Hf].
+    rewrite -map_included_spec in Hle.
+
+    assert ((S <$> fs) !! ρ = Some (S f)) as Hf' by admit.
+    apply Hle in Hf' as [v3 [H1 H2]].
+  Admitted.
+
+  Lemma decr_succ_compose_id :
+    (λ f : nat, f - 1) ∘ S = id.
+  Proof. apply FunExt. intros x. simpl. lia. Qed.
+
+  (* (* This is probably not enough. *) *)
+  Lemma model_state_interp_update c1 c2 δ ζ fs :
+    fs ≠ ∅ →
+    locale_step c1 (Some ζ) c2 →
+    model_state_interp c1.1 δ -∗
+    has_fuels_S ζ fs ==∗
+    model_state_interp c2.1 (model_update_locale_fuel δ ζ (dom fs)) ∗
+    has_fuels ζ fs.
+  Proof.
+    iIntros (Hdom Hstep) "Hm Hfs".
+    iDestruct "Hm" as (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
+    iDestruct (has_fuels_agree with "Hfm Hfs") as %Hagree.
+    iMod (has_fuels_decr with "Hfm Hfs") as "[Hfm Hfs]".
+    iFrame "Hfs".
+    iModIntro.
+    iExists _. iFrame.
+    iPureIntro.
+    repeat split.
+    - rewrite /model_update_locale_fuel. simpl.
+      apply map_included_insert'; [|done].
+      assert (map_included le (S <$> fs) ((ls_map δ) !!! ζ)) as Hfs.
+      {
+        rewrite /fuel_map_le in Hfmle.
+        rewrite -map_included_spec in Hfmle.
+        apply Hfmle in Hagree as [ρs [HSome Hρs]].
+        rewrite lookup_total_alt. simpl. rewrite HSome. done.
+      }
+      apply map_included_spec.
+      intros ρ f1 Hρ.
+      rewrite -map_included_spec in Hfs.
+      assert ((S <$> fs) !! ρ = Some (S f1)) as Hρ'.
+      { rewrite lookup_fmap. rewrite Hρ. simpl. done. }
+      specialize (Hfs ρ (S f1) Hρ') as [v2 [Hv2 Hle]].
+      destruct v2; [lia|].
+      exists v2.
+      split; [|lia].
+      rewrite !lookup_fmap.
+      rewrite map_filter_lookup.
+      rewrite Hv2.
+      simpl.
+      destruct (decide (ρ ∈ live_roles M δ ∨ ρ ∈ dom fs)) as [Hin|Hnin].
+      + rewrite option_guard_True; [|done].
+        (* apply map_filter_lookup_Some_2; [|done]. *)
+        simpl. f_equiv. lia.
+      + apply Decidable.not_or in Hnin.
+        destruct Hnin as [Hnin1 Hnin2].
+        apply not_elem_of_dom in Hnin2. set_solver.
+    - intros ρ Hin.
+      apply Hfmdead in Hin as (ζ'&ρs&HSome&Hρ).
+      destruct (decide (ζ = ζ')) as [<-|Hneq].
+      + exists ζ, fs. rewrite lookup_insert. set_solver.
+      + exists ζ', ρs. rewrite lookup_insert_ne; [|done]. set_solver.
+    - intros ζ' Hζ'.
+      destruct c1, c2.
+      apply locales_of_list_step_incl in Hstep.
+      simpl in *.
+      assert (ζ' ∉ locales_of_list l) as Hζ'' by set_solver.
+      apply Htp in Hζ''.
+      rewrite -not_elem_of_dom. rewrite -not_elem_of_dom in Hζ''.
+      set_solver.
+  Qed.
+
+  Lemma update_fuel_step extr (auxtr : auxiliary_trace LM) c2 fs ζ :
+    fs ≠ ∅ →
+    locale_step (trace_last extr) (Some ζ) c2 →
+    has_fuels_S ζ fs -∗
+    model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
+    ∃ δ2,
+      ⌜ valid_state_evolution_fairness
+        (extr :tr[Some ζ]: c2) (auxtr :tr[Silent_step ζ]: δ2) ⌝ ∗
+      has_fuels ζ fs ∗ model_state_interp c2.1 δ2.
+  Proof.
+    iIntros (Hdom Hstep) "Hfuel Hm".
+    iDestruct (model_state_interp_can_fuel_step with "Hm Hfuel") as %Hcan_step;
+      [done|].
+    iMod (model_state_interp_update with "Hm Hfuel") as "[Hm Hfuel]"; [done..|].
+    iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
+    iModIntro.
+    iExists (model_update_locale_fuel (trace_last auxtr) ζ (dom fs)).
+    iSplit.
+    - iPureIntro. by apply model_update_locale_spec.
+    - iFrame.
   Qed.
 
   Lemma free_roles_inclusion FR fr:
@@ -435,21 +864,6 @@ Section model_state_lemmas.
     - apply auth_update, gset_disj_dealloc_local_update.
     - iModIntro. iFrame. iApply (own_proper with "Hfr2").
       do 2 f_equiv. set_solver.
-  Qed.
-
-  Lemma model_agree s1 s2:
-    auth_model_is s1 -∗ frag_model_is s2 -∗ ⌜ s1 = s2 ⌝.
-  Proof.
-    iIntros "Ha Hf".
-      by iDestruct (own_valid_2 with "Ha Hf") as
-          %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete.
-  Qed.
-
-  Lemma model_agree' δ1 s2 n:
-    model_state_interp n δ1 -∗ frag_model_is s2 -∗ ⌜ ls_under δ1 = s2 ⌝.
-  Proof.
-    iIntros "Hsi Hs2". iDestruct "Hsi" as (??) "(_&_&_&_&_&Hs1&_)".
-    iApply (model_agree with "Hs1 Hs2").
   Qed.
 
   Lemma update_fuel_delete ρ f F:
