@@ -518,17 +518,16 @@ Section model_state_lemmas.
     by subst.
   Qed.
 
-  (* Lemma map_included_subseteq_inv `{∀ A, Lookup K A (MAP A)} {A} *)
-  (*       `{Dom (MAP A) A} `{SubsetEq A} *)
-  (*       (R : relation A) (m1 m2 : MAP A) : *)
-  (*   map_included R m1 m2 → (dom m1) ⊆ (dom m2). *)
-  (* Proof. *)
-  (*   rewrite /subseteq /map_subseteq !map_included_spec. *)
-  (*   intros Hle. intros k v1 HSome. *)
-  (*   apply Hle in HSome as [v2 [HSome HR]]. *)
-  (*   exists v2. split; [done|]. *)
-  (*   by subst. *)
-  (* Qed. *)
+  (* TODO: Generalise to better typeclasses *)
+  Lemma map_included_subseteq_inv `{Countable K} {V}
+        (R : relation V) (m1 m2 : gmap K V) :
+    map_included R m1 m2 → (dom m1) ⊆ (dom m2).
+  Proof.
+    rewrite /map_included /map_relation /option_relation.
+    intros Hle k. rewrite !elem_of_dom. specialize (Hle k).
+    intros [? Heq]. rewrite Heq in Hle.
+    by destruct (m2 !! k).
+  Qed.
 
   Lemma map_included_transitivity `{∀ A, Lookup K A (MAP A)} {A}
         `{!Transitive R} (m1 m2 m3 : MAP A) :
@@ -542,7 +541,6 @@ Section model_state_lemmas.
     exists v3. split; [done|].
     by etransitivity.
   Qed.
-
 
   (* TODO: Generalize types *)
   Lemma map_included_fmap `{Countable K} {A}
@@ -565,9 +563,6 @@ Section model_state_lemmas.
   (*   { intros. exists ∅. set_solver. } *)
   (*   intros. *)
   (* Admitted. *)
-
-  Global Instance Excl_inj_eq {A} : Inj (=) (=) (@Excl A).
-  Proof. by inversion_clear 1. Qed.
 
   Lemma has_fuels_agree (ζ : locale Λ) (fs : gmap (fmrole M) nat)
         (m : gmap (locale Λ) (gmap (fmrole M) nat)) :
@@ -874,7 +869,7 @@ Section model_state_lemmas.
     - simpl. f_equiv.
       rewrite lookup_total_alt. rewrite HSome. done.
     - assert (dom fs ⊆ dom v2).
-      { admit.                  (* Need lemma *) }
+      { erewrite <-dom_fmap_L. by eapply map_included_subseteq_inv. }
       rewrite -dom_empty_iff_L.
       rewrite -dom_empty_iff_L in Hfs.
       set_solver.
@@ -884,7 +879,19 @@ Section model_state_lemmas.
       exists (S v1).
       split; [|lia].
       admit.                    (* UGH, but can be done. *)
-    - admit.
+    - rewrite /model_update_locale_role_map.
+      simpl.
+      rewrite dom_fmap_L.
+      clear.
+      induction v2 using map_ind.
+      { set_solver. }
+      rewrite map_filter_insert. simpl.
+      case_decide.
+      + set_solver.
+      + rewrite -dom_difference_L.
+        rewrite map_filter_delete.
+        rewrite -insert_difference.
+        set_solver.
   Admitted.
 
   Lemma decr_succ_compose_id :
