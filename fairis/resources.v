@@ -11,7 +11,6 @@ Class fairnessGpreS `{Countable (locale Λ)} `(LM: LiveModel Λ M) Σ := {
   fairnessGpreS_model_fuel_mapping :>
     inG Σ (authUR (gmapUR (localeO Λ)
                           (exclR $ gmapUR (RoleO M) natO)));
-  (* fairnessGpreS_model_fuel :> inG Σ (authUR (gmapUR (RoleO M) (exclR natO))); *)
   fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
@@ -21,8 +20,6 @@ Class fairnessGS `{Countable (locale Λ)} `(LM : LiveModel Λ M) Σ := FairnessG
   fairness_model_name : gname;
   (** Mapping of threads to roles with fuel *)
   fairness_model_fuel_mapping_name : gname;
-  (* (** Mapping of roles to fuel *) *)
-  (* fairness_model_fuel_name : gname; *)
   (** Set of free/availble roles *)
   fairness_model_free_roles_name : gname;
 }.
@@ -36,8 +33,6 @@ Definition fairnessΣ Λ M `{Countable (locale Λ)} : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO M))));
    GFunctor (authUR (gmapUR (localeO Λ)
                             (exclR $ gmapUR (RoleO M) natO)));
-   (* GFunctor (authUR (gmapUR (localeO Λ) (exclR (gsetR (RoleO M))))); *)
-   (* GFunctor (authUR (gmapUR (RoleO M) (exclR natO))); *)
    GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
@@ -175,6 +170,10 @@ Section model_state_interp.
 
   Notation Role := (M.(fmrole)).
 
+  (* Definition fuel_map_to_ghost_fuel_map (m: gmap (locale Λ) (gmap Role nat)) : *)
+  (*   gmapUR (locale Λ) (exclR $ gmapUR (RoleO M) natO) := *)
+  (*   Excl <$> m. *)
+  
   Definition auth_fuel_mapping_is
              (m: gmap (locale Λ) (gmap Role nat)) : iProp Σ :=
     own (fairness_model_fuel_mapping_name fG)
@@ -188,26 +187,6 @@ Section model_state_interp.
         (◯ (fmap Excl m:
               ucmra_car (gmapUR _ (exclR $ gmapUR (RoleO M) natO)
         ))).
-
-  (* Definition auth_fuel_is (F: gmap Role nat): iProp Σ := *)
-  (*   own (fairness_model_fuel_name fG) *)
-  (*       (● (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))). *)
-
-  (* Definition frag_fuel_is (F: gmap Role nat): iProp Σ := *)
-  (*   own (fairness_model_fuel_name fG) *)
-  (*       (◯ (fmap (λ f, Excl f) F : ucmra_car (gmapUR (RoleO M) (exclR natO)))). *)
-
-  (* Definition auth_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ := *)
-  (*   own (fairness_model_mapping_name fG) *)
-  (*       (● ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) : *)
-  (*             ucmra_car (gmapUR _ (exclR (gsetR (RoleO M)))) *)
-  (*       )). *)
-
-  (* Definition frag_mapping_is (m: gmap (locale Λ) (gset Role)): iProp Σ := *)
-  (*   own (fairness_model_mapping_name fG) *)
-  (*       (◯ ( (fmap (λ (f: gset M.(fmrole)), Excl f) m) : *)
-  (*             ucmra_car (gmapUR _ (exclR (gsetR (RoleO M)))) *)
-  (*       )). *)
 
   Definition auth_model_is (fm: M): iProp Σ :=
     own (fairness_model_name fG) (● Excl' fm).
@@ -226,6 +205,7 @@ Section model_state_interp.
                     map_included (≤) fs1 fs2) m1 m2 ∧
     (* OBS: This is a bit hacky, should instead change definition. *)
     dom m1 = dom m2.
+
   Definition fuel_map_preserve_dead
              (m : gmap (locale Λ) (gmap Role nat))
              (δ : LiveState Λ M) :=
@@ -264,16 +244,6 @@ Lemma own_proper `{inG Σ X} γ (x y: X):
   x ≡ y ->
   own γ x -∗ own γ y.
 Proof. by intros ->. Qed.
-
-(* Lemma auth_fuel_is_proper `{fairnessGS (LM:=LM) Σ} *)
-(*       (x y : gmap (fmrole M) nat): *)
-(*   x = y -> *)
-(*   auth_fuel_is x -∗ auth_fuel_is y. *)
-(* Proof. by intros ->. Qed. *)
-
-(* Notation "tid ↦M R" := (frag_mapping_is {[ tid := R ]}) (at level 33). *)
-(* Notation "tid ↦m ρ" := (frag_mapping_is {[ tid := {[ ρ ]} ]}) (at level 33). *)
-(* Notation "ρ ↦F f" := (frag_fuel_is {[ ρ := f ]}) (at level 33). *)
 
 Section model_state_lemmas.
   Context `{Countable (locale Λ)}.
@@ -356,13 +326,15 @@ Section model_state_lemmas.
 
 End model_state_lemmas.
 
+Notation "tid ↦M R" := (has_fuels {[ tid := R ]}) (at level 33).
+
 Section adequacy.
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGpreS LM Σ}.
 
-  Lemma model_state_init (s0: M):
+  Lemma model_state_init (s0: M) :
     ⊢ |==> ∃ γ,
         own (A := authUR (optionUR (exclR (ModelO M)))) γ
             (● (Excl' s0) ⋅ ◯ (Excl' s0)).
@@ -372,43 +344,29 @@ Section adequacy.
     iExists _. by iSplitL "Hfl".
   Qed.
 
-  (* Lemma model_mapping_init (s0: M) (ζ0: locale Λ): *)
-  (*   ⊢ |==> ∃ γ, *)
-  (*       own (A := authUR (gmapUR _ (exclR (gsetR (RoleO M))))) γ *)
-  (*           (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅ *)
-  (*              ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]})). *)
-  (* Proof. *)
-  (*   iMod (own_alloc (● ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}) ⋅ *)
-  (*                      ◯ ({[ ζ0 :=  Excl (M.(live_roles) s0) ]}))) as (γ) "[Hfl Hfr]". *)
-  (*   { apply auth_both_valid_2; eauto. by apply singleton_valid. } *)
-  (*   iExists _. by iSplitL "Hfl". *)
-  (* Qed. *)
+  Definition init_fuel_map (s0: M) (ζ0: locale Λ) :
+    gmap (locale Λ) (exclR $ gmap (fmrole M) nat) :=
+    {[ ζ0 := Excl (gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0)) ]}.
 
-  (* Lemma model_fuel_init (s0: M): *)
-  (*   ⊢ |==> ∃ γ, *)
-  (*       own (A := authUR (gmapUR (RoleO M) (exclR natO))) γ *)
-  (*           (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅ *)
-  (*              (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0))). *)
-  (* Proof. *)
-  (*   iMod (own_alloc *)
-  (*           (● gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)  ⋅ *)
-  (*              (◯ gset_to_gmap (Excl (LM.(lm_fl) s0)) (M.(live_roles) s0)))) as (γ) "[H1 H2]". *)
-  (*   { apply auth_both_valid_2;eauto. intros ρ. *)
-  (*     destruct (gset_to_gmap (Excl (LM.(lm_fl) s0)) (live_roles M s0) !! ρ) eqn:Heq; *)
-  (*       rewrite Heq; last done. *)
-  (*     apply lookup_gset_to_gmap_Some in Heq. *)
-  (*     destruct Heq as [?<-]. done. } *)
-  (*   iExists _. by iSplitL "H1". *)
-  (* Qed. *)
+  Lemma model_fuel_mapping_init (s0: M) (ζ0: locale Λ) :
+    ⊢ |==> ∃ γ,
+      own γ (● (init_fuel_map s0 ζ0)) ∗
+      own γ (◯ (init_fuel_map s0 ζ0)).
+  Proof.
+    iMod (own_alloc (● (init_fuel_map s0 ζ0) ⋅
+                     ◯ (init_fuel_map s0 ζ0))) as (γ) "[Hfl Hfr]".
+    { apply auth_both_valid_2; eauto. by apply singleton_valid. }
+    iExists _. by iSplitL "Hfl".
+  Qed.
 
-  (* Lemma model_free_roles_init (s0: M) (FR: gset _): *)
-  (*   ⊢ |==> ∃ γ, *)
-  (*       own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR). *)
-  (* Proof. *)
-  (*   iMod (own_alloc (● GSet FR  ⋅ ◯ GSet FR)) as (γ) "[H1 H2]". *)
-  (*   { apply auth_both_valid_2 =>//. } *)
-  (*   iExists _. by iSplitL "H1". *)
-  (* Qed. *)
+  Lemma model_free_roles_init (s0: M) (FR: gset _):
+    ⊢ |==> ∃ γ,
+        own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR).
+  Proof.
+    iMod (own_alloc (● GSet FR  ⋅ ◯ GSet FR)) as (γ) "[H1 H2]".
+    { apply auth_both_valid_2 =>//. }
+    iExists _. by iSplitL "H1".
+  Qed.
 End adequacy.
 
 Section model_state_lemmas.
