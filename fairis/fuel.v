@@ -244,7 +244,7 @@ Section fairness.
     by eapply map_disjoint_spec.
   Qed.
 
-  Definition ls_trans fuel_limit (a: LiveStateData) ℓ (b: LiveStateData): Prop :=
+  Definition ls_trans (fuel_limit :  M → nat) (a: LiveStateData) ℓ (b: LiveStateData): Prop :=
     match ℓ with
     | Take_step ρ tid =>
       M.(fmtrans) a (Some ρ) b
@@ -448,6 +448,24 @@ Section fairness.
           ** rewrite lookup_insert_ne // /data' in Hlk0. eapply ls_fuel_dom_data; eauto.
         * eapply ls_fuel_dom_data; eauto.
   Qed.
+
+  Lemma model_step_suff_data fl (δ: LiveState) ρ0 m' (fs fs': gmap _ nat) ζ :
+    δ.(ls_map) !! ζ = Some fs →
+    ρ0 ∈ dom fs →
+    (∀ ρ f', fs' !! ρ = Some f' → ρ ≠ ρ0 → ∃ f, fs !! ρ = Some f ∧ f' < f) →
+    (∃ f'0, fs' !! ρ0 = Some f'0 ∧ f'0 ≤ fl m') →
+    (M.(live_roles) m' ∖ M.(live_roles) δ = dom fs' ∖ dom fs) →
+    (dom fs ∖ dom fs' ∩ M.(live_roles) δ = ∅) →
+    let data' := <[ζ := fs']> δ.(ls_map) in
+    ∃ δ', δ'.(ls_data) = {| ls_under := m'; ls_map := data' |} ∧
+            ls_trans fl δ (Take_step ρ0 ζ) δ'.
+  Proof.
+    intros Hζ Hρ0in Hfs' Hfl Hborn Hdead data'.
+    assert (∃ δ', δ'.(ls_data) = {| ls_under := m'; ls_map := data' |}) as [δ' Hd].
+    { unshelve refine (ex_intro _ {| ls_data := {| ls_under := m'; ls_map := data' |} |} _); last done.
+      { rewrite /data' /=. intros z1 z2 fs1 fs2 Hneq Hlk1 Hlk2. apply map_disjoint_dom_2.
+        intros ρ Hin1 Hin2. destruct (decide (z1 = ζ)) as [->|Hneq1]. (* etc etc *)
+  Admitted.
 
   Record LiveModel := {
       lm_fl : M → nat;
