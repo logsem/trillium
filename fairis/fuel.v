@@ -455,16 +455,33 @@ Section fairness.
     (∀ ρ f', fs' !! ρ = Some f' → ρ ≠ ρ0 → ∃ f, fs !! ρ = Some f ∧ f' < f) →
     (∃ f'0, fs' !! ρ0 = Some f'0 ∧ f'0 ≤ fl m') →
     (M.(live_roles) m' ∖ M.(live_roles) δ = dom fs' ∖ dom fs) →
+    (∀ ρ, ρ ∈ M.(live_roles) m' ∖ M.(live_roles) δ → ∀ ζ' fs', δ.(ls_map) !! ζ' = Some fs' → ρ ∉ dom fs') →
     (dom fs ∖ dom fs' ∩ M.(live_roles) δ = ∅) →
     let data' := <[ζ := fs']> δ.(ls_map) in
     ∃ δ', δ'.(ls_data) = {| ls_under := m'; ls_map := data' |} ∧
             ls_trans fl δ (Take_step ρ0 ζ) δ'.
   Proof.
-    intros Hζ Hρ0in Hfs' Hfl Hborn Hdead data'.
+    intros Hζ Hρ0in Hfs' Hfl Hborn Hnew Hdead data'.
     assert (∃ δ', δ'.(ls_data) = {| ls_under := m'; ls_map := data' |}) as [δ' Hd].
     { unshelve refine (ex_intro _ {| ls_data := {| ls_under := m'; ls_map := data' |} |} _); last done.
       { rewrite /data' /=. intros z1 z2 fs1 fs2 Hneq Hlk1 Hlk2. apply map_disjoint_dom_2.
-        intros ρ Hin1 Hin2. destruct (decide (z1 = ζ)) as [->|Hneq1]. (* etc etc *)
+        intros ρ Hin1 Hin2.
+        destruct (decide (z1 = ζ)) as [->|Hneq1]; destruct (decide (z2 = ζ)) as [->|Hneq2] =>//.
+        - rewrite lookup_insert in Hlk1. rewrite lookup_insert_ne // in Hlk2. simplify_eq.
+          destruct (decide (ρ ∈ dom fs)).
+          + have Hdone: fs ##ₘ fs2 by eapply (ls_map_disj δ ζ z2).
+            apply map_disjoint_dom in Hdone. set_solver.
+          + have Hdone: ρ ∉ dom fs2; last done. eapply Hnew. set_solver. done.
+        - rewrite lookup_insert in Hlk2. rewrite lookup_insert_ne // in Hlk1. simplify_eq.
+          destruct (decide (ρ ∈ dom fs)).
+          + have Hdone: fs ##ₘ fs1 by eapply (ls_map_disj δ ζ z1).
+            apply map_disjoint_dom in Hdone. set_solver.
+          + have Hdone: ρ ∉ dom fs1; last done. eapply Hnew. set_solver. done.
+        - rewrite lookup_insert_ne // in Hlk1. rewrite lookup_insert_ne // in Hlk2.
+          have Hdone: fs1 ##ₘ fs2 by eapply (ls_map_disj δ z1 z2).
+          apply map_disjoint_dom in Hdone. set_solver. }
+      admit.
+      }
   Admitted.
 
   Record LiveModel := {
