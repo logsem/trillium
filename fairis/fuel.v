@@ -455,7 +455,7 @@ Section fairness.
     ρ0 ∈ dom fs →
     (∀ ρ f', fs' !! ρ = Some f' → ρ ≠ ρ0 → ∃ f, fs !! ρ = Some f ∧ f' < f) →
     (ρ0 ∈ live_roles _ m' → ∀ f'0, fs' !! ρ0 = Some f'0 → f'0 ≤ fl m') →
-    (∀ ρ, ρ ∈ M.(live_roles) m' ∖ M.(live_roles) δ → ∀ f', fs' !! ρ = Some f' → f' ≤ fl m') →
+    (∀ ρ, ρ ∈ dom fs' ∖ dom fs → ∀ f', fs' !! ρ = Some f' → f' ≤ fl m') →
     (M.(live_roles) m' ∖ M.(live_roles) δ = dom fs' ∖ dom fs) →
     (∀ ρ, ρ ∈ M.(live_roles) m' ∖ M.(live_roles) δ → ∀ ζ' fs', δ.(ls_map) !! ζ' = Some fs' → ρ ∉ dom fs') →
     (dom fs ∖ dom fs' ∩ M.(live_roles) δ = ∅) →
@@ -487,17 +487,35 @@ Section fairness.
           + simplify_eq. exists ζ', fs'. rewrite lookup_insert. split; first done. set_solver.
           + exists ζ', fs''. rewrite lookup_insert_ne //.
         - exists ζ, fs'. rewrite lookup_insert. split; first done. set_solver. } }
-    have H0live: ρ0 ∈ live_roles _ δ.
-    { admit. }
+    have H0live: ρ0 ∈ live_roles _ δ by eapply fm_live_spec.
     have Hζ' : ls_map δ' !! ζ = Some fs' by rewrite Hd lookup_insert //.
     exists δ'. split; first done. constructor; first by rewrite Hd //.
-    split; [| split; [| split; [| split; [| split]]]].
+
+    have Hdom: dom (ls_fuel δ') ∖ dom (ls_fuel δ) ⊆ live_roles M δ' ∖ live_roles M δ.
+    { intros ρ [Hin Hnin]%elem_of_difference. rewrite Hd Hborn.
+      apply elem_of_dom in Hin as [f' Hin].
+      apply ls_fuel_data_inv in Hin as (ζ1&fs1&Hlk1&Hlk'1).
+      destruct (decide (ζ1 = ζ)); first simplify_eq; last first.
+      { rewrite Hd lookup_insert_ne // in Hlk1. exfalso. apply Hnin.
+        eapply ls_fuel_dom_data=>//. by apply elem_of_dom_2 in Hlk'1. }
+      apply elem_of_difference. split; first by apply elem_of_dom_2 in Hlk'1.
+      intros Hina. apply Hnin. eapply ls_fuel_dom_data=>//. }
+
+    split; [| split; [| split; [| split; [| split; [| done]]]]].
     - eapply ls_mapping_data =>//.
     - admit.
     - admit.
     - intros H0live'. have H0dom: ρ0 ∈ dom fs' by set_solver. apply elem_of_dom in H0dom as [f' Hf'].
       rewrite (ls_fuel_data _ _ _ _ _ Hζ' Hf') Hd /=. eapply Hfl0; [rewrite Hd // in H0live' | done].
-    - intros ρ Hρin.
+    - intros ρ [Hρin Hρnin]%elem_of_difference.
+      have Hn: ρ ∈ dom fs' ∖ dom fs.
+      { rewrite -Hborn. rewrite elem_of_subseteq {2}Hd /= in Hdom. apply Hdom. set_solver. }
+      apply elem_of_dom in Hρin as [f' Hρin]. rewrite Hρin.
+      apply ls_fuel_data_inv in Hρin as (ζ1&fs1&Hlk1&Hlk'1). simpl. rewrite Hd /=.
+      apply elem_of_difference in Hn as [Hn1 Hn2].
+      have [??] : ζ1 = ζ ∧ fs1 = fs'.
+      { eapply ls_map_agree=>//. by apply elem_of_dom_2 in Hlk'1. }
+      simplify_eq. eapply Hfln; last done. by apply elem_of_difference.
   Admitted.
 
   Record LiveModel := {
