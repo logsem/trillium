@@ -533,7 +533,16 @@ Section fairness.
           rewrite Hd lookup_insert_ne // in Hlk.
     - intros ρ Hin Hneq. apply ls_fuel_dom_data_inv in Hin as (ζ1&fs1&Hlk1&Hdom1).
       destruct (decide (ζ1 = ζ)).
-      + simplify_eq. admit.
+      + simplify_eq. destruct (decide (ρ ∈ dom fs')) as [Hin|]; [left| right; split; [|set_solver]].
+        * apply elem_of_dom in Hin as [f' Hf'].
+          have ->: ls_fuel δ' !! ρ = Some f' by eapply ls_fuel_data.
+          apply elem_of_dom in Hdom1 as [f Hf].
+          have -> /=: ls_fuel δ !! ρ = Some f by eapply ls_fuel_data.
+          naive_solver lia.
+        * intros Ha. apply ls_fuel_dom_data_inv in Ha as (ζ1&fs1&Hlk1&Hin1).
+          destruct (decide (ζ1 = ζ)) as [|Hneq1]; first naive_solver.
+          rewrite Hd lookup_insert_ne // in Hlk1. apply Hneq1.
+          by eapply ls_map_agree.
       + left. apply elem_of_dom in Hdom1 as (f'&Hf').
         have ->: ls_fuel δ' !! ρ = Some f'.
         { eapply (ls_fuel_data _ _ ζ1); eauto. rewrite Hd lookup_insert_ne //. }
@@ -551,7 +560,7 @@ Section fairness.
       have [??] : ζ1 = ζ ∧ fs1 = fs'.
       { eapply ls_map_agree=>//. by apply elem_of_dom_2 in Hlk'1. }
       simplify_eq. eapply Hfln; last done. by apply elem_of_difference.
-  Admitted.
+  Qed.
 
   Record LiveModel := {
       lm_fl : M → nat;
