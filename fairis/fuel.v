@@ -450,10 +450,12 @@ Section fairness.
   Qed.
 
   Lemma model_step_suff_data fl (δ: LiveState) ρ0 m' (fs fs': gmap _ nat) ζ :
+    fmtrans _ δ (Some ρ0) m' →
     δ.(ls_map) !! ζ = Some fs →
     ρ0 ∈ dom fs →
     (∀ ρ f', fs' !! ρ = Some f' → ρ ≠ ρ0 → ∃ f, fs !! ρ = Some f ∧ f' < f) →
-    (∃ f'0, fs' !! ρ0 = Some f'0 ∧ f'0 ≤ fl m') →
+    (ρ0 ∈ live_roles _ m' → ∀ f'0, fs' !! ρ0 = Some f'0 → f'0 ≤ fl m') →
+    (∀ ρ, ρ ∈ M.(live_roles) m' ∖ M.(live_roles) δ → ∀ f', fs' !! ρ = Some f' → f' ≤ fl m') →
     (M.(live_roles) m' ∖ M.(live_roles) δ = dom fs' ∖ dom fs) →
     (∀ ρ, ρ ∈ M.(live_roles) m' ∖ M.(live_roles) δ → ∀ ζ' fs', δ.(ls_map) !! ζ' = Some fs' → ρ ∉ dom fs') →
     (dom fs ∖ dom fs' ∩ M.(live_roles) δ = ∅) →
@@ -461,7 +463,7 @@ Section fairness.
     ∃ δ', δ'.(ls_data) = {| ls_under := m'; ls_map := data' |} ∧
             ls_trans fl δ (Take_step ρ0 ζ) δ'.
   Proof.
-    intros Hζ Hρ0in Hfs' Hfl Hborn Hnew Hdead data'.
+    intros Htrans Hζ Hρ0in Hfs' Hfl0 Hfln Hborn Hnew Hdead data'.
     assert (∃ δ', δ'.(ls_data) = {| ls_under := m'; ls_map := data' |}) as [δ' Hd].
     { unshelve refine (ex_intro _ {| ls_data := {| ls_under := m'; ls_map := data' |} |} _); last done.
       { rewrite /data' /=. intros z1 z2 fs1 fs2 Hneq Hlk1 Hlk2. apply map_disjoint_dom_2.
@@ -480,8 +482,22 @@ Section fairness.
         - rewrite lookup_insert_ne // in Hlk1. rewrite lookup_insert_ne // in Hlk2.
           have Hdone: fs1 ##ₘ fs2 by eapply (ls_map_disj δ z1 z2).
           apply map_disjoint_dom in Hdone. set_solver. }
-      admit.
-      }
+      { simpl. intros ρ Hlive. destruct (decide (ρ ∈ live_roles _ δ)) as [Hwaslive|Hnewborn].
+        - destruct (ls_map_live δ ρ Hwaslive) as (ζ'&fs''&Hlk&Hdom). destruct (decide (ζ = ζ')).
+          + simplify_eq. exists ζ', fs'. rewrite lookup_insert. split; first done. set_solver.
+          + exists ζ', fs''. rewrite lookup_insert_ne //.
+        - exists ζ, fs'. rewrite lookup_insert. split; first done. set_solver. } }
+    have H0live: ρ0 ∈ live_roles _ δ.
+    { admit. }
+    have Hζ' : ls_map δ' !! ζ = Some fs' by rewrite Hd lookup_insert //.
+    exists δ'. split; first done. constructor; first by rewrite Hd //.
+    split; [| split; [| split; [| split; [| split]]]].
+    - eapply ls_mapping_data =>//.
+    - admit.
+    - admit.
+    - intros H0live'. have H0dom: ρ0 ∈ dom fs' by set_solver. apply elem_of_dom in H0dom as [f' Hf'].
+      rewrite (ls_fuel_data _ _ _ _ _ Hζ' Hf') Hd /=. eapply Hfl0; [rewrite Hd // in H0live' | done].
+    - intros ρ Hρin.
   Admitted.
 
   Record LiveModel := {
