@@ -169,7 +169,7 @@ Section model_state_interp.
   Context {fG: fairnessGS LM Σ}.
 
   Notation Role := (M.(fmrole)).
-  
+
   Definition auth_fuel_mapping_is
              (m: gmap (locale Λ) (gmap Role nat)) : iProp Σ :=
     own (fairness_model_fuel_mapping_name fG)
@@ -584,66 +584,84 @@ Section model_state_lemmas.
     destruct 1 as (?&?&?&?&?&?&?&?). by eapply silent_step_suff_data_weak_alt.
   Qed.
 
-  Definition model_update_locale_role_map
-          δ (ρs : gset (fmrole M)) (fs : gmap (fmrole M) nat) :
-      gmap (fmrole M) nat :=
-    (λ f, f - 1) <$> (filter (λ ρf, ρf.1 ∈ M.(live_roles) δ.(ls_under) ∨ ρf.1 ∈ ρs)) fs.
+  Definition decr_fuel_map (fs : gmap (fmrole M) nat) : gmap (fmrole M) nat :=
+    (λ f, f - 1) <$> fs.
 
-  Lemma model_update_locale_role_map_map_included δ ρs fs :
-    map_included (≤) (model_update_locale_role_map δ ρs fs) fs.
+  Lemma decr_fuel_map_included fs : map_included (≤) (decr_fuel_map fs) fs.
   Proof.
-    rewrite /model_update_locale_role_map.
+    apply map_included_spec. intros k v1 Hm.
+    apply lookup_fmap_Some in Hm as [v2 [Hv2 Hm]].
+    exists v2. split; [done|lia].
+  Qed.
+
+  Definition filter_fuel_map
+             δ (ρs : gset (fmrole M)) (fs : gmap (fmrole M) nat) :
+      gmap (fmrole M) nat :=
+    (filter (λ ρf, ρf.1 ∈ M.(live_roles) δ.(ls_under) ∨ ρf.1 ∈ ρs)) fs.
+
+  Lemma filter_fuel_map_included δ ρs fs :
+    map_included (≤) (filter_fuel_map δ ρs fs) fs.
+  Proof.
     apply map_included_spec.
     intros k v1 Hm.
-    apply lookup_fmap_Some in Hm as [v2 [Hv2 Hm]].
-    exists v2. split; [|lia].
+    exists v1. split; [|lia].
     pose proof (map_filter_subseteq
                   (λ ρf : fmrole M * nat, ρf.1 ∈ live_roles M δ ∨ ρf.1 ∈ ρs) fs)
       as Hle.
     rewrite map_subseteq_spec in Hle.
     by apply Hle.
   Qed.
-  
+
+  Definition model_update_locale_role_map
+          δ (ρs : gset (fmrole M)) : gmap (fmrole M) nat → gmap (fmrole M) nat :=
+    decr_fuel_map ∘ filter_fuel_map δ ρs.
+
+  Lemma model_update_locale_role_map_map_included δ ρs fs :
+    map_included (≤) (model_update_locale_role_map δ ρs fs) fs.
+  Proof.
+    rewrite /model_update_locale_role_map.
+    eapply map_included_transitivity;
+      [eapply decr_fuel_map_included|eapply filter_fuel_map_included].
+  Qed.
+
   Definition model_update_locale_fuel_map
           δ (ζ : locale Λ) (ρs : gset (fmrole M))
           (fm : gmap (locale Λ) (gmap (fmrole M) nat)) :
       gmap (locale Λ) (gmap (fmrole M) nat) :=
     <[ζ:= model_update_locale_role_map δ ρs (fm !!! ζ)]>fm.
-  
-  Program Definition model_update_locale_fuel
-          (δ : LM) (ζ : locale Λ) (ρs : gset (fmrole M)) : LM :=
+
+  Program Definition model_update_decr (ζ : locale Λ) (δ : LM) : LM :=
     {|
       ls_data :=
         {| ls_under := δ.(ls_under);
-           ls_map :=
-             <[ζ:= (λ f, f - 1) <$>
-                     (filter
-                       (λ ρf, ρf.1 ∈ M.(live_roles) δ.(ls_under) ∨
-                              ρf.1 ∈ ρs)
-                       (δ.(ls_map) !!! ζ))]>δ.(ls_map); |};
+           ls_map := alter (fmap (λ f, f - 1)) ζ δ.(ls_map); |};
     |}.
   Next Obligation.
-    intros δ ζ ρs ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2.
+    intros ζ δ ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2.
     simpl in *.
     pose proof δ.(ls_map_disj) as Hdisj.
     assert (∃ fs1', map_included (≤) fs1 fs1' ∧ ls_map δ !!! ζ1 = fs1')
       as (fs1' & Hle1 & Hfs1').
     { destruct (decide (ζ = ζ1)) as [<-|Hneq'].
-      + rewrite lookup_insert in HSome1.
+      + rewrite lookup_alter in HSome1.
+        rewrite -lookup_fmap in HSome1.
+        apply lookup_fmap_Some in HSome1 as (fs1'&Hfs1'&HSome1').
         simplify_eq.
-        exists (ls_map δ !!! ζ).
-        split; [apply model_update_locale_role_map_map_included|done].
-      + rewrite lookup_insert_ne in HSome1; [|done].
+        exists fs1'. rewrite lookup_total_alt. simpl. rewrite HSome1'.
+        split; [apply decr_fuel_map_included|done].
+      + rewrite lookup_alter_ne in HSome1; [|done].
         rewrite lookup_total_alt. eexists _.
         split; [done|by rewrite HSome1]. }
     assert (∃ fs2', map_included (≤) fs2 fs2' ∧ ls_map δ !!! ζ2 = fs2')
       as (fs2' & Hle2 & Hfs2').
     { destruct (decide (ζ = ζ2)) as [<-|Hneq'].
-      + rewrite lookup_insert in HSome2.
+      + rewrite lookup_alter in HSome2.
+        rewrite -lookup_fmap in HSome2.
+        apply lookup_fmap_Some in HSome2 as (fs2'&Hfs2'&HSome2').
         simplify_eq.
-        exists (ls_map δ !!! ζ).
-        split; [apply model_update_locale_role_map_map_included|done].
-      + rewrite lookup_insert_ne in HSome2; [|done].
+        exists fs2'. rewrite lookup_total_alt. simpl. rewrite HSome2'.
+        split; [apply decr_fuel_map_included|done].
+      + rewrite lookup_alter_ne in HSome2; [|done].
         rewrite lookup_total_alt. eexists _.
         split; [done|by rewrite HSome2]. }
     rewrite lookup_total_alt in Hfs1'.
@@ -666,26 +684,96 @@ Section model_state_lemmas.
     by eapply Hdisj.
   Qed.
   Next Obligation.
-    intros δ ζ ρs ρ Hlive.
+    intros ζ δ ρ Hlive.
     simpl in *.
     pose proof Hlive as Hlive'.
     apply (ls_map_live δ) in Hlive as (ζ' & fs & HSome & Hdom).
     destruct (decide (ζ = ζ')) as [<-|Hneq].
     - eexists ζ, _.
-      rewrite lookup_insert.
-      rewrite lookup_total_alt. rewrite HSome. simpl.
+      rewrite lookup_alter. rewrite HSome. simpl.
       split; [done|].
-      rewrite dom_fmap.
+      rewrite dom_fmap. done.
+    - eexists ζ', fs. by rewrite lookup_alter_ne.
+  Qed.
+
+  Program Definition model_update_filter
+          (ζ : locale Λ) (ρs : gset (fmrole M)) (δ : LM) : LM :=
+    {|
+      ls_data :=
+        {| ls_under := δ.(ls_under);
+           ls_map :=
+             alter (filter
+                       (λ ρf, ρf.1 ∈ M.(live_roles) δ.(ls_under) ∨ ρf.1 ∈ ρs))
+                       ζ δ.(ls_map); |};
+    |}.
+  Next Obligation.
+    intros ζ ρs δ ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2.
+    simpl in *.
+    pose proof δ.(ls_map_disj) as Hdisj.
+    assert (∃ fs1', map_included (≤) fs1 fs1' ∧ ls_map δ !!! ζ1 = fs1')
+      as (fs1' & Hle1 & Hfs1').
+    { destruct (decide (ζ = ζ1)) as [<-|Hneq'].
+      + rewrite lookup_alter in HSome1.
+        rewrite -lookup_fmap in HSome1.
+        apply lookup_fmap_Some in HSome1 as (fs1'&Hfs1'&HSome1').
+        simplify_eq.
+        exists fs1'. rewrite lookup_total_alt. simpl. rewrite HSome1'.
+        split; [apply filter_fuel_map_included|done].
+      + rewrite lookup_alter_ne in HSome1; [|done].
+        rewrite lookup_total_alt. eexists _.
+        split; [done|by rewrite HSome1]. }
+    assert (∃ fs2', map_included (≤) fs2 fs2' ∧ ls_map δ !!! ζ2 = fs2')
+      as (fs2' & Hle2 & Hfs2').
+    { destruct (decide (ζ = ζ2)) as [<-|Hneq'].
+      + rewrite lookup_alter in HSome2.
+        rewrite -lookup_fmap in HSome2.
+        apply lookup_fmap_Some in HSome2 as (fs2'&Hfs2'&HSome2').
+        simplify_eq.
+        exists fs2'. rewrite lookup_total_alt. simpl. rewrite HSome2'.
+        split; [apply filter_fuel_map_included|done].
+      + rewrite lookup_alter_ne in HSome2; [|done].
+        rewrite lookup_total_alt. eexists _.
+        split; [done|by rewrite HSome2]. }
+    rewrite lookup_total_alt in Hfs1'.
+    rewrite lookup_total_alt in Hfs2'.
+    destruct (ls_map δ !! ζ1) as [fs1''|] eqn:Hfs1''; last first.
+    { apply map_included_subseteq_inv in Hle1.
+      apply map_disjoint_dom. set_solver. }
+    destruct (ls_map δ !! ζ2) as [fs2''|] eqn:Hfs2''; last first.
+    { apply map_included_subseteq_inv in Hle2.
+      apply map_disjoint_dom. set_solver. }
+    simplify_eq; simpl in *.
+    specialize (Hdisj ζ1 ζ2 fs1'' fs2'' Hneq Hfs1'' Hfs2'').
+    apply map_disjoint_spec.
+    rewrite map_disjoint_spec in Hdisj.
+    intros i x y HSome1' HSome2'.
+    rewrite map_included_spec in Hle1.
+    apply Hle1 in HSome1' as (?&?&?).
+    rewrite map_included_spec in Hle2.
+    apply Hle2 in HSome2' as (?&?&?).
+    by eapply Hdisj.
+  Qed.
+  Next Obligation.
+    intros ζ ρs δ ρ Hlive.
+    simpl in *.
+    pose proof Hlive as Hlive'.
+    apply (ls_map_live δ) in Hlive as (ζ' & fs & HSome & Hdom).
+    destruct (decide (ζ = ζ')) as [<-|Hneq].
+    - eexists ζ, _.
+      rewrite lookup_alter. rewrite HSome. simpl.
+      split; [done|].
       rewrite map_filter_or.
       rewrite dom_union_L.
       apply elem_of_union. left.
       apply elem_of_dom.
       apply elem_of_dom in Hdom as [f Heq]. exists f.
       by apply map_filter_lookup_Some_2.
-    - eexists ζ', fs.
-      rewrite lookup_insert_ne; [|done].
-      done.
+    - eexists ζ', fs. by rewrite lookup_alter_ne.
   Qed.
+
+  Definition model_update_locale_fuel
+             (δ : LM) (ζ : locale Λ) (ρs : gset (fmrole M)) : LM :=
+    model_update_decr ζ $ model_update_filter ζ ρs δ.
 
   Lemma model_update_locale_spec extr (auxtr : auxiliary_trace LM) ζ c2 ρs:
     model_can_fuel_step (trace_last auxtr) ζ ((model_update_locale_fuel (trace_last auxtr) ζ) ρs) →
@@ -717,8 +805,8 @@ Section model_state_lemmas.
     iPureIntro.
     exists v2. exists (model_update_locale_role_map δ (dom fs) v2).
     repeat split; try done.
-    - simpl. f_equiv.
-      rewrite lookup_total_alt. rewrite HSome. done.
+    - simpl. rewrite -alter_compose.
+      rewrite -alter_insert. f_equiv; [done|by rewrite insert_id].
     - assert (dom fs ⊆ dom v2).
       { erewrite <-dom_fmap_L. by eapply map_included_subseteq_inv. }
       rewrite -dom_empty_iff_L.
@@ -742,7 +830,7 @@ Section model_state_lemmas.
             simplify_eq. set_solver. }
           pose proof δ.(ls_map_disj) as Hdisj.
           apply Hfmle in Hagree' as (fs''&Hfs''&Hle'').
-          apply Hfmle in Hfs' as (fs'''&Hfs'''&Hle''').          
+          apply Hfmle in Hfs' as (fs'''&Hfs'''&Hle''').
           specialize (Hdisj ζ ζ' fs'' fs''' Hneq Hfs'' Hfs''').
           rewrite map_disjoint_spec in Hdisj.
           assert (k ∈ dom fs'') as Hin''.
@@ -763,7 +851,7 @@ Section model_state_lemmas.
       pose proof Heq as Heq'.
       apply lookup_fmap_Some in Heq' as [f' [<- _]].
       apply Hle in Heq as [f'' [Heq Hle']].
-      exists f''. split; [done|]. 
+      exists f''. split; [done|].
       destruct f''; [lia|].
       simplify_eq. lia.
     - rewrite /model_update_locale_role_map.
@@ -772,6 +860,7 @@ Section model_state_lemmas.
       clear.
       induction v2 using map_ind.
       { set_solver. }
+      rewrite /filter_fuel_map.
       rewrite map_filter_insert. simpl.
       case_decide.
       + set_solver.
@@ -785,8 +874,7 @@ Section model_state_lemmas.
     (λ f : nat, f - 1) ∘ S = id.
   Proof. apply FunExt. intros x. simpl. lia. Qed.
 
-  (* (* This is probably not enough. *) *)
-  Lemma model_state_interp_update c1 c2 δ ζ fs :
+  Lemma model_state_interp_fuel_update c1 c2 δ ζ fs :
     fs ≠ ∅ →
     locale_step c1 (Some ζ) c2 →
     model_state_interp c1.1 δ -∗
@@ -804,12 +892,17 @@ Section model_state_lemmas.
     iPureIntro.
     repeat split.
     - rewrite /model_update_locale_fuel. simpl.
+      pose proof Hfmle as Hfmle'.
+      rewrite map_included_spec in Hfmle'.
+      apply Hfmle' in Hagree as [ρs [HSome Hρs]].
+      rewrite -(insert_id (ls_map δ) ζ ρs); [|done].
+      rewrite -alter_compose.
+      rewrite alter_insert. simpl.
       apply map_included_insert; [|done].
       assert (map_included le (S <$> fs) ((ls_map δ) !!! ζ)) as Hfs.
       {
         rewrite /fuel_map_le in Hfmle.
         rewrite map_included_spec in Hfmle.
-        apply Hfmle in Hagree as [ρs [HSome Hρs]].
         rewrite lookup_total_alt. simpl. rewrite HSome. done.
       }
       apply map_included_spec.
@@ -822,6 +915,7 @@ Section model_state_lemmas.
       exists v2.
       split; [|lia].
       rewrite !lookup_fmap.
+      rewrite lookup_total_alt in Hv2. rewrite HSome in Hv2. simpl in *.
       rewrite map_filter_lookup.
       rewrite Hv2.
       simpl.
@@ -830,7 +924,7 @@ Section model_state_lemmas.
       + apply Decidable.not_or in Hnin.
         destruct Hnin as [Hnin1 Hnin2].
         apply not_elem_of_dom in Hnin2. set_solver.
-    - set_solver.
+    - apply elem_of_dom_2 in Hagree. set_solver.
     - intros ρ Hin.
       apply Hfmdead in Hin as (ζ'&ρs&HSome&Hρ).
       destruct (decide (ζ = ζ')) as [<-|Hneq].
@@ -859,13 +953,124 @@ Section model_state_lemmas.
     iIntros (Hdom Hstep) "Hfuel Hm".
     iDestruct (model_state_interp_can_fuel_step with "Hm Hfuel") as %Hcan_step;
       [done|].
-    iMod (model_state_interp_update with "Hm Hfuel") as "[Hm Hfuel]"; [done..|].
+    iMod (model_state_interp_fuel_update with "Hm Hfuel") as "[Hm Hfuel]"; [done..|].
     iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
     iModIntro.
     iExists (model_update_locale_fuel (trace_last auxtr) ζ (dom fs)).
     iFrame "Hm Hfuel".
     iPureIntro. by apply model_update_locale_spec.
   Qed.
+
+  Definition has_forked (tp1 tp2 : list (expr Λ)) e : Prop :=
+    ∃ tp1', tp2 = tp1' ++ [e] ∧ length tp1' = length tp1.
+
+  (* OBS: Def might be improved. *)
+  Program Definition model_update_split
+          (ζ ζf : locale Λ) (ρs : gset (fmrole M)) (δ : LM) : LM :=
+    {|
+      ls_data :=
+        {| ls_under := δ.(ls_under);
+           ls_map := <[ζf := filter (λ ρf, ρf.1 ∉ ρs) (δ.(ls_map) !!! ζ)]>
+                       (alter (filter (λ ρf, ρf.1 ∈ ρs)) ζ δ.(ls_map)); |};
+    |}.
+  Next Obligation. Admitted.
+  Next Obligation. Admitted.
+
+  (* OBS: Def needs to change to reflect forks *)
+  Definition model_update_fork
+          (δ : LM) (ζ : locale Λ) (ζf : locale Λ) (ρs1 ρs2 : gset (fmrole M)) : LM :=
+    model_update_split ζ ζf ρs2 $ model_update_decr ζ $ model_update_filter ζ ρs1 δ.
+
+  Lemma model_state_interp_fork_update fs1 fs2 tp1 tp2
+        δ ζ efork σ1 σ2 :
+    fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 →
+    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
+    model_state_interp tp1 δ -∗
+    has_fuels_S ζ (fs1 ∪ fs2) ==∗
+    model_state_interp tp2
+      (model_update_fork δ ζ (locale_of tp1 efork)
+                                (dom (fs1 ∪ fs2)) (dom fs1)) ∗
+    has_fuels ζ fs1 ∗
+    has_fuels (locale_of tp1 efork) fs2.
+  Proof. Admitted.
+
+  (* TODO: Need to update this to reflect fork requirements. *)
+  Definition model_can_fork_step (δ1 : LM) (ζ : locale Λ) (δ2 : LM) : Prop :=
+    ∃ fs1 fs1',
+      δ1.(ls_under) = δ2.(ls_under) ∧
+      δ1.(ls_map) !! ζ = Some fs1 ∧
+      δ2.(ls_map) = <[ζ := fs1']>δ1.(ls_map) ∧
+      fs1 ≠ ∅ ∧
+      map_included (<) fs1' fs1 ∧
+      (dom fs1 ∖ dom fs1') ∩ M.(live_roles) δ1 = ∅.
+
+  Lemma model_can_fork_step_trans fl ζ (δ δ' : LiveState Λ M) :
+    model_can_fork_step δ ζ δ' → ls_trans fl δ (Silent_step ζ) δ'.
+  Proof. Admitted.
+
+  Lemma model_state_interp_can_fork_step es δ ζ ζf
+        (fs1 fs2 : gmap (fmrole M) nat) :
+    (fs1 ∪ fs2) ≠ ∅ → fs1 ##ₘ fs2 →
+    model_state_interp es δ -∗ has_fuels_S ζ (fs1 ∪ fs2) -∗
+    ⌜model_can_fork_step δ ζ (model_update_fork δ ζ ζf (dom (fs1 ∪ fs2)) (dom fs1))⌝.
+  Proof. Admitted.
+
+  Lemma model_update_locale_spec_fork extr
+        (auxtr : auxiliary_trace LM) ζ ζf c2 ρs1 ρs2 :
+    model_can_fork_step (trace_last auxtr) ζ
+      (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2) →
+    tids_smaller c2.1 (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2) →
+    valid_state_evolution_fairness
+      (extr :tr[Some ζ]: c2)
+      (auxtr :tr[Silent_step ζ]:
+          (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2)).
+  Proof.
+    intros Hstep Htids. destruct c2.
+    split; [done|]. split; [by apply model_can_fork_step_trans|done].
+  Qed.
+
+  Lemma update_fork_step fs1 fs2 tp1 tp2 (extr : execution_trace Λ)
+        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 :
+    fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 →
+    trace_last extr = (tp1, σ1) →
+    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
+    has_forked tp1 tp2 efork →
+    has_fuels_S ζ (fs1 ∪ fs2) -∗
+    model_state_interp tp1 (trace_last auxtr) ==∗
+    ∃ δ2,
+      ⌜valid_state_evolution_fairness
+        (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝ ∗
+      has_fuels ζ fs1 ∗ has_fuels (locale_of tp1 efork) fs2 ∗
+      model_state_interp tp2 δ2.
+  Proof.
+    iIntros (Hdom Hdisj Hlast Hstep Hforked) "Hfuel Hm".
+    iDestruct (model_state_interp_can_fork_step with "Hm Hfuel") as %Hcan_step;
+      [done..|].
+    iMod (model_state_interp_fork_update with "Hm Hfuel") as "(Hm&Hf1&Hf2)";
+      [done..|].
+    iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
+    iModIntro.
+    iExists (model_update_fork (trace_last auxtr) ζ (locale_of tp1 _) (dom (fs1 ∪ fs2)) (dom fs1)).
+    iFrame "Hm Hf1 Hf2".
+    iPureIntro.
+    by apply model_update_locale_spec_fork.
+  Qed.
+
+  Lemma update_model_step
+        (extr : execution_trace Λ)
+        (auxtr: auxiliary_trace LM) c2 s1 s2 fs ρ (δ1 : LM) ζ f :
+    ρ ∉ dom fs →
+    trace_last auxtr = δ1 →
+    locale_step (trace_last extr) (Some ζ) c2 →
+    fmtrans _ s1 (Some ρ) s2 →
+    has_fuels ζ ({[ρ := f]} ∪ fmap S fs) -∗ frag_model_is s1 -∗
+    model_state_interp (trace_last extr).1 δ1 ==∗
+    ∃ (δ2: LM),
+      ⌜valid_state_evolution_fairness
+        (extr :tr[Some ζ]: c2) (auxtr :tr[Take_step ρ ζ]: δ2)⌝ ∗
+      has_fuels ζ ({[ρ := LM.(lm_fl) s2]} ∪ fs) ∗
+      frag_model_is s2 ∗ model_state_interp c2.1 δ2.
+  Proof. Admitted.
 
   Lemma free_roles_inclusion FR fr:
     auth_free_roles_are FR -∗
@@ -903,37 +1108,5 @@ Section model_state_lemmas.
     - iModIntro. iFrame. iApply (own_proper with "Hfr2").
       do 2 f_equiv. set_solver.
   Qed.
-
-  Lemma update_model_step
-        (extr : execution_trace Λ)
-        (auxtr: auxiliary_trace LM) c2 s1 s2 fs ρ (δ1 : LM) ζ f :
-    ρ ∉ dom fs →
-    trace_last auxtr = δ1 →
-    locale_step (trace_last extr) (Some ζ) c2 →
-    fmtrans _ s1 (Some ρ) s2 →
-    has_fuels ζ ({[ρ := f]} ∪ fmap S fs) -∗ frag_model_is s1 -∗
-    model_state_interp (trace_last extr).1 δ1 ==∗
-    ∃ (δ2: LM),
-      ⌜valid_state_evolution_fairness
-        (extr :tr[Some ζ]: c2) (auxtr :tr[Take_step ρ ζ]: δ2)⌝ ∗
-      has_fuels ζ ({[ρ := LM.(lm_fl) s2]} ∪ fs) ∗
-      frag_model_is s2 ∗ model_state_interp c2.1 δ2.
-  Proof. Admitted.
-
-  Lemma update_fork_step R1 R2 tp1 tp2 (extr : execution_trace Λ)
-        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 (Hdisj: R1 ##ₘ R2) :
-    R1 ∪ R2 ≠ ∅ →
-    trace_last extr = (tp1, σ1) →
-    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
-    (∃ tp1', tp2 = tp1' ++ [efork] ∧ length tp1' = length tp1) →
-    has_fuels_S ζ (R1 ∪ R2) -∗
-    model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
-    ∃ δ2,
-      ⌜valid_state_evolution_fairness
-        (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝ ∗
-      has_fuels (locale_of tp1 efork) R2 ∗
-      has_fuels ζ R1 ∗
-      model_state_interp tp2 δ2.
-  Proof. Admitted.
 
 End model_state_lemmas.
