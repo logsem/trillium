@@ -216,8 +216,8 @@ Section fairness.
   | Change_tid otid (Hneqtid: ls_mapping a !! ρ' ≠ ls_mapping b !! ρ')
                (Hissome: is_Some (ls_mapping b !! ρ')):
     must_decrease ρ' oρ a b otid
-  | Zombie otid (Hismainrole: oρ = Some ρ') (Hnotalive: ρ' ∉ live_roles _ b) (Hnotdead: ρ' ∈ dom $ ls_fuel b):
-    must_decrease ρ' oρ a b otid
+  (* | Zombie otid (Hismainrole: oρ = Some ρ') (Hnotalive: ρ' ∉ live_roles _ b) (Hnotdead: ρ' ∈ dom $ ls_fuel b): *)
+  (*   must_decrease ρ' oρ a b otid *)
   .
 
   Definition fuel_decr (tid: olocale Λ) (oρ: option M.(fmrole))
@@ -453,7 +453,7 @@ Section fairness.
     fmtrans _ δ (Some ρ0) m' →
     δ.(ls_map) !! ζ = Some fs →
     ρ0 ∈ dom fs →
-    (∀ ρ f', fs' !! ρ = Some f' → ρ ≠ ρ0 → ∃ f, fs !! ρ = Some f ∧ f' < f) →
+    (∀ ρ f f', fs' !! ρ = Some f' → ρ ≠ ρ0 → fs !! ρ = Some f → f' < f) →
     (ρ0 ∈ live_roles _ m' → ∀ f'0, fs' !! ρ0 = Some f'0 → f'0 ≤ fl m') →
     (∀ ρ, ρ ∈ dom fs' ∖ dom fs → ∀ f', fs' !! ρ = Some f' → f' ≤ fl m') →
     (M.(live_roles) m' ∖ M.(live_roles) δ = dom fs' ∖ dom fs) →
@@ -503,8 +503,43 @@ Section fairness.
 
     split; [| split; [| split; [| split; [| split; [| done]]]]].
     - eapply ls_mapping_data =>//.
-    - admit.
-    - admit.
+    - intros ρ Hin Hin' Hmd.
+      apply elem_of_dom in Hin as [f Hf].
+      apply elem_of_dom in Hin' as [f' Hf'].
+      rewrite Hf Hf' /=. inversion Hmd; simplify_eq.
+      + symmetry in Hsametid. apply ls_mapping_data_inv in Hsametid as (fs1&Hlk1&Hin1).
+        rewrite Hζ in Hlk1. symmetry in Hlk1. simplify_eq.
+        apply ls_fuel_data_inv in Hf as (ζ1&fs1&Hlk1&Hlk'1).
+        have [??] : ζ1 = ζ ∧ fs1 = fs; last simplify_eq.
+        { eapply (ls_map_agree (ρ := ρ) Hlk1); eauto. by apply elem_of_dom_2 in Hlk'1. }
+
+        apply ls_fuel_data_inv in Hf' as (ζ2&fs2&Hlk2&Hlk'2).
+        destruct (decide (ζ2 = ζ)); last first.
+        { rewrite Hd lookup_insert_ne // in Hlk2.
+        have [??] : ζ2 = ζ ∧ fs2 = fs; last simplify_eq.
+        eapply (ls_map_agree (ρ := ρ) Hlk2); eauto. by apply elem_of_dom_2 in Hlk'2. }
+        simplify_eq. eapply Hfs'=>//. naive_solver.
+      + exfalso. destruct Hissome as [ζ1 Hmap]. have Hmap' := Hmap.
+        apply ls_mapping_data_inv in Hmap as (fs1&Hlk&YHin).
+        destruct (decide (ζ1 = ζ)) as [->|].
+        * simplify_eq. have ?: ρ ∈ dom fs.
+          { apply ls_fuel_data_inv in Hf as (ζ1&fs1&Hlk1&Hlk'1).
+            destruct (decide (ρ ∈ dom fs)); first done. exfalso.
+            eapply Hnew; eauto; last by apply elem_of_dom_2 in Hlk'1.
+            rewrite Hborn. set_solver. }
+          apply Hneqtid. rewrite Hmap'. by eapply ls_mapping_data.
+        * apply Hneqtid. rewrite Hmap'.
+          eapply ls_mapping_data=>//.
+          rewrite Hd lookup_insert_ne // in Hlk.
+    - intros ρ Hin Hneq. apply ls_fuel_dom_data_inv in Hin as (ζ1&fs1&Hlk1&Hdom1).
+      destruct (decide (ζ1 = ζ)).
+      + simplify_eq. admit.
+      + left. apply elem_of_dom in Hdom1 as (f'&Hf').
+        have ->: ls_fuel δ' !! ρ = Some f'.
+        { eapply (ls_fuel_data _ _ ζ1); eauto. rewrite Hd lookup_insert_ne //. }
+        have ->: ls_fuel δ !! ρ = Some f'.
+        { eapply (ls_fuel_data _ _ ζ1); eauto. }
+        naive_solver.
     - intros H0live'. have H0dom: ρ0 ∈ dom fs' by set_solver. apply elem_of_dom in H0dom as [f' Hf'].
       rewrite (ls_fuel_data _ _ _ _ _ Hζ' Hf') Hd /=. eapply Hfl0; [rewrite Hd // in H0live' | done].
     - intros ρ [Hρin Hρnin]%elem_of_difference.
