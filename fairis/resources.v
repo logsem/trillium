@@ -1068,6 +1068,116 @@ Section model_state_lemmas.
     by apply model_update_locale_spec_fork.
   Qed.
 
+  (* OBS: Maybe use fuel limit instead of generic [f] *)
+  Program Definition model_update_set (ζ : locale Λ) (ρ : fmrole M) (f : nat) (δ : LM) : LM :=
+    {|
+      ls_data :=
+        {| ls_under := δ.(ls_under);
+           ls_map := alter (alter (λ _, f) ρ) ζ δ.(ls_map); |};
+    |}.
+  Next Obligation.
+    intros ζ ρ f δ ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2.
+    pose proof (δ.(ls_map_disj)) as Hdisj.
+    simpl in *.
+    apply elem_of_dom_2 in HSome1.
+    rewrite !dom_alter_L in HSome1.
+    apply elem_of_dom_2 in HSome2.
+    rewrite !dom_alter_L in HSome2.
+    apply elem_of_dom in HSome1 as [fs1' HSome1].
+    apply elem_of_dom in HSome2 as [fs2' HSome2].
+    specialize (Hdisj ζ1 ζ2 fs1' fs2' Hneq HSome1 HSome2).
+  Admitted.
+  Next Obligation. Admitted.
+
+  Definition model_update_model_step
+          (δ : LM) (ζ : locale Λ) (ρs : gset (fmrole M)) ρ f : LM :=
+    model_update_set ζ ρ f $ model_update_decr ζ $ model_update_filter ζ ρs δ.
+
+  Lemma model_state_interp_model_step_update (ρ : fmrole M)
+        (fs : gmap (fmrole M) nat) tp1 tp2 s1 s2
+        δ ζ σ1 σ2 (f1 f2 : nat) :
+    ρ ∉ dom fs →
+    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
+    (* fmtrans _ s1 (Some ρ) s2 → *)
+    model_state_interp tp1 δ -∗
+    has_fuels ζ ({[ρ := f1]} ∪ (S <$> fs)) -∗
+    frag_model_is s1 ==∗
+    model_state_interp tp2
+      (model_update_model_step δ ζ (dom fs) ρ f2) ∗
+    has_fuels ζ ({[ρ := f2]} ∪ fs) ∗
+    frag_model_is s2.
+  Proof. Admitted.
+
+  (* TODO: Need to update this to reflect model step requirements. *)
+  Definition model_can_model_step (δ1 : LM) (ζ : locale Λ) (ρ : fmrole M) (δ2 : LM) : Prop :=
+    ∃ (δ2 : LM) (fs fs' : gmap (fmrole M) nat),
+      fmtrans _ δ1 (Some ρ) δ2 ∧
+      δ1.(ls_map) !! ζ = Some fs ∧
+      ρ ∈ dom fs ∧
+      (∀ ρ' f f', fs' !! ρ' = Some f' → ρ' ≠ ρ → fs !! ρ' = Some f → f' < f) ∧
+      (ρ ∈ live_roles _ δ2 → ∀ f, fs' !! ρ = Some f → f ≤ LM.(lm_fl) δ2) ∧
+      (∀ ρ, ρ ∈ dom fs' ∖ dom fs → ∀ f', fs' !! ρ = Some f' → f' ≤ LM.(lm_fl) δ2) ∧
+      (M.(live_roles) δ2 ∖ M.(live_roles) δ1 = dom fs' ∖ dom fs) ∧
+      (∀ ρ, ρ ∈ M.(live_roles) δ2 ∖ M.(live_roles) δ1 → ∀ ζ' fs', δ1.(ls_map) !! ζ' = Some fs' → ρ ∉ dom fs') ∧
+      (dom fs ∖ dom fs' ∩ M.(live_roles) δ1 = ∅) ∧
+      let data' := <[ζ := fs']> δ1.(ls_map) in
+      δ2.(ls_data) = {| ls_under := δ2; ls_map := data' |}.
+
+  (* TODO: Clean up *)
+  Lemma model_step_suff_data_alt fl (δ δ': LiveState Λ M) ρ0 m' (fs fs': gmap _ nat) ζ :
+    fmtrans _ δ (Some ρ0) m' →
+    δ.(ls_map) !! ζ = Some fs →
+    ρ0 ∈ dom fs →
+    (∀ ρ f f', fs' !! ρ = Some f' → ρ ≠ ρ0 → fs !! ρ = Some f → f' < f) →
+    (ρ0 ∈ live_roles _ m' → ∀ f'0, fs' !! ρ0 = Some f'0 → f'0 ≤ fl m') →
+    (∀ ρ, ρ ∈ dom fs' ∖ dom fs → ∀ f', fs' !! ρ = Some f' → f' ≤ fl m') →
+    (M.(live_roles) m' ∖ M.(live_roles) δ = dom fs' ∖ dom fs) →
+    (∀ ρ, ρ ∈ M.(live_roles) m' ∖ M.(live_roles) δ → ∀ ζ' fs', δ.(ls_map) !! ζ' = Some fs' → ρ ∉ dom fs') →
+    (dom fs ∖ dom fs' ∩ M.(live_roles) δ = ∅) →
+    let data' := <[ζ := fs']> δ.(ls_map) in
+    δ'.(ls_data) = {| ls_under := m'; ls_map := data' |} →
+    ls_trans fl δ (Take_step ρ0 ζ) δ'.
+  Proof.
+    intros.
+    assert (∃ (δ':LiveState Λ M), δ'.(ls_data) =
+          {| ls_under := m';
+            ls_map := data' |} ∧
+            ls_trans fl δ (Take_step ρ0 ζ) δ') as (δ''&Heq&Htrans).
+    { eapply (model_step_suff_data); try set_solver. }
+    rewrite Heq in Htrans. rewrite H9.
+    destruct δ', ls_data. done.
+  Qed.
+
+  Lemma model_can_model_step_trans ζ ρ (δ δ' : LiveState Λ M) :
+    model_can_model_step δ ζ ρ δ' → ls_trans (LM.(lm_fl)) δ (Take_step ρ ζ) δ'.
+  Proof.
+    destruct 1 as (?&?&?&?&?&?&?&?&?&?&?&?&?).
+    eapply model_step_suff_data_alt; try done.
+    admit.                      (* Some record stuff.. *)
+  Admitted.
+
+  Lemma model_state_interp_can_model_step es δ ζ ρ f1 f2
+        (fs : gmap (fmrole M) nat) s1 :
+    ρ ∉ dom fs →
+    model_state_interp es δ -∗ has_fuels ζ ({[ρ := f1]} ∪ (S <$> fs)) -∗
+    frag_model_is s1 -∗
+    ⌜model_can_model_step δ ζ ρ (model_update_model_step δ ζ (dom fs) ρ f2)⌝.
+  Proof. Admitted.
+
+  Lemma model_update_locale_spec_model_step extr
+        (auxtr : auxiliary_trace LM) ζ c2 ρs ρ f :
+    model_can_model_step (trace_last auxtr) ζ ρ
+      (model_update_model_step (trace_last auxtr) ζ ρs ρ f) →
+    tids_smaller c2.1 (model_update_model_step (trace_last auxtr) ζ ρs ρ f) →
+    valid_state_evolution_fairness
+      (extr :tr[Some ζ]: c2)
+      (auxtr :tr[Take_step ρ ζ]:
+          (model_update_model_step (trace_last auxtr) ζ ρs ρ f)).
+  Proof.
+    intros Hstep Htids. destruct c2.
+    split; [done|]. split; [by apply model_can_model_step_trans|done].
+  Qed.
+
   Lemma update_model_step
         (extr : execution_trace Λ)
         (auxtr: auxiliary_trace LM) c2 s1 s2 fs ρ (δ1 : LM) ζ f :
@@ -1075,14 +1185,29 @@ Section model_state_lemmas.
     trace_last auxtr = δ1 →
     locale_step (trace_last extr) (Some ζ) c2 →
     fmtrans _ s1 (Some ρ) s2 →
-    has_fuels ζ ({[ρ := f]} ∪ fmap S fs) -∗ frag_model_is s1 -∗
+    has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗ frag_model_is s1 -∗
     model_state_interp (trace_last extr).1 δ1 ==∗
     ∃ (δ2: LM),
       ⌜valid_state_evolution_fairness
         (extr :tr[Some ζ]: c2) (auxtr :tr[Take_step ρ ζ]: δ2)⌝ ∗
       has_fuels ζ ({[ρ := LM.(lm_fl) s2]} ∪ fs) ∗
       frag_model_is s2 ∗ model_state_interp c2.1 δ2.
-  Proof. Admitted.
+  Proof.
+    iIntros (Hdom Hlast Hstep Htrans) "Hfuel Hfrag Hm".
+    iDestruct (model_state_interp_can_model_step with "Hm Hfuel Hfrag")
+      as %Hcan_step; [done..|].
+    rewrite -Hlast.
+    destruct (trace_last extr), c2.
+    iMod (model_state_interp_model_step_update with "Hm Hfuel Hfrag")
+      as "(Hm&Hf&Hfrag)"; [done..|].
+    iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
+    iModIntro.
+    iExists (model_update_model_step (trace_last auxtr) ζ (dom fs) ρ _).
+    iFrame "Hm Hf Hfrag".
+    iPureIntro.
+    subst.
+    by apply model_update_locale_spec_model_step. 
+  Qed.
 
   Lemma free_roles_inclusion FR fr:
     auth_free_roles_are FR -∗
