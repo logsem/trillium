@@ -207,11 +207,15 @@ Section model_state_interp.
              (δ : LiveState Λ M) :=
     ∀ ρ, ρ ∈ M.(live_roles) δ → ∃ ζ fs, m !! ζ = Some fs ∧ ρ ∈ dom fs.
 
+  Definition fuel_map_preserve_threadpool (tp: list $ expr Λ)
+             (fuel_map : gmap (locale Λ) (gmap Role nat)) :=
+     ∀ ζ, ζ ∉ locales_of_list tp → fuel_map !! ζ = None.
+
   Definition model_state_interp (tp: list $ expr Λ) (δ: LiveState Λ M): iProp Σ :=
     ∃ fuel_map,
       ⌜ fuel_map_le fuel_map δ.(ls_map) ⌝ ∗
       ⌜ fuel_map_preserve_dead fuel_map δ ⌝ ∗
-      ⌜ ∀ ζ, ζ ∉ locales_of_list tp → fuel_map !! ζ = None ⌝ ∗
+      ⌜ fuel_map_preserve_threadpool tp fuel_map ⌝ ∗
       auth_model_is δ ∗ auth_fuel_mapping_is fuel_map.
 
   Lemma model_state_interp_tids_smaller δ tp :
@@ -870,74 +874,80 @@ Section model_state_lemmas.
         set_solver.
   Qed.
 
-  Lemma decr_succ_compose_id :
-    (λ f : nat, f - 1) ∘ S = id.
+  Lemma decr_succ_compose_id : (λ f : nat, f - 1) ∘ S = id.
   Proof. apply FunExt. intros x. simpl. lia. Qed.
 
+  Lemma fuel_map_le_fuel_step fm ζ fs (δ:LM) :
+    fm !! ζ = Some (S <$> fs) →
+    fuel_map_le fm (ls_map δ) →
+    fuel_map_le (<[ζ:=fs]> fm) (ls_map (model_update_locale_fuel δ ζ (dom fs))).
+  Proof.
+    intros Hagree [Hfmle Hfmdom].
+    split; [|by apply elem_of_dom_2 in Hagree; set_solver].
+    rewrite /model_update_locale_fuel=> /=.
+    pose proof Hfmle as Hfmle'. rewrite map_included_spec in Hfmle'.
+    apply Hfmle' in Hagree as [ρs [HSome Hρs]].
+    rewrite -(insert_id (ls_map δ) ζ ρs); [|done].
+    rewrite -alter_compose alter_insert=> /=.
+    apply map_included_insert; [|done].
+    (* OBS: The remaining proof can likely be decomposed into library lemmas *)
+    clear Hfmle Hfmle' HSome Hfmdom.
+    apply map_included_spec.
+    intros ρ f1 Hρ.
+    rewrite map_included_spec in Hρs.
+    assert ((S <$> fs) !! ρ = Some (S f1)) as Hρ'; [by rewrite lookup_fmap Hρ|].
+    specialize (Hρs ρ (S f1) Hρ') as [v2 [Hv2 Hle]].
+    destruct v2; [lia|]. exists v2. split; [|lia].
+    rewrite !lookup_fmap map_filter_lookup Hv2=> /=.
+    destruct (decide (ρ ∈ live_roles M δ ∨ ρ ∈ dom fs)) as [Hin|Hnin].
+    + rewrite option_guard_True; [|done]. simpl. f_equiv. lia.
+    + apply Decidable.not_or in Hnin. destruct Hnin as [Hnin1 Hnin2].
+      apply not_elem_of_dom in Hnin2. set_solver.
+  Qed.
+
+  Lemma fuel_map_preserve_dead_fuel_step fm ζ fs (δ:LM) :
+    fm !! ζ = Some (S <$> fs) →
+    fuel_map_preserve_dead fm (model_update_locale_fuel δ ζ (dom fs)) →
+    fuel_map_preserve_dead (<[ζ:=fs]> fm) (model_update_locale_fuel δ ζ (dom fs)).
+  Proof.
+    intros Hagree Hfmdead ρ Hin. apply Hfmdead in Hin as (ζ'&ρs&HSome&Hρ).
+    destruct (decide (ζ = ζ')) as [<-|Hneq].
+    + exists ζ, fs. rewrite lookup_insert. by set_solver.
+    + exists ζ', ρs. rewrite lookup_insert_ne; [by set_solver|done].
+  Qed.
+
+  Lemma fuel_map_preserve_threadpool_fuel_step
+        c1 ζ c2 (fm1 fm2 : gmap _ (gmap (fmrole M) nat)) :
+    dom fm1 = dom fm2 → locale_step c1 (Some ζ) c2 →
+    fuel_map_preserve_threadpool c1.1 fm1 →
+    fuel_map_preserve_threadpool c2.1 fm2.
+  Proof.
+    rewrite /fuel_map_preserve_threadpool.
+    intros Hdom Hstep Htp. intros ζ' Hζ'. destruct c1, c2.
+    apply locales_of_list_step_incl in Hstep.
+    assert (ζ' ∉ locales_of_list l) as Hζ'' by set_solver.
+    apply Htp in Hζ''.
+    rewrite -not_elem_of_dom. rewrite -not_elem_of_dom in Hζ''.
+    set_solver.
+  Qed.
+
   Lemma model_state_interp_fuel_update c1 c2 δ ζ fs :
-    fs ≠ ∅ →
     locale_step c1 (Some ζ) c2 →
     model_state_interp c1.1 δ -∗
     has_fuels_S ζ fs ==∗
     model_state_interp c2.1 (model_update_locale_fuel δ ζ (dom fs)) ∗
     has_fuels ζ fs.
   Proof.
-    iIntros (Hdom Hstep) "Hm Hfs".
-    iDestruct "Hm" as (fm [Hfmle ?] Hfmdead Htp) "(Hm & Hfm)".
+    iIntros (Hstep) "Hm Hfs".
+    iDestruct "Hm" as (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
     iDestruct (has_fuels_agree with "Hfm Hfs") as %Hagree.
-    iMod (has_fuels_decr with "Hfm Hfs") as "[Hfm Hfs]".
-    iFrame "Hfs".
-    iModIntro.
-    iExists _. iFrame.
-    iPureIntro.
-    repeat split.
-    - rewrite /model_update_locale_fuel. simpl.
-      pose proof Hfmle as Hfmle'.
-      rewrite map_included_spec in Hfmle'.
-      apply Hfmle' in Hagree as [ρs [HSome Hρs]].
-      rewrite -(insert_id (ls_map δ) ζ ρs); [|done].
-      rewrite -alter_compose.
-      rewrite alter_insert. simpl.
-      apply map_included_insert; [|done].
-      assert (map_included le (S <$> fs) ((ls_map δ) !!! ζ)) as Hfs.
-      {
-        rewrite /fuel_map_le in Hfmle.
-        rewrite map_included_spec in Hfmle.
-        rewrite lookup_total_alt. simpl. rewrite HSome. done.
-      }
-      apply map_included_spec.
-      intros ρ f1 Hρ.
-      rewrite map_included_spec in Hfs.
-      assert ((S <$> fs) !! ρ = Some (S f1)) as Hρ'.
-      { rewrite lookup_fmap. rewrite Hρ. simpl. done. }
-      specialize (Hfs ρ (S f1) Hρ') as [v2 [Hv2 Hle]].
-      destruct v2; [lia|].
-      exists v2.
-      split; [|lia].
-      rewrite !lookup_fmap.
-      rewrite lookup_total_alt in Hv2. rewrite HSome in Hv2. simpl in *.
-      rewrite map_filter_lookup.
-      rewrite Hv2.
-      simpl.
-      destruct (decide (ρ ∈ live_roles M δ ∨ ρ ∈ dom fs)) as [Hin|Hnin].
-      + rewrite option_guard_True; [|done]. simpl. f_equiv. lia.
-      + apply Decidable.not_or in Hnin.
-        destruct Hnin as [Hnin1 Hnin2].
-        apply not_elem_of_dom in Hnin2. set_solver.
-    - apply elem_of_dom_2 in Hagree. set_solver.
-    - intros ρ Hin.
-      apply Hfmdead in Hin as (ζ'&ρs&HSome&Hρ).
-      destruct (decide (ζ = ζ')) as [<-|Hneq].
-      + exists ζ, fs. rewrite lookup_insert. set_solver.
-      + exists ζ', ρs. rewrite lookup_insert_ne; [|done]. set_solver.
-    - intros ζ' Hζ'.
-      destruct c1, c2.
-      apply locales_of_list_step_incl in Hstep.
-      simpl in *.
-      assert (ζ' ∉ locales_of_list l) as Hζ'' by set_solver.
-      apply Htp in Hζ''.
-      rewrite -not_elem_of_dom. rewrite -not_elem_of_dom in Hζ''.
-      set_solver.
+    iMod (has_fuels_decr with "Hfm Hfs") as "[Hfm $]".
+    iModIntro. iExists _. iFrame. iPureIntro.
+    split; [|split].
+    - by apply fuel_map_le_fuel_step.
+    - by apply fuel_map_preserve_dead_fuel_step.
+    - eapply fuel_map_preserve_threadpool_fuel_step; [|done..].
+      apply elem_of_dom_2 in Hagree. by set_solver.
   Qed.
 
   Lemma update_fuel_step extr (auxtr : auxiliary_trace LM) c2 fs ζ :
@@ -951,12 +961,13 @@ Section model_state_lemmas.
       has_fuels ζ fs ∗ model_state_interp c2.1 δ2.
   Proof.
     iIntros (Hdom Hstep) "Hfuel Hm".
+    iExists (model_update_locale_fuel (trace_last auxtr) ζ (dom fs)).
     iDestruct (model_state_interp_can_fuel_step with "Hm Hfuel") as %Hcan_step;
       [done|].
-    iMod (model_state_interp_fuel_update with "Hm Hfuel") as "[Hm Hfuel]"; [done..|].
+    iMod (model_state_interp_fuel_update with "Hm Hfuel") as "[Hm Hfuel]";
+      [done..|].
     iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
     iModIntro.
-    iExists (model_update_locale_fuel (trace_last auxtr) ζ (dom fs)).
     iFrame "Hm Hfuel".
     iPureIntro. by apply model_update_locale_spec.
   Qed.
@@ -965,6 +976,7 @@ Section model_state_lemmas.
     ∃ tp1', tp2 = tp1' ++ [e] ∧ length tp1' = length tp1.
 
   (* OBS: Def might be improved. *)
+  (* OBS: Need freshness condition on ζf. *)
   Program Definition model_update_split
           (ζ ζf : locale Λ) (ρs : gset (fmrole M)) (δ : LM) : LM :=
     {|
