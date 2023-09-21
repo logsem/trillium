@@ -1134,27 +1134,27 @@ Section model_state_lemmas.
   Qed.
 
   Definition model_update_model_step
-          (ζ : locale Λ) (ρs : gset (fmrole M)) ρ f (δ2 : M) (δ : LM) : M :=
-    model_update_state δ2 $ model_update_set ζ ρ f $ model_update_decr ζ $ model_update_filter ζ ρs δ.
+          (ζ : locale Λ) (ρs : gset (fmrole M)) ρ (δ2 : M) (δ : LM) : M :=
+    model_update_state δ2 $ model_update_set ζ ρ (LM.(lm_fl) δ2) $ model_update_decr ζ $ model_update_filter ζ ρs δ.
 
   (* UGH! *)
-  Lemma model_update_model_step_valid (ζ : locale Λ) (ρs : gset (fmrole M)) ρ f (δ2 : M) (δ1:LM) :
+  Lemma model_update_model_step_valid (ζ : locale Λ) (ρs : gset (fmrole M)) ρ (δ2 : M) (δ1:LM) :
     M.(live_roles) δ2 ⊆ M.(live_roles) δ1 →
-    ∃ δ, (ls_data δ) = model_update_model_step ζ ρs ρ f δ2 δ1.
+    ∃ δ, (ls_data δ) = model_update_model_step ζ ρs ρ δ2 δ1.
   Proof. intros. by apply model_update_state_valid. Qed.
 
   Lemma model_state_interp_model_step_update (ρ : fmrole M)
         (fs : gmap (fmrole M) nat) tp1 tp2
-        (δ:LM) ζ σ1 σ2 (f1 f2 : nat) δ2 s2 :
+        (δ:LM) ζ σ1 σ2 (f1 : nat) δ2 s2 :
     ρ ∉ dom fs →
     locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
     fmtrans _ δ (Some ρ) s2 →
-    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ dom fs) ρ f2 s2 δ →
+    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ dom fs) ρ s2 δ →
     model_state_interp tp1 δ -∗
     has_fuels ζ ({[ρ := f1]} ∪ (S <$> fs)) -∗
     frag_model_is δ ==∗
     model_state_interp tp2 δ2 ∗
-    has_fuels ζ ({[ρ := f2]} ∪ fs) ∗
+    has_fuels ζ ({[ρ := LM.(lm_fl) δ2]} ∪ fs) ∗
     frag_model_is s2.
   Proof. Admitted.
 
@@ -1207,16 +1207,72 @@ Section model_state_lemmas.
   Qed.
 
   Lemma model_state_interp_can_model_step es (δ δ2 : LM) ζ ρ f
-        (fs : gmap (fmrole M) nat) s2 :
-    fmtrans _ δ (Some ρ) s2 →
-    M.(live_roles) s2 ⊆ M.(live_roles) δ →
+        (fs : gmap (fmrole M) nat) :
+    fmtrans _ δ (Some ρ) δ2 →
+    M.(live_roles) δ2 ⊆ M.(live_roles) δ →
     ρ ∉ dom fs →
-    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ dom fs) ρ (LM.(lm_fl) s2) s2 δ →
+    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ dom fs) ρ δ2 δ →
     model_state_interp es δ -∗
     has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗
     frag_model_is δ -∗
     ⌜model_can_model_step δ ζ ρ δ2⌝.
-  Proof. Admitted.
+  Proof.
+    iIntros (Hstep Hle Hρ Hδ2) "Hm Hf Hδ".
+    iDestruct "Hm" as (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
+    iDestruct (has_fuels_agree with "Hfm Hf") as %Hagree.
+    iPureIntro.
+    rewrite /fuel_map_le map_included_spec in Hfmle.
+    apply Hfmle in Hagree as (fs'&Hζ&Hfs').
+    assert (ρ ∈ dom fs') as Hρ'.
+    { apply map_included_subseteq_inv in Hfs'. set_solver. }
+    eexists _, _. repeat split; try done.
+    - rewrite Hδ2. simpl. rewrite -!alter_compose.
+      rewrite -{1}(insert_id (ls_map δ) ζ fs'); [|done].
+      rewrite alter_insert.
+      f_equiv.
+      done.
+    - simpl. rewrite lookup_alter. rewrite lookup_fmap.
+      apply elem_of_dom in Hρ' as [f' Heq].
+      rewrite map_filter_lookup.
+      rewrite Heq. simpl.
+      rewrite option_guard_True; [done|].
+      set_solver.
+    - rewrite map_included_spec.
+      intros ρ' f' HSome.
+      assert (ρ ≠ ρ').
+      { intros Heq. rewrite Heq in HSome.
+        by rewrite lookup_delete in HSome. }
+      rewrite lookup_delete_ne in HSome; [|done].
+      exists (f' + 1).
+      split; [|lia].
+      simpl in *.
+      rewrite lookup_alter_ne in HSome; [|done].
+      rewrite lookup_fmap in HSome.
+      rewrite map_filter_lookup in HSome. simpl in *.
+      destruct (fs' !! ρ'); [|done].
+      simpl in *.
+      destruct (decide (ρ' ∈ live_roles M δ ∨ ρ' ∈ {[ρ]} ∪ dom fs)) as [Hin|Hnin].
+      + rewrite option_guard_True in HSome; [|done].
+        simpl in *. simplify_eq. f_equiv.
+        (* OBS: Need to track that fs' is non-zero *)
+        admit.
+      + by rewrite option_guard_False in HSome.
+    - (* TODO: Make a lemma for this *)
+      simpl.
+      rewrite dom_alter_L.
+      rewrite dom_fmap_L.
+      clear.
+      induction fs' using map_ind.
+      { set_solver. }
+      rewrite /filter_fuel_map.
+      rewrite map_filter_insert. simpl.
+      case_decide.
+      + set_solver.
+      + rewrite -dom_difference_L.
+        rewrite map_filter_delete.
+        rewrite -insert_difference.
+        set_solver.
+  Admitted.
 
   Lemma model_update_locale_spec_model_step extr
         (auxtr : auxiliary_trace LM) ζ c2 ρs ρ f δ2 s2 :
