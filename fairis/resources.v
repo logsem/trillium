@@ -961,13 +961,17 @@ Section model_state_lemmas.
       has_fuels ζ fs ∗ model_state_interp c2.1 δ2.
   Proof.
     iIntros (Hdom Hstep) "Hfuel Hm".
+    (* 1: Construct new model state *)
     iExists (model_update_locale_fuel (trace_last auxtr) ζ (dom fs)).
+    (* 2: Determine that we can step to new state *)
     iDestruct (model_state_interp_can_fuel_step with "Hm Hfuel") as %Hcan_step;
       [done|].
+    (* 3: Update ghost state in tandem with model state *)
     iMod (model_state_interp_fuel_update with "Hm Hfuel") as "[Hm Hfuel]";
       [done..|].
     iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
     iModIntro.
+    (* 4: Close proof *)
     iFrame "Hm Hfuel".
     iPureIntro. by apply model_update_locale_spec.
   Qed.
@@ -1076,103 +1080,153 @@ Section model_state_lemmas.
            ls_map := alter (alter (λ _, f) ρ) ζ δ.(ls_map); |};
     |}.
   Next Obligation.
-    intros ζ ρ f δ ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2.
+    intros ζ ρ f δ ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2. simpl in *.
     pose proof (δ.(ls_map_disj)) as Hdisj.
-    simpl in *.
-    apply elem_of_dom_2 in HSome1.
-    rewrite !dom_alter_L in HSome1.
-    apply elem_of_dom_2 in HSome2.
-    rewrite !dom_alter_L in HSome2.
-    apply elem_of_dom in HSome1 as [fs1' HSome1].
-    apply elem_of_dom in HSome2 as [fs2' HSome2].
-    specialize (Hdisj ζ1 ζ2 fs1' fs2' Hneq HSome1 HSome2).
-  Admitted.
-  Next Obligation. Admitted.
+    apply lookup_alter_Some in HSome1.
+    apply lookup_alter_Some in HSome2.
+    destruct HSome1 as [[-> [fs1' [HSome1 ->]]]|[_ HSome1]],
+               HSome2 as [[-> [fs2' [HSome2 ->]]]|[_ HSome2]];
+               [done| | |].
+    - specialize (Hdisj ζ1 ζ2 _ _ Hneq HSome1 HSome2).
+      rewrite map_disjoint_dom dom_alter_L.
+      rewrite map_disjoint_dom in Hdisj. set_solver.
+    - specialize (Hdisj ζ1 ζ2 _ _ Hneq HSome1 HSome2).
+      rewrite map_disjoint_dom dom_alter_L.
+      rewrite map_disjoint_dom in Hdisj. set_solver.
+    - by eapply Hdisj.
+  Qed.
+  Next Obligation.
+    intros ζ ρ f δ ρ' Hρ'. simpl in *.
+    pose proof (δ.(ls_map_live)) as Hlive.
+    apply Hlive in Hρ' as (ζ'&fs'&HSome&Hρ').
+    destruct (decide (ζ = ζ')) as [<-|Hneq].
+    - eexists ζ, _. rewrite lookup_alter HSome. split; [done|].
+      by rewrite dom_alter_L.
+    - eexists ζ', _. by rewrite lookup_alter_ne.
+  Qed.
+
+  Definition model_update_state (δ2 : M) (δ1 : LiveStateData Λ M) :
+    LiveStateData Λ M :=
+    {| ls_under := δ2;
+      ls_map := δ1.(ls_map); |}.
+
+  (* Ugh *)
+  Lemma model_update_state_valid (δ2 : M) (δ1 : LM) :
+    M.(live_roles) δ2 ⊆ M.(live_roles) δ1 →
+    ∃ δ, (ls_data δ) = model_update_state δ2 δ1.
+  Proof.
+    intros Hle.
+    assert (∀ ζ ζ' fs fs',
+              ζ ≠ ζ' → (model_update_state δ2 δ1).(ls_map) !! ζ = Some fs →
+              (model_update_state δ2 δ1).(ls_map) !! ζ' = Some fs' → fs ##ₘ fs') as Hdisj'.
+    { intros. by eapply (δ1.(ls_map_disj)). }
+    assert (∀ ρ, ρ ∈ M.(live_roles) (model_update_state δ2 δ1).(ls_under) →
+                 ∃ ζ fs, (model_update_state δ2 δ1).(ls_map) !! ζ = Some fs ∧ ρ ∈ dom fs) as Hlive'.
+    { pose proof (δ1.(ls_map_live)) as Hlive.
+      intros.
+      assert (ρ ∈ live_roles M δ1) as Hin by set_solver.
+      apply Hlive in Hin as (?&?&?&?). eexists _, _. done. }
+    exists
+      {| ls_data := model_update_state δ2 δ1;
+         ls_map_disj := Hdisj';
+         ls_map_live := Hlive' |}.
+    done.
+  Qed.
 
   Definition model_update_model_step
-          (δ : LM) (ζ : locale Λ) (ρs : gset (fmrole M)) ρ f : LM :=
-    model_update_set ζ ρ f $ model_update_decr ζ $ model_update_filter ζ ρs δ.
+          (ζ : locale Λ) (ρs : gset (fmrole M)) ρ f (δ2 : M) (δ : LM) : M :=
+    model_update_state δ2 $ model_update_set ζ ρ f $ model_update_decr ζ $ model_update_filter ζ ρs δ.
+
+  (* UGH! *)
+  Lemma model_update_model_step_valid (ζ : locale Λ) (ρs : gset (fmrole M)) ρ f (δ2 : M) (δ1:LM) :
+    M.(live_roles) δ2 ⊆ M.(live_roles) δ1 →
+    ∃ δ, (ls_data δ) = model_update_model_step ζ ρs ρ f δ2 δ1.
+  Proof. intros. by apply model_update_state_valid. Qed.
 
   Lemma model_state_interp_model_step_update (ρ : fmrole M)
-        (fs : gmap (fmrole M) nat) tp1 tp2 s1 s2
-        δ ζ σ1 σ2 (f1 f2 : nat) :
+        (fs : gmap (fmrole M) nat) tp1 tp2
+        (δ:LM) ζ σ1 σ2 (f1 f2 : nat) δ2 s2 :
     ρ ∉ dom fs →
     locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
-    (* fmtrans _ s1 (Some ρ) s2 → *)
+    fmtrans _ δ (Some ρ) s2 →
+    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ dom fs) ρ f2 s2 δ →
     model_state_interp tp1 δ -∗
     has_fuels ζ ({[ρ := f1]} ∪ (S <$> fs)) -∗
-    frag_model_is s1 ==∗
-    model_state_interp tp2
-      (model_update_model_step δ ζ (dom fs) ρ f2) ∗
+    frag_model_is δ ==∗
+    model_state_interp tp2 δ2 ∗
     has_fuels ζ ({[ρ := f2]} ∪ fs) ∗
     frag_model_is s2.
   Proof. Admitted.
 
-  (* TODO: Need to update this to reflect model step requirements. *)
-  Definition model_can_model_step (δ1 : LM) (ζ : locale Λ) (ρ : fmrole M) (δ2 : LM) : Prop :=
-    ∃ (δ2 : LM) (fs fs' : gmap (fmrole M) nat),
-      fmtrans _ δ1 (Some ρ) δ2 ∧
-      δ1.(ls_map) !! ζ = Some fs ∧
-      ρ ∈ dom fs ∧
-      (∀ ρ' f f', fs' !! ρ' = Some f' → ρ' ≠ ρ → fs !! ρ' = Some f → f' < f) ∧
-      (ρ ∈ live_roles _ δ2 → ∀ f, fs' !! ρ = Some f → f ≤ LM.(lm_fl) δ2) ∧
-      (∀ ρ, ρ ∈ dom fs' ∖ dom fs → ∀ f', fs' !! ρ = Some f' → f' ≤ LM.(lm_fl) δ2) ∧
-      (M.(live_roles) δ2 ∖ M.(live_roles) δ1 = dom fs' ∖ dom fs) ∧
-      (∀ ρ, ρ ∈ M.(live_roles) δ2 ∖ M.(live_roles) δ1 → ∀ ζ' fs', δ1.(ls_map) !! ζ' = Some fs' → ρ ∉ dom fs') ∧
-      (dom fs ∖ dom fs' ∩ M.(live_roles) δ1 = ∅) ∧
-      let data' := <[ζ := fs']> δ1.(ls_map) in
-      δ2.(ls_data) = {| ls_under := δ2; ls_map := data' |}.
-
-  (* TODO: Clean up *)
-  Lemma model_step_suff_data_alt fl (δ δ': LiveState Λ M) ρ0 m' (fs fs': gmap _ nat) ζ :
-    fmtrans _ δ (Some ρ0) m' →
-    δ.(ls_map) !! ζ = Some fs →
-    ρ0 ∈ dom fs →
-    (∀ ρ f f', fs' !! ρ = Some f' → ρ ≠ ρ0 → fs !! ρ = Some f → f' < f) →
-    (ρ0 ∈ live_roles _ m' → ∀ f'0, fs' !! ρ0 = Some f'0 → f'0 ≤ fl m') →
-    (∀ ρ, ρ ∈ dom fs' ∖ dom fs → ∀ f', fs' !! ρ = Some f' → f' ≤ fl m') →
-    (M.(live_roles) m' ∖ M.(live_roles) δ = dom fs' ∖ dom fs) →
-    (∀ ρ, ρ ∈ M.(live_roles) m' ∖ M.(live_roles) δ → ∀ ζ' fs', δ.(ls_map) !! ζ' = Some fs' → ρ ∉ dom fs') →
-    (dom fs ∖ dom fs' ∩ M.(live_roles) δ = ∅) →
-    let data' := <[ζ := fs']> δ.(ls_map) in
-    δ'.(ls_data) = {| ls_under := m'; ls_map := data' |} →
-    ls_trans fl δ (Take_step ρ0 ζ) δ'.
+  Lemma model_step_suff_data_weak_alt (δ1 δ2 : LiveState Λ M) ρ
+        (fs fs': gmap _ nat) ζ :
+    fmtrans _ δ1 (Some ρ) δ2 →
+    M.(live_roles) δ2 ⊆ M.(live_roles) δ1 →
+    δ1.(ls_map) !! ζ = Some fs →
+    δ2.(ls_map) = <[ζ := fs']> δ1.(ls_map) →
+    ρ ∈ dom fs →
+    fs' !! ρ = Some (LM.(lm_fl) (ls_under δ2)) →
+    map_included (<) (delete ρ fs') fs →
+    (dom fs ∖ dom fs' ∩ M.(live_roles) δ1 = ∅) →
+    ls_trans LM.(lm_fl) δ1 (Take_step ρ ζ) δ2.
   Proof.
-    intros.
-    assert (∃ (δ':LiveState Λ M), δ'.(ls_data) =
-          {| ls_under := m';
-            ls_map := data' |} ∧
-            ls_trans fl δ (Take_step ρ0 ζ) δ') as (δ''&Heq&Htrans).
-    { eapply (model_step_suff_data); try set_solver. }
-    rewrite Heq in Htrans. rewrite H9.
-    destruct δ', ls_data. done.
+    intros Hstep Hlive Hfs Hfs' Hρ Hρ' Hlt Hlive'.
+    assert (∃ (δ'':LiveState Λ M), δ''.(ls_data) =
+          {| ls_under := ls_under δ2;
+            ls_map := <[ζ := fs']> δ1.(ls_map) |} ∧
+            ls_trans LM.(lm_fl) δ1 (Take_step ρ ζ) δ'') as (δ''&Heq&Htrans).
+    { eapply (model_step_suff_data); try done.
+      - rewrite map_included_spec in Hlt.
+        intros ρ' f f' Hf' Hneq Hf.
+        rewrite -(lookup_delete_ne _ ρ ρ') in Hf'; [|done].
+        apply Hlt in Hf' as (?&?&?). by simplify_eq.
+      - set_solver.
+      - apply map_included_subseteq_inv in Hlt. set_solver.
+      - apply map_included_subseteq_inv in Hlt. set_solver.
+      - set_solver. }
+    rewrite Heq -Hfs' in Htrans. by destruct δ2, ls_data.
   Qed.
+
+  Definition model_can_model_step (δ1 : LM) (ζ : locale Λ) (ρ : fmrole M) (δ2 : LM) : Prop :=
+    ∃ (fs fs' : gmap (fmrole M) nat),
+      fmtrans _ δ1 (Some ρ) δ2 ∧
+      (* OBS: This pertains to resurrection, but is needed *)
+      M.(live_roles) δ2 ⊆ M.(live_roles) δ1 ∧
+      δ1.(ls_map) !! ζ = Some fs ∧
+      δ2.(ls_map) = <[ζ := fs']> δ1.(ls_map) ∧
+      ρ ∈ dom fs ∧
+      fs' !! ρ = Some (LM.(lm_fl) (ls_under δ2)) ∧
+      map_included (<) (delete ρ fs') fs ∧
+      (dom fs ∖ dom fs' ∩ M.(live_roles) δ1 = ∅).
 
   Lemma model_can_model_step_trans ζ ρ (δ δ' : LiveState Λ M) :
     model_can_model_step δ ζ ρ δ' → ls_trans (LM.(lm_fl)) δ (Take_step ρ ζ) δ'.
   Proof.
-    destruct 1 as (?&?&?&?&?&?&?&?&?&?&?&?&?).
-    eapply model_step_suff_data_alt; try done.
-    admit.                      (* Some record stuff.. *)
-  Admitted.
+    destruct 1 as (?&?&?&?&?&?&?&?&?&?).
+    by eapply model_step_suff_data_weak_alt.
+  Qed.
 
-  Lemma model_state_interp_can_model_step es δ ζ ρ f1 f2
-        (fs : gmap (fmrole M) nat) s1 :
+  Lemma model_state_interp_can_model_step es (δ δ2 : LM) ζ ρ f
+        (fs : gmap (fmrole M) nat) s2 :
+    fmtrans _ δ (Some ρ) s2 →
+    M.(live_roles) s2 ⊆ M.(live_roles) δ →
     ρ ∉ dom fs →
-    model_state_interp es δ -∗ has_fuels ζ ({[ρ := f1]} ∪ (S <$> fs)) -∗
-    frag_model_is s1 -∗
-    ⌜model_can_model_step δ ζ ρ (model_update_model_step δ ζ (dom fs) ρ f2)⌝.
+    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ dom fs) ρ (LM.(lm_fl) s2) s2 δ →
+    model_state_interp es δ -∗
+    has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗
+    frag_model_is δ -∗
+    ⌜model_can_model_step δ ζ ρ δ2⌝.
   Proof. Admitted.
 
   Lemma model_update_locale_spec_model_step extr
-        (auxtr : auxiliary_trace LM) ζ c2 ρs ρ f :
-    model_can_model_step (trace_last auxtr) ζ ρ
-      (model_update_model_step (trace_last auxtr) ζ ρs ρ f) →
-    tids_smaller c2.1 (model_update_model_step (trace_last auxtr) ζ ρs ρ f) →
+        (auxtr : auxiliary_trace LM) ζ c2 ρs ρ f δ2 s2 :
+    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ ρs) ρ f s2
+                                           (trace_last auxtr) →
+    model_can_model_step (trace_last auxtr) ζ ρ δ2 →
+    tids_smaller c2.1 δ2 →
     valid_state_evolution_fairness
       (extr :tr[Some ζ]: c2)
-      (auxtr :tr[Take_step ρ ζ]:
-          (model_update_model_step (trace_last auxtr) ζ ρs ρ f)).
+      (auxtr :tr[Take_step ρ ζ]: δ2).
   Proof.
     intros Hstep Htids. destruct c2.
     split; [done|]. split; [by apply model_can_model_step_trans|done].
@@ -1180,12 +1234,13 @@ Section model_state_lemmas.
 
   Lemma update_model_step
         (extr : execution_trace Λ)
-        (auxtr: auxiliary_trace LM) c2 s1 s2 fs ρ (δ1 : LM) ζ f :
+        (auxtr: auxiliary_trace LM) c2 s2 fs ρ (δ1 : LM) ζ f :
+    M.(live_roles) s2 ⊆ M.(live_roles) δ1 →
     ρ ∉ dom fs →
     trace_last auxtr = δ1 →
     locale_step (trace_last extr) (Some ζ) c2 →
-    fmtrans _ s1 (Some ρ) s2 →
-    has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗ frag_model_is s1 -∗
+    fmtrans _ δ1 (Some ρ) s2 →
+    has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗ frag_model_is δ1 -∗
     model_state_interp (trace_last extr).1 δ1 ==∗
     ∃ (δ2: LM),
       ⌜valid_state_evolution_fairness
@@ -1193,20 +1248,20 @@ Section model_state_lemmas.
       has_fuels ζ ({[ρ := LM.(lm_fl) s2]} ∪ fs) ∗
       frag_model_is s2 ∗ model_state_interp c2.1 δ2.
   Proof.
-    iIntros (Hdom Hlast Hstep Htrans) "Hfuel Hfrag Hm".
+    iIntros (Hlive Hdom Hlast Hstep Htrans) "Hfuel Hfrag Hm".
+    pose proof (model_update_model_step_valid
+                  ζ ({[ρ]} ∪ dom fs) ρ (LM.(lm_fl) s2) s2 δ1) as [δ2 Hδ2]; [done|].
+    iExists δ2.
     iDestruct (model_state_interp_can_model_step with "Hm Hfuel Hfrag")
       as %Hcan_step; [done..|].
-    rewrite -Hlast.
     destruct (trace_last extr), c2.
     iMod (model_state_interp_model_step_update with "Hm Hfuel Hfrag")
       as "(Hm&Hf&Hfrag)"; [done..|].
     iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
     iModIntro.
-    iExists (model_update_model_step (trace_last auxtr) ζ (dom fs) ρ _).
     iFrame "Hm Hf Hfrag".
-    iPureIntro.
-    subst.
-    by apply model_update_locale_spec_model_step. 
+    iPureIntro. subst.
+    by eapply model_update_locale_spec_model_step.
   Qed.
 
   Lemma free_roles_inclusion FR fr:
