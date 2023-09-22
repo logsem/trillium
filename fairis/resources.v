@@ -1306,7 +1306,7 @@ Section model_state_lemmas.
   Proof.
     destruct 1 as (?&?&?&?&?&?&?&?&?&?).
     by eapply model_step_suff_data_weak_alt.
-  Qed.
+  Qed.  
 
   Lemma model_state_interp_can_model_step es (δ δ2 : LM) ζ ρ f
         (fs : gmap (fmrole M) nat) (s1 s2 : M) :
@@ -1325,6 +1325,7 @@ Section model_state_lemmas.
     iDestruct (has_fuels_agree with "Hfm Hf") as %Hagree.
     iPureIntro.
     rewrite /fuel_map_le map_included_spec in Hfmle.
+    pose proof Hagree as Hagree'.
     apply Hfmle in Hagree as (fs'&Hζ&Hfs').
     assert (ρ ∈ dom fs') as Hρ'.
     { apply map_included_subseteq_inv in Hfs'. set_solver. }
@@ -1354,13 +1355,50 @@ Section model_state_lemmas.
       rewrite lookup_alter_ne in HSome; [|done].
       rewrite lookup_fmap in HSome.
       rewrite map_filter_lookup in HSome. simpl in *.
-      destruct (fs' !! ρ'); [|done].
+      destruct (fs' !! ρ') eqn:Heqn; [|done].
       simpl in *.
       destruct (decide (ρ' ∈ live_roles M δ ∨ ρ' ∈ {[ρ]} ∪ dom fs)) as [Hin|Hnin].
       + rewrite option_guard_True in HSome; [|done].
         simpl in *. simplify_eq. f_equiv.
         (* OBS: Need to track that fs' is non-zero *)
-        admit.
+        assert (ρ' ∈ dom (S <$> fs)) as Hin'.
+        { destruct Hin as [Hin|Hin]; [|set_solver].
+          apply Hfmdead in Hin as (ζ'&ρs&Hζ'&Hρs).
+          destruct (decide (ρ' ∈ dom (S <$> fs))) as [|Hnin]; [done|].
+          rewrite dom_fmap_L in Hnin.
+          assert (dom ({[ρ := f]} ∪ (S <$> fs)) = dom ρs).
+          { destruct (decide (ζ = ζ')) as [<-|Hneq].
+            { rewrite Hagree' in Hζ'.
+              simplify_eq. done. }
+
+            pose proof δ.(ls_map_disj) as Hdisj.
+            apply Hfmle in Hagree' as (fs''&Hfs''&Hle'').
+            apply Hfmle in Hζ' as (fs'''&Hfs'''&Hle''').
+            specialize (Hdisj ζ ζ' fs'' fs''' Hneq Hfs'' Hfs''').
+            rewrite map_disjoint_spec in Hdisj.
+            assert (ρ' ∈ dom fs'') as Hin''.
+            { rewrite Hζ in Hfs''. simplify_eq.
+              apply elem_of_dom. set_solver. }
+            assert (ρ' ∈ dom fs''') as Hin'''.
+            { apply elem_of_dom.
+              rewrite map_included_spec in Hle'''.
+              apply elem_of_dom in Hρs as [? HSome'].
+              apply Hle''' in HSome' as (?&?&?).
+              set_solver. }
+            apply elem_of_dom in Hin'' as (?&?).
+            apply elem_of_dom in Hin''' as (?&?).
+            exfalso. by eapply Hdisj. }
+          set_solver.
+        }
+        apply elem_of_dom in Hin' as [v2 Hv2].
+        rewrite map_included_spec in Hfs'.
+        specialize (Hfs' ρ' v2).
+        rewrite lookup_union_r in Hfs'; [|by rewrite lookup_insert_ne].
+        destruct v2.
+        { apply lookup_fmap_Some in Hv2 as (?&?&?). lia. }
+        apply Hfs' in Hv2 as (n'&Hn'&Hn'').
+        simplify_eq.
+        lia.
       + by rewrite option_guard_False in HSome.
     - (* TODO: Make a lemma for this *)
       simpl.
@@ -1377,7 +1415,7 @@ Section model_state_lemmas.
         rewrite map_filter_delete.
         rewrite -insert_difference.
         set_solver.
-  Admitted.
+  Qed.
 
   Lemma model_update_locale_spec_model_step extr
         (auxtr : auxiliary_trace LM) ζ c2 ρs ρ δ2 s2 :
