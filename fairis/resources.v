@@ -1047,101 +1047,7 @@ Section model_state_lemmas.
     iPureIntro. by apply model_update_locale_spec.
   Qed.
 
-  Definition has_forked (tp1 tp2 : list (expr Λ)) e : Prop :=
-    ∃ tp1', tp2 = tp1' ++ [e] ∧ length tp1' = length tp1.
-
-  (* OBS: Def might be improved. *)
-  (* OBS: Need freshness condition on ζf. *)
-  Program Definition model_update_split
-          (ζ ζf : locale Λ) (ρs : gset (fmrole M)) (δ : LM) : LM :=
-    {|
-      ls_data :=
-        {| ls_under := δ.(ls_under);
-           ls_map := <[ζf := filter (λ ρf, ρf.1 ∉ ρs) (δ.(ls_map) !!! ζ)]>
-                       (alter (filter (λ ρf, ρf.1 ∈ ρs)) ζ δ.(ls_map)); |};
-    |}.
-  Next Obligation. Admitted.
-  Next Obligation. Admitted.
-
-  (* OBS: Def needs to change to reflect forks *)
-  Definition model_update_fork
-          (δ : LM) (ζ : locale Λ) (ζf : locale Λ) (ρs1 ρs2 : gset (fmrole M)) : LM :=
-    model_update_split ζ ζf ρs2 $ model_update_decr ζ $ model_update_filter ζ ρs1 δ.
-
-  Lemma model_state_interp_fork_update fs1 fs2 tp1 tp2
-        δ ζ efork σ1 σ2 :
-    fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 →
-    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
-    model_state_interp tp1 δ -∗
-    has_fuels_S ζ (fs1 ∪ fs2) ==∗
-    model_state_interp tp2
-      (model_update_fork δ ζ (locale_of tp1 efork)
-                                (dom (fs1 ∪ fs2)) (dom fs1)) ∗
-    has_fuels ζ fs1 ∗
-    has_fuels (locale_of tp1 efork) fs2.
-  Proof. Admitted.
-
-  (* TODO: Need to update this to reflect fork requirements. *)
-  Definition model_can_fork_step (δ1 : LM) (ζ : locale Λ) (δ2 : LM) : Prop :=
-    ∃ fs1 fs1',
-      δ1.(ls_under) = δ2.(ls_under) ∧
-      δ1.(ls_map) !! ζ = Some fs1 ∧
-      δ2.(ls_map) = <[ζ := fs1']>δ1.(ls_map) ∧
-      fs1 ≠ ∅ ∧
-      map_included (<) fs1' fs1 ∧
-      (dom fs1 ∖ dom fs1') ∩ M.(live_roles) δ1 = ∅.
-
-  Lemma model_can_fork_step_trans fl ζ (δ δ' : LiveState Λ M) :
-    model_can_fork_step δ ζ δ' → ls_trans fl δ (Silent_step ζ) δ'.
-  Proof. Admitted.
-
-  Lemma model_state_interp_can_fork_step es δ ζ ζf
-        (fs1 fs2 : gmap (fmrole M) nat) :
-    (fs1 ∪ fs2) ≠ ∅ → fs1 ##ₘ fs2 →
-    model_state_interp es δ -∗ has_fuels_S ζ (fs1 ∪ fs2) -∗
-    ⌜model_can_fork_step δ ζ (model_update_fork δ ζ ζf (dom (fs1 ∪ fs2)) (dom fs1))⌝.
-  Proof. Admitted.
-
-  Lemma model_update_locale_spec_fork extr
-        (auxtr : auxiliary_trace LM) ζ ζf c2 ρs1 ρs2 :
-    model_can_fork_step (trace_last auxtr) ζ
-      (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2) →
-    tids_smaller c2.1 (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2) →
-    valid_state_evolution_fairness
-      (extr :tr[Some ζ]: c2)
-      (auxtr :tr[Silent_step ζ]:
-          (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2)).
-  Proof.
-    intros Hstep Htids. destruct c2.
-    split; [done|]. split; [by apply model_can_fork_step_trans|done].
-  Qed.
-
-  Lemma update_fork_step fs1 fs2 tp1 tp2 (extr : execution_trace Λ)
-        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 :
-    fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 →
-    trace_last extr = (tp1, σ1) →
-    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
-    has_forked tp1 tp2 efork →
-    has_fuels_S ζ (fs1 ∪ fs2) -∗
-    model_state_interp tp1 (trace_last auxtr) ==∗
-    ∃ δ2,
-      ⌜valid_state_evolution_fairness
-        (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝ ∗
-      has_fuels ζ fs1 ∗ has_fuels (locale_of tp1 efork) fs2 ∗
-      model_state_interp tp2 δ2.
-  Proof.
-    iIntros (Hdom Hdisj Hlast Hstep Hforked) "Hfuel Hm".
-    iDestruct (model_state_interp_can_fork_step with "Hm Hfuel") as %Hcan_step;
-      [done..|].
-    iMod (model_state_interp_fork_update with "Hm Hfuel") as "(Hm&Hf1&Hf2)";
-      [done..|].
-    iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
-    iModIntro.
-    iExists (model_update_fork (trace_last auxtr) ζ (locale_of tp1 _) (dom (fs1 ∪ fs2)) (dom fs1)).
-    iFrame "Hm Hf1 Hf2".
-    iPureIntro.
-    by apply model_update_locale_spec_fork.
-  Qed.
+  (** Model step *)
 
   (* OBS: Maybe use fuel limit instead of generic [f] *)
   Program Definition model_update_set (ζ : locale Λ) (ρ : fmrole M) (f : nat) (δ : LM) : LM :=
@@ -1378,7 +1284,6 @@ Section model_state_lemmas.
     by eapply model_step_suff_data_weak_alt.
   Qed.
 
-
   Lemma model_state_interp_can_model_step es (δ δ2 : LM) ζ ρ f
         (fs : gmap (fmrole M) nat) (s1 s2 : M) :
     fmtrans _ s1 (Some ρ) s2 →
@@ -1511,6 +1416,104 @@ Section model_state_lemmas.
     iFrame "Hm Hf Hfrag".
     iPureIntro. subst.
     by eapply model_update_locale_spec_model_step.
+  Qed.
+
+  (** Fork step *)
+
+  Definition has_forked (tp1 tp2 : list (expr Λ)) e : Prop :=
+    ∃ tp1', tp2 = tp1' ++ [e] ∧ length tp1' = length tp1.
+
+  (* OBS: Def might be improved. *)
+  (* OBS: Need freshness condition on ζf. *)
+  Program Definition model_update_split
+          (ζ ζf : locale Λ) (ρs : gset (fmrole M)) (δ : LM) : LM :=
+    {|
+      ls_data :=
+        {| ls_under := δ.(ls_under);
+           ls_map := <[ζf := filter (λ ρf, ρf.1 ∉ ρs) (δ.(ls_map) !!! ζ)]>
+                       (alter (filter (λ ρf, ρf.1 ∈ ρs)) ζ δ.(ls_map)); |};
+    |}.
+  Next Obligation. Admitted.
+  Next Obligation. Admitted.
+
+  (* OBS: Def needs to change to reflect forks *)
+  Definition model_update_fork
+          (δ : LM) (ζ : locale Λ) (ζf : locale Λ) (ρs1 ρs2 : gset (fmrole M)) : LM :=
+    model_update_split ζ ζf ρs2 $ model_update_decr ζ $ model_update_filter ζ ρs1 δ.
+
+  Lemma model_state_interp_fork_update fs1 fs2 tp1 tp2
+        δ ζ efork σ1 σ2 :
+    fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 →
+    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
+    model_state_interp tp1 δ -∗
+    has_fuels_S ζ (fs1 ∪ fs2) ==∗
+    model_state_interp tp2
+      (model_update_fork δ ζ (locale_of tp1 efork)
+                                (dom (fs1 ∪ fs2)) (dom fs1)) ∗
+    has_fuels ζ fs1 ∗
+    has_fuels (locale_of tp1 efork) fs2.
+  Proof. Admitted.
+
+  (* TODO: Need to update this to reflect fork requirements. *)
+  Definition model_can_fork_step (δ1 : LM) (ζ : locale Λ) (δ2 : LM) : Prop :=
+    ∃ fs1 fs1',
+      δ1.(ls_under) = δ2.(ls_under) ∧
+      δ1.(ls_map) !! ζ = Some fs1 ∧
+      δ2.(ls_map) = <[ζ := fs1']>δ1.(ls_map) ∧
+      fs1 ≠ ∅ ∧
+      map_included (<) fs1' fs1 ∧
+      (dom fs1 ∖ dom fs1') ∩ M.(live_roles) δ1 = ∅.
+
+  Lemma model_can_fork_step_trans fl ζ (δ δ' : LiveState Λ M) :
+    model_can_fork_step δ ζ δ' → ls_trans fl δ (Silent_step ζ) δ'.
+  Proof. Admitted.
+
+  Lemma model_state_interp_can_fork_step es δ ζ ζf
+        (fs1 fs2 : gmap (fmrole M) nat) :
+    (fs1 ∪ fs2) ≠ ∅ → fs1 ##ₘ fs2 →
+    model_state_interp es δ -∗ has_fuels_S ζ (fs1 ∪ fs2) -∗
+    ⌜model_can_fork_step δ ζ (model_update_fork δ ζ ζf (dom (fs1 ∪ fs2)) (dom fs1))⌝.
+  Proof. Admitted.
+
+  Lemma model_update_locale_spec_fork extr
+        (auxtr : auxiliary_trace LM) ζ ζf c2 ρs1 ρs2 :
+    model_can_fork_step (trace_last auxtr) ζ
+      (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2) →
+    tids_smaller c2.1 (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2) →
+    valid_state_evolution_fairness
+      (extr :tr[Some ζ]: c2)
+      (auxtr :tr[Silent_step ζ]:
+          (model_update_fork (trace_last auxtr) ζ ζf ρs1 ρs2)).
+  Proof.
+    intros Hstep Htids. destruct c2.
+    split; [done|]. split; [by apply model_can_fork_step_trans|done].
+  Qed.
+
+  Lemma update_fork_step fs1 fs2 tp1 tp2 (extr : execution_trace Λ)
+        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 :
+    fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 →
+    trace_last extr = (tp1, σ1) →
+    locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
+    has_forked tp1 tp2 efork →
+    has_fuels_S ζ (fs1 ∪ fs2) -∗
+    model_state_interp tp1 (trace_last auxtr) ==∗
+    ∃ δ2,
+      ⌜valid_state_evolution_fairness
+        (extr :tr[Some ζ]: (tp2, σ2)) (auxtr :tr[Silent_step ζ]: δ2)⌝ ∗
+      has_fuels ζ fs1 ∗ has_fuels (locale_of tp1 efork) fs2 ∗
+      model_state_interp tp2 δ2.
+  Proof.
+    iIntros (Hdom Hdisj Hlast Hstep Hforked) "Hfuel Hm".
+    iDestruct (model_state_interp_can_fork_step with "Hm Hfuel") as %Hcan_step;
+      [done..|].
+    iMod (model_state_interp_fork_update with "Hm Hfuel") as "(Hm&Hf1&Hf2)";
+      [done..|].
+    iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
+    iModIntro.
+    iExists (model_update_fork (trace_last auxtr) ζ (locale_of tp1 _) (dom (fs1 ∪ fs2)) (dom fs1)).
+    iFrame "Hm Hf1 Hf2".
+    iPureIntro.
+    by apply model_update_locale_spec_fork.
   Qed.
 
   Lemma free_roles_inclusion FR fr:
