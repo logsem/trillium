@@ -3,14 +3,14 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.prelude Require Import classical_instances.
-From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fair_termination (* fairness_finiteness fuel fuel_termination *).
-From trillium.fairness.heap_lang Require Export lifting.
+From trillium.program_logic Require Import weakestpre adequacy.
+From trillium.fairness Require Export fairness resources fair_termination (* fairness_finiteness fuel *) fuel_termination.
 From trillium.program_logic Require Import ectx_lifting.
-From trillium.fairness.heap_lang Require Export lang.
+From trillium.fairness.heap_lang Require Import lang.
 From trillium.fairness.heap_lang Require Import tactics notation.
+From trillium.fairness.heap_lang Require Import lifting.
 Set Default Proof Using "Type".
-
+ 
 Section adequacy.
 
 Lemma posts_of_empty_mapping `{heapGS Σ M} (e1 e: expr) v (tid : nat) (tp : list expr):
@@ -164,7 +164,7 @@ Proof.
   iSplitR.
   { unfold config_wp. iIntros "!>!>" (???????) "?". done. }
   iSpecialize ("Hwp" with "Hσ Hmodf Hfr [Hfuelf Hmapf]").
-  { iAssert ([∗ map] ρ↦f ∈ gset_to_gmap (lm_fl LM s1) (live_roles M s1), 
+  { iAssert ([∗ map] ρ↦f ∈ gset_to_gmap (lm_fl LM s1) (live_roles M s1),
   ρ ↦F f)%I with "[Hfuelf]" as "H".
     - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
       rewrite -big_opM_own //; last first.
