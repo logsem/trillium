@@ -526,8 +526,6 @@ Section proof_start.
   Context `{!heapGS Σ the_model, !yesnoPreG Σ}.
   Let Ns := nroot .@ "yes_no".
 
-  From stdpp Require Import sets.
-
   Lemma start_spec tid (N: nat) f (Hf: f > 60):
     {{{ frag_model_is (N, true) ∗ frag_free_roles_are ∅ ∗
         has_fuels tid {[ Y := f; No := f ]} ∗ ⌜N > 0⌝ }}}
