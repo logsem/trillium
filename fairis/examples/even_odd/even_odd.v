@@ -153,11 +153,10 @@ Section proof.
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]".
     - iDestruct (even_agree with "Heven Hay") as "%Heq".
       rewrite -has_fuel_fuels.
-      iApply (wp_cmpxchg_suc_step_singlerole _ tid (ρEven: fmrole the_fair_model) _ 55%nat _
+      iApply (wp_cmpxchg_suc_step_singlerole _ tid (ρEven: fmrole the_fair_model) _ _
                                              M (M + 1)
              with "[$]"); eauto.
       { by do 3 f_equiv. }
-      { simpl. lia. }
       { rewrite Nat.add_1_r. econstructor. eauto. }
       iModIntro.
       iIntros "!> (Hb & Hmod & HFR & Hf)".
@@ -173,19 +172,18 @@ Section proof.
       iModIntro. rewrite decide_True; last first.
       { set_solver. }
       rewrite has_fuel_fuels.
+      simpl.
       wp_pures.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
       iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
-      { iFrame "∗#". rewrite has_fuel_fuels.
-        subst. iFrame. }
+      { iFrame "∗#". subst. iFrame. }
       iPureIntro; lia.
     - iDestruct (even_agree with "Heven Hay") as "%Heq". rewrite -> Heq in *.
       rewrite -has_fuel_fuels.
-      iApply (wp_cmpxchg_fail_step_singlerole _ tid (ρEven: fmrole the_fair_model) _ 50%nat _
+      iApply (wp_cmpxchg_fail_step_singlerole _ tid (ρEven: fmrole the_fair_model) _ _
                                              M M
              with "[$]"); eauto.
       { intros Hne. simplify_eq. lia. }
-      { simpl. lia. }
       { econstructor. rewrite -Nat.negb_even. rewrite Heqn. done. }
       iIntros "!>!> (Hb & Hmod & HFR & Hf)".
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
@@ -195,6 +193,7 @@ Section proof.
       rewrite decide_True; last first.
       { set_solver. }
       iModIntro.
+      simpl.
       wp_pures.
       rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
@@ -217,11 +216,10 @@ Section proof.
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]"; last first.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq".
       rewrite -has_fuel_fuels.
-      iApply (wp_cmpxchg_suc_step_singlerole _ tid (ρOdd: fmrole the_fair_model) _ 55%nat _
+      iApply (wp_cmpxchg_suc_step_singlerole _ tid (ρOdd: fmrole the_fair_model) _ _
                                              M (S M)
                with "[$]"); eauto.
       { by do 3 f_equiv. }
-      { simpl. lia. }
       { econstructor. rewrite -Nat.negb_even. rewrite Heqn. done. }
       iModIntro.
       iIntros "!> (Hb & Hmod & HFR & Hf)".
@@ -240,6 +238,7 @@ Section proof.
       iModIntro. rewrite decide_True; last first.
       { set_solver. }
       rewrite has_fuel_fuels.
+      simpl.
       wp_pures.
       rewrite -has_fuel_fuels.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
@@ -248,11 +247,10 @@ Section proof.
       iPureIntro; lia.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq". rewrite -> Heq in *.
       rewrite -has_fuel_fuels. simplify_eq.
-      iApply (wp_cmpxchg_fail_step_singlerole _ tid (ρOdd: fmrole the_fair_model) _ 50%nat _
+      iApply (wp_cmpxchg_fail_step_singlerole _ tid (ρOdd: fmrole the_fair_model) _ _
                                              M M
              with "[$]"); eauto.
       { intros Hneq. simplify_eq. lia. }
-      { simpl. lia. }
       { econstructor. eauto. }
       iIntros "!>!> (Hb & Hmod & HFR & Hf)".
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
@@ -261,6 +259,7 @@ Section proof.
       rewrite decide_True; last first.
       { set_solver. }
       iModIntro.
+      simpl.
       wp_pures.
       rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Hodd Hf] [$]"); last first.
@@ -312,87 +311,79 @@ Section proof_start.
       iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ]") as "_".
       { iIntros "!>". iExists _. iFrame. rewrite Heven. iFrame. }
       iIntros "!>". wp_pures. wp_bind (Fork _).
-      rewrite has_fuels_gt_1; last solve_fuel_positive.
-      iApply (wp_fork_nostep _ tid _ _ _ {[ ρOdd ]} {[ ρEven ]} {[ρEven := _; ρOdd := _]}
-               with "[Heven_at] [- Hf] [Hf]");
-        [ set_solver | by apply insert_non_empty | | | |
-          rewrite !fmap_insert fmap_empty // ]; [set_solver | |].
+      (* rewrite has_fuels_gt_1; last solve_fuel_positive. *)
+      iApply (wp_role_fork _ tid _ _ _ {[ρOdd := _]} {[ρEven := _]}
+               with "[Hf] [Heven_at]").
+      { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
+      { intros Hempty%map_positive_l. set_solver. }
+      { rewrite has_fuels_gt_1; last solve_fuel_positive.
+        rewrite !fmap_insert fmap_empty //.
+        rewrite insert_union_singleton_l. 
+        rewrite map_union_comm; [done|].
+        apply map_disjoint_dom. set_solver. }
       { iIntros (tid') "!> Hf".
-        rewrite map_filter_insert_True; last set_solver.
-        rewrite map_filter_insert_not; last set_solver.
-        rewrite map_filter_empty insert_empty.
-        rewrite -has_fuel_fuels.
         iApply (incr_loop_spec with "[Heven_at $Hf]"); [lia|iFrame "#∗"|].
         by iIntros "!>?". }
       iIntros "!> Hf".
       iIntros "!>".
-      rewrite map_filter_insert_not; last set_solver.
-      rewrite map_filter_insert_True; last set_solver.
-      rewrite map_filter_empty insert_empty.
       wp_pures.
-      rewrite has_fuels_gt_1; last solve_fuel_positive.
-      iApply (wp_fork_nostep _ tid _ _ _ ∅ {[ ρOdd ]} {[ρOdd := _]} with "[Hodd_at] [HΦ] [Hf]");
-        [ set_solver | by apply insert_non_empty | | | |
-          rewrite !fmap_insert fmap_empty // ]; [set_solver| |].
-      + iIntros (tid') "!> Hf".
-        rewrite map_filter_insert_True; last set_solver.
-        rewrite map_filter_empty insert_empty.
-        rewrite -has_fuel_fuels.
+      (* rewrite has_fuels_gt_1; last solve_fuel_positive. *)
+      iApply (wp_role_fork _ tid _ _ _ ∅ {[ρOdd := _]} with "[Hf] [Hodd_at]").
+      { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
+      { rewrite map_union_comm.
+        - intros Hempty%map_positive_l. set_solver.
+        - apply map_disjoint_dom. rewrite dom_singleton. set_solver. }
+      { rewrite has_fuels_gt_1; last solve_fuel_positive.
+        rewrite !fmap_insert fmap_empty //.
+        rewrite insert_union_singleton_l. 
+        rewrite map_union_comm; [done|].
+        apply map_disjoint_dom. set_solver. }
+      { iIntros (tid') "!> Hf".
         wp_pures.
         rewrite -has_fuel_fuels.
         replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
         iApply (incr_loop_spec with "[Hodd_at $Hf]"); [lia|iFrame "#∗"|].
-        by iIntros "!>?".
-    + iIntros "!> Hf".
-        rewrite map_filter_insert_not; last set_solver.
-        rewrite map_filter_empty.
-        iApply "HΦ". iModIntro.
-        iDestruct "Hf" as "[Hf _]".
-        by rewrite dom_empty_L.
+        by iIntros "!>?". }
+      iIntros "!> Hf". by iApply "HΦ".
     - iDestruct "Hauths" as "[Heven Hodd]".
       iDestruct (even_agree with "Heven_at Heven") as %<-.
       iDestruct (odd_agree with "Hodd_at Hodd") as %<-.
       iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ]") as "_".
       { iIntros "!>". iExists _. iFrame. rewrite Heven. iFrame. }
       iIntros "!>". wp_pures. wp_bind (Fork _).
-      rewrite has_fuels_gt_1; last solve_fuel_positive.
-      rewrite insert_commute; [|done].
-      iApply (wp_fork_nostep _ tid _ _ _ {[ ρEven ]} {[ ρOdd ]} {[ρOdd := _; ρEven := _]}
-               with "[Hodd_at] [- Hf] [Hf]");
-        [ set_solver | by apply insert_non_empty | | | |
-          rewrite !fmap_insert fmap_empty // ]; [set_solver | |].
+      (* rewrite has_fuels_gt_1; last solve_fuel_positive. *)
+      (* rewrite insert_commute; [|done]. *)
+      iApply (wp_role_fork _ tid _ _ _ {[ρEven := _]} {[ρOdd := _]}
+               with "[Hf] [Hodd_at]").
+      { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
+      { intros Hempty%map_positive_l. set_solver. }
+      { rewrite has_fuels_gt_1; last solve_fuel_positive.
+        rewrite !fmap_insert fmap_empty //.
+        rewrite insert_union_singleton_l. done. }
       { iIntros (tid') "!> Hf".
-        rewrite map_filter_insert_True; last set_solver.
-        rewrite map_filter_insert_not; last set_solver.
-        rewrite map_filter_empty insert_empty.
-        rewrite -has_fuel_fuels.
         iApply (incr_loop_spec with "[Hodd_at $Hf]"); [lia|iFrame "#∗"|].
         by iIntros "!>?". }
       iIntros "!> Hf".
       iIntros "!>".
-      rewrite map_filter_insert_not; last set_solver.
-      rewrite map_filter_insert_True; last set_solver.
-      rewrite map_filter_empty insert_empty.
       wp_pures.
-      rewrite has_fuels_gt_1; last solve_fuel_positive.
-      iApply (wp_fork_nostep _ tid _ _ _ ∅ {[ ρEven ]} {[ρEven := _]} with "[Heven_at] [HΦ] [Hf]");
-        [ set_solver | by apply insert_non_empty | | | |
-          rewrite !fmap_insert fmap_empty // ]; [set_solver| |].
-      + iIntros (tid') "!> Hf".
-        rewrite map_filter_insert_True; last set_solver.
-        rewrite map_filter_empty insert_empty.
-        rewrite -has_fuel_fuels.
+      (* rewrite has_fuels_gt_1; last solve_fuel_positive. *)
+      iApply (wp_role_fork _ tid _ _ _ ∅ {[ρEven := _]} with "[Hf] [Heven_at]").
+      { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
+      { rewrite map_union_comm.
+        - intros Hempty%map_positive_l. set_solver.
+        - apply map_disjoint_dom. rewrite dom_singleton. set_solver. }
+      { rewrite has_fuels_gt_1; last solve_fuel_positive.
+        rewrite !fmap_insert fmap_empty //.
+        rewrite insert_union_singleton_l. 
+        rewrite map_union_comm; [done|].
+        apply map_disjoint_dom. set_solver. }
+      { iIntros (tid') "!> Hf".
         wp_pures.
         rewrite -has_fuel_fuels.
         replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
         iApply (incr_loop_spec with "[Heven_at $Hf]"); [lia|iFrame "#∗"|].
-        by iIntros "!>?".
-      + iIntros "!> Hf".
-        rewrite map_filter_insert_not; last set_solver.
-        rewrite map_filter_empty.
-        iApply "HΦ". iModIntro.
-        iDestruct "Hf" as "[Hf _]".
-        by rewrite dom_empty_L.
+        by iIntros "!>?". }
+      iIntros "!> Hf". by iApply "HΦ".
   Qed.
 
 End proof_start.
