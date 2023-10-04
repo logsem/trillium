@@ -311,7 +311,7 @@ Section model_state_lemmas.
 
 End model_state_lemmas.
 
-Notation "tid ↦M R" := (has_fuels {[ tid := R ]}) (at level 33).
+Notation "tid ↦M R" := (has_fuels tid R) (at level 33).
 
 Section adequacy.
   Context `{Countable (locale Λ)}.
