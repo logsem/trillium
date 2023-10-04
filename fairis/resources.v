@@ -1631,26 +1631,6 @@ Section model_state_lemmas.
       done.
   Qed.
 
-  (* Lemma map_included_insert_inv `{Countable K} {V} *)
-  (*     (R : relation V) (m1 m2 : gmap K V) k v1 : *)
-  (*   map_included R (<[k:=v1]>m1) m2 → *)
-  (*   ∃ m2' v2, m2 = <[k:=v2]>m2' ∧ k ∉ dom m2' ∧ R v1 v2. *)
-  (* Proof. Admitted. *)
-
-  (* Lemma map_included_insert_inv `{Countable K} {V} *)
-  (*     (R : relation V) (m1 m2 : gmap K V) k v1 v2 : *)
-  (*   k ∉ dom m1 → k ∉ dom m2 → *)
-  (*   map_included R (<[k:=v1]>m1) (<[k:=v2]>m2) → *)
-  (*   map_included R m1 m2. *)
-  (* Proof. Admitted. *)
-
-  (* Lemma map_included_insert_inv_r `{Countable K} {V} *)
-  (*     (R : relation V) (m1 m2 : gmap K V) k v : *)
-  (*   k ∉ dom m1 → *)
-  (*   map_included R m1 (<[k:=v]> m2) → *)
-  (*   map_included R m1 m2. *)
-  (* Proof. Admitted. *)
-
   Lemma map_included_delete `{Countable K} {V}
       (R : relation V) (m1 m2 : gmap K V) k :
     map_included R m1 m2 →
@@ -1812,22 +1792,6 @@ Section model_state_lemmas.
     rewrite map_included_spec map_agree_R_spec.
     by intros [Hle _].
   Qed.
-
-  (* Lemma map_agree_R_refl `{Countable K} {V} *)
-  (*     (R : relation V) `{!Reflexive R} (m : gmap K V) : *)
-  (*   map_agree_R R m m. *)
-  (* Proof. *)
-  (*   rewrite map_agree_R_spec. *)
-  (*   induction m as [|k v m Hnin Hm] using map_ind; [done|]. *)
-  (*   split. *)
-  (*   - intros k' v1 HSome1. *)
-  (*     destruct (decide (k = k')) as [->|Hneq]. *)
-  (*     + rewrite lookup_insert in HSome1. *)
-  (*       simplify_eq. *)
-  (*       exists v1. rewrite lookup_insert. done. *)
-  (*     + admit. *)
-  (*   - admit. *)
-  (* Admitted. *)
 
   Lemma map_agree_R_union_inv `{Countable K} {V}
       (R : relation V) (m11 m12 m2 : gmap K V) :
