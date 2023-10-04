@@ -200,20 +200,18 @@ Section proof.
 
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
-      + iApply (wp_cmpxchg_suc_step_singlerole_keep_dead _ tid (Y: fmrole the_fair_model) _ _
-                                             (1, true) (1, false)
-             with "[$]") =>//.
-        { set_solver. }
+      +
+        iModIntro.
+        iApply (wp_step_model_singlerole with "Hmod Hf HFR").
         { econstructor. lia. }
         { set_solver. }
-        iModIntro.
-        iIntros "!> (Hb & Hmod & HFR & Hf)".
+        iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
+        iIntros "!> Hb Hmod Hf HFR".
         iMod (yes_update 0 with "[$]") as "[Hay Hyes]".
+        wp_pures.
         iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
         { iNext. iExists _, _. iFrame. simpl. iFrame. by iPureIntro. }
-
-        iModIntro.
-
+        iApply fupd_mask_intro; [done|]. iMod 1. iModIntro.
         rewrite has_fuel_fuels.
         (* TODO: Needing this is a bit bad. Maybe add simple to wp_pures? *)
         simpl in *.
@@ -232,96 +230,95 @@ Section proof.
         iInv Ns as (M B) "(>HFR & >Hmod & >Hb & Hauths & >%Hbever')" "Hclose".
 
         destruct B.
-        * iApply (wp_lift_pure_step_no_fork_remove_role {[ Y ]} ((0, true): fmstate the_fair_model) _ _ _ _ _ _ {[ Y := _ ]}) =>//.
-          { rewrite dom_singleton. set_solver. }
-          { simpl. set_solver. }
-
-          repeat iModIntro.
-
-          iDestruct "Hauths" as "[Hay Han]". iDestruct (yes_agree with "Hyes Hay") as %Heq.
-          assert (M = 0) by lia. simplify_eq. iFrame "Hmod". iSplitL "Hf".
-          { rewrite /has_fuels_S fmap_insert fmap_empty //. }
-          iIntros "Hmod Hf".
-
-          wp_pures. repeat iModIntro.
+        * iModIntro.
+          iApply (wp_step_fuel with "[Hf]").
+          2: { iClear "Hg". rewrite has_fuels_gt_1; last by solve_fuel_positive.
+            rewrite fmap_insert fmap_empty. done. }
+          { set_solver. }
+          iApply sswp_pure_step; [done|].
+          iIntros "!> Hf". iApply wp_pre_step. wp_pures.
+          iApply fupd_mask_intro; [done|].
+          iIntros "Hclose'".
+          iDestruct "Hauths" as "[Hay Han]".
+          iDestruct (yes_agree with "Hyes Hay") as %Heq.
+          assert (M = 0) by lia. simplify_eq.
+          iMod (has_fuels_dealloc _ _ _ (Y:fmrole the_fair_model)
+                 with "Hmod Hf") as "[Hmod Hf]"; [done|].
+          iModIntro. iMod "Hclose'".
           iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
           { iNext. iExists _, _. iFrame. done. }
           iModIntro. iApply "Hk".
-          rewrite map_filter_singleton_False; last set_solver.
-          iFrame.
+          rewrite delete_insert; [|set_solver].
+          iFrame "Hf".
         * iDestruct "Hauths" as "[>Hay >Han]". iDestruct (yes_agree with "Hyes Hay") as %Heq.
           assert (M = 1) by (destruct M; [done|lia]). simplify_eq.
-
-          iApply (wp_lift_pure_step_no_fork_remove_role {[ Y ]} ((1, false): fmstate the_fair_model) _ _ _ _ _ _ {[ Y := _ ]}) =>//.
-          { rewrite dom_singleton. set_solver. }
-          { simpl. set_solver. }
-
-          repeat iModIntro.
-
-          iFrame "Hmod". iSplitL "Hf".
-          { rewrite /has_fuels_S fmap_insert fmap_empty //. }
-          iIntros "Hmod Hf".
-
-          wp_pures. repeat iModIntro.
+          iModIntro.
+          iApply (wp_step_fuel with "[Hf]").
+          2: { iClear "Hg". rewrite has_fuels_gt_1; last by solve_fuel_positive.
+               rewrite fmap_insert fmap_empty. done. }
+          { set_solver. }
+          iApply sswp_pure_step; [done|].
+          iIntros "!> Hf". iApply wp_pre_step. wp_pures.
+          iApply fupd_mask_intro; [done|].
+          iIntros "Hclose'".
+          iMod (has_fuels_dealloc _ _ _ (Y:fmrole the_fair_model)
+                 with "Hmod Hf") as "[Hmod Hf]"; [set_solver|].
+          iModIntro. iMod "Hclose'".
           iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
           { iNext. iExists _, _. iFrame. done. }
           iModIntro. iApply "Hk".
-          rewrite map_filter_singleton_False; last set_solver.
+          rewrite delete_insert; [|set_solver].
           iFrame.
-      +  assert (N = N) by lia. simplify_eq. iApply (wp_cmpxchg_suc_step_singlerole _ tid (Y: fmrole the_fair_model) _ _
-                                             (M, true) (M, false)
-             with "[$]"); eauto.
-      { econstructor. lia. }
-      { simpl. destruct M; [set_solver | destruct M; set_solver]. }
-      iModIntro.
-      iIntros "!> (Hb & Hmod & HFR & Hf)".
-      iMod (yes_update (M-1) with "[$]") as "[Hay Hyes]".
-      iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
-      { iNext. iExists _, _. iFrame. iPureIntro. intro contra. simplify_eq. }
-      iModIntro. rewrite decide_True; last first.
-      { do 2 (destruct M; try done). set_solver. }
+      + assert (N = N) by lia. simplify_eq.
+        iModIntro.
+        iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+        { constructor. lia. }
+        {  simpl. destruct M; [set_solver | destruct M; set_solver]. }
+        iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
+        iIntros "!> Hb Hmod Hf HFR".
+        iMod (yes_update (M-1) with "[$]") as "[Hay Hyes]".
+        wp_pures. iModIntro.
+        iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
+        { iNext. iExists _, _. iFrame. iPureIntro. intro contra. simplify_eq. }
+        iModIntro.
+        simpl. wp_pures.
+        wp_load.
+        wp_pures.
+        wp_store.
+        wp_pures.
+        wp_load.
+        wp_pures.
 
-      rewrite has_fuel_fuels.
-      simpl.
-      wp_pures.
-      wp_load.
-      wp_pures.
-      wp_store.
-      wp_pures.
-      wp_load.
-      wp_pures.
+        destruct (decide (0 < S M - 1)) as [Heq|Heq].
+        * rewrite bool_decide_eq_true_2 //; last lia.
+          wp_pure _.
 
-      destruct (decide (0 < S M - 1)) as [Heq|Heq].
-      * rewrite bool_decide_eq_true_2 //; last lia.
-        wp_pure _.
+          rewrite -has_fuel_fuels.
+          iApply ("Hg" with "[] [Hyes HnN Hf] [$]"); last first.
+          { iFrame "∗#". iSplit; last by iPureIntro; lia.
+            iClear "Hg Hinv".
 
-        rewrite -has_fuel_fuels.
-        iApply ("Hg" with "[] [Hyes HnN Hf] [$]"); last first.
-        { iFrame "∗#". iSplit; last by iPureIntro; lia.
-          iClear "Hg Hinv".
+            assert (∀ l v v', v = v' → l ↦ v ⊣⊢ l ↦ v') as pointsto_proper.
+            { intros ??? ->. done. }
 
-          assert (∀ l v v', v = v' → l ↦ v ⊣⊢ l ↦ v') as pointsto_proper.
-          { intros ??? ->. done. }
-
-          iApply (pointsto_proper with "HnN"). do 2 f_equiv. destruct M; [done|]. lia. }
-        iPureIntro; lia.
-      * rewrite bool_decide_eq_false_2 //; last lia.
-        have ->: M = 0 by lia. simpl. lia.
+            iApply (pointsto_proper with "HnN"). do 2 f_equiv. destruct M; [done|]. lia. }
+          iPureIntro; lia.
+        * rewrite bool_decide_eq_false_2 //; last lia.
+          have ->: M = 0 by lia. simpl. lia.
     - iDestruct (yes_agree with "Hyes Hay") as "%Heq". rewrite -> Heq in *.
       have HM: M > 0 by lia.
 
       rewrite -has_fuel_fuels.
-      iApply (wp_cmpxchg_fail_step_singlerole _ tid (Y: fmrole the_fair_model) _ _
-                                             (M, false) (M, false)
-             with "[$]"); eauto.
-      { econstructor. lia. }
-      iIntros "!>!> (Hb & Hmod & HFR & Hf)".
+      iModIntro.
+      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      { constructor. lia. }
+      { set_solver. }
+      iApply (wp_cmpxchg_fail with "Bb"); [done|done|].
+      iIntros "!> Hb Hmod Hf HFR".
       (* iMod (yes_update (N-1) with "[$]") as "[Hay Hyes]". *)
+      wp_pures. iModIntro.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
       { iNext. simplify_eq. iExists _, _. iFrame. iSplit; [iFrame|done]. }
-
-      rewrite decide_True; last first.
-      { destruct M; [done|destruct M; [lia|set_solver]]. }
 
       iModIntro.
       simpl.
@@ -383,13 +380,14 @@ Section proof.
 
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
-      + iApply (wp_cmpxchg_suc_step_singlerole_keep_dead _ tid (No: fmrole the_fair_model) _ _
-                                             (1, false) (0, true)
-             with "[$]") =>//.
+      + iModIntro.
+        iApply (wp_step_model_singlerole with "Hmod Hf HFR").
         { econstructor. }
-        iModIntro.
-        iIntros "!> (Hb & Hmod & HFR & Hf)".
+        { set_solver. }
+        iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
+        iIntros "!> Hb Hmod Hf HFR".
         iMod (no_update 0 with "[$]") as "[Han Hno]".
+        wp_pures. iModIntro.
         iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
         { iNext. iExists _, _. iFrame. simpl. iFrame. by iPureIntro. }
 
@@ -412,81 +410,75 @@ Section proof.
         iInv Ns as (M B) "(>HFR & >Hmod & >Hb & Hauths & >%Hbever')" "Hclose".
 
         destruct B.
-        * iApply (wp_lift_pure_step_no_fork_remove_role {[ No ]} ((0, true): fmstate the_fair_model) _ _ _ _ _ _ {[ No := _ ]}) =>//.
-          { rewrite dom_singleton. set_solver. }
-          { simpl. set_solver. }
-
-          repeat iModIntro.
+        * iModIntro.
+          iApply (wp_step_fuel with "[Hf]").
+          2: { iClear "Hg". rewrite has_fuels_gt_1; last by solve_fuel_positive.
+            rewrite fmap_insert fmap_empty. done. }
+          { set_solver. }
+          iApply sswp_pure_step; [done|].
+          iIntros "!> Hf".
+          iApply pre_step_wp.
 
           iDestruct "Hauths" as "[Hay Han]". iDestruct (no_agree with "Hno Han") as %Heq.
-          assert (M = 0) by lia. simplify_eq. iFrame "Hmod". iSplitL "Hf".
-          { rewrite /has_fuels_S fmap_insert fmap_empty //. }
-          iIntros "Hmod Hf".
-
-          wp_pures. repeat iModIntro.
+          assert (M = 0) by lia. simplify_eq.
+          iMod (has_fuels_dealloc _ _ _
+                                  (No:fmrole the_fair_model) with "Hmod Hf")
+            as "[Hmod Hf]"; [set_solver|].
+          iModIntro. wp_pures. iModIntro.
           iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
           { iNext. iExists _, _. iFrame. done. }
           iModIntro. iApply "Hk".
-          rewrite map_filter_singleton_False; last set_solver.
+          rewrite delete_insert; [|done].
           iFrame.
         * iDestruct "Hauths" as "[>Hay >Han]". iDestruct (no_agree with "Hno Han") as %Heq.
           assert (M = 0) by lia. simplify_eq.
-      +  assert (N = N) by lia. simplify_eq.
-         destruct M; first done.
+      + assert (N = N) by lia. simplify_eq.
+        destruct M; first done.
+        iModIntro.
+        iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+        { econstructor. }
+        { simpl. destruct M; [set_solver | destruct M; set_solver]. }
+        iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
+        iIntros "!> Hb Hmod Hf HFR".
+        iMod (no_update (M) with "[$]") as "[Han Hno]".
+        wp_pures. iModIntro.
+        iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
+        { iNext. iExists _, _. iFrame. iSplit; last by iPureIntro.
+          iApply (own_proper with "Hay"). f_equiv. apply leibniz_equiv_iff. lia. }
 
-         iApply (wp_cmpxchg_suc_step_singlerole _ tid (No: fmrole the_fair_model) _ _
-                                             (S M, false) (M, true)
-             with "[$]"); eauto.
-         { econstructor. }
-         { simpl. destruct M; [set_solver | destruct M; set_solver]. }
-         iModIntro.
-         iIntros "!> (Hb & Hmod & HFR & Hf)".
-         iMod (no_update (M) with "[$]") as "[Han Hno]".
-         iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
-         { iNext. iExists _, _. iFrame. iSplit; last by iPureIntro.
-           iApply (own_proper with "Hay"). f_equiv. apply leibniz_equiv_iff. lia. }
+        iModIntro. simpl. wp_pures.
+        wp_load.
+        wp_pures.
+        wp_store.
+        wp_pures.
+        wp_load.
+        wp_pures.
 
-         iModIntro. rewrite decide_True; last first.
-         { do 2 (destruct M; try done); set_solver. }
+        destruct (decide (0 < S M - 1)) as [Heq|Heq].
+        * rewrite bool_decide_eq_true_2 //; last lia.
+          wp_pure _.
 
-         rewrite has_fuel_fuels.
-         simpl.
-         wp_pures.
-         wp_load.
-         wp_pures.
-         wp_store.
-         wp_pures.
-         wp_load.
-         wp_pures.
-
-         destruct (decide (0 < S M - 1)) as [Heq|Heq].
-         * rewrite bool_decide_eq_true_2 //; last lia.
-           wp_pure _.
-
-           rewrite -has_fuel_fuels.
-           iApply ("Hg" with "[] [Hno HnN Hf] [$]"); last first.
-           { iFrame "∗#". assert ((S M - 1)%Z = M)%nat as -> by lia. iFrame. iPureIntro; lia. }
-           iPureIntro; lia.
-         * rewrite bool_decide_eq_false_2 //; last lia.
-           have ->: M = 0 by lia. simpl. lia.
+          rewrite -has_fuel_fuels.
+          iApply ("Hg" with "[] [Hno HnN Hf] [$]"); last first.
+          { iFrame "∗#". assert ((S M - 1)%Z = M)%nat as -> by lia. iFrame. iPureIntro; lia. }
+          iPureIntro; lia.
+        * rewrite bool_decide_eq_false_2 //; last lia.
+          have ->: M = 0 by lia. simpl. lia.
     - iDestruct (no_agree with "Hno Han") as "%Heq". rewrite -> Heq in *.
       have HM: M > 0 by lia.
 
       rewrite -has_fuel_fuels. assert (M = N) by lia. simplify_eq.
-      iApply (wp_cmpxchg_fail_step_singlerole _ tid (No: fmrole the_fair_model) _ _
-                                             (N, true) (N, true)
-             with "[$]"); eauto.
+      iModIntro.
+      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
       { econstructor. lia. }
-      iIntros "!>!> (Hb & Hmod & HFR & Hf)".
+      { set_solver. }
+      iApply (wp_cmpxchg_fail with "Bb"); [done|done|].
+      iIntros "!> Hb Hmod Hf HFR".
+      wp_pures.
+      iModIntro.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
       { iNext. simplify_eq. iExists _, _. iFrame. iSplit; [iFrame|done]. }
-
-      rewrite decide_True; last first.
-      { destruct N; [lia|destruct N; set_solver]. }
-
-      iModIntro.
-      simpl.
-      wp_pures.
+      iModIntro. simpl. wp_pures.
       wp_load.
       wp_pure _. rewrite bool_decide_eq_true_2; last lia.
       wp_pure _.
@@ -565,13 +557,13 @@ Section proof_start.
     iModIntro.
 
     wp_bind (Fork _).
-    iApply (wp_role_fork _ tid _ _ _ {[No := _]} {[Y := _]} 
+    iApply (wp_role_fork _ tid _ _ _ {[No := _]} {[Y := _]}
              with "[Hf] [Hyes_at]").
     { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
     { intros Hempty%map_positive_l. set_solver. }
     { rewrite has_fuels_gt_1; last solve_fuel_positive.
       rewrite !fmap_insert fmap_empty //.
-      rewrite insert_union_singleton_l. 
+      rewrite insert_union_singleton_l.
       rewrite map_union_comm; [done|].
       apply map_disjoint_dom. set_solver. }
     { iIntros (tid') "!> Hf". iApply (yes_spec with "[-]"); last first.
@@ -591,7 +583,7 @@ Section proof_start.
       - apply map_disjoint_dom. rewrite dom_singleton. set_solver. }
     { rewrite has_fuels_gt_1; last solve_fuel_positive.
       rewrite !fmap_insert fmap_empty //.
-      rewrite insert_union_singleton_l. 
+      rewrite insert_union_singleton_l.
       rewrite map_union_comm; [done|].
       apply map_disjoint_dom. set_solver. }
     { iIntros (tid') "!> Hf". iApply (no_spec with "[-]"); last first.

@@ -363,11 +363,11 @@ Qed.
 
 Lemma wp_step_fuel s tid E e fs Φ :
   fs ≠ ∅ →
-  has_fuels_S tid fs -∗
+  ▷ has_fuels_S tid fs -∗
   sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
 Proof.
-  iIntros (?) "HfuelS Hwp".
+  iIntros (?) ">HfuelS Hwp".
   rewrite wp_unfold /wp_pre /sswp /=.
   destruct (to_val e).
   { (* This should be possible without fupd_pre_step? Probably import stuff. *)
@@ -450,7 +450,7 @@ Proof.
 Qed.
 
 Lemma sswp_pure_step s E e1 e2 (Φ : Prop) Ψ :
-  PureExec Φ 1 e1 e2 → Φ → Ψ e2 -∗ sswp s E e1 Ψ%I.
+  PureExec Φ 1 e1 e2 → Φ → ▷ Ψ e2 -∗ sswp s E e1 Ψ%I.
 Proof.
   iIntros (Hpe HΦ) "HΨ".
   assert (pure_step e1 e2) as Hps.
@@ -752,26 +752,6 @@ Proof.
   by iApply "HΦ".
 Qed.
 
-(* TODO: Remove *)
-Lemma wp_cmpxchg_fail_step_singlerole s tid ρ (f1 : nat) fr s1 s2 E l q v' v1 v2:
-  v' ≠ v1 → vals_compare_safe v' v1 →  M.(fmtrans) s1 (Some ρ) s2 ->
-  live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦{q} v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
-  {{{ RET PairV v' (LitV $ LitBool false); l ↦{q} v' ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles M s2) then has_fuel tid ρ (LM.(lm_fl) s2) else tid ↦M ∅ ) }}}.
-Proof.
-  iIntros (?? Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ".
-  iApply (wp_step_model_singlerole with "Hst Hfuel1 Hfr"); [done..|].
-  iApply (wp_cmpxchg_fail with "Hl"); [done..|].
-  iIntros "!> Hl Hs Hfuel2 Hfr".
-  destruct (decide (ρ ∈ live_roles M s2)).
-  { iApply wp_value. iApply "HΦ". iFrame. }
-  iApply pre_step_wp.
-  iMod (has_fuels_dealloc with "Hs Hfuel2") as "[Hs Hfuel2]"; [done|].
-  rewrite delete_insert; [|set_solver].
-  iModIntro. iApply wp_value. iApply "HΦ". iFrame.
-Qed.
-
 Lemma wp_cmpxchg_suc s E l v' v1 v2 (Φ : expr → iProp Σ) :
   v' = v1 → vals_compare_safe v' v1 →
   ▷ l ↦ v' -∗
@@ -793,45 +773,6 @@ Proof.
   rewrite bool_decide_true //. iFrame. iModIntro.
   iSplit; [|done].
   by iApply "HΦ".
-Qed.
-
-(* TODO: Remove *)
-Lemma wp_cmpxchg_suc_step_singlerole_keep_dead s tid ρ (f1: nat) fr s1 s2 E l v' v1 v2:
-  ρ ∉ live_roles _ s2 →
-  v' = v1 → vals_compare_safe v' v1 → M.(fmtrans) s1 (Some ρ) s2 ->
-  live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
-    CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
-  {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
-      has_fuel tid ρ (lm_fl LM s2) }}}.
-Proof.
-  iIntros (??? Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & >Hfr) HΦ".
-  iApply (wp_step_model_singlerole with "Hst Hfuel1 Hfr"); [done..|].
-  iApply (wp_cmpxchg_suc with "Hl"); [done..|].
-  iIntros "!> Hl Hs Hfr Hfuel2".
-  iApply wp_value. iApply "HΦ". iFrame.
-Qed.
-
-(* TODO: Remove *)
-(* OBS: tid ↦M ∅ vs has_fuels tid ∅ *)
-Lemma wp_cmpxchg_suc_step_singlerole s tid ρ (f1: nat) fr s1 s2 E l v' v1 v2:
-  v' = v1 → vals_compare_safe v' v1 → M.(fmtrans) s1 (Some ρ) s2 ->
-  live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
-    CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; tid; E
-  {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles M s2) then has_fuel tid ρ (lm_fl LM s2) else has_fuels tid ∅ ) }}}.
-Proof.
-  iIntros (?? Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & >Hfr) HΦ".
-  iApply (wp_step_model_singlerole with "Hst Hfuel1 Hfr"); [done..|].
-  iApply (wp_cmpxchg_suc with "Hl"); [done..|].
-  iIntros "!> Hl Hs Hfuel2 Hfr".
-  destruct (decide (ρ ∈ live_roles M s2)).
-  { iApply wp_value. iApply "HΦ". iFrame. }
-  iApply pre_step_wp.
-  iMod (has_fuels_dealloc with "Hs Hfuel2") as "[Hs Hfuel2]"; [done|].
-  rewrite delete_insert; [|set_solver].
-  iModIntro. iApply wp_value. iApply "HΦ". iFrame.
 Qed.
 
 End lifting.
