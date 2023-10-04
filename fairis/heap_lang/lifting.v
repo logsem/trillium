@@ -667,16 +667,6 @@ Proof.
   iApply ("HΦ" with "Hl Hm").
 Qed.
 
-Lemma wp_alloc_nostep s tid E v fs :
-  fs ≠ ∅ ->
-  {{{ has_fuels_S tid fs }}} Alloc (Val v) @ s; tid; E {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ has_fuels tid fs }}}.
-Proof.
-  iIntros (? Φ) "HfuelS HΦ".
-  iApply (wp_step_fuel with "HfuelS"); [done|].
-  iApply wp_alloc. iIntros "!>" (l) "Hl Hm Hfuel".
-  iApply wp_value. iApply ("HΦ" with "[$Hl $Hm $Hfuel]").
-Qed.
-
 Lemma wp_choose_nat s E (Φ : expr → iProp Σ) :
   ▷ (∀ (n:nat), Φ $ Val $ LitV (LitInt n)) -∗
   sswp s E ChooseNat Φ.
@@ -697,19 +687,6 @@ Proof.
   iApply "HΦ".
   (* TODO: Improve this so we hide the (arbitrary) choice of `n` *)
   Unshelve. all: apply O.
-Qed.
-
-(* TODO: Remove *)
-Lemma wp_choose_nat_nostep s tid E fs :
-  fs ≠ ∅ ->
-  {{{ has_fuels_S tid fs }}}
-    ChooseNat @ s; tid; E
-  {{{ (n:nat), RET LitV (LitInt n); has_fuels tid fs }}}.
-Proof.
-  iIntros (? Φ) "HfuelS HΦ".
-  iApply (wp_step_fuel with "HfuelS"); [done|].
-  iApply (wp_choose_nat). iIntros "!>" (n) "Hfuel".
-  iApply wp_value. iApply "HΦ". iFrame.
 Qed.
 
 Lemma wp_load s E l q v (Φ : expr → iProp Σ) :
@@ -734,17 +711,6 @@ Proof.
   by iApply "HΦ".
 Qed.
 
-(* TODO: Remove *)
-Lemma wp_load_nostep s tid E l q v fs:
-  fs ≠ ∅ ->
-  {{{ ▷ l ↦{q} v ∗ has_fuels_S tid fs }}} Load (Val $ LitV $ LitLoc l) @ s; tid; E {{{ RET v; l ↦{q} v ∗ has_fuels tid fs }}}.
-Proof.
-  iIntros (? Φ) "[>Hl HfuelS] HΦ".
-  iApply (wp_step_fuel with "HfuelS"); [done|].
-  iApply (wp_load with "Hl"). iIntros "!> Hl Hfuel".
-  iApply wp_value. iApply "HΦ". iFrame.
-Qed.
-
 Lemma wp_store s E l v' v (Φ : expr → iProp Σ) :
   ▷ l ↦ v' -∗
   ▷ (l ↦ v -∗ Φ $ LitV LitUnit) -∗
@@ -762,19 +728,6 @@ Proof.
   iFrame.
   apply head_reducible_prim_step in Hstep; [|by eauto].
   inv_head_step. iFrame. iModIntro. iSplit; [|done]. by iApply "HΦ".
-Qed.
-
-(* TODO: Remove *)
-Lemma wp_store_nostep s tid E l v' v fs:
-  fs ≠ ∅ ->
-  {{{ ▷ l ↦ v' ∗ has_fuels_S tid fs }}}
-    Store (Val $ LitV (LitLoc l)) (Val v) @ s; tid; E
-  {{{ RET LitV LitUnit; l ↦ v ∗ has_fuels tid fs }}}.
-Proof.
-  iIntros (? Φ) "[>Hl HfuelS] HΦ".
-  iApply (wp_step_fuel with "HfuelS"); [done|].
-  iApply (wp_store with "Hl"). iIntros "!> Hl Hfuel".
-  iApply wp_value. iApply "HΦ". iFrame.
 Qed.
 
 (* TODO: Remove *)

@@ -342,21 +342,17 @@ Section proof.
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & %HN & Hyes) Hk". unfold yes.
-
     wp_pures.
     wp_bind (Alloc _).
-
-    iApply (wp_alloc_nostep _ _ _ _ {[Y := _]}%nat with "[Hf]").
+    iApply (wp_step_fuel with "[Hf]").
     { apply map_non_empty_singleton. }
     { rewrite has_fuels_gt_1; last by solve_fuel_positive.
       rewrite fmap_insert fmap_empty. done. }
-    iNext. iIntros (n) "(HnN & _ & Hf)".
-    rewrite -has_fuel_fuels.
-
+    iApply wp_alloc.
+    iNext. iIntros (n) "HnN _ Hf".
     wp_pures.
-
-    rewrite -has_fuel_fuels.
-
+    iModIntro.
+    wp_pures.
     iApply (yes_go_spec with "[-Hk]"); try iFrame.
     { lia. }
     { iFrame "Hinv". iPureIntro; lia. }
@@ -510,18 +506,15 @@ Section proof.
 
     wp_pures.
     wp_bind (Alloc _).
-
-    iApply (wp_alloc_nostep _ _ _ _ {[No := _]}%nat with "[Hf]").
+    iApply (wp_step_fuel with "[Hf]").
     { apply map_non_empty_singleton. }
     { rewrite has_fuels_gt_1; last by solve_fuel_positive.
       rewrite fmap_insert fmap_empty. done. }
-    iNext. iIntros (n) "(HnN & _ & Hf)".
-    rewrite -has_fuel_fuels.
-
+    iApply wp_alloc.
+    iNext. iIntros (n) "HnN _ Hf".
     wp_pures.
-
-    rewrite -has_fuel_fuels.
-
+    iModIntro.
+    wp_pures.
     iApply (no_go_spec with "[-Hk]"); try iFrame.
     { lia. }
     { iFrame "Hinv". done. }
@@ -546,13 +539,15 @@ Section proof_start.
     wp_pures.
 
     wp_bind (Alloc _).
-    iApply (wp_alloc_nostep _ _ _ _ {[Y := _; No := _]} with "[Hf]").
-    { apply insert_non_empty. }
-    { rewrite has_fuels_gt_1; last solve_fuel_positive.
-      rewrite !fmap_insert fmap_empty //. }
-
-    iIntros "!>" (l) "(Hl & _ & Hf)".
-
+    iApply (wp_step_fuel with "[Hf]").
+    2: { rewrite has_fuels_gt_1; last by solve_fuel_positive.
+         rewrite !fmap_insert fmap_empty. done. }
+    { rewrite insert_union_singleton_l.
+      intros ?%map_positive_l. set_solver. }
+    iApply wp_alloc.
+    iNext. iIntros (l) "HnN _ Hf".
+    wp_pures.
+    iModIntro.
     wp_pures.
 
     (* Allocate the invariant. *)
