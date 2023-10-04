@@ -49,8 +49,8 @@ Proof. exact (populate ρEven). Qed.
 Inductive eotrans: nat -> option EO -> nat -> Prop :=
 | even_trans n : Nat.even n → eotrans n (Some ρEven) (S n)
 | even_fail n : Nat.odd n → eotrans n (Some ρEven) n
-| no_trans n : Nat.odd n → eotrans n (Some ρOdd) (S n)
-| no_fail n : Nat.even n → eotrans n (Some ρOdd) n
+| odd_trans n : Nat.odd n → eotrans n (Some ρOdd) (S n)
+| odd_fail n : Nat.even n → eotrans n (Some ρOdd) n
 .
 
 Definition eo_live_roles : gset EO := {[ ρOdd; ρEven ]}.
@@ -152,49 +152,45 @@ Section proof.
     iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose".
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]".
     - iDestruct (even_agree with "Heven Hay") as "%Heq".
-      rewrite -has_fuel_fuels.
-      iApply (wp_cmpxchg_suc_step_singlerole _ tid (ρEven: fmrole the_fair_model) _ _
-                                             M (M + 1)
-             with "[$]"); eauto.
-      { by do 3 f_equiv. }
-      { rewrite Nat.add_1_r. econstructor. eauto. }
+      rewrite -has_fuel_fuels.      
       iModIntro.
-      iIntros "!> (Hb & Hmod & HFR & Hf)".
+      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      { constructor. by eauto. }
+      { set_solver. }
+      iApply (wp_cmpxchg_suc with "Hn"); [by do 3 f_equiv|done|].
+      iIntros "!> Hb Hmod Hf HFR".
       iMod (even_update (M + 2) with "[$]") as "[Hay Heven]".
+      wp_pures.
       iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
-      { iNext. iExists _. iFrame. rewrite Nat2Z.inj_add.
-        subst. iFrame.
-        rewrite Nat.add_1_r.
+      { iNext. iExists _. iFrame. subst.
+        iEval (rewrite -Nat.add_1_r).
+        rewrite Nat2Z.inj_add.
+        iFrame.
+        rewrite !Nat.add_1_r.
         rewrite Nat.even_succ.
         rewrite -Nat.negb_even. rewrite Heqn. simpl. iFrame.
-        rewrite Nat.add_1_r.
         replace (S (S N)) with (N + 2) by lia. iFrame. }
-      iModIntro. rewrite decide_True; last first.
-      { set_solver. }
-      rewrite has_fuel_fuels.
-      simpl.
-      wp_pures.
+      iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H".
+      iModIntro. simpl. wp_pures.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
       iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
       { iFrame "∗#". subst. iFrame. }
       iPureIntro; lia.
     - iDestruct (even_agree with "Heven Hay") as "%Heq". rewrite -> Heq in *.
       rewrite -has_fuel_fuels.
-      iApply (wp_cmpxchg_fail_step_singlerole _ tid (ρEven: fmrole the_fair_model) _ _
-                                             M M
-             with "[$]"); eauto.
-      { intros Hne. simplify_eq. lia. }
-      { econstructor. rewrite -Nat.negb_even. rewrite Heqn. done. }
-      iIntros "!>!> (Hb & Hmod & HFR & Hf)".
+      iModIntro.
+      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      { apply even_fail. rewrite -Nat.negb_even. rewrite Heqn. done. }
+      { set_solver. }
+      iApply (wp_cmpxchg_fail with "Hn"); [intros Hne; simplify_eq; lia|done|].
+      iIntros "!> Hb Hmod Hf HFR".
+      wp_pures.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
       { iNext. simplify_eq. iExists _. iFrame.
         subst. iFrame.
         rewrite Nat.add_1_r. rewrite Heqn. iFrame. }
-      rewrite decide_True; last first.
-      { set_solver. }
-      iModIntro.
-      simpl.
-      wp_pures.
+      iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H".
+      iModIntro. simpl. wp_pures.
       rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
       { iFrame "∗#". }
@@ -216,14 +212,14 @@ Section proof.
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]"; last first.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq".
       rewrite -has_fuel_fuels.
-      iApply (wp_cmpxchg_suc_step_singlerole _ tid (ρOdd: fmrole the_fair_model) _ _
-                                             M (S M)
-               with "[$]"); eauto.
-      { by do 3 f_equiv. }
-      { econstructor. rewrite -Nat.negb_even. rewrite Heqn. done. }
       iModIntro.
-      iIntros "!> (Hb & Hmod & HFR & Hf)".
+      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      { apply odd_trans. rewrite -Nat.negb_even. rewrite Heqn. done. }
+      { set_solver. }
+      iApply (wp_cmpxchg_suc with "Hn"); [by do 3 f_equiv|done|].
+      iIntros "!> Hb Hmod Hf HFR".
       iMod (odd_update (M + 2) with "[$]") as "[Han Hodd]".
+      wp_pures.
       iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
       { iNext. iExists _. iFrame. subst.
         rewrite Nat.add_1_r.
@@ -235,11 +231,8 @@ Section proof.
         iEval (rewrite -Nat.add_1_r).
         rewrite Nat2Z.inj_add.
         iFrame. }
-      iModIntro. rewrite decide_True; last first.
-      { set_solver. }
-      rewrite has_fuel_fuels.
-      simpl.
-      wp_pures.
+      iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H". iModIntro.
+      simpl. wp_pures.
       rewrite -has_fuel_fuels.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
       iApply ("Hg" with "[] [Hodd Hf] [$]"); last first.
@@ -247,20 +240,19 @@ Section proof.
       iPureIntro; lia.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq". rewrite -> Heq in *.
       rewrite -has_fuel_fuels. simplify_eq.
-      iApply (wp_cmpxchg_fail_step_singlerole _ tid (ρOdd: fmrole the_fair_model) _ _
-                                             M M
-             with "[$]"); eauto.
-      { intros Hneq. simplify_eq. lia. }
-      { econstructor. eauto. }
-      iIntros "!>!> (Hb & Hmod & HFR & Hf)".
+      iModIntro.
+      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      { apply odd_fail. by eauto. }
+      { set_solver. }
+      iApply (wp_cmpxchg_fail with "Hn");
+        [by intros Hneq; simplify_eq; lia|done|].
+      iIntros "!> Hb Hmod Hf HFR".
+      wp_pures.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
       { iNext. simplify_eq. iExists _. iFrame.
         rewrite Heqn. iFrame. }
-      rewrite decide_True; last first.
-      { set_solver. }
-      iModIntro.
-      simpl.
-      wp_pures.
+      iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H". iModIntro.
+      simpl. wp_pures.
       rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Hodd Hf] [$]"); last first.
       { iFrame "∗#". }
