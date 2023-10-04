@@ -1959,31 +1959,29 @@ Section model_state_lemmas.
       by eauto.
   Qed.
 
-  Lemma locale_of_from_list_from (tp0 tp0' tp tp' : list $ expr Λ) e :
-    locales_equiv tp0 tp0' →
-    locales_equiv tp tp' →
-    locale_of (tp0++tp) e ∉ locales_of_list_from tp0' tp'.
-  Proof. Admitted.
-
-  (* Lemma not_elem_of_locale_of_from_list (tp : list $ expr Λ) e : *)
-  (*   locale_of tp e ∉ locales_of_list tp. *)
-  (* Proof. *)
-  (*   rewrite -{1}(app_nil_l tp). *)
-  (*   apply locale_of_from_list_from; apply locales_equiv_refl. *)
-  (* Qed. *)
-
-  Lemma not_elem_of_locale_of_from_list (tp1 tp2 : list $ expr Λ) e :
-    locales_equiv tp1 tp2 →
-    locale_of tp1 e ∉ locales_of_list tp2.
+  Lemma not_elem_of_locale_of_from_list (tp : list $ expr Λ) e :
+    locale_of tp e ∉ locales_of_list tp.
   Proof.
-    intros. rewrite -{1}(app_nil_l tp1).
-    apply locale_of_from_list_from; [apply locales_equiv_refl|done].
+    unfold locales_of_list_from.
+    intros Habs.
+    apply elem_of_list_fmap in Habs as ((tp1&e1) & Hlo & Hpf).
+    apply prefixes_from_spec in Hpf as (tp2&tp3&He1&He2).
+    simplify_eq.
+    list_simplifier.
+
+    have Hdone: (tp2 ++ e1 :: tp3, e) ∈ prefixes_from (tp2++[e1]) (tp3 ++ [e]).
+    { apply prefixes_from_spec. eexists _, _. list_simplifier. naive_solver. }
+    by apply locale_injective in Hdone.
   Qed.
 
   Lemma elem_of_locale_of_from_list (tp1 tp2 : list $ expr Λ) e :
     locales_equiv tp1 tp2 →
     locale_of tp1 e ∈ locales_of_list (tp2++[e]).
-  Proof. Admitted.
+  Proof.
+    intros Heq. rewrite (locale_equiv _ _ _ Heq) /locales_of_list_from.
+    apply elem_of_list_fmap. exists (tp2, e). split=>//.
+    apply prefixes_from_spec. eexists _, _. list_simplifier. naive_solver.
+  Qed.
 
   Lemma model_state_interp_fork_update fs1 fs2 tp1 tp2
         (δ1 δ2 : LM) ζ efork σ1 σ2 :
@@ -2001,7 +1999,7 @@ Section model_state_lemmas.
     iDestruct "Hm" as (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
     iDestruct (has_fuels_agree with "Hfm Hf") as %Hagree.
     assert (locale_of tp1 efork ∉ dom fm) as Hnin.
-    { pose proof (not_elem_of_locale_of_from_list tp1 tp1 efork) as Hes%Htp; [|apply locales_equiv_refl].
+    { pose proof (not_elem_of_locale_of_from_list tp1 efork) as Hes%Htp.
       apply not_elem_of_dom in Hes. set_solver. }
     assert (ζ ≠ locale_of tp1 efork) as Hneq.
     { rewrite not_elem_of_dom in Hnin. set_solver. }
@@ -2251,8 +2249,7 @@ Section model_state_lemmas.
     - rewrite Hδ2. simpl.
       rewrite insert_commute; last first.
       { assert (locale_of es e ∉ locales_of_list es) as Hes%Htp.
-        { apply not_elem_of_locale_of_from_list.
-          apply locales_equiv_refl. }
+        apply not_elem_of_locale_of_from_list.
         set_solver. }
       f_equiv.
       { rewrite lookup_total_alt. simpl.
@@ -2396,8 +2393,8 @@ Section model_state_lemmas.
       apply disjoint_intersection_L.
       apply map_disjoint_dom in Hdisj.
       set_solver.
-    - pose proof (not_elem_of_locale_of_from_list es es e)
-        as Hes%Htp; [|apply locales_equiv_refl].
+    - pose proof (not_elem_of_locale_of_from_list es e)
+        as Hes%Htp.
       apply not_elem_of_dom in Hes. set_solver.
   Qed.
 
@@ -2449,7 +2446,7 @@ Section model_state_lemmas.
       rewrite -Hdom'.
       iPureIntro. apply not_elem_of_dom. apply Htp.
       apply locale_step_equiv in Hstep. simpl in *.
-      apply not_elem_of_locale_of_from_list. apply locales_equiv_refl. }
+      apply not_elem_of_locale_of_from_list. }
     pose proof (model_update_fork_valid) as [δ2 Hδ];
       [by apply elem_of_dom|done|].
     iDestruct (model_state_interp_can_fork_step with "Hm Hfuel") as %Hcan_step;
