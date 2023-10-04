@@ -299,9 +299,9 @@ Qed.
 
 Lemma wp_step_model s tid ρ (f1 : nat) fs fr s1 s2 E e Φ :
   TCEq (to_val e) None →
+  fmtrans M s1 (Some ρ) s2 →
   M.(live_roles) s2 ⊆ M.(live_roles) s1 →
   ρ ∉ dom fs →
-  fmtrans M s1 (Some ρ) s2 →
   ▷ frag_model_is s1 -∗ ▷ has_fuels tid ({[ρ:=f1]} ∪ fmap S fs) -∗
   ▷ frag_free_roles_are fr -∗
   sswp s E e (λ e', frag_model_is s2 -∗
@@ -310,7 +310,7 @@ Lemma wp_step_model s tid ρ (f1 : nat) fs fr s1 s2 E e Φ :
                     WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
 Proof.
-  iIntros (Hval Hlive Hdom Htrans) ">Hst >Hfuel1 >Hfr Hwp".
+  iIntros (Hval Htrans Hlive Hdom) ">Hst >Hfuel1 >Hfr Hwp".
   rewrite wp_unfold /wp_pre.
   rewrite /sswp. simpl. rewrite Hval.
   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hexend) "(% & Hsi & Hmi)".
@@ -340,8 +340,8 @@ Qed.
 
 Lemma wp_step_model_singlerole s tid ρ (f1 : nat) fr s1 s2 E e Φ :
   TCEq (to_val e) None →
-  M.(live_roles) s2 ⊆ M.(live_roles) s1 →
   fmtrans M s1 (Some ρ) s2 →
+  M.(live_roles) s2 ⊆ M.(live_roles) s1 →
   ▷ frag_model_is s1 -∗ ▷ has_fuel tid ρ f1 -∗ ▷ frag_free_roles_are fr -∗
   sswp s E e (λ e', frag_model_is s2 -∗
                     has_fuel tid ρ (LM.(lm_fl) s2) -∗
@@ -349,7 +349,7 @@ Lemma wp_step_model_singlerole s tid ρ (f1 : nat) fr s1 s2 E e Φ :
                     WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
 Proof.
-  iIntros (Hval Hlive Htrans) ">Hst >Hfuel1 >Hfr Hwp".
+  iIntros (Hval Htrans Hlive) ">Hst >Hfuel1 >Hfr Hwp".
   rewrite has_fuel_fuels.
   replace ({[ρ := f1]}) with ({[ρ := f1]} ∪ (fmap S ∅:gmap _ _)); last first.
   { rewrite fmap_empty. rewrite right_id_L. done. }
@@ -728,27 +728,6 @@ Proof.
   iFrame.
   apply head_reducible_prim_step in Hstep; [|by eauto].
   inv_head_step. iFrame. iModIntro. iSplit; [|done]. by iApply "HΦ".
-Qed.
-
-(* TODO: Remove *)
-Lemma wp_store_step_singlerole s tid ρ (f1 : nat) fr s1 s2 E l v' v :
-  fmtrans M s1 (Some ρ) s2 ->
-  live_roles _ s2 ⊆ live_roles _ s1 ->
-  {{{ ▷ l ↦ v' ∗ ▷ frag_model_is s1 ∗ ▷ has_fuel tid ρ f1 ∗ ▷ frag_free_roles_are fr }}}
-    Store (Val $ LitV $ LitLoc l) (Val v) @ s; tid; E
-  {{{ RET LitV LitUnit; l ↦ v ∗ frag_model_is s2 ∗ frag_free_roles_are fr ∗
-      (if decide (ρ ∈ live_roles M s2) then has_fuel tid ρ (lm_fl LM s2) else tid ↦M ∅ ) }}}.
-Proof.
-  iIntros (Htrans ? Φ) "(>Hl & >Hst & >Hfuel1 & > Hfr) HΦ".
-  iApply (wp_step_model_singlerole with "Hst Hfuel1 Hfr"); [done..|].
-  iApply (wp_store with "Hl").
-  iIntros "!> Hl Hst Hfuel2 Hfr".
-  destruct (decide (ρ ∈ live_roles M s2)).
-  { iApply wp_value. iApply "HΦ". iFrame. }
-  iApply pre_step_wp.
-  iMod (has_fuels_dealloc with "Hst Hfuel2") as "[Hst Hfuel2]"; [done|].
-  rewrite delete_insert; [|set_solver].
-  iModIntro. iApply wp_value. iApply "HΦ". iFrame.
 Qed.
 
 Lemma wp_cmpxchg_fail s E l q v' v1 v2 (Φ : expr → iProp Σ) :

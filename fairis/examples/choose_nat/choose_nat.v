@@ -199,21 +199,27 @@ Section proof.
       assert (cn = N 1) as ->.
       { destruct cn; inversion Hvalid. by simplify_eq. }
       (* Update the model state to maintain program correspondence *)
-      iApply (wp_store_step_singlerole _ _ (():fmrole cn_fair_model) (f - 7)
-               with "[$Hl $Hs $Hr Hf]").
-      { constructor. }
+      iApply (wp_step_model_singlerole _ _ (():fmrole cn_fair_model) (f - 7)
+                                       _ _ (N 0)
+               with "Hs [Hf] Hr").
       { set_solver. }
+      { constructor. }
       { replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia.
         by rewrite has_fuel_fuels. }
-      iIntros "!> (Hl & Hs & Hr & Hf)".
+      iApply (wp_store with "Hl").
+      iIntros "!> Hl Hs Hf Hr".
+      iApply pre_step_wp.
+      iMod (has_fuels_dealloc _ _ _ (():fmrole cn_fair_model) with "Hs Hf")
+        as "[Hs Hf]"; [done|].
+      iModIntro. wp_pures.
       iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
       { apply (excl_auth_update _ _ 0%Z). }
       iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
       { iExists (N 0). iFrame. }
-      iModIntro.
-      simpl.
-      destruct (decide (() ∈ ∅)); [set_solver|].
-      by iApply "HΦ". }
+      (* There should be a better way of doing this. *)
+      iApply fupd_mask_intro; [done|].
+      iIntros "H". iMod "H".
+      iModIntro. by iApply "HΦ". }
     wp_lam.
     (* Load - with invariant *)
     wp_bind (Load _).
@@ -241,20 +247,23 @@ Section proof.
     assert (cn = N (S (S n))) as ->.
     { destruct cn; inversion Hvalid. by simplify_eq. }
     (* Update the model state to maintain program correspondence *)
-    iApply (wp_store_step_singlerole _ _ (():fmrole cn_fair_model) (f - 7)
-                                     with "[$Hl $Hs $Hr Hf]").
-    { constructor. }
+    iApply (wp_step_model_singlerole _ _ (():fmrole cn_fair_model) (f - 7)
+                                     _ _ (N (S n))
+             with "Hs [Hf] Hr").
     { set_solver. }
+    { constructor. }
     { replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia.
-      done. }
-    iIntros "!> (Hl & Hs & Hr & Hf)".
+      by rewrite has_fuel_fuels. }
+    iApply (wp_store with "Hl").
+    iIntros "!> Hl Hs Hf Hr".
+    wp_pures.
     iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
     { apply (excl_auth_update _ _ (Z.of_nat (S n))%Z). }
     iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
     { iExists (N (S n)). iFrame. }
-    iModIntro.
-    simpl. destruct (decide (() ∈ {[()]})); [|set_solver].
-    wp_pures.
+    iApply fupd_mask_intro; [done|].
+    iIntros "H". iMod "H".
+    iModIntro. simpl. wp_pures.
     iApply ("IHn" with "[] [] Hf Hr Hm"); [iPureIntro; lia..|done].
   Qed.
 
@@ -288,22 +297,25 @@ Section proof.
     assert (cn = Start) as ->.
     { destruct cn; inversion Hvalid; [done|]. lia. }
     (* Update the model state to maintain program correspondence *)
-    iApply (wp_store_step_singlerole _ _ (():fmrole cn_fair_model)
-                                     (f - 3) _ _ (N (S n))
-             with "[$Hl $Hs $Hr Hf]").
-    { constructor. }
+    iApply (wp_step_model_singlerole _ _ (():fmrole cn_fair_model) (f - 3)
+                                     _ _ (N (S n))
+             with "Hs [Hf] Hr").
     { set_solver. }
+    { constructor. }
     { replace (f - 1 - 1 - 1)%nat with (f - 3)%nat by lia.
-      rewrite has_fuel_fuels. done. }
-    iIntros "!> (Hl & Hs & Hr & Hf)".
+      by rewrite has_fuel_fuels. }
+    iApply (wp_store with "Hl").
+    iIntros "!> Hl Hs Hf Hr".
+    wp_pures.
     iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
     { apply (excl_auth_update _ _ (Z.of_nat (S n))%Z). }
     iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
     { replace (Z.of_nat n + 1)%Z with (Z.of_nat (S n)) by lia.
       iExists (N (S n)). iFrame. }
+    iApply fupd_mask_intro; [done|].
+    iIntros "H". iMod "H".
     iModIntro.
-    simpl. destruct (decide (() ∈ {[()]})); [|set_solver].
-    wp_pures.
+    simpl. wp_pures.
     rewrite -has_fuel_fuels.
     by iApply (decr_loop_spec with "IH [$Hm $Hr $Hf]"); [lia|lia|].
   Qed.
