@@ -395,6 +395,24 @@ Proof.
   iIntros (v) "HΦ'". iFrame.
 Qed.
 
+Lemma heap_lang_locales_equiv_from_length (es10 es1 es20 es2 : list expr) :
+  length es10 = length es20 → length es1 = length es2 →
+  locales_equiv_from es10 es20 es1 es2.
+Proof.
+  revert es10 es20 es2.
+  induction es1 as [|e es1 IHes1]; intros es10 es20 es2 Hlen; [by destruct es2|].
+  destruct es2; [done|].
+  simpl in *.
+  constructor; [done|].
+  apply IHes1.
+  - rewrite !app_length=> /=. f_equiv. done.
+  - lia.
+Qed.
+
+Lemma heap_lang_locales_equiv_length (es1 es2 : list expr) :
+  length es1 = length es2 → locales_equiv es1 es2.
+Proof. intros Hlen. by apply heap_lang_locales_equiv_from_length. Qed.  
+
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
 Lemma wp_role_fork s tid E e Φ R1 R2 (Hdisj: R1 ##ₘ R2) (Hnemp: R1 ∪ R2 ≠ ∅):
   has_fuels_S tid (R1 ∪ R2) -∗
@@ -417,9 +435,9 @@ Proof.
     apply fill_step, head_prim_step. econstructor. }
   { list_simplifier. exists (tp1 ++ fill K #() :: tp2).
     rewrite /trace_ends_in in Hexend. rewrite Hexend.
-    split; first by list_simplifier. simpl.
-    admit. }
-    (* rewrite app_length //=. } *)
+    split; first by list_simplifier.
+    apply heap_lang_locales_equiv_length. simpl.
+    rewrite !app_length //=. }
   iModIntro. iSplit. iPureIntro; first by eauto. iNext.
   iIntros (e2 σ2 efs Hstep).
   have [-> [-> ->]] : σ2 = σ1 ∧ efs = [e] ∧ e2 = Val $ LitV LitUnit by inv_head_step.
@@ -429,7 +447,7 @@ Proof.
   iSplit; first by iPureIntro.
   iSplit; [|done].
   iApply "He". by list_simplifier.
-Admitted.
+Qed.
 
 Lemma sswp_pure_step s E e1 e2 (Φ : Prop) Ψ :
   PureExec Φ 1 e1 e2 → Φ → Ψ e2 -∗ sswp s E e1 Ψ%I.
@@ -500,6 +518,7 @@ Proof.
   iApply "Hkont". iApply (has_fuels_proper with "Hfuels") =>//.
 Qed.
 
+(* TODO: Remove or keep? *)
 Lemma has_fuels_dealloc_multiple E tid fs rem s :
   rem ⊆ dom fs →
   rem ∩ live_roles _ s = ∅ →
@@ -519,9 +538,24 @@ Proof.
   { set_solver. }
   iModIntro. iFrame.
   iApply has_fuels_proper; [done| |iApply "Hfuels"].
-  apply leibniz_equiv_iff.
   rewrite -map_filter_delete.
-Admitted.
+  rewrite difference_union_distr_r_L.
+  apply leibniz_equiv_iff.
+  apply map_filter_strong_ext.
+  intros i x.
+  split.
+  - intros [HP HSome].
+    apply elem_of_intersection in HP as [HP1 HP2].
+    split; [done|].
+    assert (ρ ≠ i) as Hneq by set_solver.
+    by rewrite lookup_delete_ne.
+  - intros [HP HSome].
+    assert (ρ ≠ i) as Hneq.
+    { intros ->. rewrite lookup_delete in HSome. by set_solver. }
+    rewrite lookup_delete_ne in HSome; [|done].
+    split; [|done].
+    set_solver.
+Qed.
 
 Lemma wp_lift_pure_step_no_fork_remove_role rem s tid E E' Φ e1 e2 fs ϕ:
   fs ≠ ∅ ->
