@@ -661,3 +661,17 @@ Section enumerate_gsets.
     intros H. unfold enumerate_dom_gsets'. eapply (enumerate_gsets_spec D). split; set_solver.
   Qed.
 End enumerate_gsets.
+
+Section finite_range_gmap.
+  Context `{!EqDecision K, !Countable K}.
+
+ Definition enumerate_subdomain_gmap (D: gset K) (B: nat) : list (gmap K nat)  :=
+    D' ← enumerate_dom_gsets' D;
+    m ← enum_gmap_bounded' D' B;
+    mret (`m).
+
+  Lemma enumerate_subdomain_gmap_spec m D B:
+    dom m ⊆ D → map_Forall (λ (_ : K) (v : nat), v ≤ B) m → m ∈ enumerate_subdomain_gmap D B.
+  Proof. Admitted.
+
+End finite_range_gmap.
