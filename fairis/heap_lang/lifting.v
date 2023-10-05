@@ -305,19 +305,19 @@ Lemma wp_step_model_singlerole s tid ρ (f1 : nat) fr s1 s2 E e Φ :
   TCEq (to_val e) None →
   fmtrans M s1 (Some ρ) s2 →
   M.(live_roles) s2 ⊆ M.(live_roles) s1 →
-  ▷ frag_model_is s1 -∗ ▷ has_fuel tid ρ f1 -∗ ▷ frag_free_roles_are fr -∗
+  ▷ frag_model_is s1 -∗ ▷ has_fuels tid {[ρ := f1]} -∗ ▷ frag_free_roles_are fr -∗
   sswp s E e (λ e', frag_model_is s2 -∗
-                    has_fuel tid ρ (LM.(lm_fl) s2) -∗
+                    has_fuels tid {[ρ := (LM.(lm_fl) s2)]} -∗
                     frag_free_roles_are fr -∗
                     WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
 Proof.
-  iIntros (Hval Htrans Hlive) ">Hst >Hfuel1 >Hfr Hwp". rewrite has_fuel_fuels.
+  iIntros (Hval Htrans Hlive) ">Hst >Hfuel1 >Hfr Hwp".
   replace ({[ρ := f1]}) with ({[ρ := f1]} ∪ (fmap S ∅:gmap _ _)); last first.
   { rewrite fmap_empty. rewrite right_id_L. done. }
   iApply (wp_step_model with "Hst Hfuel1 Hfr"); [done|set_solver|done|].
   iApply (sswp_wand with "[] Hwp"). iIntros (e') "Hwp Hst Hfuel1 Hfr".
-  rewrite has_fuel_fuels right_id_L. iApply ("Hwp" with "Hst Hfuel1 Hfr").
+  rewrite right_id_L. iApply ("Hwp" with "Hst Hfuel1 Hfr").
 Qed.
 
 Lemma wp_step_fuel s tid E e fs Φ :

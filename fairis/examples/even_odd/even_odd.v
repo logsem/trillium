@@ -137,7 +137,7 @@ Section proof.
   Definition evenodd_inv n := inv Ns (evenodd_inv_inner n).
 
   Lemma even_go_spec tid n (N: nat) f (Hf: f > 40):
-    {{{ evenodd_inv n ∗ has_fuel tid ρEven f ∗ even_at N }}}
+    {{{ evenodd_inv n ∗ has_fuels tid {[ ρEven := f ]} ∗ even_at N }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -147,7 +147,6 @@ Section proof.
     iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose".
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]".
     - iDestruct (even_agree with "Heven Hay") as "%Heq".
-      rewrite -has_fuel_fuels.      
       iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
       { constructor. by eauto. }
@@ -167,7 +166,6 @@ Section proof.
       { iFrame "∗#". subst. iFrame. }
       iPureIntro; lia.
     - iDestruct (even_agree with "Heven Hay") as "%Heq". rewrite -> Heq in *.
-      rewrite -has_fuel_fuels.
       iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
       { apply even_fail. rewrite -Nat.negb_even. rewrite Heqn. done. }
@@ -181,14 +179,13 @@ Section proof.
         rewrite Nat.add_1_r. rewrite Heqn. iFrame. }
       iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H".
       iModIntro. simpl. wp_pures.
-      rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
   Qed.
 
   Lemma odd_go_spec tid n (N: nat) f (Hf: f > 40):
-    {{{ evenodd_inv n ∗ has_fuel tid ρOdd f ∗ odd_at N }}}
+    {{{ evenodd_inv n ∗ has_fuels tid {[ ρOdd := f ]} ∗ odd_at N }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -201,7 +198,6 @@ Section proof.
     iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose".
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]"; last first.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq".
-      rewrite -has_fuel_fuels.
       iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
       { apply odd_trans. rewrite -Nat.negb_even. rewrite Heqn. done. }
@@ -217,14 +213,12 @@ Section proof.
         iEval (rewrite -Nat.add_1_r). rewrite Nat2Z.inj_add. iFrame. }
       iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H". iModIntro.
       simpl. wp_pures.
-      rewrite -has_fuel_fuels.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
       iApply ("Hg" with "[] [Hodd Hf] [$]"); last first.
       { iFrame "∗#". simplify_eq. done. }
       iPureIntro; lia.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq". rewrite -> Heq in *.
-      rewrite -has_fuel_fuels. simplify_eq.
-      iModIntro.
+      simplify_eq. iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
       { apply odd_fail. by eauto. }
       { set_solver. }
@@ -237,7 +231,6 @@ Section proof.
         rewrite Heqn. iFrame. }
       iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H". iModIntro.
       simpl. wp_pures.
-      rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Hodd Hf] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
@@ -250,7 +243,7 @@ Section proof.
     end.
 
   Lemma incr_loop_spec tid n (N : nat) f (Hf: f > 40) (eo : EO) :
-    {{{ evenodd_inv n ∗ has_fuel tid eo f ∗ (role_frag eo) N }}}
+    {{{ evenodd_inv n ∗ has_fuels tid {[ eo := f ]} ∗ (role_frag eo) N }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -312,7 +305,6 @@ Section proof_start.
         apply map_disjoint_dom. set_solver. }
       { iIntros (tid') "!> Hf".
         wp_pures.
-        rewrite -has_fuel_fuels.
         replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
         iApply (incr_loop_spec with "[Hodd_at $Hf]"); [lia|iFrame "#∗"|].
         by iIntros "!>?". }
@@ -347,7 +339,6 @@ Section proof_start.
         apply map_disjoint_dom. set_solver. }
       { iIntros (tid') "!> Hf".
         wp_pures.
-        rewrite -has_fuel_fuels.
         replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
         iApply (incr_loop_spec with "[Heven_at $Hf]"); [lia|iFrame "#∗"|].
         by iIntros "!>?". }

@@ -158,7 +158,8 @@ Section proof.
   Definition yesno_inv b := inv Ns (yesno_inv_inner b).
 
   Lemma yes_go_spec tid n b (N: nat) f (Hf: f > 40):
-    {{{ yesno_inv b ∗ has_fuel tid Y f ∗ n ↦ #N ∗ ⌜N > 0⌝%nat ∗ yes_at N }}}
+    {{{ yesno_inv b ∗ has_fuels tid {[ Y := f ]} ∗ n ↦ #N ∗ ⌜N > 0⌝%nat ∗
+        yes_at N }}}
       yes_go #n #b @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -171,7 +172,6 @@ Section proof.
     iInv Ns as (M B) "(>%Hnever & >HFR & >Hmod & >Bb & Hauths)" "Hclose".
     destruct B; iDestruct "Hauths" as "[>Hay >Han]".
     - iDestruct (yes_agree with "Hyes Hay") as "%Heq".
-      rewrite -has_fuel_fuels.
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
       + iModIntro.
@@ -185,7 +185,6 @@ Section proof.
         iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
         { iNext. iExists _, _. iFrame. simpl. iFrame. by iPureIntro. }
         iApply fupd_mask_intro; [done|]. iMod 1. iModIntro.
-        rewrite has_fuel_fuels.
         (* TODO: Needing this is a bit bad. Maybe add simple to wp_pures? *)
         simpl in *. wp_load. wp_store. wp_load. wp_pure _. simplify_eq. simpl.
         iApply wp_atomic.
@@ -246,7 +245,6 @@ Section proof.
         destruct (decide (0 < S M - 1)) as [Heq|Heq].
         * rewrite bool_decide_eq_true_2 //; last lia.
           wp_pure _.
-          rewrite -has_fuel_fuels.
           iApply ("Hg" with "[] [Hyes HnN Hf] [$]"); last first.
           { iFrame "∗#". iSplit; last by iPureIntro; lia.
             iClear "Hg Hinv".
@@ -258,7 +256,6 @@ Section proof.
           have ->: M = 0 by lia. simpl. lia.
     - iDestruct (yes_agree with "Hyes Hay") as "%Heq". rewrite -> Heq in *.
       have HM: M > 0 by lia.
-      rewrite -has_fuel_fuels.
       iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
       { constructor. lia. }
@@ -271,14 +268,13 @@ Section proof.
       iModIntro.
       simpl. wp_load. wp_pure _. rewrite bool_decide_eq_true_2; last lia.
       wp_pure _.
-      rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Hyes HnN Hf] [$]"); last first.
       { iFrame "∗#". iPureIntro; lia. }
       iPureIntro; lia.
   Qed.
 
   Lemma yes_spec tid b (N: nat) f (Hf: f > 50):
-    {{{ yesno_inv b ∗ has_fuel tid Y f ∗ ⌜N > 0⌝ ∗ yes_at N }}}
+    {{{ yesno_inv b ∗ has_fuels tid {[ Y := f ]} ∗ ⌜N > 0⌝ ∗ yes_at N }}}
       yes #N #b @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -296,7 +292,7 @@ Section proof.
   Qed.
 
   Lemma no_go_spec tid n b (N: nat) f (Hf: f > 40):
-    {{{ yesno_inv b ∗ has_fuel tid No f ∗ n ↦ #N ∗ ⌜N > 0⌝ ∗ no_at N }}}
+    {{{ yesno_inv b ∗ has_fuels tid {[ No := f ]} ∗ n ↦ #N ∗ ⌜N > 0⌝ ∗ no_at N }}}
       no_go #n #b @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -309,7 +305,6 @@ Section proof.
     iInv Ns as (M B) "(>%Hnever & >HFR & >Hmod & >Bb & Hauths)" "Hclose".
     destruct B; iDestruct "Hauths" as "[>Hay >Han]"; last first.
     - iDestruct (no_agree with "Hno Han") as "%Heq".
-      rewrite -has_fuel_fuels.
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
       + iModIntro.
@@ -323,7 +318,6 @@ Section proof.
         iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
         { iNext. iExists _, _. iFrame. simpl. iFrame. by iPureIntro. }
         iModIntro.
-        rewrite has_fuel_fuels.
         simpl. wp_load. wp_store. wp_load. wp_pure _. simplify_eq. simpl.
         iApply wp_atomic.
         iInv Ns as (M B) "(>%Hbever' & >HFR & >Hmod & >Hb & Hauths)" "Hclose".
@@ -365,7 +359,6 @@ Section proof.
         destruct (decide (0 < S M - 1)) as [Heq|Heq].
         * rewrite bool_decide_eq_true_2 //; last lia.
           wp_pure _.
-          rewrite -has_fuel_fuels.
           iApply ("Hg" with "[] [Hno HnN Hf] [$]"); last first.
           { iFrame "∗#". assert ((S M - 1)%Z = M)%nat as -> by lia. iFrame. iPureIntro; lia. }
           iPureIntro; lia.
@@ -373,8 +366,7 @@ Section proof.
           have ->: M = 0 by lia. simpl. lia.
     - iDestruct (no_agree with "Hno Han") as "%Heq". rewrite -> Heq in *.
       have HM: M > 0 by lia.
-      rewrite -has_fuel_fuels. assert (M = N) by lia. simplify_eq.
-      iModIntro.
+      assert (M = N) by lia. simplify_eq. iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
       { econstructor. lia. }
       { set_solver. }
@@ -386,14 +378,13 @@ Section proof.
       { iNext. simplify_eq. iExists _, _. iFrame. iFrame. done. }
       iModIntro. simpl. wp_load. wp_pure _.
       rewrite bool_decide_eq_true_2; last lia. wp_pure _.
-      rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Hno HnN Hf] [$]"); last first.
       { iFrame "∗#". iPureIntro; lia. }
       iPureIntro; lia.
   Qed.
 
   Lemma no_spec tid b (N: nat) f (Hf: f > 50):
-    {{{ yesno_inv b ∗ has_fuel tid No f ∗ ⌜N > 0⌝ ∗ no_at N }}}
+    {{{ yesno_inv b ∗ has_fuels tid {[ No := f ]} ∗ ⌜N > 0⌝ ∗ no_at N }}}
       no #N #b @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.

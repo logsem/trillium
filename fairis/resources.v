@@ -259,9 +259,6 @@ Section model_state_lemmas.
   Definition has_fuels (ζ: locale Λ) (fs: gmap Role nat) : iProp Σ :=
     frag_fuel_mapping_is {[ ζ := fs ]}.
 
-  Definition has_fuel (ζ: locale Λ) (ρ: Role) (f: nat): iProp Σ :=
-    has_fuels ζ  {[ρ := f ]}.
-
   #[global] Instance has_fuels_proper :
     Proper ((≡) ==> (≡) ==> (≡)) (has_fuels).
   Proof. solve_proper. Qed.
@@ -270,21 +267,11 @@ Section model_state_lemmas.
     Timeless (has_fuels ζ fs).
   Proof. rewrite /has_fuels. apply _. Qed.
 
-  Lemma has_fuel_fuels (ζ: locale Λ) (ρ: Role) (f: nat):
-    has_fuel ζ ρ f ⊣⊢ has_fuels ζ {[ ρ := f ]}.
-  Proof. done. Qed.
-
   Definition has_fuels_S (ζ: locale Λ) (fs: gmap Role nat): iProp Σ :=
     has_fuels ζ (S <$> fs).
 
   Definition has_fuels_plus (n: nat) (ζ: locale Λ) (fs: gmap Role nat): iProp Σ :=
     has_fuels ζ (fmap (fun m => n+m) fs).
-
-  Lemma has_fuel_fuels_S (ζ: locale Λ) (ρ: Role) (f: nat):
-    has_fuel ζ ρ (S f) ⊣⊢ has_fuels_S ζ {[ ρ := f ]}.
-  Proof.
-    rewrite has_fuel_fuels /has_fuels_S map_fmap_singleton //.
-  Qed.
 
   Lemma has_fuel_fuels_plus_1 (ζ: locale Λ) fs:
     has_fuels_plus 1 ζ fs ⊣⊢ has_fuels_S ζ fs.

@@ -237,7 +237,6 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
     let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
     iAssumptionCore || fail "wp_pure: cannot find" fs in
   iStartProof;
-  rewrite ?has_fuel_fuels;
   lazymatch goal with
   | |- envs_entails _ (wp ?s ?E ?locale ?e ?Q) =>
     let e := eval simpl in e in

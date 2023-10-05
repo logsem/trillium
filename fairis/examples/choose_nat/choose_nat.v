@@ -166,7 +166,7 @@ Section proof.
   Lemma decr_loop_spec γ tid l (n:nat) (f:nat) :
     7 ≤ f → f ≤ 38 →
     choose_nat_inv γ l -∗
-    {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗
+    {{{ has_fuels tid {[ () := f ]} ∗ frag_free_roles_are ∅ ∗
         own γ (◯E (Z.of_nat (S n))) }}}
       decr_loop_prog l #() @ tid ; ⊤
     {{{ RET #(); tid ↦M ∅ }}}.
@@ -203,8 +203,7 @@ Section proof.
                with "Hs [Hf] Hr").
       { constructor. }
       { set_solver. }
-      { replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia.
-        by rewrite has_fuel_fuels. }
+      { by replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia. }
       iApply (wp_store with "Hl").
       iIntros "!> Hl Hs Hf Hr".
       iMod (has_fuels_dealloc _ _ _ (():fmrole cn_fair_model) with "Hs Hf")
@@ -249,8 +248,7 @@ Section proof.
              with "Hs [Hf] Hr").
     { constructor. }
     { set_solver. }
-    { replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia.
-      by rewrite has_fuel_fuels. }
+    { by replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia. }
     iApply (wp_store with "Hl").
     iIntros "!> Hl Hs Hf Hr".
     wp_pures.
@@ -267,7 +265,7 @@ Section proof.
   Lemma choose_nat_spec γ l tid (f:nat) :
     12 ≤ f → f ≤ 40 →
     choose_nat_inv γ l -∗
-    {{{ has_fuel tid () f ∗ frag_free_roles_are ∅ ∗ own γ (◯E (-1)%Z) }}}
+    {{{ has_fuels tid {[ () := f ]} ∗ frag_free_roles_are ∅ ∗ own γ (◯E (-1)%Z) }}}
       choose_nat_prog l #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -299,8 +297,7 @@ Section proof.
              with "Hs [Hf] Hr").
     { constructor. }
     { set_solver. }
-    { replace (f - 1 - 1 - 1)%nat with (f - 3)%nat by lia.
-      by rewrite has_fuel_fuels. }
+    { by replace (f - 1 - 1 - 1)%nat with (f - 3)%nat by lia. }
     iApply (wp_store with "Hl").
     iIntros "!> Hl Hs Hf Hr".
     wp_pures.
@@ -311,9 +308,7 @@ Section proof.
       iExists (N (S n)). iFrame. }
     iApply fupd_mask_intro; [done|].
     iIntros "H". iMod "H".
-    iModIntro.
-    simpl. wp_pures.
-    rewrite -has_fuel_fuels.
+    iModIntro. simpl. wp_pures.
     by iApply (decr_loop_spec with "IH [$Hm $Hr $Hf]"); [lia|lia|].
   Qed.
 
