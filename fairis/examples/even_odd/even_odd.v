@@ -137,7 +137,7 @@ Section proof.
   Definition evenodd_inv n := inv Ns (evenodd_inv_inner n).
 
   Lemma even_go_spec tid n (N: nat) f (Hf: f > 40):
-    {{{ evenodd_inv n ∗ has_fuels tid {[ ρEven := f ]} ∗ even_at N }}}
+    {{{ evenodd_inv n ∗ tid ↦M {[ ρEven := f ]} ∗ even_at N }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -185,7 +185,7 @@ Section proof.
   Qed.
 
   Lemma odd_go_spec tid n (N: nat) f (Hf: f > 40):
-    {{{ evenodd_inv n ∗ has_fuels tid {[ ρOdd := f ]} ∗ odd_at N }}}
+    {{{ evenodd_inv n ∗ tid ↦M {[ ρOdd := f ]} ∗ odd_at N }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -243,7 +243,7 @@ Section proof.
     end.
 
   Lemma incr_loop_spec tid n (N : nat) f (Hf: f > 40) (eo : EO) :
-    {{{ evenodd_inv n ∗ has_fuels tid {[ eo := f ]} ∗ (role_frag eo) N }}}
+    {{{ evenodd_inv n ∗ tid ↦M {[ eo := f ]} ∗ (role_frag eo) N }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -260,7 +260,7 @@ Section proof_start.
   Let Ns := nroot .@ "even_odd".
 
   Lemma start_spec tid n N1 N2 f (Hf: f > 60) :
-    {{{ evenodd_inv n ∗ has_fuels tid {[ ρEven := f; ρOdd := f ]} ∗
+    {{{ evenodd_inv n ∗ tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
         even_at N1 ∗ odd_at N2 }}}
       start #n @ tid
     {{{ RET #(); tid ↦M ∅ }}}.

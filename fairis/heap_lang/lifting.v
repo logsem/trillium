@@ -39,7 +39,7 @@ Proof. solve_inG. Qed.
       (⌜valid_state_evolution_fairness extr auxtr⌝ ∗
        gen_heap_interp (trace_last extr).2.(heap) ∗
        model_state_interp (trace_last extr).1 (trace_last auxtr))%I ;
-    fork_post tid := λ _, (tid ↦M ∅);
+    fork_post tid := λ _, (tid ↦M ∅)%I;
 }.
 
 (** Override the notations so that scopes and coercions work out *)
@@ -242,7 +242,7 @@ Proof.
 Qed.
 
 Lemma has_fuels_decr E tid fs :
-  has_fuels_S tid fs -∗ |~{E}~| has_fuels tid fs.
+  tid ↦M++ fs -∗ |~{E}~| tid ↦M fs.
 Proof.
   iIntros "Hf". rewrite weakestpre.pre_step_unseal.
   iIntros (extr atr) "[%Hvse [Hσ Hm]]".
@@ -250,8 +250,8 @@ Proof.
 Qed.
 
 Lemma has_fuels_dealloc E tid fs ρ δ :
-  ρ ∉ live_roles _ δ → frag_model_is δ -∗ has_fuels tid fs -∗
-  |~{E}~| frag_model_is δ ∗ has_fuels tid (delete ρ fs).
+  ρ ∉ live_roles _ δ → frag_model_is δ -∗ tid ↦M fs -∗
+  |~{E}~| frag_model_is δ ∗ tid ↦M (delete ρ fs).
 Proof.
   iIntros (Hnin) "Hst Hf". rewrite weakestpre.pre_step_unseal.
   iIntros (extr atr) "[%Hvse [Hσ Hm]]".
@@ -261,8 +261,8 @@ Qed.
 
 (* Rule from the Trillium article *)
 Lemma wp_role_dealloc s tid E e fs ρ δ Φ :
-  ρ ∉ live_roles _ δ → frag_model_is δ -∗ has_fuels tid fs -∗
-  (frag_model_is δ -∗ has_fuels tid (delete ρ fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
+  ρ ∉ live_roles _ δ → frag_model_is δ -∗ tid ↦M fs -∗
+  (frag_model_is δ -∗ tid ↦M (delete ρ fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
   WP e @ s; tid; E {{ Φ }}.
 Proof.
   iIntros (Hnin) "HM Hfuels Hwp".
@@ -275,10 +275,11 @@ Lemma wp_step_model s tid ρ (f1 : nat) fs fr s1 s2 E e Φ :
   fmtrans M s1 (Some ρ) s2 →
   M.(live_roles) s2 ⊆ M.(live_roles) s1 →
   ρ ∉ dom fs →
-  ▷ frag_model_is s1 -∗ ▷ has_fuels tid ({[ρ:=f1]} ∪ fmap S fs) -∗
+  ▷ frag_model_is s1 -∗
+  ▷ tid ↦M ({[ρ:=f1]} ∪ fmap S fs) -∗
   ▷ frag_free_roles_are fr -∗
   sswp s E e (λ e', frag_model_is s2 -∗
-                    has_fuels tid ({[ρ:=(LM.(lm_fl) s2)]} ∪ fs) -∗
+                    tid ↦M ({[ρ:=(LM.(lm_fl) s2)]} ∪ fs) -∗
                     frag_free_roles_are fr -∗
                     WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
@@ -305,9 +306,9 @@ Lemma wp_step_model_singlerole s tid ρ (f1 : nat) fr s1 s2 E e Φ :
   TCEq (to_val e) None →
   fmtrans M s1 (Some ρ) s2 →
   M.(live_roles) s2 ⊆ M.(live_roles) s1 →
-  ▷ frag_model_is s1 -∗ ▷ has_fuels tid {[ρ := f1]} -∗ ▷ frag_free_roles_are fr -∗
+  ▷ frag_model_is s1 -∗ ▷ tid ↦M {[ρ := f1]} -∗ ▷ frag_free_roles_are fr -∗
   sswp s E e (λ e', frag_model_is s2 -∗
-                    has_fuels tid {[ρ := (LM.(lm_fl) s2)]} -∗
+                    tid ↦M {[ρ := (LM.(lm_fl) s2)]} -∗
                     frag_free_roles_are fr -∗
                     WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
@@ -321,8 +322,8 @@ Proof.
 Qed.
 
 Lemma wp_step_fuel s tid E e fs Φ :
-  fs ≠ ∅ → ▷ has_fuels_S tid fs -∗
-  sswp s E e (λ e', has_fuels tid fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
+  fs ≠ ∅ → ▷ tid ↦M++ fs -∗
+  sswp s E e (λ e', tid ↦M fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
 Proof.
   iIntros (?) ">HfuelS Hwp". rewrite wp_unfold /wp_pre /sswp /=.
@@ -360,9 +361,9 @@ Lemma heap_lang_locales_equiv_length (es1 es2 : list expr) :
 Proof. intros Hlen. by apply heap_lang_locales_equiv_from_length. Qed.  
 
 Lemma wp_role_fork s tid E e Φ R1 R2 (Hdisj: R1 ##ₘ R2) (Hnemp: R1 ∪ R2 ≠ ∅):
-  has_fuels_S tid (R1 ∪ R2) -∗
-  (∀ tid', ▷ (has_fuels tid' R2 -∗ WP e @ s; tid'; ⊤ {{ _, tid' ↦M ∅ }})) -∗
-  ▷ (has_fuels tid R1 ={E}=∗ Φ (LitV LitUnit)) -∗
+  tid ↦M++ (R1 ∪ R2) -∗
+  (∀ tid', ▷ (tid' ↦M R2 -∗ WP e @ s; tid'; ⊤ {{ _, tid' ↦M ∅ }})) -∗
+  ▷ (tid ↦M R1 ={E}=∗ Φ (LitV LitUnit)) -∗
   WP Fork e @ s; tid; E {{ Φ }}.
 Proof.
   iIntros "Htid He HΦ". iApply wp_lift_atomic_head_step; [done|].

@@ -158,7 +158,7 @@ Section proof.
   Definition yesno_inv b := inv Ns (yesno_inv_inner b).
 
   Lemma yes_go_spec tid n b (N: nat) f (Hf: f > 40):
-    {{{ yesno_inv b ∗ has_fuels tid {[ Y := f ]} ∗ n ↦ #N ∗ ⌜N > 0⌝%nat ∗
+    {{{ yesno_inv b ∗ tid ↦M {[ Y := f ]} ∗ n ↦ #N ∗ ⌜N > 0⌝%nat ∗
         yes_at N }}}
       yes_go #n #b @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
@@ -274,7 +274,7 @@ Section proof.
   Qed.
 
   Lemma yes_spec tid b (N: nat) f (Hf: f > 50):
-    {{{ yesno_inv b ∗ has_fuels tid {[ Y := f ]} ∗ ⌜N > 0⌝ ∗ yes_at N }}}
+    {{{ yesno_inv b ∗ tid ↦M {[ Y := f ]} ∗ ⌜N > 0⌝ ∗ yes_at N }}}
       yes #N #b @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -292,7 +292,7 @@ Section proof.
   Qed.
 
   Lemma no_go_spec tid n b (N: nat) f (Hf: f > 40):
-    {{{ yesno_inv b ∗ has_fuels tid {[ No := f ]} ∗ n ↦ #N ∗ ⌜N > 0⌝ ∗ no_at N }}}
+    {{{ yesno_inv b ∗ tid ↦M {[ No := f ]} ∗ n ↦ #N ∗ ⌜N > 0⌝ ∗ no_at N }}}
       no_go #n #b @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -384,7 +384,7 @@ Section proof.
   Qed.
 
   Lemma no_spec tid b (N: nat) f (Hf: f > 50):
-    {{{ yesno_inv b ∗ has_fuels tid {[ No := f ]} ∗ ⌜N > 0⌝ ∗ no_at N }}}
+    {{{ yesno_inv b ∗ tid ↦M {[ No := f ]} ∗ ⌜N > 0⌝ ∗ no_at N }}}
       no #N #b @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -407,7 +407,7 @@ Section proof_start.
 
   Lemma start_spec tid (N: nat) f (Hf: f > 60):
     {{{ frag_model_is (N, true) ∗ frag_free_roles_are ∅ ∗
-        has_fuels tid {[ Y := f; No := f ]} ∗ ⌜N > 0⌝ }}}
+        tid ↦M {[ Y := f; No := f ]} ∗ ⌜N > 0⌝ }}}
       start #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using All.

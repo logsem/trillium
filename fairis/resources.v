@@ -294,7 +294,8 @@ Section model_state_lemmas.
 
 End model_state_lemmas.
 
-Notation "tid ↦M R" := (has_fuels tid R) (at level 33).
+Notation "tid ↦M R" := (has_fuels tid R) (at level 20, format "tid  ↦M  R") : bi_scope.
+Notation "tid ↦M++ R" := (has_fuels_S tid R) (at level 20, format "tid  ↦M++  R") : bi_scope.
 
 Section adequacy.
   Context `{Countable (locale Λ)}.

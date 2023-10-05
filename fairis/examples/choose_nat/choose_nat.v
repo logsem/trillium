@@ -166,7 +166,7 @@ Section proof.
   Lemma decr_loop_spec γ tid l (n:nat) (f:nat) :
     7 ≤ f → f ≤ 38 →
     choose_nat_inv γ l -∗
-    {{{ has_fuels tid {[ () := f ]} ∗ frag_free_roles_are ∅ ∗
+    {{{ tid ↦M {[ () := f ]} ∗ frag_free_roles_are ∅ ∗
         own γ (◯E (Z.of_nat (S n))) }}}
       decr_loop_prog l #() @ tid ; ⊤
     {{{ RET #(); tid ↦M ∅ }}}.
@@ -265,7 +265,7 @@ Section proof.
   Lemma choose_nat_spec γ l tid (f:nat) :
     12 ≤ f → f ≤ 40 →
     choose_nat_inv γ l -∗
-    {{{ has_fuels tid {[ () := f ]} ∗ frag_free_roles_are ∅ ∗ own γ (◯E (-1)%Z) }}}
+    {{{ tid ↦M {[ () := f ]} ∗ frag_free_roles_are ∅ ∗ own γ (◯E (-1)%Z) }}}
       choose_nat_prog l #() @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
