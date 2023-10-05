@@ -1,4 +1,4 @@
-# Trillium / Fairis
+# Trillium / Fairis / Aneris
 
 Trillium is a higher-order concurrent separation logic for proving trace
 refinements between programs and models. The logic is
