@@ -1,0 +1,14 @@
+opam-version: "2.0"
+name: "coq-trillium"
+synopsis: ""
+maintainer: "Trillium Team"
+authors: "Trillium Team"
+license: "MIT"
+homepage: "https://github.com/logsem/trillium"
+dev-repo: "git+https://github.com/logsem/trillium.git"
+bug-reports: "https://github.com/logsem/trillium/issues"
+build: [make "-j%{jobs}%"]
+install: []
+depends: [
+  "coq" { (= "8.16.1") | (= "dev") }
+]
