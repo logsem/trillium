@@ -672,6 +672,12 @@ Section finite_range_gmap.
 
   Lemma enumerate_subdomain_gmap_spec m D B:
     dom m ⊆ D → map_Forall (λ (_ : K) (v : nat), v ≤ B) m → m ∈ enumerate_subdomain_gmap D B.
-  Proof. Admitted.
-
+  Proof.
+    intros Hincl Hfa. unfold enumerate_subdomain_gmap.
+    apply elem_of_list_bind. exists (dom m). split.
+    - apply elem_of_list_bind. unshelve eexists (m ↾ _); first done.
+      split; first by apply elem_of_list_ret.
+      apply enum_gmap_bounded'_spec. naive_solver.
+    - by apply enumerate_dom_gsets'_spec.
+  Qed.
 End finite_range_gmap.

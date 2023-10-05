@@ -247,9 +247,135 @@ Section finitary_simple.
     exists (exist _ (s2, ℓ) Ht). split =>//. apply elem_of_enum.
   Qed.
 
+  Program Definition enumerate_next_simple (fmodtr: auxiliary_trace LM) (c': cfg Λ) oζ:
+    list (LiveStateData Λ M * @mlabel LM) :=
+    let δ1 := trace_last fmodtr in
+    '(s2, ℓ) ← (δ1.(ls_under), None) :: enum_inner_simple δ1.(ls_under);
+    d ← enumerate_dom_gsets' (dom (ls_fuel δ1) ∪ live_roles _ s2);
+    (* ms ← enum_gmap_range_bounded' (live_roles _ s2 ∪ d) (locales_of_list c'.1); *)
+    let fss := enumerate_subdomain_gmap d (max_gmap (ls_fuel δ1) `max` LM.(lm_fl) s2) in
+    locs ← enumerate_dom_gsets' $ list_to_set $ locales_of_list c'.1;
+    ms ← enum_gmap_range_bounded' locs fss;
+    let ℓ' := match ℓ with
+              | None => match oζ with
+                         Some ζ => Silent_step ζ
+                       | None => Config_step
+                       end
+              | Some ℓ => match oζ with
+                         | None => Config_step
+                         | Some ζ => Take_step ℓ ζ
+                         end
+              end in
+    mret ({| ls_under := s2;
+             ls_map := `ms;
+          |}, ℓ').
+
+  Definition enumerate_next_valid_simple (fmodtr: auxiliary_trace LM) c' oζ: list (LM * @mlabel LM) :=
+    let ns := enumerate_next_simple fmodtr c' oζ in
+    omap (λ '(x, ℓ), (λ x, (x, ℓ)) <$> to_ls x) ns.
+
   Lemma valid_state_evolution_finitary_fairness_simple (φ: execution_trace Λ -> auxiliary_trace LM -> Prop) :
     rel_finitary (valid_lift_fairness φ).
-  Proof. Admitted.
+  Proof.
+    rewrite /valid_lift_fairness.
+    intros ex atr [tp' σ'] oζ.
+    eapply finite_smaller_card_nat.
+    simpl.
+    eapply (in_list_finite (enumerate_next_valid_simple atr (tp',σ') oζ)).
+    intros [δ' ℓ] [[Hlab [Htrans Hsmall]] ?].
+    unfold enumerate_next_valid.
+
+    apply elem_of_list_omap.
+    exists (δ'.(ls_data), ℓ).
+
+    split; last first.
+    { simpl. rewrite /to_ls /=.
+      destruct (decide
+      (∀ (ζ ζ' : locale Λ) (fs fs' : gmap (fmrole M) nat),
+         ζ ≠ ζ' → ls_map δ' !! ζ = Some fs → ls_map δ' !! ζ' = Some fs' → fs ##ₘ fs')); last first.
+      { pose proof ls_map_disj δ'. done. }
+      destruct (decide
+                  (∀ ρ : fmrole M, ρ ∈ live_roles M δ' → ∃ (ζ : locale Λ) (fs : gmap (fmrole M) nat),
+                        ls_map δ' !! ζ = Some fs ∧ ρ ∈ dom fs)).
+      - simpl. do 2 f_equal. destruct δ'. simpl. destruct ls_data. f_equal.
+        Require Import Coq.Logic.ProofIrrelevance.
+        apply proof_irrelevance.
+        apply proof_irrelevance.
+      - pose proof ls_map_live δ'. done. }
+
+    unfold enumerate_next.
+    apply elem_of_list_bind.
+    exists (δ'.(ls_under), match ℓ with Take_step l _ => Some l | _ => None end).
+    split; last first.
+    { destruct ℓ as [ρ tid' | |].
+      - inversion Htrans as [Htrans']. apply elem_of_cons; right.
+        by apply enum_inner_spec_simple.
+      - apply elem_of_cons; left. f_equal. inversion Htrans as (?&?&?&?&?); done.
+      - apply elem_of_cons; right. inversion Htrans as (?&?). by apply enum_inner_spec_simple. }
+    apply elem_of_list_bind. eexists (dom $ ls_fuel δ'). split; last first.
+    { apply enumerate_dom_gsets'_spec. destruct ℓ as [ρ tid' | |].
+      - inversion Htrans as (?&?&?&?&?&?&?). intros ρ' Hin. destruct (decide (ρ' ∈ live_roles _ δ')); first set_solver.
+        destruct (decide (ρ' ∈ dom $ ls_fuel (trace_last atr))); first set_solver. set_solver.
+      - inversion Htrans as (?&?&?&?&?). set_solver.
+      - inversion Htrans as (?&?&?&?&?). done. }
+    apply elem_of_list_bind.
+    assert (Hfueldom: dom $ ls_fuel δ' = live_roles M δ' ∪ dom (ls_fuel δ')).
+    { rewrite subseteq_union_1_L //. apply ls_fuel_dom. }
+
+    exists (dom δ'.(ls_data).(ls_map)).
+    split; last first.
+    { apply enumerate_dom_gsets'_spec. intros ζ Hin. simpl.
+      unfold tids_smaller in Hsmall.
+      specialize (Hsmall _ Hin).
+      by apply elem_of_list_to_set, locales_of_list_from_locale_from. }
+
+    apply elem_of_list_bind.
+    unshelve eexists (ls_map δ' ↾ _); first done. split.
+    { apply elem_of_list_ret. destruct ℓ; destruct oζ; simpl; try naive_solver;
+      f_equal; try naive_solver.
+      - destruct δ'. simpl. destruct ls_data. simpl. done.
+      - destruct δ'. simpl. destruct ls_data. simpl. done. }
+
+    apply enum_gmap_range_bounded'_spec. split=>//.
+    intros ζ fs Hlk. apply enumerate_subdomain_gmap_spec.
+    { intros ρ Hin. eapply ls_fuel_dom_data =>//. }
+    intros ρ f Hlk'.
+    have Hsome: ls_fuel δ' !! ρ = Some f by eapply ls_fuel_data.
+    have Hmapping: ls_mapping δ' !! ρ = Some ζ.
+    { eapply ls_mapping_data=>//. apply elem_of_dom. naive_solver. }
+
+    destruct ℓ as [ρ' tid' | |].
+    - destruct (decide (ρ = ρ')) as [-> | Hneq].
+      + inversion Htrans as [? Hbig]. destruct Hbig as (Hmap&Hleq&?&Hlim&?&?).
+        rewrite Hsome /= in Hlim. lia.
+      + inversion Htrans as [? Hbig]. destruct Hbig as (Hmap&?&Hleq'&?&Hnew&?).
+        destruct (decide (ρ ∈ dom $ ls_fuel (trace_last atr))) as [Hin|Hnotin].
+        * assert (Hok: oleq (ls_fuel δ' !! ρ) (ls_fuel (trace_last atr) !! ρ)).
+          { unfold fuel_must_not_incr in *.
+            assert (ρ ∈ dom $ ls_fuel (trace_last atr)) by SS.
+            specialize (Hleq' ρ ltac:(done) ltac:(congruence)) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
+          rewrite Hsome in Hok. destruct (ls_fuel (trace_last atr) !! ρ) as [f'|] eqn:Heqn; last done.
+          pose proof (max_gmap_spec _ _ _ Heqn). simpl in *. lia.
+        * assert (Hok: oleq (ls_fuel δ' !! ρ) (Some (LM.(lm_fl) δ'))).
+          { apply Hnew. apply elem_of_dom_2 in Hsome. set_solver. }
+          rewrite Hsome in Hok. simpl in Hok. lia.
+    - inversion Htrans as [? [? [Hleq [Hincl Heq]]]]. specialize (Hleq ρ).
+      assert (ρ ∈ dom $ ls_fuel (trace_last atr)) as Hin.
+      { apply elem_of_dom_2 in Hsome. set_solver. }
+      specialize (Hleq Hin ltac:(done)) as [Hleq|Hleq].
+      + rewrite Hsome in Hleq. destruct (ls_fuel (trace_last atr) !! ρ) as [f'|] eqn:Heqn.
+        * pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
+          rewrite Heqn in Hleq.
+          lia.
+        * simpl in *. rewrite Heqn in Hleq. done.
+      + apply elem_of_dom_2 in Hsome. set_solver.
+    - inversion Htrans. naive_solver.
+
+      Unshelve.
+      + intros ??. apply make_decision.
+      + intros. apply make_proof_irrel.
+      + done.
+  Qed.
 End finitary_simple.
 
 (* TODO: Why do we need [LM] explicit here? *)
