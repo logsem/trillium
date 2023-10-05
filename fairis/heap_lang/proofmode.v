@@ -37,13 +37,12 @@ Proof.
 
   iIntros "H Hf".
   rewrite has_fuels_plus_split_S.
-
-  iApply (wp_lift_pure_step_no_fork _ _ _ _ _ _ ((λ m : nat, (n + m)%nat) <$> fs)) =>//.
+  iApply (wp_step_fuel with "Hf").
   { by intros ?%fmap_empty_inv. }
-  { econstructor =>//; [ by eapply pure_step_ctx | constructor ]. }
-  iModIntro; iFrame. do 2 iModIntro.
-  iIntros "Hf".
-  iApply (IHn _ _ _ with "[H] [Hf]") => //.
+  iApply sswp_pure_step.
+  { econstructor =>//. constructor. }
+  { eapply pure_step_ctx. done. }
+  iModIntro. iIntros "Hf". iApply (IHn _ _ _ with "[H] [Hf]") => //.
 Qed.
 
 Lemma equiv_wand {Σ} (P Q: iProp Σ):
@@ -457,8 +456,9 @@ Proof.
   iDestruct "H2" as "[H2 H3]".
 
   rewrite has_fuels_gt_1 //.
-  iApply (wp_load_nostep with "[H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
-  iIntros "!> [Hl Hf]". iApply Hccl. rewrite /Δ' /=.
+  iApply (wp_step_fuel with "H1"); [by intros ?%fmap_empty_inv|].
+  iApply (wp_load with "H2").
+  iIntros "!> Hl Hf". wp_pures. iApply Hccl. rewrite /Δ' /=.
   iApply (envs_snoc_sound Δ'other false i with "[H3 Hl] [Hf]") =>//.
   - rewrite maybe_into_latersN_envs_dom // /Δother.
     erewrite envs_lookup_envs_delete =>//.
@@ -466,7 +466,6 @@ Proof.
     eapply maybe_into_latersN_envs_wf =>//.
     rewrite /Δother. by apply envs_delete_wf.
 Qed.
-
 
 Lemma tac_wp_store K fs tid Δ Δ'other E i j l v v' Φ :
   (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ 1)%nat) ->
@@ -503,8 +502,9 @@ Proof.
   iDestruct "H2" as "[H2 H3]".
 
   rewrite has_fuels_gt_1 //.
-  iApply (wp_store_nostep with "[H1 H2]"); [| iFrame |]; [by intros ?%fmap_empty_inv|].
-  iIntros "!> [Hl Hf]".
+  iApply (wp_step_fuel with "H1"); [by intros ?%fmap_empty_inv|].
+  iApply (wp_store with "H2").
+  iIntros "!> Hl Hf". wp_pures.
   set Δ' := envs_snoc Δ'other2 false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)).
   fold Δ' in Hccl.
 
