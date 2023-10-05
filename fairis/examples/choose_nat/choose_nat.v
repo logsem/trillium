@@ -87,7 +87,7 @@ Qed.
 Definition cn_decreasing_role (s : fmstate cn_fair_model) : unit :=
   match s with | _ => () end.
 
-#[local] Program Instance cn_model_terminates :
+#[global] Program Instance cn_model_terminates :
   FairTerminatingModel cn_fair_model :=
   {|
     ftm_leq := cn_order;

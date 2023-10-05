@@ -612,7 +612,7 @@ Arguments fair_model_model _ {_ _ _} _.
 Definition live_model_to_model Λ M `{Countable (locale Λ)} : LiveModel Λ M -> Model :=
   λ lm, fair_model_model Λ lm.
 Coercion live_model_to_model : LiveModel >-> Model.
-Arguments live_model_to_model {_ _}.
+Arguments live_model_to_model {_ _ _ _}.
 
 Definition auxtrace {Λ M} `{Countable (locale Λ)} (LM: LiveModel Λ M) := trace LM.(lm_ls) LM.(lm_lbl).
 

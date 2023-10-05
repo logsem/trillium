@@ -7,8 +7,7 @@ From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
-From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode notation adequacy.
 From trillium.fairness.examples Require Import choose_nat.
 
 Import derived_laws_later.bi.
@@ -65,7 +64,7 @@ Proof.
   { iApply (choose_nat_spec _ _ _ 40 with "IH [Hr Hf He○]");
       [lia|lia| |by eauto]=> /=.
     replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
-    rewrite has_fuel_fuels gset_to_gmap_set_to_map. iFrame. }
+    rewrite gset_to_gmap_set_to_map. iFrame. }
   iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ _".
   iInv Ns as ">H".
   iDestruct "H" as (cn) "(Hf & Hl & H●)".

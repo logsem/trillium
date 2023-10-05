@@ -5,8 +5,7 @@ From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From trillium.fairness.heap_lang Require Export lang lifting tactics.
-From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
 From trillium.fairness Require Import trace_utils.
 From trillium.fairness.examples.even_odd Require Import even_odd.
 From stdpp Require Import finite.
@@ -254,27 +253,29 @@ Qed.
 
 (** Proof that fair progress is preserved through auxiliary trace *)
 
+
 Definition evenodd_aux_progress (auxtr : auxtrace the_model) :=
-  ∀ i, ∃ n, pred_at auxtr n (λ s l, (λ s' _, s' = i) (ls_under s) (l ≫= Ul)).
+  ∀ i, ∃ n, pred_at auxtr n (λ s l, (λ s' _, s' = i)
+                                      (ls_under $ ls_data s) (l ≫= Ul)).
 
 Lemma evenodd_mtr_aux_progress_preserved
       (mtr : mtrace the_fair_model)
       (auxtr : auxtrace the_model) :
-  upto_stutter ls_under Ul auxtr mtr →
+  upto_stutter (ls_under ∘ ls_data) Ul auxtr mtr →
   evenodd_mdl_progress mtr → evenodd_aux_progress auxtr.
 Proof.
   intros Hstutter Hmtr n. specialize (Hmtr n).
   by apply (trace_eventually_stutter_preserves
-              ls_under Ul auxtr mtr (λ s' _, s' = n)).
+              (λ x, ls_under (ls_data x)) Ul auxtr mtr (λ s' _, s' = n)).
 Qed.
 
 Definition evenodd_aux_mono (auxtr : auxtrace the_model) :=
-  ∀ n, ∃ i, pred_at auxtr n (λ s l, (λ s' _, s' = i) (ls_under s) (l ≫= Ul)) ∧
-            pred_at auxtr (S n) (λ s l, (λ s' _, ∃ j, s' = j ∧ i ≤ j) (ls_under s) (l ≫= Ul)).
+  ∀ n, ∃ i, pred_at auxtr n (λ s l, (λ s' _, s' = i) (ls_under $ ls_data s) (l ≫= Ul)) ∧
+            pred_at auxtr (S n) (λ s l, (λ s' _, ∃ j, s' = j ∧ i ≤ j) (ls_under $ ls_data s) (l ≫= Ul)).
 
 Lemma evenodd_mtr_aux_mono_preserved (mtr : mtrace the_fair_model)
       (auxtr : auxtrace the_model) :
-  upto_stutter ls_under Ul auxtr mtr →
+  upto_stutter (ls_under ∘ ls_data) Ul auxtr mtr →
   evenodd_mdl_mono mtr → evenodd_aux_mono auxtr.
 Proof.
   intros Hstutter Hmtr n.
@@ -445,7 +446,7 @@ Proof.
   iIntros "Hclose'".
   iDestruct (gen_heap_valid with "Hσ Hn") as %Hn.
   iDestruct (model_state_interp_tids_smaller with "Hδ") as %Hsmaller.
-  iDestruct "Hδ" as (Mζ ?) "(Hf&HM&HFR_auth&%Hinverse&%Hlocales&Hδ&%Hdom)".
+  iDestruct "Hδ" as (fm Hfmle Hfmdead Htp) "[Hδ Hfm]".
   iDestruct (model_agree with "Hδ Hmod") as %Hn'.
   iSplitL; last first.
   { iPureIntro. exists M. split; [done|]. rewrite -Hn'. by destruct auxtr. }
@@ -467,20 +468,21 @@ Proof.
       assert (k < length es).
       { apply lookup_lt_is_Some_1. by eauto. }
       by replace (k `min` length es) with k by lia. }
-    iAssert (⌜∀ i, i < length c.1 → Mζ !! i = Some ∅⌝)%I as "%HMζ".
+    iAssert (⌜∀ i, i < length c.1 → fm !! i = Some ∅⌝)%I as "%HMζ".
     { iIntros (i Hlen).
       assert (is_Some $ c.1 !! i) as [e HSome].
       { by apply lookup_lt_is_Some_2. }
       iDestruct (big_sepL_delete with "Hposts") as "[Hpost _]"; [done|].
-      by iDestruct (frag_mapping_same with "HM Hpost") as "?". }
-    assert (dom Mζ = list_to_set $ locales_of_list c.1).
-    { rewrite Hends in Hlocales. apply set_eq.
+      admit.
+      (* by iDestruct (frag_mapping_same with "HM Hpost") as "?".  *)}
+    assert (dom fm = list_to_set $ locales_of_list c.1).
+    { rewrite Hends in Htp. apply set_eq.
       intros x. rewrite elem_of_dom.
       rewrite elem_of_list_to_set.
       split.
       - intros HSome.
         destruct (decide (x ∈ locales_of_list c.1)) as [|Hnin]; [done|].
-        apply Hlocales in Hnin.
+        apply Htp in Hnin.
         destruct HSome as [??]. simplify_eq.
       - intros Hin. exists ∅. apply HMζ.
         rewrite locales_of_list_indexes in Hin.
@@ -488,16 +490,17 @@ Proof.
         apply elem_of_lookup_imap_1 in Hin as (i&?&->&HSome).
         by apply lookup_lt_is_Some_1. }
     assert (ls_mapping (trace_last auxtr) = ∅) as Hmapping.
-    { apply map_eq. intros i. rewrite lookup_empty.
-      destruct (ls_mapping (trace_last auxtr) !! i) as [ζ|] eqn:Heqn; [|done].
-      pose proof Heqn as [e He]%Hsmaller.
-      assert (Mζ !! ζ = Some ∅) as Hζ.
-      { apply HMζ.
-        apply from_locale_lookup in He.
-        rewrite Hends in He.
-        by apply lookup_lt_is_Some_1. }
-      eapply (no_locale_empty _ _ i) in Hζ; [|done].
-      by simplify_eq. }
+    { admit. }
+    (* { apply map_eq. intros i. rewrite lookup_empty. *)
+    (*   destruct (ls_mapping (trace_last auxtr) !! i) as [ζ|] eqn:Heqn; [|done]. *)
+    (*   pose proof Heqn as [e He]%Hsmaller. *)
+    (*   assert (Mζ !! ζ = Some ∅) as Hζ. *)
+    (*   { apply HMζ. *)
+    (*     apply from_locale_lookup in He. *)
+    (*     rewrite Hends in He. *)
+    (*     by apply lookup_lt_is_Some_1. } *)
+    (*   eapply (no_locale_empty _ _ i) in Hζ; [|done]. *)
+    (*   by simplify_eq. } *)
     assert (live_roles _ M = ∅) as Hlive.
     { cut (live_roles the_fair_model M ⊆ ∅); [by set_solver|].
       etrans.
@@ -508,7 +511,7 @@ Proof.
   - iPureIntro.
     apply Forall_forall.
     intros e He. by apply Hnstuck.
-Qed.
+Admitted.
 
 CoInductive extrace_maximal {Λ} : extrace Λ → Prop :=
 | extrace_maximal_singleton c :

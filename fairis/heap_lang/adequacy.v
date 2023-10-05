@@ -4,7 +4,7 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Import weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fair_termination (* fairness_finiteness fuel *) fuel_termination.
+From trillium.fairness Require Export fairness resources fair_termination fairness_finiteness fuel fuel_termination.
 From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Import lang.
 From trillium.fairness.heap_lang Require Import tactics notation.
@@ -20,9 +20,9 @@ Lemma posts_of_empty_mapping `{heapGS Σ M} (e1 e: expr) v (tid : nat) (tp : lis
   tid ↦M ∅.
 Proof.
   intros Hsome Hval. simpl.
-  rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (λ _: val, tid ↦M ∅)) _) //.
+  rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (λ _: val, tid ↦M ∅)%I) _) //.
   apply elem_of_list_omap.
-  exists (e, (λ _: val, tid ↦M ∅)); split; last first.
+  exists (e, (λ _: val, tid ↦M ∅)%I); split; last first.
   - simpl. apply fmap_Some. exists v. split; done.
   - destruct tp as [|e1' tp]; first set_solver. simpl.
     apply elem_of_cons.
@@ -147,15 +147,13 @@ Proof.
   iIntros (?) "".
   iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".
   iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
-  iMod (model_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
-  iMod (model_fuel_init s1) as (γfuel) "[Hfuela Hfuelf]".
+  iMod (model_fuel_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
   iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]".
   set (distG :=
          {|
           heap_fairnessGS := {|
                               fairness_model_name := γmod;
-                              fairness_model_mapping_name := γmap;
-                              fairness_model_fuel_name := γfuel;
+                              fairness_model_fuel_mapping_name := γmap;
                               fairness_model_free_roles_name := γfr;
                               |}
          |}).
@@ -163,41 +161,24 @@ Proof.
   iExists state_interp, (λ _, 0%nat ↦M ∅)%I, fork_post.
   iSplitR.
   { unfold config_wp. iIntros "!>!>" (???????) "?". done. }
-  iSpecialize ("Hwp" with "Hσ Hmodf Hfr [Hfuelf Hmapf]").
-  { iAssert ([∗ map] ρ↦f ∈ gset_to_gmap (lm_fl LM s1) (live_roles M s1),
-  ρ ↦F f)%I with "[Hfuelf]" as "H".
-    - unfold frag_fuel_is. setoid_rewrite map_fmap_singleton.
-      rewrite -big_opM_own //; last first.
-      { intros Hm. apply dom_empty_iff_L in Hm. rewrite dom_gset_to_gmap in Hm.
-        done. }
-      iApply (own_proper with "Hfuelf").
-      rewrite -big_opM_auth_frag. f_equiv.
-      rewrite big_opM_gset_to_gmap.
-      rewrite gset_to_gmap_singletons //.
-    - iExists _. rewrite dom_gset_to_gmap. iSplit; [done|].
-      rewrite /frag_mapping_is. simpl. rewrite fmap_insert fmap_empty. iFrame. }
+  iSpecialize ("Hwp" with "Hσ Hmodf Hfr [Hmapf]").
+  { rewrite /init_fuel_map.
+    rewrite /has_fuels /frag_fuel_mapping_is.
+    rewrite fmap_insert fmap_empty. iFrame. }
   iDestruct "Hwp" as ">[Hwp H]".
   iModIntro. iFrame "Hwp".
-  iSplitL "Hgen Hmoda Hmapa Hfuela HFR".
+  iSplitL "Hgen Hmoda Hmapa HFR".
   { unfold state_interp. simpl. iFrame.
-    iExists _, {[ 0%nat := (live_roles M s1) ]}, _.
-    iSplit; first done.
-    rewrite /auth_fuel_is /= fmap_gset_to_gmap //.
-    rewrite /auth_mapping_is /= map_fmap_singleton //.
-    iFrame.
-    iPureIntro.
-    split.
-    { intros ρ Hρ Hin.
-      rewrite not_elem_of_dom in Hρ.
-      rewrite lookup_gset_to_gmap_None in Hρ.
-      set_solver. }
-    split.
-    { intros ρ tid. rewrite lookup_gset_to_gmap_Some.
-      setoid_rewrite lookup_singleton_Some. split; naive_solver. }
-    split.
-    { intros tid Hlocs. rewrite lookup_singleton_ne //. compute in Hlocs.
-      set_solver. }
-    rewrite dom_gset_to_gmap. set_solver. }
+    iExists (ls_map (initial_ls s1 0%nat)).
+    iSplit; [done|].
+    iSplit.
+    { iPureIntro. simpl. rewrite /fuel_map_preserve_dead.
+      intros ρ Hline. eexists 0%nat, _. rewrite lookup_insert. split; [done|].
+      by rewrite dom_gset_to_gmap. }
+    iSplit.
+    { iPureIntro. intros tid Hlocs. rewrite lookup_singleton_ne //.
+      compute in Hlocs. set_solver. }
+    iFrame. }
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Hequiv) "Hsi Hposts".
   assert ( ∀ (ex' : finite_trace (cfg heap_lang) (olocale heap_lang)) (atr' : auxiliary_trace LM) (oζ : olocale heap_lang) (ℓ : mlabel LM),
    trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' (map_underlying_trace atr')) as Hcontr'.
@@ -221,30 +202,29 @@ Proof.
     pose proof (trace_singleton_starts_in_inv _ _ Hstartatr). simpl.
     simplify_eq.
     iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
-    assert (∀ (ρ : fmrole M) (tid : nat),
-               ls_mapping (initial_ls (LM := LM) s1 0%nat) !! ρ = Some tid →
-               is_Some (([e1], σ1).1 !! tid)) as HA.
-    { simpl. intros ρ tid Hsome. apply lookup_gset_to_gmap_Some in Hsome as [??].
-      simplify_eq. by eexists _. }
+    (* (* OBS: tids_smaller; will change *) *)
+    (* assert (∀ (ρ : fmrole M) (tid : nat), *)
+    (*            ls_mapping (initial_ls (LM := LM) s1 0%nat) !! ρ = Some tid → *)
+    (*            is_Some (([e1], σ1).1 !! tid)) as HA. *)
+    (* { admit. } *)
     iSplit; last done. iClear "H1".
     iSplit; first done.
     destruct (to_val e1) as [v1|] eqn:Heq.
     + iSplit.
-      { iPureIntro. intros ρ tid Hinit.
-        simpl in *. apply lookup_gset_to_gmap_Some in Hinit as [_ <-].
-        rewrite /from_locale //. }
+      (* OBS: tids_smaller; will change *)
+      { admit. }
       iIntros (tid e Hsome Hnoval ρ). destruct tid; last done.
       simpl in Hsome. compute in Hsome. simplify_eq. simpl.
-      iAssert (0%nat ↦M ∅) with "[Hposts]" as "Hem".
+      iAssert (0%nat ↦M ∅)%I with "[Hposts]" as "Hem".
       { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
       iDestruct "Hsi" as "(_&_&Hsi)".
-      iDestruct "Hsi" as
-        (fm rm FR' Hfmle Hfmdead Hmapinv Htp Hfr) "(Hfm & Hrm & HFR & Hm)".
-      iDestruct (frag_mapping_same 0%nat rm with "Hrm Hem") as "%H".
-      iPureIntro. by eapply no_locale_empty.
+      iDestruct "Hsi" as (fm Hfmle Hfmdead Hmapinv) "(Hm & Hfm)".
+      iDestruct (has_fuels_agree with "Hfm Hem") as "%H".
+      iPureIntro.
+      admit.
+      (* by eapply no_locale_empty. *)      
     + iSplit; iPureIntro.
-      { simpl. intros ρ tid Hsome. apply lookup_gset_to_gmap_Some in Hsome as [??].
-        simplify_eq. by eexists _. }
+      { admit. (* tids_smaller *) }
       intros tid e Hsome Hval' ρ.
       destruct tid as [|tid]; rewrite /from_locale /= in Hsome; by simplify_eq.
   - (* We need to prove that that the property is preserved *)
@@ -259,20 +239,19 @@ Proof.
     apply (trace_singleton_ends_in_inv (L := unit)) in Hendex.
     simpl in *. simplify_eq.
     iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)".
-      iDestruct "Hsi" as
-        (fm rm FR' Hfmle Hfmdead Hmapinv Htp Hfr) "(Hfm & Hrm & HFR & Hm)".
+      iDestruct "Hsi" as (fm Hfmle Hfmdead Hmapinv) "(Hm & Hfm)".
     iSplit; [|done].
     iSplit; [done|].
     iSplit.
-    + iPureIntro. intros ρ tid' Hsome. simpl. unfold tids_smaller in Htids. eapply Htids. done.
+    + admit.                    (* live_rel *)
     + iIntros (tid' e' Hsome Hnoval ρ). simpl.
-      iAssert (tid' ↦M ∅) with "[Hposts]" as "H".
+      iAssert (tid' ↦M ∅)%I with "[Hposts]" as "H".
       { destruct (to_val e') as [?|] eqn:Heq; last done.
         iApply posts_of_empty_mapping => //.
         apply from_locale_lookup =>//. }
-      iDestruct (frag_mapping_same tid' rm with "Hrm H") as "%Hlk".
-      { rewrite /auth_mapping_is. iPureIntro. by eapply no_locale_empty. }
-Qed.
+      iDestruct (has_fuels_agree with "Hfm H") as "%Hlk".
+      iPureIntro. admit.
+Admitted.
 
 Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M) (FR: gset _):
   (* The model has finite branching *)
@@ -415,7 +394,7 @@ Theorem simulation_adequacy_model_trace Σ `(LM : LiveModel heap_lang M)
   ) ->
   (* The coinductive pure coq proposition given by adequacy *)
   ∃ (auxtr : auxtrace LM) mtr, exaux_traces_match extr auxtr ∧
-                               upto_stutter ls_under Ul auxtr mtr.
+                               upto_stutter (λ x, ls_under (ls_data x)) Ul auxtr mtr.
 Proof.
   intros Hfb Hlr Hwp.
   destruct (simulation_adequacy_traces
