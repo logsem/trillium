@@ -911,7 +911,7 @@ Section proofmode_classes.
   #[global] Instance elim_modal_pre_step_wp p s E ζ e P Φ :
     ElimModal True p false (|~{E}~| P) P
               (WP e @ s; ζ; E {{ Φ }}) (WP e @ s; ζ; E {{ v, Φ v }})%I.
-  Proof. 
+  Proof.
     destruct p.
     - rewrite /ElimModal. iIntros (_) "[HP HPQ]". iDestruct "HP" as "#HP".
       iApply pre_step_wp. iMod "HP". iModIntro. by iApply "HPQ".
