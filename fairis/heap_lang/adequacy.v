@@ -4,13 +4,13 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Import weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fair_termination fairness_finiteness fuel fuel_termination.
+From trillium.fairness Require Export fairness fair_termination fairness_finiteness fuel fuel_termination map_included_utils resources.
 From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Import lang.
 From trillium.fairness.heap_lang Require Import tactics notation.
 From trillium.fairness.heap_lang Require Import lifting.
 Set Default Proof Using "Type".
- 
+
 Section adequacy.
 
 Lemma posts_of_empty_mapping `{heapGS Σ M} (e1 e: expr) v (tid : nat) (tp : list expr):
@@ -211,20 +211,41 @@ Proof.
     iSplit; first done.
     destruct (to_val e1) as [v1|] eqn:Heq.
     + iSplit.
-      (* OBS: tids_smaller; will change *)
-      { admit. }
+      { iPureIntro. intros ρ tid Hinit.
+        apply ls_mapping_data_inv in Hinit.
+        destruct Hinit as [fs [HSome Hfs]].
+        assert (tid = 0%nat).
+        { simpl in *. rewrite lookup_insert_Some in HSome. by set_solver. }
+        rewrite /from_locale //. simpl in *. set_solver. }
       iIntros (tid e Hsome Hnoval ρ). destruct tid; last done.
-      simpl in Hsome. compute in Hsome. simplify_eq. simpl.
+      simpl in Hsome. compute in Hsome. simplify_eq.
       iAssert (0%nat ↦M ∅)%I with "[Hposts]" as "Hem".
       { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
       iDestruct "Hsi" as "(_&_&Hsi)".
       iDestruct "Hsi" as (fm Hfmle Hfmdead Hmapinv) "(Hm & Hfm)".
       iDestruct (has_fuels_agree with "Hfm Hem") as "%H".
       iPureIntro.
-      admit.
-      (* by eapply no_locale_empty. *)      
+      intros HSome. apply ls_mapping_data_inv in HSome.
+      destruct HSome as [fs [HSome Hfs]].
+      destruct Hfmle as [Hfmle1 Hfmle2].
+      rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
+      pose proof H as HSome'.
+      apply Hfmle1 in H as (?&?&?). simpl in *. clear Hfmle1.
+      simplify_eq. rewrite lookup_insert in H. simplify_eq.
+      rewrite dom_gset_to_gmap in Hfs.
+      apply Hfmdead in Hfs as (?&?&?&?).
+      rewrite dom_singleton_L in Hfmle2.
+      assert (x = 0%nat).
+      { apply elem_of_dom_2 in H. rewrite Hfmle2 in H. set_solver. }
+      simplify_eq.
+      by set_solver.
     + iSplit; iPureIntro.
-      { admit. (* tids_smaller *) }
+      { intros ρ tid Hinit.
+        apply ls_mapping_data_inv in Hinit.
+        destruct Hinit as [fs [HSome Hfs]].
+        assert (tid = 0%nat).
+        { simpl in *. rewrite lookup_insert_Some in HSome. by set_solver. }
+        rewrite /from_locale //. simpl in *. set_solver. }
       intros tid e Hsome Hval' ρ.
       destruct tid as [|tid]; rewrite /from_locale /= in Hsome; by simplify_eq.
   - (* We need to prove that that the property is preserved *)
@@ -243,15 +264,38 @@ Proof.
     iSplit; [|done].
     iSplit; [done|].
     iSplit.
-    + admit.                    (* live_rel *)
-    + iIntros (tid' e' Hsome Hnoval ρ). simpl.
+    + iPureIntro. intros ρ tid' Hsome. simpl. unfold tids_smaller in Htids.
+      eapply Htids.
+      apply ls_mapping_data_inv in Hsome.
+      destruct Hsome as [fs [HSome Hfs]].
+      simpl in *. apply elem_of_dom. set_solver.
+    + iIntros (tid' e' Hsome Hnoval ρ HSome). simpl.
       iAssert (tid' ↦M ∅)%I with "[Hposts]" as "H".
       { destruct (to_val e') as [?|] eqn:Heq; last done.
         iApply posts_of_empty_mapping => //.
         apply from_locale_lookup =>//. }
       iDestruct (has_fuels_agree with "Hfm H") as "%Hlk".
-      iPureIntro. admit.
-Admitted.
+      iPureIntro.
+      intros Hlive.
+      apply ls_mapping_data_inv in HSome.
+      destruct HSome as [fs [HSome Hfs]].
+      destruct Hfmle as [Hfmle1 Hfmle2].
+      rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
+      pose proof Hlk as HSome'.
+      apply Hfmle1 in Hlk as (fs'&HSomefs&Hfs'). simpl in *.
+      simplify_eq.
+      apply Hfmdead in Hlive as (tid''&fs''&HSome''&Hfs'').
+      assert (tid'' = tid').
+      { apply Hfmle1 in HSome'' as (?&?&?).
+        pose proof (δ.(ls_map_disj)) as Hdisj.
+        destruct (decide (tid' = tid'')) as [->|Hneq]; [done|].
+        specialize (Hdisj tid' tid'' fs x Hneq HSome H2).
+        apply map_disjoint_dom in Hdisj.
+        apply map_included_subseteq_inv in H3.
+        set_solver. }
+      simplify_eq.
+      by set_solver.
+Qed.
 
 Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M) (FR: gset _):
   (* The model has finite branching *)

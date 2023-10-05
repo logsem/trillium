@@ -473,8 +473,7 @@ Proof.
       assert (is_Some $ c.1 !! i) as [e HSome].
       { by apply lookup_lt_is_Some_2. }
       iDestruct (big_sepL_delete with "Hposts") as "[Hpost _]"; [done|].
-      admit.
-      (* by iDestruct (frag_mapping_same with "HM Hpost") as "?".  *)}
+      by iDestruct (has_fuels_agree with "Hfm Hpost") as "?". }
     assert (dom fm = list_to_set $ locales_of_list c.1).
     { rewrite Hends in Htp. apply set_eq.
       intros x. rewrite elem_of_dom.
@@ -489,29 +488,30 @@ Proof.
         rewrite /indexes in Hin.
         apply elem_of_lookup_imap_1 in Hin as (i&?&->&HSome).
         by apply lookup_lt_is_Some_1. }
-    assert (ls_mapping (trace_last auxtr) = ∅) as Hmapping.
-    { admit. }
-    (* { apply map_eq. intros i. rewrite lookup_empty. *)
-    (*   destruct (ls_mapping (trace_last auxtr) !! i) as [ζ|] eqn:Heqn; [|done]. *)
-    (*   pose proof Heqn as [e He]%Hsmaller. *)
-    (*   assert (Mζ !! ζ = Some ∅) as Hζ. *)
-    (*   { apply HMζ. *)
-    (*     apply from_locale_lookup in He. *)
-    (*     rewrite Hends in He. *)
-    (*     by apply lookup_lt_is_Some_1. } *)
-    (*   eapply (no_locale_empty _ _ i) in Hζ; [|done]. *)
-    (*   by simplify_eq. } *)
+    (* TODO: Clean this up *)
     assert (live_roles _ M = ∅) as Hlive.
-    { cut (live_roles the_fair_model M ⊆ ∅); [by set_solver|].
-      etrans.
-      - eapply (ls_mapping_dom (M:=the_fair_model)).
-      - erewrite Hmapping. done. }
+    {
+      apply set_eq. intros i. split; [|done].
+      intros Hin.
+      apply Hfmdead in Hin as (ζ&fs&HSome&Hfs).
+      assert (fm !! ζ = Some ∅).
+      { apply HMζ.
+        assert (ζ ∈ dom (ls_map (trace_last auxtr))) as Hin.
+        { destruct Hfmle as [Hfmle1 Hfmle2].
+          rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
+          apply Hfmle1 in HSome as (?&?&?).
+          by apply elem_of_dom. }
+        apply Hsmaller in Hin as [? Hin].
+        rewrite Hends in Hin.
+        apply lookup_lt_is_Some_1.
+        by apply from_locale_lookup in Hin. }
+      by simplify_eq. }
     rewrite /live_roles in Hlive. simpl in *.
     rewrite /eo_live_roles in Hlive. set_solver.
   - iPureIntro.
     apply Forall_forall.
     intros e He. by apply Hnstuck.
-Admitted.
+Qed.
 
 CoInductive extrace_maximal {Λ} : extrace Λ → Prop :=
 | extrace_maximal_singleton c :
@@ -644,7 +644,7 @@ Proof.
   - pose proof (evenodd_mdl_progresses mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
       as Hprogress.
     eapply (evenodd_aux_ex_progress_preserved l _ auxtr).
-    { eapply traces_match_impl; [done| |apply Hmatch_strong]. by intros ??[??]. } 
+    { eapply traces_match_impl; [done| |apply Hmatch_strong]. by intros ??[??]. }
     by eapply evenodd_mtr_aux_progress_preserved.
   - pose proof (evenodd_mdl_is_mono mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
       as Hmono.

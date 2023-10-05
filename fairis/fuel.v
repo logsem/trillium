@@ -669,7 +669,7 @@ Definition live_tids `{Countable (locale Λ)} `{LM:LiveModel Λ M}
            (c : cfg Λ) (δ : LM.(lm_ls)) : Prop :=
   (∀ ρ ζ, ls_mapping δ !! ρ = Some ζ -> is_Some (from_locale c.1 ζ)) ∧
   ∀ ζ e, from_locale c.1 ζ = Some e -> (to_val e ≠ None) ->
-         ∀ ρ, ls_mapping δ !! ρ ≠ Some ζ.
+         ∀ ρ, ls_mapping δ !! ρ = Some ζ → ρ ∉ M.(live_roles) δ. 
 
 Definition exaux_traces_match  `{Countable (locale Λ)} `{LM:LiveModel Λ M} :
   extrace Λ → auxtrace LM → Prop :=
@@ -731,16 +731,17 @@ Section fairness_preserved.
   Local Hint Resolve fuel_live_role: core.
 
   Lemma match_locale_enabled (extr : extrace Λ) (auxtr : auxtrace LM) ζ ρ:
+    ρ ∈ M.(live_roles) (trfirst auxtr) →
     exaux_traces_match extr auxtr ->
     ls_mapping (trfirst auxtr) !! ρ = Some ζ ->
     locale_enabled ζ (trfirst extr).
   Proof.
-    intros Hm Hloc.
+    intros Hlive Hm Hloc.
     rewrite /locale_enabled. have [HiS Hneqloc] := traces_match_first _ _ _ _ _ _ Hm.
     have [e Hein] := (HiS _ _ Hloc). exists e. split; first done.
     destruct (to_val e) eqn:Heqe =>//.
     exfalso. specialize (Hneqloc ζ e Hein). rewrite Heqe in Hneqloc.
-    have Hv: Some v ≠ None by []. by specialize (Hneqloc Hv ρ).
+    have Hv: Some v ≠ None by []. by specialize (Hneqloc Hv ρ Hloc).
   Qed.
 
   Local Hint Resolve match_locale_enabled: core.
@@ -878,13 +879,15 @@ Section fairness_preserved.
         { rewrite /pred_at /= pred_first_trace. inversion Htm; eauto. }
         destruct m as [| m'].
         { rewrite -> !pred_at_0 in Hexen. destruct Hexen as [Hexen|Hexen].
-          - exfalso. apply Hexen. unfold locale_enabled. by eapply (match_locale_enabled _ _ _ _ Htm).
+          - exfalso. apply Hexen. unfold locale_enabled. by eapply (match_locale_enabled _ _ _ _ _ Htm).
           - simplify_eq. }
 
         have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ δ0 _, ¬ role_enabled ρ δ0)
                         ∨ pred_at auxtr' M0 (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
-        { eapply (IH _ _ _ m' _ extr'); eauto. by eapply infinite_cons. by inversion Htm.
-          Unshelve. unfold strict, lt_lex. lia. }
+        { eapply (IH _ _ _ m' _ extr'); eauto. by eapply infinite_cons. by inversion Htm. 
+          Unshelve.
+          - done.
+          - unfold strict, lt_lex. lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
       + have [f' [Hfuel' Hff']] : exists f', ls_fuel (trfirst auxtr') !! ρ = Some f' ∧ f' < f.
         { destruct ζ' as [ζ'|]; last first; simpl in *.
@@ -946,7 +949,7 @@ Section fairness_preserved.
       have [e Hein] := (HiS _ _ Hζ). exists e. split; first done.
       destruct (to_val e) eqn:Heqe =>//.
       exfalso. specialize (Hneqζ ζ e Hein). rewrite Heqe in Hneqζ.
-      have HnotNull: Some v ≠ None by []. specialize (Hneqζ HnotNull ρ). done. }
+      have HnotNull: Some v ≠ None by []. specialize (Hneqζ HnotNull ρ Hζ). done. }
     setoid_rewrite pred_at_sum in Hex'. rewrite Heq' in Hex'.
     have Hpa: pred_at extr n (λ c _, locale_enabled ζ c).
     { unfold pred_at. rewrite Heq'. destruct tr1'; eauto. }
