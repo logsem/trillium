@@ -251,7 +251,7 @@ Section fairness.
       ∧ ls_mapping a !! ρ = Some tid
       ∧ fuel_decr (Some tid) (Some ρ) a b
       ∧ fuel_must_not_incr (Some ρ) a b
-      ∧ (ρ ∈ live_roles _ b -> oleq (ls_fuel b !! ρ) (Some (fuel_limit b)))
+      ∧ (oleq (ls_fuel b !! ρ) (Some (fuel_limit b)))
       ∧ (∀ ρ, ρ ∈ (dom $ ls_fuel b) ∖ (dom $ ls_fuel a) -> oleq (ls_fuel b !! ρ) (Some (fuel_limit b)))
       ∧ (dom $ ls_fuel b) ∖ (dom $ ls_fuel a) ⊆ live_roles _ b ∖ live_roles _ a
     | Silent_step tid =>
@@ -454,7 +454,7 @@ Section fairness.
     δ.(ls_map) !! ζ = Some fs →
     ρ0 ∈ dom fs →
     (∀ ρ f f', fs' !! ρ = Some f' → ρ ≠ ρ0 → fs !! ρ = Some f → f' < f) →
-    (ρ0 ∈ live_roles _ m' → ∀ f'0, fs' !! ρ0 = Some f'0 → f'0 ≤ fl m') →
+    (∀ f'0, fs' !! ρ0 = Some f'0 → f'0 ≤ fl m') →
     (∀ ρ, ρ ∈ dom fs' ∖ dom fs → ∀ f', fs' !! ρ = Some f' → f' ≤ fl m') →
     (M.(live_roles) m' ∖ M.(live_roles) δ = dom fs' ∖ dom fs) →
     (∀ ρ, ρ ∈ M.(live_roles) m' ∖ M.(live_roles) δ → ∀ ζ' fs', δ.(ls_map) !! ζ' = Some fs' → ρ ∉ dom fs') →
@@ -549,8 +549,8 @@ Section fairness.
         have ->: ls_fuel δ !! ρ = Some f'.
         { eapply (ls_fuel_data _ _ ζ1); eauto. }
         naive_solver.
-    - intros H0live'. have H0dom: ρ0 ∈ dom fs' by set_solver. apply elem_of_dom in H0dom as [f' Hf'].
-      rewrite (ls_fuel_data _ _ _ _ _ Hζ' Hf') Hd /=. eapply Hfl0; [rewrite Hd // in H0live' | done].
+    - intros. have H0dom: ρ0 ∈ dom fs' by set_solver. apply elem_of_dom in H0dom as [f' Hf'].
+      rewrite (ls_fuel_data _ _ _ _ _ Hζ' Hf') Hd /=. by eapply Hfl0.
     - intros ρ [Hρin Hρnin]%elem_of_difference.
       have Hn: ρ ∈ dom fs' ∖ dom fs.
       { rewrite -Hborn. rewrite elem_of_subseteq {2}Hd /= in Hdom. apply Hdom. set_solver. }
