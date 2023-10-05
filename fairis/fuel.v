@@ -566,7 +566,7 @@ Section fairness.
       lm_fl : M → nat;
       lm_ls := LiveState;
       lm_lbl := FairLabel M.(fmrole);
-      lm_ls_trans := ls_trans lm_fl;
+      lm_ls_trans (δ: LiveState) (ℓ: FairLabel (fmrole M)) := ls_trans lm_fl δ ℓ;
     }.
 
   Definition fair_model_model `(LM : LiveModel) : Model := {|
