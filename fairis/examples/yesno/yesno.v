@@ -1,53 +1,38 @@
-From iris.proofmode Require Import tactics.
-From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination.
-From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-
-Require Import stdpp.decidable.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
-From trillium.fairness.heap_lang Require Import notation.
-From iris.base_logic.lib Require Import invariants.
+From stdpp Require Import decidable.
 From iris.prelude Require Import options.
 From iris.algebra Require Import excl_auth.
 From iris.bi Require Import bi.
+From iris.base_logic.lib Require Import invariants.
+From iris.proofmode Require Import tactics.
+From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
+From trillium.program_logic Require Export weakestpre.
+From trillium.fairness Require Import fairness fair_termination.
+From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode  notation.
 
 Import derived_laws_later.bi.
+
+Open Scope nat.
 
 Set Default Proof Using "Type".
 
 Definition yes_go : val :=
   rec: "yes_go" "n" "b" :=
-    (if: CAS "b" #true #false
-      then "n" <- !"n" - #1
-       else #());;
-    if: #0 < !"n"
-      then "yes_go" "n" "b"
-      else #().
+    (if: CAS "b" #true #false then "n" <- !"n" - #1 else #());;
+    if: #0 < !"n" then "yes_go" "n" "b" else #().
 
 Definition yes : val :=
-  λ: "N" "b",
-    let: "n" := Alloc "N" in
-    yes_go "n" "b".
+  λ: "N" "b", let: "n" := Alloc "N" in yes_go "n" "b".
 
 Definition no_go : val :=
   rec: "no_go" "n" "b" :=
-    (if: CAS "b" #false #true
-      then "n" <- !"n" - #1
-       else #());;
-    if: #0 < !"n"
-      then "no_go" "n" "b"
-      else #().
+    (if: CAS "b" #false #true then "n" <- !"n" - #1 else #());;
+    if: #0 < !"n" then "no_go" "n" "b" else #().
 
 Definition no : val :=
-  λ: "N" "b",
-    let: "n" := Alloc "N" in
-    no_go "n" "b".
+  λ: "N" "b", let: "n" := Alloc "N" in no_go "n" "b".
 
 Definition start : val :=
-  λ: "N",
-    let: "b" := Alloc #true in
-    (Fork (yes "N" "b") ;;
-    Fork (no "N" "b")).
+  λ: "N", let: "b" := Alloc #true in (Fork (yes "N" "b") ;; Fork (no "N" "b")).
 
 (** * Definition of the model! *)
 
@@ -101,9 +86,7 @@ Proof.
 Defined.
 
 Definition the_model: LiveModel heap_lang the_fair_model :=
-  {|
-    lm_fl (x: fmstate the_fair_model) := 61%nat;
-  |}.
+  {| lm_fl (x: fmstate the_fair_model) := 61%nat; |}.
 
 (** The CMRAs we need. *)
 Class yesnoG Σ := YesnoG {
@@ -132,47 +115,46 @@ Section proof.
   Definition auth_yes_at (n: nat) := own yes_name (●E n).
   Definition auth_no_at (n: nat) := own no_name (●E n).
 
-  Lemma they_agree γ (N M: nat):
+  Lemma they_agree γ (N M: nat) :
     own γ (◯E N) -∗ own γ (●E M) -∗ ⌜ M = N ⌝.
   Proof.
     iIntros "HA HB". iCombine "HB HA" as "H".
     iDestruct (own_valid with "H") as "%Hval".
     iPureIntro. by apply excl_auth_agree_L.
   Qed.
-  Lemma yes_agree N M:
+  Lemma yes_agree N M :
     yes_at N -∗ auth_yes_at M -∗ ⌜ M = N ⌝.
   Proof. apply they_agree. Qed.
-  Lemma no_agree N M:
+  Lemma no_agree N M :
     no_at N -∗ auth_no_at M -∗ ⌜ M = N ⌝.
   Proof. apply they_agree. Qed.
 
-  Lemma they_update γ (N M P: nat):
+  Lemma they_update γ (N M P: nat) :
     own γ (●E N) ∗ own γ (◯E M) ==∗ own γ (●E P) ∗ own γ (◯E P).
   Proof.
     rewrite -!own_op. iApply own_update. apply excl_auth_update.
   Qed.
-  Lemma yes_update P N M:
+  Lemma yes_update P N M :
      auth_yes_at M ∗ yes_at N ==∗ auth_yes_at P ∗ yes_at P.
   Proof. apply they_update. Qed.
-  Lemma no_update P N M:
+  Lemma no_update P N M :
      auth_no_at M ∗ no_at N ==∗ auth_no_at P ∗ no_at P.
   Proof. apply they_update. Qed.
 
-  Lemma they_finished_update γ (N M P: bool):
+  Lemma they_finished_update γ (N M P: bool) :
     own γ (●E N) ∗ own γ (◯E M) ==∗ own γ (●E P) ∗ own γ (◯E P).
   Proof.
     rewrite -!own_op. iApply own_update. apply excl_auth_update.
   Qed.
 
-  Definition yesno_inv_inner b :=
-    (∃ N B,
-          frag_free_roles_are ∅ ∗
-          frag_model_is (N, B) ∗ b ↦ #B ∗
-          (if B
-           then auth_yes_at N ∗ auth_no_at N
-           else auth_yes_at (N-1) ∗ auth_no_at N) ∗
-          ⌜(N, B) ≠ (0, false)⌝
-    )%I.
+  Definition yesno_inv_inner b : iProp Σ :=
+    ∃ N B, 
+      ⌜(N, B) ≠ (0, false)⌝ ∗
+      frag_free_roles_are ∅ ∗
+      frag_model_is (N, B) ∗ b ↦ #B ∗
+      if B
+      then auth_yes_at N ∗ auth_no_at N
+      else auth_yes_at (N-1) ∗ auth_no_at N.
   Definition yesno_inv b := inv Ns (yesno_inv_inner b).
 
   Lemma yes_go_spec tid n b (N: nat) f (Hf: f > 40):
@@ -181,27 +163,18 @@ Section proof.
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iLöb as "Hg" forall (N f Hf).
-
     iIntros (Φ) "(#Hinv & Hf & HnN & %HN & Hyes) Hk". unfold yes_go.
-
     wp_pures.
     wp_bind (CmpXchg _ _ _).
-
     assert (∀ s, Atomic s (CmpXchg #b #true #false)) by apply _.
-
     iApply wp_atomic.
-
-    iInv Ns as (M B) "(>HFR & >Hmod & >Bb & Hauths & >%Hnever)" "Hclose".
+    iInv Ns as (M B) "(>%Hnever & >HFR & >Hmod & >Bb & Hauths)" "Hclose".
     destruct B; iDestruct "Hauths" as "[>Hay >Han]".
     - iDestruct (yes_agree with "Hyes Hay") as "%Heq".
-
-      (* TODO *)
       rewrite -has_fuel_fuels.
-
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
-      +
-        iModIntro.
+      + iModIntro.
         iApply (wp_step_model_singlerole with "Hmod Hf HFR").
         { econstructor. lia. }
         { set_solver. }
@@ -214,21 +187,9 @@ Section proof.
         iApply fupd_mask_intro; [done|]. iMod 1. iModIntro.
         rewrite has_fuel_fuels.
         (* TODO: Needing this is a bit bad. Maybe add simple to wp_pures? *)
-        simpl in *.
-        wp_pures.
-        wp_load.
-        wp_pures.
-        wp_store.
-        wp_pures.
-        wp_load.
-
-        wp_pure _.
-        simplify_eq. simpl.
-
+        simpl in *. wp_load. wp_store. wp_load. wp_pure _. simplify_eq. simpl.
         iApply wp_atomic.
-
-        iInv Ns as (M B) "(>HFR & >Hmod & >Hb & Hauths & >%Hbever')" "Hclose".
-
+        iInv Ns as (M B) "(>%Hbever' & >HFR & >Hmod & >Hb & Hauths)" "Hclose".
         destruct B.
         * iModIntro.
           iApply (wp_step_fuel with "[Hf]").
@@ -281,33 +242,22 @@ Section proof.
         iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
         { iNext. iExists _, _. iFrame. iPureIntro. intro contra. simplify_eq. }
         iModIntro.
-        simpl. wp_pures.
-        wp_load.
-        wp_pures.
-        wp_store.
-        wp_pures.
-        wp_load.
-        wp_pures.
-
+        simpl. wp_load. wp_store. wp_load. wp_pures.
         destruct (decide (0 < S M - 1)) as [Heq|Heq].
         * rewrite bool_decide_eq_true_2 //; last lia.
           wp_pure _.
-
           rewrite -has_fuel_fuels.
           iApply ("Hg" with "[] [Hyes HnN Hf] [$]"); last first.
           { iFrame "∗#". iSplit; last by iPureIntro; lia.
             iClear "Hg Hinv".
-
             assert (∀ l v v', v = v' → l ↦ v ⊣⊢ l ↦ v') as pointsto_proper.
             { intros ??? ->. done. }
-
             iApply (pointsto_proper with "HnN"). do 2 f_equiv. destruct M; [done|]. lia. }
           iPureIntro; lia.
         * rewrite bool_decide_eq_false_2 //; last lia.
           have ->: M = 0 by lia. simpl. lia.
     - iDestruct (yes_agree with "Hyes Hay") as "%Heq". rewrite -> Heq in *.
       have HM: M > 0 by lia.
-
       rewrite -has_fuel_fuels.
       iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
@@ -315,18 +265,12 @@ Section proof.
       { set_solver. }
       iApply (wp_cmpxchg_fail with "Bb"); [done|done|].
       iIntros "!> Hb Hmod Hf HFR".
-      (* iMod (yes_update (N-1) with "[$]") as "[Hay Hyes]". *)
       wp_pures. iModIntro.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
-      { iNext. simplify_eq. iExists _, _. iFrame. iSplit; [iFrame|done]. }
-
+      { iNext. simplify_eq. iExists _, _. iFrame. iFrame. done. }
       iModIntro.
-      simpl.
-      wp_pures.
-      wp_load.
-      wp_pure _. rewrite bool_decide_eq_true_2; last lia.
+      simpl. wp_load. wp_pure _. rewrite bool_decide_eq_true_2; last lia.
       wp_pure _.
-
       rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Hyes HnN Hf] [$]"); last first.
       { iFrame "∗#". iPureIntro; lia. }
@@ -345,11 +289,7 @@ Section proof.
     { apply map_non_empty_singleton. }
     { rewrite has_fuels_gt_1; last by solve_fuel_positive.
       rewrite fmap_insert fmap_empty. done. }
-    iApply wp_alloc.
-    iNext. iIntros (n) "HnN _ Hf".
-    wp_pures.
-    iModIntro.
-    wp_pures.
+    iApply wp_alloc. iNext. iIntros (n) "HnN _ Hf". wp_pures. iModIntro. wp_pures.
     iApply (yes_go_spec with "[-Hk]"); try iFrame.
     { lia. }
     { iFrame "Hinv". iPureIntro; lia. }
@@ -361,23 +301,15 @@ Section proof.
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iLöb as "Hg" forall (N f Hf).
-
     iIntros (Φ) "(#Hinv & Hf & HnN & %HN & Hno) Hk". unfold no_go.
-
     wp_pures.
     wp_bind (CmpXchg _ _ _).
-
     assert (∀ s, Atomic s (CmpXchg #b #true #false)) by apply _.
-
     iApply wp_atomic.
-
-    iInv Ns as (M B) "(>HFR & >Hmod & >Bb & Hauths & >%Hnever)" "Hclose".
+    iInv Ns as (M B) "(>%Hnever & >HFR & >Hmod & >Bb & Hauths)" "Hclose".
     destruct B; iDestruct "Hauths" as "[>Hay >Han]"; last first.
     - iDestruct (no_agree with "Hno Han") as "%Heq".
-
-      (* TODO *)
       rewrite -has_fuel_fuels.
-
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
       + iModIntro.
@@ -390,25 +322,11 @@ Section proof.
         wp_pures. iModIntro.
         iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
         { iNext. iExists _, _. iFrame. simpl. iFrame. by iPureIntro. }
-
         iModIntro.
-
         rewrite has_fuel_fuels.
-        simpl.
-        wp_pures.
-        wp_load.
-        wp_pures.
-        wp_store.
-        wp_pures.
-        wp_load.
-
-        wp_pure _.
-        simplify_eq. simpl.
-
+        simpl. wp_load. wp_store. wp_load. wp_pure _. simplify_eq. simpl.
         iApply wp_atomic.
-
-        iInv Ns as (M B) "(>HFR & >Hmod & >Hb & Hauths & >%Hbever')" "Hclose".
-
+        iInv Ns as (M B) "(>%Hbever' & >HFR & >Hmod & >Hb & Hauths)" "Hclose".
         destruct B.
         * iModIntro.
           iApply (wp_step_fuel with "[Hf]").
@@ -441,21 +359,12 @@ Section proof.
         iMod (no_update (M) with "[$]") as "[Han Hno]".
         wp_pures. iModIntro.
         iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
-        { iNext. iExists _, _. iFrame. iSplit; last by iPureIntro.
+        { iNext. iExists _, _. iFrame. iSplit; [done|].
           iApply (own_proper with "Hay"). f_equiv. apply leibniz_equiv_iff. lia. }
-
-        iModIntro. simpl. wp_pures.
-        wp_load.
-        wp_pures.
-        wp_store.
-        wp_pures.
-        wp_load.
-        wp_pures.
-
+        iModIntro. simpl. wp_load. wp_store. wp_load. wp_pures.
         destruct (decide (0 < S M - 1)) as [Heq|Heq].
         * rewrite bool_decide_eq_true_2 //; last lia.
           wp_pure _.
-
           rewrite -has_fuel_fuels.
           iApply ("Hg" with "[] [Hno HnN Hf] [$]"); last first.
           { iFrame "∗#". assert ((S M - 1)%Z = M)%nat as -> by lia. iFrame. iPureIntro; lia. }
@@ -464,7 +373,6 @@ Section proof.
           have ->: M = 0 by lia. simpl. lia.
     - iDestruct (no_agree with "Hno Han") as "%Heq". rewrite -> Heq in *.
       have HM: M > 0 by lia.
-
       rewrite -has_fuel_fuels. assert (M = N) by lia. simplify_eq.
       iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
@@ -475,12 +383,9 @@ Section proof.
       wp_pures.
       iModIntro.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
-      { iNext. simplify_eq. iExists _, _. iFrame. iSplit; [iFrame|done]. }
-      iModIntro. simpl. wp_pures.
-      wp_load.
-      wp_pure _. rewrite bool_decide_eq_true_2; last lia.
-      wp_pure _.
-
+      { iNext. simplify_eq. iExists _, _. iFrame. iFrame. done. }
+      iModIntro. simpl. wp_load. wp_pure _.
+      rewrite bool_decide_eq_true_2; last lia. wp_pure _.
       rewrite -has_fuel_fuels.
       iApply ("Hg" with "[] [Hno HnN Hf] [$]"); last first.
       { iFrame "∗#". iPureIntro; lia. }
@@ -493,24 +398,17 @@ Section proof.
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & %HN & Hyes) Hk". unfold no.
-
-    wp_pures.
-    wp_bind (Alloc _).
+    wp_pures. wp_bind (Alloc _).
     iApply (wp_step_fuel with "[Hf]").
     { apply map_non_empty_singleton. }
     { rewrite has_fuels_gt_1; last by solve_fuel_positive.
       rewrite fmap_insert fmap_empty. done. }
-    iApply wp_alloc.
-    iNext. iIntros (n) "HnN _ Hf".
-    wp_pures.
-    iModIntro.
-    wp_pures.
+    iApply wp_alloc. iNext. iIntros (n) "HnN _ Hf". wp_pures. iModIntro. wp_pures.
     iApply (no_go_spec with "[-Hk]"); try iFrame.
     { lia. }
     { iFrame "Hinv". done. }
   Qed.
 End proof.
-
 
 Section proof_start.
   Context `{!heapGS Σ the_model, !yesnoPreG Σ}.
@@ -523,37 +421,26 @@ Section proof_start.
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using All.
     iIntros (Φ) "[Hst [HFR [Hf %HN]]] Hkont". unfold start.
-
-    wp_pures.
-
-    wp_bind (Alloc _).
+    wp_pures. wp_bind (Alloc _).
     iApply (wp_step_fuel with "[Hf]").
     2: { rewrite has_fuels_gt_1; last by solve_fuel_positive.
          rewrite !fmap_insert fmap_empty. done. }
     { rewrite insert_union_singleton_l.
       intros ?%map_positive_l. set_solver. }
-    iApply wp_alloc.
-    iNext. iIntros (l) "HnN _ Hf".
-    wp_pures.
-    iModIntro.
-    wp_pures.
-
+    iApply wp_alloc. iNext. iIntros (l) "HnN _ Hf". wp_pures. iModIntro. wp_pures.
     (* Allocate the invariant. *)
     iMod (own_alloc (●E N  ⋅ ◯E N))%nat as (γ_yes_at) "[Hyes_at_auth Hyes_at]".
     { apply auth_both_valid_2; eauto. by compute. }
     iMod (own_alloc (●E N  ⋅ ◯E N))%nat as (γ_no_at) "[Hno_at_auth Hno_at]".
     { apply auth_both_valid_2; eauto. by compute. }
-
     pose (the_names := {|
      yes_name := γ_yes_at;
      no_name := γ_no_at;
     |}).
-
     iApply fupd_wp.
     iMod (inv_alloc Ns _ (yesno_inv_inner l) with "[-Hkont Hf Hyes_at Hno_at]") as "#Hinv".
     { iNext. unfold yesno_inv_inner. iExists N, true. iFrame. done. }
     iModIntro.
-
     wp_bind (Fork _).
     iApply (wp_role_fork _ tid _ _ _ {[No := _]} {[Y := _]}
              with "[Hf] [Hyes_at]").
@@ -568,12 +455,7 @@ Section proof_start.
       + by eauto.
       + iFrame "#∗". iPureIntro. lia.
       + lia. }
-
-    iIntros "!> Hf".
-    iModIntro.
-    wp_pures.
-
-    (* rewrite has_fuels_gt_1; last solve_fuel_positive. *)
+    iIntros "!> Hf !>". wp_pures.
     iApply (wp_role_fork _ tid _ _ _ ∅ {[No := _]} with "[Hf] [Hno_at] [Hkont]").
     { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
     { rewrite map_union_comm.
@@ -588,9 +470,7 @@ Section proof_start.
       + by eauto.
       + by iFrame "#∗".
       + lia. }
-
-    iNext. iIntros "Hf".
-    by iApply "Hkont".
+    iNext. iIntros "Hf". by iApply "Hkont".
   Qed.
 
 End proof_start.
