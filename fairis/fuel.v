@@ -576,7 +576,7 @@ Section fairness.
   |}.
 
   Definition tids_smaller (c : list (expr Λ)) (δ: LiveState) :=
-    ∀ ρ ζ, ls_mapping δ !! ρ = Some ζ -> is_Some (from_locale c ζ).
+    ∀ ζ, ζ ∈ dom $ ls_map δ -> is_Some (from_locale c ζ).
 
   Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: locale Λ)
     : LM.(lm_ls) :=

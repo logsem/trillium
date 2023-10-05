@@ -224,18 +224,14 @@ Section model_state_interp.
   Lemma model_state_interp_tids_smaller δ tp :
     model_state_interp tp δ -∗ ⌜ tids_smaller tp δ ⌝.
   Proof.
-    iIntros "(%m&[_%]&%&%Hbig&_)".
+    iIntros "(%m&[_ %Heq]&%&%Hbig&_)".
     iPureIntro.
-    intros ρ ζ Hin.
+    intros ζ Hin.
     assert (¬ (ζ ∉ locales_of_list tp)).
     - intros contra.
       specialize (Hbig _ contra).
-      apply ls_mapping_data_inv in Hin.
-      destruct Hin as (fs&HSome&Hin).
-      rewrite -not_elem_of_dom in Hbig.
-      assert (ζ ∈ dom (ls_map δ)).
-      { by apply elem_of_dom. }
-      set_solver.
+      rewrite -Heq elem_of_dom Hbig in Hin.
+      inversion Hin. naive_solver.
     - destruct (decide (ζ ∈ locales_of_list tp)) as [Hin'|] =>//.
       apply elem_of_list_fmap in Hin' as [[tp' e'] [-> Hin']].
       unfold from_locale. exists e'. by apply from_locale_from_Some.
