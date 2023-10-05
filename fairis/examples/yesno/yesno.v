@@ -417,14 +417,12 @@ Section proof.
           { set_solver. }
           iApply sswp_pure_step; [done|].
           iIntros "!> Hf".
-          iApply pre_step_wp.
-
           iDestruct "Hauths" as "[Hay Han]". iDestruct (no_agree with "Hno Han") as %Heq.
           assert (M = 0) by lia. simplify_eq.
           iMod (has_fuels_dealloc _ _ _
                                   (No:fmrole the_fair_model) with "Hmod Hf")
             as "[Hmod Hf]"; [set_solver|].
-          iModIntro. wp_pures. iModIntro.
+          wp_pures. iModIntro.
           iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
           { iNext. iExists _, _. iFrame. done. }
           iModIntro. iApply "Hk".

@@ -207,10 +207,9 @@ Section proof.
         by rewrite has_fuel_fuels. }
       iApply (wp_store with "Hl").
       iIntros "!> Hl Hs Hf Hr".
-      iApply pre_step_wp.
       iMod (has_fuels_dealloc _ _ _ (():fmrole cn_fair_model) with "Hs Hf")
         as "[Hs Hf]"; [done|].
-      iModIntro. wp_pures.
+      wp_pures.
       iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
       { apply (excl_auth_update _ _ 0%Z). }
       iMod ("Hclose" with "[Hs Hl Hcn]") as "_".

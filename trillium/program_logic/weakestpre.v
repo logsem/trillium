@@ -21,7 +21,6 @@ Class irisG (Λ : language) (M : Model) (Σ : gFunctors) := IrisG {
 }.
 Global Opaque iris_invGS.
 
-
 (* TODO: Move this *)
 Definition pre_step_def `{!irisG Λ M Σ} E1 E2 (P:iProp Σ) : iProp Σ :=
   ∀ extr atr, state_interp extr atr ={E1,E2}=∗
@@ -41,7 +40,7 @@ Notation "|~~| P" := (|~{⊤}~| P)%I
                                      (at level 99, P at level 200, format "'[  ' |~~|  '/' P ']'").
 
 Section pre_step.
-  Context `{iG : irisG Λ M Σ}.
+  Context `{!irisG Λ M Σ}.
 
   Lemma pre_step_intro E P :
     P -∗ |~{E}~| P.
@@ -92,19 +91,19 @@ Section pre_step.
     state_interp extr atr -∗ (|~{E}~| P) ={E}=∗ state_interp extr atr ∗ P.
   Proof. rewrite pre_step_unseal. iIntros "Hσ HP". by iApply "HP". Qed.
 
-  Global Instance pre_step_ne n : Proper ((≡) ==> (≡) ==> (dist n) ==> (dist n)) pre_step.
+  #[global] Instance pre_step_ne n : Proper ((≡) ==> (≡) ==> (dist n) ==> (dist n)) pre_step.
   Proof. rewrite pre_step_unseal. solve_proper. Qed.
-  Global Instance pre_step_proper : Proper ((≡) ==> (≡) ==> (≡) ==> (≡)) pre_step.
+  #[global] Instance pre_step_proper : Proper ((≡) ==> (≡) ==> (≡) ==> (≡)) pre_step.
   Proof. rewrite pre_step_unseal. solve_proper. Qed.
 
   Class IntoPreStep E (P Q : iProp Σ) := into_pre_step : P ⊢ |~{E}~| Q.
-  Global Instance into_pre_step_id E P : IntoPreStep E (|~{E}~| P) P | 0.
+  #[global] Instance into_pre_step_id E P : IntoPreStep E (|~{E}~| P) P | 0.
   Proof. rewrite /IntoPreStep. by iIntros "HP". Qed.
-  Global Instance into_pre_step_intro E P : IntoPreStep E P P | 1.
+  #[global] Instance into_pre_step_intro E P : IntoPreStep E P P | 1.
   Proof. rewrite /IntoPreStep. by iApply pre_step_intro. Qed.
 
   Lemma modality_pre_step_mixin E :
-    modality_mixin (@pre_step Λ M Σ iG E E)
+    modality_mixin (@pre_step Λ M Σ _ E E)
                    (MIEnvId) (MIEnvTransform (IntoPreStep E)).
   Proof.
     split; simpl.
@@ -117,11 +116,11 @@ Section pre_step.
   Qed.
   Definition modality_pre_step E :=
     Modality _ (modality_pre_step_mixin E).
-  Global Instance from_modality_pre_step E P :
+  #[global] Instance from_modality_pre_step E P :
     FromModal True (modality_pre_step E) (|~{E}~| P) (|~{E}~| P) P.
   Proof. by rewrite /FromModal /=. Qed.
 
-  Global Instance elim_modal_pre_step_pre_step p E1 E2 E3 P Q :
+  #[global] Instance elim_modal_pre_step_pre_step p E1 E2 E3 P Q :
     ElimModal True p false (|~{E1,E2}~| P) P (|~{E1,E3}~| Q) (|~{E2,E3}~| Q).
   Proof.
     destruct p.
@@ -135,7 +134,7 @@ Section pre_step.
       iMod ("HPQ" with "HP' Hσ") as "HQ". iFrame. done.
   Qed.
 
-  Global Instance elim_modal_pre_step_fupd p E1 E2 E3 P Q :
+  #[global] Instance elim_modal_pre_step_fupd p E1 E2 E3 P Q :
     ElimModal True p false (|={E1,E2}=> P) P (|~{E1,E3}~| Q) (|~{E2,E3}~| Q).
   Proof.
     destruct p.
@@ -159,7 +158,7 @@ Section pre_step.
     iIntros (??) "$". iApply "Hclose".
   Qed.
 
-  Global Instance elim_modal_pre_step_bupd p E1 E2 P Q :
+  #[global] Instance elim_modal_pre_step_bupd p E1 E2 P Q :
     ElimModal True p false (|==> P) P (|~{E1,E2}~| Q) (|~{E1,E2}~| Q).
   Proof.
     destruct p.
@@ -908,4 +907,16 @@ Section proofmode_classes.
     iApply (wp_wand with "(Hinner Hα)").
     iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
   Qed.
+
+  #[global] Instance elim_modal_pre_step_wp p s E ζ e P Φ :
+    ElimModal True p false (|~{E}~| P) P
+              (WP e @ s; ζ; E {{ Φ }}) (WP e @ s; ζ; E {{ v, Φ v }})%I.
+  Proof. 
+    destruct p.
+    - rewrite /ElimModal. iIntros (_) "[HP HPQ]". iDestruct "HP" as "#HP".
+      iApply pre_step_wp. iMod "HP". iModIntro. by iApply "HPQ".
+    - rewrite /ElimModal. iIntros (_) "[HP HPQ]".
+      iApply pre_step_wp. iMod "HP". iModIntro. by iApply "HPQ".
+  Qed.
+
 End proofmode_classes.

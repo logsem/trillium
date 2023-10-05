@@ -21,10 +21,8 @@ Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG {
 
 Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG {
   heap_inG :> heapGpreS Σ LM;
-
   heap_invGS :> invGS_gen HasNoLc Σ;
   heap_gen_heapGS :> gen_heapGS loc val Σ;
-
   heap_fairnessGS :> fairnessGS LM Σ;
 }.
 
@@ -68,9 +66,6 @@ Ltac inv_head_step :=
   end.
 
 Local Hint Extern 0 (head_reducible _ _) => eexists _, _, _; simpl : core.
-(* Local Hint Extern 0 (head_reducible_no_obs _ _) => eexists _, _, _; simpl : core. *)
-
-(* [simpl apply] is too stupid, so we need extern hints here. *)
 Local Hint Extern 1 (head_step _ _ _ _ _) => econstructor : core.
 Local Hint Extern 0 (head_step (CmpXchg _ _ _) _ _ _ _) => eapply CmpXchgS : core.
 Local Hint Extern 0 (head_step (AllocN _ _) _ _ _ _) => apply alloc_fresh : core.
@@ -211,13 +206,6 @@ Proof. solve_pure_exec. Qed.
   PureExec True 1 (Case (Val $ InjRV v) e1 e2) (App e2 (Val v)).
 Proof. solve_pure_exec. Qed.
 
-Notation "f ⇂ R" := (filter (λ '(k,v), k ∈ R) f) (at level 30).
-
-Lemma own_proper `{inG Σ X} γ (x y: X):
-  x ≡ y ->
-  own γ x -∗ own γ y.
-Proof. by intros ->. Qed.
-
 Section lifting.
 Context `{LM:LiveModel heap_lang M}.
 Context `{!heapGS Σ LM}.
@@ -229,7 +217,6 @@ Implicit Types v : val.
 Implicit Types l : loc.
 Implicit Types tid : nat.
 
-(* WIP solution for generic fuel-handling *)
 Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
   match to_val e1 with
   | Some v => |={E}=> (Φ (of_val v))
@@ -269,32 +256,24 @@ Proof.
 Qed.
 
 Lemma has_fuels_dealloc E tid fs ρ δ :
-  ρ ∉ live_roles _ δ →
-  frag_model_is δ -∗
-  has_fuels tid fs -∗
+  ρ ∉ live_roles _ δ → frag_model_is δ -∗ has_fuels tid fs -∗
   |~{E}~| frag_model_is δ ∗ has_fuels tid (delete ρ fs).
 Proof.
-  iIntros (Hnin) "Hst Hf".
-  rewrite weakestpre.pre_step_unseal.
+  iIntros (Hnin) "Hst Hf". rewrite weakestpre.pre_step_unseal.
   iIntros (extr atr) "[%Hvse [Hσ Hm]]".
   iMod (model_state_interp_has_fuels_dealloc with "Hm Hst Hf") as "[Hm Hf]";
-    [done|].
-  by iFrame.
+    [done|by iFrame].
 Qed.
 
-(* Sanity check: Rule from paper *)
+(* Rule from the Trillium article *)
 Lemma wp_role_dealloc s tid E e fs ρ δ Φ :
-  ρ ∉ live_roles _ δ →
-  frag_model_is δ -∗
-  has_fuels tid fs -∗
+  ρ ∉ live_roles _ δ → frag_model_is δ -∗ has_fuels tid fs -∗
   (frag_model_is δ -∗ has_fuels tid (delete ρ fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
   WP e @ s; tid; E {{ Φ }}.
 Proof.
   iIntros (Hnin) "HM Hfuels Hwp".
-  (* TODO: add typeclass to allow iMod'ing pre_step mods under WP's *)
-  iApply pre_step_wp.
   iMod (has_fuels_dealloc with "HM Hfuels") as "[HM Hfuels]"; [done|].
-  iIntros "!>". by iApply ("Hwp" with "HM Hfuels").
+  by iApply ("Hwp" with "HM Hfuels").
 Qed.
 
 Lemma wp_step_model s tid ρ (f1 : nat) fs fr s1 s2 E e Φ :
@@ -588,9 +567,7 @@ Proof.
   rewrite /state_interp /=.
   rewrite Hexend /=. list_simplifier. iFrame "Hgh Hmi".
   repeat iSplit; try naive_solver.
-  iApply pre_step_wp.
   iMod (has_fuels_dealloc_multiple with "Hs Hfuels") as "[Hs Hfuels]"; [done..|].
-  iModIntro.
   iApply ("Hkont" with "Hs Hfuels").
 Qed.
 
