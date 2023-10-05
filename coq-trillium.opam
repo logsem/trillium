@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "coq-trillium"
-synopsis: ""
+synopsis: "The Trilllium trace program logic framework"
 maintainer: "Trillium Team"
 authors: "Trillium Team"
 license: "MIT"
@@ -10,5 +10,5 @@ bug-reports: "https://github.com/logsem/trillium/issues"
 build: [make "-j%{jobs}%"]
 install: []
 depends: [
-  "coq" { (= "8.16.1") | (= "dev") }
+  "coq" { (= "8.17.1") | (= "dev") }
 ]

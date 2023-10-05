@@ -1068,7 +1068,7 @@ Proof.
          fill_item_no_aneris_val_inj, head_ctx_step_aneris_val,
          locale_step, locale_fill, aneris_locale_injective.
   { intros t1 t2 e H . rewrite /locale_of. f_equal.
-    apply filter_length_equiv, (filter_locales_equiv [] []) =>//. constructor. }
+    apply filter_length_equiv, (filter_locales_equiv [] []) =>//. }
 Qed.
 
 #[global] Instance state_inhabited : Inhabited state.
