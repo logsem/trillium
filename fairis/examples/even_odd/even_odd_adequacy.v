@@ -256,7 +256,7 @@ Qed.
 
 Definition evenodd_aux_progress (auxtr : auxtrace the_model) :=
   ∀ i, ∃ n, pred_at auxtr n (λ s l, (λ s' _, s' = i)
-                                      (ls_under $ ls_data s) (l ≫= Ul)).
+                                      (ls_under s) (l ≫= Ul)).
 
 Lemma evenodd_mtr_aux_progress_preserved
       (mtr : mtrace the_fair_model)
@@ -266,11 +266,11 @@ Lemma evenodd_mtr_aux_progress_preserved
 Proof.
   intros Hstutter Hmtr n. specialize (Hmtr n).
   by apply (trace_eventually_stutter_preserves
-              (λ x, ls_under (ls_data x)) Ul auxtr mtr (λ s' _, s' = n)).
+              (ls_under ∘ ls_data) Ul auxtr mtr (λ s' _, s' = n)).
 Qed.
 
 Definition evenodd_aux_mono (auxtr : auxtrace the_model) :=
-  ∀ n, ∃ i, pred_at auxtr n (λ s l, (λ s' _, s' = i) (ls_under $ ls_data s) (l ≫= Ul)) ∧
+  ∀ n, ∃ i, pred_at auxtr n (λ s l, (λ s' _, s' = i) (ls_under s) (l ≫= Ul)) ∧
             pred_at auxtr (S n) (λ s l, (λ s' _, ∃ j, s' = j ∧ i ≤ j) (ls_under $ ls_data s) (l ≫= Ul)).
 
 Lemma evenodd_mtr_aux_mono_preserved (mtr : mtrace the_fair_model)
