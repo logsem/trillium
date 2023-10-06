@@ -171,7 +171,7 @@ Section gset_flat_map.
     { rewrite gset_map_empty. rewrite union_empty_r_L.
       rewrite elements_singleton union_list_singleton_L //. }
     rewrite (gset_map_const_nonempty _ _ ∅); [done|set_solver|].
-    set_unfold; by intros ? [|].
+    by set_unfold.
   Qed.
 
 End gset_flat_map.

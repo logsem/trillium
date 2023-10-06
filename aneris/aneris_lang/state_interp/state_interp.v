@@ -319,7 +319,7 @@ Section state_interpretation.
               with "[Hh Hs] [Hlcoh]").
     - rewrite lookup_insert //.
     - iExists ∅, ∅.
-      iFrame. iFrame "#". rewrite !lookup_insert fmap_empty.
+      iFrame. iFrame "#". unfold σ'. rewrite !lookup_insert.
       repeat iSplit; eauto.
     - rewrite delete_insert //.
       by iApply big_sepM_local_state_coh_alloc_node.

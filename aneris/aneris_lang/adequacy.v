@@ -36,8 +36,10 @@ Proof.
   induction M as [|m M Hnin IHM] using set_ind_L; [done|].
   rewrite /ports_in_use.
   rewrite gset_to_gmap_union_singleton.
-  rewrite map_fold_insert_L;
-    [set_solver|set_solver|by rewrite lookup_gset_to_gmap_None].
+  rewrite map_fold_insert_L.
+  - rewrite map_fold_empty. set_solver.
+  - set_solver.
+  - by rewrite lookup_gset_to_gmap_None.
 Qed.
 
 Definition wp_group_proto_multiple_strong `{anerisPreG Σ Mdl} A

@@ -34,7 +34,8 @@ Section collect.
     |- (λ x, (λ y, ?P) _) _ =>
       simpl; apply (map_fold_ind (M := gmap _) (B := gset B) (λ y, λ x, P))
     end; [ done | exact ∅ | |].
-    - intros. rewrite collect_singleton; set_solver.
+    - intros. rewrite collect_singleton.
+      rewrite delete_empty. rewrite collect_empty. set_solver.
     - intros k' a' h acc Hk' IH k a.
       destruct (decide (k = k')) as [-> | Hneq].
       + rewrite insert_insert delete_insert_delete.
