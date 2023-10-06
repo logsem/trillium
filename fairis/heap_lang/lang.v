@@ -1,7 +1,7 @@
 From stdpp Require Export binders strings.
 From stdpp Require Import gmap.
 From iris.algebra Require Export ofe.
-From trillium Require Export language ectx_language ectxi_language adequacy.
+From trillium.program_logic Require Export language ectx_language ectxi_language adequacy.
 From trillium.fairness.heap_lang Require Export locations.
 Set Default Proof Using "Type".
 

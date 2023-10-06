@@ -2,14 +2,14 @@ From stdpp Require Import option.
 From Paco Require Import pacotac.
 From trillium.fairness Require Export fairness fair_termination fuel.
 
-Definition auxtrace_fairly_terminating {Λ} {Mdl : FairModel}
+Definition auxtrace_fairly_terminating {Λ} `{Countable (locale Λ)} {Mdl : FairModel}
            {LM : LiveModel Λ Mdl} (auxtr : auxtrace LM) :=
   auxtrace_valid (LM:=LM) auxtr →
   (∀ ρ, fair_aux ρ auxtr) →
   terminating_trace auxtr.
 
 Theorem continued_simulation_fair_termination
-        `{FairTerminatingModel FM} `(LM:LiveModel Λ FM) `{Countable (locale Λ)}
+        `{FairTerminatingModel FM} `{Countable (locale Λ)} (LM:LiveModel Λ FM)
         (ξ : execution_trace Λ → auxiliary_trace LM → Prop) a1 r1 extr :
   (* TODO: This is required for destruttering - Not sure why *)
   (∀ c c', locale_step (Λ := Λ) c None c' -> False) →
