@@ -65,10 +65,10 @@ Proof.
   iEval (rewrite right_id) in "Hmv_ctx Hmb_ctx".
   assert (fn_to_gmap Acceptors' (λ _, None) =
          ({[ a1 := None; a2 := None; a3 := None]} : _ _ (option (Ballot * Value)))) as HmvE.
-  { apply map_eq. by set_unfold. }
+  { apply map_eq. set_solver. }
   assert (fn_to_gmap Acceptors' (λ _, None) =
          ({[ a1 := None; a2 := None; a3 := None]} : gmap Acceptor (option Ballot))) as HmbE.
-  { apply map_eq. by set_unfold. }
+  { apply map_eq. set_solver. }
   rewrite {2}HmvE {2}HmbE.
   iModIntro. iExists _, _, _, _. iFrame.
   iEval (rewrite !big_sepM_insert //) in "Hmvs Hmbs".

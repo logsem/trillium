@@ -136,7 +136,7 @@ Proof.
   rewrite pretty_N_go_step; last done.
   destruct (decide (x < 10)%N).
   - rewrite N.mod_small //.
-    rewrite N.div_small // pretty_N_go_0 /= ZOfAscii_pretty //.
+    rewrite N.div_small // pretty_N_go_0 /= ZOfAscii_pretty //. f_equiv. lia.
   - assert (x `div` 10 < x)%N as Hltdv.
     { apply N.div_lt; auto with lia. }
     assert (0 < x `div` 10)%N as Hdvp.
@@ -148,8 +148,7 @@ Proof.
     rewrite (IH _ Hltdv Hdvp) in Hlp.
     rewrite Hlp.
     rewrite /= ZOfAscii_pretty; last by apply N.mod_lt.
-    replace (x `div` 10 * 10)%N with (10 * x `div` 10)%N by lia.
-    rewrite -N.div_mod' //.
+    rewrite {3}(N.div_mod' x 10) //. f_equiv. lia.
 Qed.
 
 Lemma pretty_N_go_nnil m s :

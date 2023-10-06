@@ -86,7 +86,12 @@ Section sig_gset.
   Proof.
     assert (a ∈ ({[a]} : gset _)) as Ha by set_solver.
     eexists Ha. apply set_eq. intros ?.
-    rewrite elem_of_sig_gset_gset //.
+    rewrite elem_of_sig_gset_gset.
+    (* TODO: This feels hackish - Why did this break? *)
+    destruct x=> /=. assert (a = x) by set_solver.
+    subst. split; [|set_solver]. intros _.
+    apply elem_of_singleton.
+    f_equiv. apply proof_irrel.
   Qed.
 
   Lemma sig_gset_gset_empty :
