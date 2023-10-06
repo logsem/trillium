@@ -36,8 +36,6 @@ Proof.
       assert (tid < length tp)%nat; last lia. by eapply lookup_lt_Some.
 Qed.
 
-(* Local Hint Resolve tid_step_tp_length_heap: core. *)
-
 Lemma from_locale_from_lookup tp0 tp tid e :
   from_locale_from tp0 tp tid = Some e <-> (tp !! (tid - length tp0)%nat = Some e ∧ (length tp0 <= tid)%nat).
 Proof.
@@ -125,6 +123,7 @@ Definition rel_always_holds {Σ} `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
     posts_of c.1 ((λ _, 0%nat ↦M ∅) :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from c1.1 (drop (length c1.1) c.1)))) -∗
     |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝.
 
+
 Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
     `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M) (FR: gset _)
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
@@ -202,11 +201,6 @@ Proof.
     pose proof (trace_singleton_starts_in_inv _ _ Hstartatr). simpl.
     simplify_eq.
     iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
-    (* (* OBS: tids_smaller; will change *) *)
-    (* assert (∀ (ρ : fmrole M) (tid : nat), *)
-    (*            ls_mapping (initial_ls (LM := LM) s1 0%nat) !! ρ = Some tid → *)
-    (*            is_Some (([e1], σ1).1 !! tid)) as HA. *)
-    (* { admit. } *)
     iSplit; last done. iClear "H1".
     iSplit; first done.
     destruct (to_val e1) as [v1|] eqn:Heq.
@@ -223,22 +217,21 @@ Proof.
       { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
       iDestruct "Hsi" as "(_&_&Hsi)".
       iDestruct "Hsi" as (fm Hfmle Hfmdead Hmapinv) "(Hm & Hfm)".
-      iDestruct (has_fuels_agree with "Hfm Hem") as "%H".
+      iDestruct (has_fuels_agree with "Hfm Hem") as "%Hagree".
       iPureIntro.
       intros HSome. apply ls_mapping_data_inv in HSome.
       destruct HSome as [fs [HSome Hfs]].
       destruct Hfmle as [Hfmle1 Hfmle2].
       rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
-      pose proof H as HSome'.
-      apply Hfmle1 in H as (?&?&?). simpl in *. clear Hfmle1.
-      simplify_eq. rewrite lookup_insert in H. simplify_eq.
+      pose proof Hagree as HSome'.
+      apply Hfmle1 in Hagree as (fs''&HSome''&Hfs''). simpl in *. clear Hfmle1.
+      simplify_eq. rewrite lookup_insert in HSome''. simplify_eq.
       rewrite dom_gset_to_gmap in Hfs.
-      apply Hfmdead in Hfs as (?&?&?&?).
+      apply Hfmdead in Hfs as (tid''&fs'''&HSome'''&Hfs''').
       rewrite dom_singleton_L in Hfmle2.
-      assert (x = 0%nat).
-      { apply elem_of_dom_2 in H. rewrite Hfmle2 in H. set_solver. }
-      simplify_eq.
-      by set_solver.
+      assert (tid'' = 0%nat).
+      { apply elem_of_dom_2 in HSome'''. rewrite Hfmle2 in HSome'''. set_solver. }
+      simplify_eq. by set_solver.
     + iSplit; iPureIntro.
       { intros ρ tid Hinit.
         apply ls_mapping_data_inv in Hinit.
@@ -286,12 +279,12 @@ Proof.
       simplify_eq.
       apply Hfmdead in Hlive as (tid''&fs''&HSome''&Hfs'').
       assert (tid'' = tid').
-      { apply Hfmle1 in HSome'' as (?&?&?).
+      { apply Hfmle1 in HSome'' as (fs'''&HSome'''&Hfs''').
         pose proof (δ.(ls_map_disj)) as Hdisj.
         destruct (decide (tid' = tid'')) as [->|Hneq]; [done|].
-        specialize (Hdisj tid' tid'' fs x Hneq HSome H2).
+        specialize (Hdisj tid' tid'' fs fs''' Hneq HSome HSome''').
         apply map_disjoint_dom in Hdisj.
-        apply map_included_subseteq_inv in H3.
+        apply map_included_subseteq_inv in Hfs'''.
         set_solver. }
       simplify_eq.
       by set_solver.
@@ -321,12 +314,8 @@ Theorem simulation_adequacy Σ `(LM:LiveModel heap_lang M) `{!heapGpreS Σ LM} (
 Proof.
   intros Hfevol Hne H.
   assert (sim_rel LM = sim_rel_with_user LM (λ _ _, True)) as Heq.
-  { Require Import Coq.Logic.FunctionalExtensionality.
-    Require Import Coq.Logic.PropExtensionality.
-    do 2 (apply functional_extensionality_dep; intros ?).
-    apply propositional_extensionality.
+  { do 2 (apply FunExt; intros?). apply PropExt. 
     unfold sim_rel_with_user. intuition. }
-
   rewrite Heq.
   apply (strong_simulation_adequacy Σ LM s _ _ _ FR) =>//.
   { rewrite -Heq. done. }
@@ -364,9 +353,7 @@ Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel heap_lang M)
     iex
     iatr.
 Proof.
-  intros Hfin Hlr Hwp.
-  eexists.
-  eapply produced_inf_aux_trace_valid_inf.
+  intros Hfin Hlr Hwp. eexists. eapply produced_inf_aux_trace_valid_inf.
   Unshelve.
   - econstructor.
   - apply (simulation_adequacy Σ LM s _ _ _ FR) => //.
