@@ -19,7 +19,7 @@ The recommended way to install the Coq is through [opam](https://opam.ocaml.org/
 opam switch create trillium 5.1.0
 opam switch link trillium .
 ```
-3. Add the Coq and Iris `opam` repositories.
+3. Add the Coq `opam` repositories.
 ```
 opam repo add coq-released https://coq.inria.fr/opam/released
 opam update
@@ -38,6 +38,15 @@ git submodule update --init --recursive
 
 You should now be able to build the development by running `make -jN` where `N`
 is the number of cores available on your machine.
+
+### Alternative for Nix users
+
+Make sure the submodules have been cloned, and run:
+
+```
+nix develop
+make -jN
+```
 
 ## Directory Structure
 
