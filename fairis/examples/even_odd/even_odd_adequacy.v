@@ -488,12 +488,9 @@ Proof.
         rewrite /indexes in Hin.
         apply elem_of_lookup_imap_1 in Hin as (i&?&->&HSome).
         by apply lookup_lt_is_Some_1. }
-    (* TODO: Clean this up *)
     assert (live_roles _ M = ∅) as Hlive.
-    {
-      apply set_eq. intros i. split; [|done].
-      intros Hin.
-      apply Hfmdead in Hin as (ζ&fs&HSome&Hfs).
+    { apply set_eq. intros i. split; [|done].
+      intros (ζ&fs&HSome&Hfs)%Hfmdead.
       assert (fm !! ζ = Some ∅).
       { apply HMζ.
         assert (ζ ∈ dom (ls_map (trace_last auxtr))) as Hin.
