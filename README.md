@@ -102,6 +102,24 @@ make -jN
 | Paxos, learner spec   | [`aneris/examples/consensus/paxos_learner.v`](aneris/examples/consensus/paxos_learner.v)                 | `learner_spec`                                                                                                          |
 | Corollary 4.2         | [`aneris/examples/consensus/paxos_adequacy.v`](aneris/examples/consensus/paxos_adequacy.v)               | `simulates`, `paxos_correct_impl`                                                                                       |
 
+## Differences between the paper and formalization
+
+### Omitted details
+
+The weakest precondition rules of the formalisation use a continuation passing style as it is easier to
+work with in Coq.
+They are also strengthened by guarding their assumptions using later modalities, to more easily apply them
+in the context of Iris invariants.
+These differences were not reflected in the paper for brevity sake.
+Note that the expressivity of the logic remains the same between the paper and the formalisation.
+
+### Improvements since the submission of the paper
+
+Since the submission of the paper we have continued the development of the formalisation,
+and have made various improvements to the fuel layer that we will reflect in the final version of the paper.
+This primarily pertains to Section 3.3 which no longer accurately reflects the state of the artifact.
+While the general idea remains the same, the definitions no longer correspond exactly.
+
 ## Git submodule dependencies
 
 This project uses git submodules to manage dependencies with other Coq
