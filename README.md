@@ -119,31 +119,3 @@ Since the submission of the paper we have continued the development of the forma
 and have made various improvements to the fuel layer that we will reflect in the final version of the paper.
 This primarily pertains to Section 3.3 which no longer accurately reflects the state of the artifact.
 While the general idea remains the same, the definitions no longer correspond exactly.
-
-## Git submodule dependencies
-
-This project uses git submodules to manage dependencies with other Coq
-libraries. By default, when working with a repository that uses submodules, the
-submodules will *not* be populated and updated automatically, and it is often
-necessary to invoke `git submodule update --init --recursive` or use the
-`--recurse-submodules` flag. However, this can be automated by setting the
-`submodule.recurse` setting to `true` in your git config by running
-
-    git config --global submodule.recurse true
-
-This will make `git clone`, `git checkout`, `git pull`, etc. work as you would
-expect and it should rarely be necessary to invoke any `git submodule update`
-commands.
-
-A git submodule is pinned to a particular commit of an external (remote)
-repository. If new commits have been pushed to the remote repository and you
-wish to integrate these in to the development, invoke
-
-    git submodule update --remote
-
-to fetch the new commits and apply them to your local repository. This changes
-which commit your *local* submodule is pinned to. Remember to commit and push
-the submodule update to make it visible to other users of the repository.
-
-Read more about git submodules in [this
-tutorial](https://git-scm.com/book/en/v2/Git-Tools-Submodules).
