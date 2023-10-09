@@ -64,7 +64,7 @@ make -jN
     refinement of distributed systems.
   + [`examples/`](aneris/examples/): Examples and case studies
     * [`consensus/`](aneris/examples/consensus): Single-decree Paxos
-    * [`gcounter_convergence/`](aneris/examples/consensus): CRDT, grow-only counter
+    * [`gcounter_convergence/`](aneris/examples/gcounter_convergence): CRDT, grow-only counter
     * [`transaction_commit/`](aneris/examples/transaction_commit): Two-Phase commit
 
 - [`external/`](external/): External dependencies
