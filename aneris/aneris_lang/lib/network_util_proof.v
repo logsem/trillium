@@ -73,7 +73,6 @@ Section library.
     wp_apply ("IH" with "Hh Ha HΦ").
   Qed.
 
-  (* TODO: Maybe move this elsewhere *)
   Definition pair_to_msg (sa : socket_address)
              (m : message_body * socket_address) : message :=
     mkMessage m.2 sa m.1.

@@ -80,7 +80,6 @@ Qed.
 
 Notation state_message_coh := (@state_message_coh my_topo).
 Notation state_to_msg := (@state_to_msg my_topo).
-(* TODO: fix name clash (network.v and state_interp.v) *)
 Notation messages_sent_from := state_interp.messages_sent_from.
 
 Definition M := aneris_to_trace_model (TC_model rms).
@@ -139,8 +138,7 @@ Proof.
   iModIntro.
   iSplit; [done|].
   iSplitL.
-  { (* TODO: lift the adeaucy theorems to aneris_wp *)
-    iApply (aneris_wp_lift with "Hnode").
+  { iApply (aneris_wp_lift with "Hnode").
     iDestruct (unallocated_split with "Hf") as "[Hftm Hfrm]"; [set_solver|].
     iApply (aneris_wp_socket_interp_alloc_singleton (@tm_si my_topo _ _)
              with "Hftm").

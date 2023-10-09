@@ -110,23 +110,21 @@ Section state_interpretation.
     iSplit.
     (* gnames_coh *)
     { iPureIntro.
-      (* TODO: Dont break abstraction here. *)
       by rewrite /gnames_coh Hheap Hskt. }
     iSplitR.
     (* network_sockets_coh *)
     { iPureIntro.
-      (* TODO: Dont break abstraction here. *)
       rewrite /network_sockets_coh.
       intros ip Sn HSome.
       split.
-      { by apply Hskts_coh1 in HSome. } (* TODO: Dont take as input *)
+      { by apply Hskts_coh1 in HSome. } 
       split.
       { apply Hskts in HSome.
         rewrite /socket_messages_coh.
         intros sh skt r sa HSn. apply HSome in HSn. simpl in *.
         simplify_eq. set_solver. }
       split.
-      { by apply Hskts_coh2 in HSome. } (* TODO: Dont take as input *)
+      { by apply Hskts_coh2 in HSome. } 
       apply Hskts in HSome.
       rewrite /socket_unbound_empty_buf_coh.
       intros sh skt r HSn. apply HSome in HSn. simpl in *.
@@ -134,7 +132,6 @@ Section state_interpretation.
     iSplitR.
     (* messages_history_coh *)
     { iPureIntro.
-      (* TODO: Dont break abstraction here. *)
       rewrite /messages_history_coh. rewrite Hms.
       split.
       { rewrite /message_soup_coh. set_solver. }

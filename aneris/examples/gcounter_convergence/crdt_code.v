@@ -40,11 +40,8 @@ Section code.
      "loop"#()
     in "loop" #().
 
-  (* TODO: for extraction puroposes,
-     add as a primitive to the language. *)
   Definition sleep : val := λ: "n" "m", #().
 
-  (* TODO: move later to network_helpers *)
   Definition sendToAll : val :=
     λ: "sh" "msg" "dstl" "i",
     letrec: "send" "j" :=

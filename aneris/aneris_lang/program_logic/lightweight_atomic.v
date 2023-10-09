@@ -36,7 +36,7 @@ THE SOFTWARE.
    they remain in the iris scope. Eo is used below by different Iris connectives, meaning different numbers
    of these implicit %Is, and that difference has to be compensated by adding some explicit %I *)
 
-(* TODO: explain how our version differs from Perennial's (specifically, our use of masks) *)
+
 
 (** With ▷ around the linearization point **)
 

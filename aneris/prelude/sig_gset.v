@@ -5,7 +5,6 @@ From aneris.prelude Require Import gset_map.
 Section sig_gset.
   Context `{EqDecision A, !Countable A}.
 
-  (* TODO: upstream? *)
   Lemma length_elements (X : gset A) : length (elements X) = size X.
   Proof.
     induction X using set_ind_L.
@@ -87,7 +86,6 @@ Section sig_gset.
     assert (a ∈ ({[a]} : gset _)) as Ha by set_solver.
     eexists Ha. apply set_eq. intros ?.
     rewrite elem_of_sig_gset_gset.
-    (* TODO: This feels hackish - Why did this break? *)
     destruct x=> /=. assert (a = x) by set_solver.
     subst. split; [|set_solver]. intros _.
     apply elem_of_singleton.

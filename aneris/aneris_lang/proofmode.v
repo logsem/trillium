@@ -330,7 +330,6 @@ Proof.
   iApply "HΔ2". iFrame.
 Qed.
 
-(* (* TODO: move somewhere else? *) *)
 (* Lemma of_envs_wf Δ : *)
 (*   ⊢ of_envs Δ → ⌜envs_wf Δ⌝. *)
 (* Proof. by iIntros "[% _]". Qed. *)
@@ -629,7 +628,6 @@ Tactic Notation "wp_send_duplicate" :=
        |solve_msg_send ()
        |tc_solve
        |iAssumptionCore
-       (* |solve_message_mapsto ()    (* TODO: Why does this not work now? *) *)
        |iAssumptionCore
        |solve_message_mapsto ()
        |pm_reflexivity|..]; wp_finish

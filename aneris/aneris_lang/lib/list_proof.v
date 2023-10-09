@@ -616,7 +616,6 @@ Section list_specs_extra.
       iApply "HΦ"; auto.
   Qed.
 
-  (* TODO: is this in some Coq library? *)
   Fixpoint mapi_loop {B : Type} (f : nat -> A -> B) (k : nat) (l : list A) : list B :=
     match l with
     | h :: t => (f k h) :: (mapi_loop f (S k) t)
@@ -656,7 +655,6 @@ Section list_specs_extra.
     eauto.
   Qed.
 
-  (* TODO: clean up *)
   Lemma wp_list_mapi_loop `{!Inject B val}
         (f : nat -> A -> B) (k : nat) (l : list A) (fv lv : val)
         (γ : nat -> A -> iProp Σ) (ψ : nat -> B -> iProp Σ) ip :
@@ -777,7 +775,6 @@ Section list_specs_extra.
       iFrame.
   Qed.
 
-  (* TODO: is there a standard library lemma for this? *)
   Lemma list_lookup_succ (h : A) (l : list A) (i : nat) :
     (h :: l) !! (S i) = l !! i.
   Proof. auto. Qed.

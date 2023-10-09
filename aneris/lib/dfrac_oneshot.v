@@ -102,7 +102,6 @@ Section dfrac_oneshot_lemmas.
       rewrite Pplus_one_succ_l -pos_to_Qp_add Qp.mul_add_distr_r Qp.mul_1_l //.
   Qed.
 
-  (* TODO: upstream? *)
   Lemma size_set_seq start len :
     size (set_seq start len : gset _) = len.
   Proof.

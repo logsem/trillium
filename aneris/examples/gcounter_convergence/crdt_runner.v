@@ -228,7 +228,6 @@ Section runner_spec.
     iApply (aneris_wp_socket_interp_alloc_fun f with "HfxA").
     { destruct progs; [|done]. simpl in *. lia. }
     iIntros "#HsiA".
-    (* TODO: introduce new lemma for allocating socket interps with map *)
     wp_apply (runner_spec_helper 0 (list_to_set (gcd_addr_list gcdata) ∪ Aprogs)
                                  Aprogs portssocks f
                 with "Hinv [Hlocsf] [] [] [Hfips] [Hsevssf] [Hrevssf]"); simpl.
@@ -248,8 +247,6 @@ Section runner_spec.
 Qed.
 
 End runner_spec.
-
-(* TODO : explain the fields *)
 
 Record programs_using_gcounters {gcdata : GCData} :=
   { Aprogs : gset socket_address;

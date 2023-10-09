@@ -2,7 +2,6 @@ From trillium.fairness Require Export fairness.
 From stdpp Require Import option.
 From Paco Require Import pacotac.
 
-(* TODO: See if we can generalise the notion of fair terminating traces *)
 Definition mtrace_fairly_terminating {Mdl : FairModel} (mtr : mtrace Mdl) :=
   mtrace_valid mtr →
   (∀ ρ, fair_model_trace ρ mtr) →
@@ -48,7 +47,6 @@ Lemma ftm_trans' `{FairTerminatingModel Mdl} a b c:
   a < b -> b ≤ c -> a < c.
 Proof.
   intros [H1 H1'] H2.
-  (* TODO: Why do we need to extract this manually? *)
   assert (EqDecision Mdl) by apply Mdl.(fmstate_eqdec).
   destruct (decide (b = c)) as [->|Heq]; [done|].
   split; [by etransitivity|].

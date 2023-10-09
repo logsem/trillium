@@ -28,7 +28,6 @@ Section state_interpretation.
     iSplit; by iApply big_sepS_empty.
   Qed.
 
-  (* TODO: Repeated lemma - Why is anerisG needed over anerisPreG? *)
   Lemma socket_address_group_own_subseteq
         γ (sags sags' : gset socket_address_group) :
     sags' ⊆ sags →
@@ -281,7 +280,6 @@ Section state_interpretation.
     auto.
   Qed.
 
-  (* TODO: Clean up these lemmas and proofs *)
   Lemma messages_resource_coh_receive_in sagR sagT R T R' T' m mh :
     mh !! sagR = Some (R, T) →
     mh !! sagT = Some (R',T') →

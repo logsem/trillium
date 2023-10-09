@@ -260,7 +260,6 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
   | _ => fail "wp_pure: not a 'wp'"
   end.
 
-(* TODO: do this in one go, without [repeat]. *)
 Ltac wp_pures :=
   iStartProof;
   first [ (* The `;[]` makes sure that no side-condition magically spawns. *)

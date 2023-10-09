@@ -232,7 +232,7 @@ Section multi_collect.
     end.
     - done.
     - intros k a g' M Hk IHM IHMi.
-      cut (f k a = ∅ ∧ M = ∅). (* TODO: add to stdpp *)
+      cut (f k a = ∅ ∧ M = ∅). 
       { multiset_solver. }
       split.
       + specialize (IHMi k a). apply IHMi.

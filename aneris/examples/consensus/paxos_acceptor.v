@@ -134,8 +134,7 @@ Section paxos_acceptor.
         apply messages_agree_add; [| |done].
         { apply elem_of_union; auto. }
         exists (l ↾ Hl). destruct maxVal as [[??]|]; by destruct_is_ser Hser.
-      - (* TODO: This case is almost copy/paste of the previous; can we generalize something? *)
-        iSplit.
+      - iSplit.
         { iPureIntro. right.
           eapply phase2b; [done|done|]. eauto. }
         iSplit.

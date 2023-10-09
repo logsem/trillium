@@ -18,7 +18,6 @@ Section paxos_proposer.
         ⌜size senders = n⌝ ∗
         (∀ a, ⌜a ∈ senders⌝ -∗
                ∃ mv, ⌜mv ∈ promises⌝ ∗ msgs_elem_of (msg1b a b mv)) ∗
-        (* TODO: better spec/implementation? - this is a bit silly *)
         (∀ mv, ⌜mv ∈ promises⌝ →
                ∃ a, ⌜a ∈ senders⌝ ∗ msgs_elem_of (msg1b a b mv)) }}}.
   Proof.

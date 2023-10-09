@@ -476,7 +476,6 @@ Section destuttering.
 
 End destuttering.
 
-(* TODO: Does this belong here? *)
 (* Adapted from Arthur Azevedo De Amorim *)
 Section lex_ind.
   Section Lexicographic.
