@@ -93,7 +93,7 @@ Section ra.
               intros [[? ?] ?]; lia.
     - intros x; rewrite elem_of_filter elem_of_set_seq elem_of_singleton /=.      
       intros ->; split_and!; [done| |lia|lia].
-      apply Nat.mod_le; done.
+      apply Nat.Div0.mod_le; done.
   Qed.
 
   Lemma big_opS_apply (g : gset nat) (f : nat → ballot_oneshotUR A) (b : nat) :
@@ -166,7 +166,7 @@ Section ra.
         assert (b' =? b * N + i = false) as ->; [|done].
         apply Nat.eqb_neq. intros ->.
         rewrite -{2}(Nat.mod_small _ _ Hlt) Nat.add_comm
-                     Nat.mod_add // in Heq.
+                     Nat.Div0.mod_add // in Heq.
      + apply leb_iff_conv in Heq.
        assert ((b + 1) * N + i <=? b' = false) as ->.
        { by autorewrite with natb. }
