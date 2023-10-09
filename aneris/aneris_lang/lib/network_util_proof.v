@@ -512,7 +512,7 @@ Section library.
       rewrite /pretty_N_char.
       repeat case_match; done.
     - apply IH; first apply N.le_0_l.
-      + eapply N.lt_le_trans; last by apply (N.mul_div_le _ 10).
+      + eapply N.lt_le_trans; last by apply (N.Div0.mul_div_le _ 10).
         assert (n `div` 10 ≠ 0)%N.
         { by intros ?%N.div_small_iff. }
         assert (0 < n `div` 10)%N by by apply N.div_str_pos; auto with lia.
