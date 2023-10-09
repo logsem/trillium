@@ -19,8 +19,7 @@ Set Default Proof Using "Type".
 Definition decr_loop_prog (l : loc) : val :=
   rec: "go" <> :=
     let: "x" := !#l in
-    if: "x" = #1 then #l <- ("x" - #1)
-    else #l <- ("x" - #1);; "go" #().
+    if: #0 < "x" then #l <- ("x" - #1);; "go" #() else #().
 Definition choose_nat_prog (l : loc) : val :=
   λ: <>,
      #l <- (ChooseNat + #1);;
@@ -167,7 +166,7 @@ Section proof.
     7 ≤ f → f ≤ 38 →
     choose_nat_inv γ l -∗
     {{{ tid ↦M {[ () := f ]} ∗ frag_free_roles_are ∅ ∗
-        own γ (◯E (Z.of_nat (S n))) }}}
+        own γ (◯E (Z.of_nat n)) }}}
       decr_loop_prog l #() @ tid ; ⊤
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
@@ -187,34 +186,20 @@ Section proof.
       iMod ("Hclose" with "[Hs Hl Hcn]") as "_"; [ iExists _; iFrame | ].
       iModIntro.
       rewrite Hvalid. clear cn Hvalid.
-      (* Store - with invariant *)
-      wp_pures.
-      replace (Z.of_nat 1 - 1)%Z with 0%Z by lia.
-      wp_bind (Store _ _).
-      iApply wp_atomic.
+      do 3 wp_pure _.
       iInv Ns as ">HI" "Hclose".
       iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
-      iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+      iApply (wp_pre_step ⊤).
+      wp_pures.
       iModIntro.
-      assert (cn = N 1) as ->.
+      iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
+      assert (cn = N 0) as ->.
       { destruct cn; inversion Hvalid. by simplify_eq. }
-      (* Update the model state to maintain program correspondence *)
-      iApply (wp_step_model_singlerole _ _ (():fmrole cn_fair_model) (f - 7)
-               with "Hs [Hf] Hr").
-      { constructor. }
-      { set_solver. }
-      { by replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia. }
-      iApply (wp_store with "Hl").
-      iIntros "!> Hl Hs Hf Hr".
       iMod (has_fuels_dealloc _ _ _ (():fmrole cn_fair_model) with "Hs Hf")
         as "[Hs Hf]"; [done|].
-      wp_pures.
-      iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
-      { apply (excl_auth_update _ _ 0%Z). }
+      iModIntro. 
       iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
       { iExists (N 0). iFrame. }
-      iApply fupd_mask_intro; [done|].
-      iIntros "H". iMod "H".
       iModIntro. by iApply "HΦ". }
     wp_lam.
     (* Load - with invariant *)
@@ -229,10 +214,8 @@ Section proof.
     { iExists _. iFrame. }
     iModIntro.
     rewrite Hvalid. clear cn Hvalid.
-    wp_pures.
-    case_bool_decide as Heq; [inversion Heq; lia|clear Heq].
-    wp_pures.
-    replace (Z.of_nat (S (S n))  - 1)%Z with (Z.of_nat (S n)) %Z by lia.
+    wp_pures. 
+    replace (Z.of_nat (S n)  - 1)%Z with (Z.of_nat n) %Z by lia.
     (* Store - with invariant *)
     wp_bind (Store _ _).
     iApply wp_atomic.
@@ -240,21 +223,21 @@ Section proof.
     iModIntro.
     iDestruct "HI" as (cn) "(Hs & Hl & Hcn)".
     iDestruct (own_valid_2 with "Hcn Hm") as %Hvalid%excl_auth_agree_L.
-    assert (cn = N (S (S n))) as ->.
+    assert (cn = N (S n)) as ->.
     { destruct cn; inversion Hvalid. by simplify_eq. }
     (* Update the model state to maintain program correspondence *)
     iApply (wp_step_model_singlerole _ _ (():fmrole cn_fair_model) (f - 7)
              with "Hs [Hf] Hr").
     { constructor. }
-    { set_solver. }
+    { simpl. destruct n; set_solver. }
     { by replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia. }
     iApply (wp_store with "Hl").
     iIntros "!> Hl Hs Hf Hr".
     wp_pures.
     iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
-    { apply (excl_auth_update _ _ (Z.of_nat (S n))%Z). }
+    { apply (excl_auth_update _ _ (Z.of_nat n)%Z). }
     iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
-    { iExists (N (S n)). iFrame. }
+    { iExists (N n). iFrame. }
     iApply fupd_mask_intro; [done|].
     iIntros "H". iMod "H".
     iModIntro. simpl. wp_pures.
