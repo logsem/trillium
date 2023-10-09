@@ -146,9 +146,8 @@ Section finitary.
                   (∀ ρ : fmrole M, ρ ∈ live_roles M δ' → ∃ (ζ : locale Λ) (fs : gmap (fmrole M) nat),
                         ls_map δ' !! ζ = Some fs ∧ ρ ∈ dom fs)).
       - simpl. do 2 f_equal. destruct δ'. simpl. destruct ls_data. f_equal.
-        Require Import Coq.Logic.ProofIrrelevance.
-        apply proof_irrelevance.
-        apply proof_irrelevance.
+        eapply proof_irrel.
+        eapply proof_irrel.
       - pose proof ls_map_live δ'. done. }
 
     unfold enumerate_next.
@@ -221,6 +220,8 @@ Section finitary.
 
       Unshelve.
       + intros ??. apply make_decision.
+      + intros. apply make_proof_irrel.
+      + intros. apply make_proof_irrel.
       + intros. apply make_proof_irrel.
       + done.
   Qed.
@@ -298,9 +299,8 @@ Section finitary_simple.
                   (∀ ρ : fmrole M, ρ ∈ live_roles M δ' → ∃ (ζ : locale Λ) (fs : gmap (fmrole M) nat),
                         ls_map δ' !! ζ = Some fs ∧ ρ ∈ dom fs)).
       - simpl. do 2 f_equal. destruct δ'. simpl. destruct ls_data. f_equal.
-        Require Import Coq.Logic.ProofIrrelevance.
-        apply proof_irrelevance.
-        apply proof_irrelevance.
+        eapply proof_irrel.
+        eapply proof_irrel.
       - pose proof ls_map_live δ'. done. }
 
     unfold enumerate_next.
@@ -373,6 +373,8 @@ Section finitary_simple.
 
       Unshelve.
       + intros ??. apply make_decision.
+      + intros. apply make_proof_irrel.
+      + intros. apply make_proof_irrel.
       + intros. apply make_proof_irrel.
       + done.
   Qed.
