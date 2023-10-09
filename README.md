@@ -56,9 +56,9 @@ make -jN
   about fair termination of concurrent programs.
   + [`heap_lang/`](fairis/heap_lang/): HeapLang instantiation with fuel model
     * [`examples/`](fairis/heap_lang/examples/): Examples and case studies
-      - [`yesno/`](fairis/examples/yesno): Yes/No
-      - [`even_odd/`](fairis/examples/even_odd): Even/Odd
-      - [`choose_nat/`](fairis/examples/choose_nat): Choose nat
+      - [`yesno/`](fairis/heap_lang/examples/yesno): Yes/No
+      - [`even_odd/`](fairis/heap_lang/examples/even_odd): Even/Odd
+      - [`choose_nat/`](fairis/heap_lang/examples/choose_nat): Choose nat
   
 - [`aneris/`](aneris/): The Aneris instantiation of Trillium for reasoning about
     refinement of distributed systems.
