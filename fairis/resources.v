@@ -856,7 +856,6 @@ Section model_state_lemmas.
     set_solver.
   Qed.
 
-  (* TODO: Clean this up *)
   Lemma model_state_interp_can_fuel_step es δ ζ fs :
     fs ≠ ∅ → model_state_interp es δ -∗ has_fuels_S ζ fs -∗
     ⌜model_can_fuel_step δ ζ ((model_update_locale_fuel δ ζ) (dom fs))⌝.
@@ -1054,7 +1053,6 @@ Section model_state_lemmas.
     {| ls_under := δ2;
       ls_map := δ1.(ls_map); |}.
 
-  (* Ugh *)
   Lemma model_update_state_valid (δ2 : M) (δ1 : LM) :
     M.(live_roles) δ2 ⊆ M.(live_roles) δ1 →
     ∃ δ, (ls_data δ) = model_update_state δ2 δ1.
@@ -1081,7 +1079,6 @@ Section model_state_lemmas.
           (ζ : locale Λ) (ρs : gset (fmrole M)) ρ (δ2 : M) (δ : LM) : M :=
     model_update_state δ2 $ model_update_set ζ ρ (LM.(lm_fl) δ2) $ model_update_decr ζ $ model_update_filter ζ ρs δ.
 
-  (* UGH! *)
   Lemma model_update_model_step_valid (ζ : locale Λ) (ρs : gset (fmrole M)) ρ (s2 : M) (δ1:LM) :
     M.(live_roles) s2 ⊆ M.(live_roles) (ls_under δ1) →
     ∃ δ, (ls_data δ) = model_update_model_step ζ ρs ρ s2 δ1.
@@ -1130,8 +1127,7 @@ Section model_state_lemmas.
     rewrite Hδ2. iFrame.
     iPureIntro.
     split; [|split].
-    - (* TODO: Find a good way to prove this *)
-      split; last first.
+    - split; last first.
       { simpl.
         destruct Hfmle as [Hfmle Hdom].
         pose proof Hfmle as Hfmle'.
@@ -1235,7 +1231,6 @@ Section model_state_lemmas.
   Definition model_can_model_step (δ1 : LM) (ζ : locale Λ) (ρ : fmrole M) (δ2 : LM) : Prop :=
     ∃ (fs fs' : gmap (fmrole M) nat),
       fmtrans _ δ1 (Some ρ) δ2 ∧
-      (* OBS: This pertains to resurrection, but is needed *)
       M.(live_roles) δ2 ⊆ M.(live_roles) δ1 ∧
       δ1.(ls_map) !! ζ = Some fs ∧
       δ2.(ls_map) = <[ζ := fs']> δ1.(ls_map) ∧
@@ -1416,7 +1411,6 @@ Section model_state_lemmas.
     zs ⊆ ys → xs ## ys → xs ## zs.
   Proof. intros Hle Hdisj x Hxs Hzs. eapply Hdisj; [done|by apply Hle]. Qed.
 
-  (* Ugh *)
   Lemma model_update_split_valid ζ ζf ρs (δ1 : LM) :
     ζ ∈ dom δ1.(ls_map) → ζf ∉ dom δ1.(ls_map) →
     ∃ δ2, (ls_data δ2) = model_update_split ζ ζf ρs δ1.
@@ -1539,7 +1533,6 @@ Section model_state_lemmas.
     model_update_decr ζ $
     model_update_filter ζ ρs1 δ.
 
-  (* Ugh *)
   Lemma model_update_fork_valid
         ζ ζf (ρs1 ρs2 : gset (fmrole M)) (δ1 : LM) :
     ζ ∈ dom δ1.(ls_map) → ζf ∉ dom δ1.(ls_map) →
@@ -1626,8 +1619,7 @@ Section model_state_lemmas.
     iModIntro. iFrame. iExists _. iFrame. rewrite Hδ2. iFrame.
     iPureIntro.
     split; [|split].
-    - (* TODO: Find a good way to prove this *)
-      split; last first.
+    - split; last first.
       { simpl.
         destruct Hfmle as [Hfmle Hdom].
         pose proof Hfmle as Hfmle'.
@@ -1765,7 +1757,6 @@ Section model_state_lemmas.
       done.
   Qed.
 
-  (* TODO: Need to update this to reflect fork requirements. *)
   Definition model_can_fork_step (δ1 : LM) (ζ ζf : locale Λ) (δ2 : LM) : Prop :=
     ∃ fs fs1 fs2,
       δ1.(ls_under) = δ2.(ls_under) ∧
@@ -1996,7 +1987,6 @@ Section model_state_lemmas.
         rewrite -(dom_fmap_L S).
         eapply fuel_map_le_live_roles; [| | |apply Hagree'|..].
         - intros ????. by apply δ1.(ls_map_disj).
-        (* TODO: Fix this by unifying defs *)
         - rewrite /fuel_map_le_inner map_included_spec.
           eapply Hfmle.
         - done.
@@ -2096,17 +2086,13 @@ Section model_state_lemmas.
     frag_free_roles_are (fr1 ∖ rem).
   Proof.
     iIntros (?) "HFR Hfr1".
-
     iDestruct (free_roles_inclusion with "HFR Hfr1") as %Hincl.
-
     replace FR with ((FR ∖ rem) ∪ rem); last first.
     { rewrite difference_union_L. set_solver. }
     replace fr1 with ((fr1 ∖ rem) ∪ rem); last first.
     { rewrite difference_union_L. set_solver. }
-
     iAssert (frag_free_roles_are (fr1 ∖ rem) ∗ frag_free_roles_are rem)%I with "[Hfr1]" as "[Hfr2 Hrem]".
     { rewrite /frag_free_roles_are -own_op -auth_frag_op gset_disj_union //. set_solver. }
-
     iCombine "HFR Hrem" as "H".
     iMod (own_update with "H") as "[??]" ; eauto.
     - apply auth_update, gset_disj_dealloc_local_update.

@@ -346,7 +346,6 @@ Definition ξ_evenodd_trace (l : loc) (extr : execution_trace heap_lang)
            (auxtr : finite_trace the_fair_model (option EO)) :=
   ξ_evenodd l (trace_last extr) (trace_last auxtr).
 
-(* TODO: This could be simplified to use [ξ_evenodd_model_match] *)
 Lemma evenodd_aux_ex_progress_preserved l (extr : heap_lang_extrace) (auxtr : auxtrace the_model) :
   traces_match labels_match (λ c (δ:the_model), ξ_evenodd l c δ) locale_step
   (lm_ls_trans the_model) extr auxtr →

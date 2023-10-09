@@ -185,7 +185,6 @@ Section proof.
         iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
         { iNext. iExists _, _. iFrame. simpl. iFrame. by iPureIntro. }
         iApply fupd_mask_intro; [done|]. iMod 1. iModIntro.
-        (* TODO: Needing this is a bit bad. Maybe add simple to wp_pures? *)
         simpl in *. wp_load. wp_store. wp_load. wp_pure _. simplify_eq. simpl.
         iApply wp_atomic.
         iInv Ns as (M B) "(>%Hbever' & >HFR & >Hmod & >Hb & Hauths)" "Hclose".

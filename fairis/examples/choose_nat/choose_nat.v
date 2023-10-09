@@ -213,7 +213,6 @@ Section proof.
       { apply (excl_auth_update _ _ 0%Z). }
       iMod ("Hclose" with "[Hs Hl Hcn]") as "_".
       { iExists (N 0). iFrame. }
-      (* There should be a better way of doing this. *)
       iApply fupd_mask_intro; [done|].
       iIntros "H". iMod "H".
       iModIntro. by iApply "HΦ". }

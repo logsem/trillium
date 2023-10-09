@@ -345,7 +345,7 @@ Proof.
   iApply (wp_wand with "Hwp"). iIntros (v) "HΦ'". by iFrame.
 Qed.
 
-(* TODO: Move this to lang.v? *)
+(* TODO: Move this somewhere else *)
 Lemma heap_lang_locales_equiv_from_length (es10 es1 es20 es2 : list expr) :
   length es10 = length es20 → length es1 = length es2 →
   locales_equiv_from es10 es20 es1 es2.
@@ -502,7 +502,6 @@ Proof.
   iModIntro.
   iSplit; [|done].
   iApply "HΦ".
-  (* TODO: Improve this so we hide the (arbitrary) choice of `n` *)
   Unshelve. all: apply O.
 Qed.
 
