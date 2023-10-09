@@ -11,7 +11,8 @@ mechanized in the [Coq proof assistant](https://coq.inria.fr/).
 
 - [`fairis/`](fairis/): The Fairis instantiation of Trillium for reasoning
   about fair termination of concurrent programs.
-  * [`examples/`](fairis/examples/): Examples and case studies
+  + [`heap_lang/`](fairis/heap_lang/): HeapLang instantiation with fuel model
+    * [`examples/`](fairis/heap_lang/examples/): Examples and case studies
 
 - [`external/`](external/): External dependencies
 

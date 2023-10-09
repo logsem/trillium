@@ -2,12 +2,11 @@ From Paco Require Import paco1 paco2 pacotac.
 From iris.base_logic.lib Require Import invariants.
 From iris.algebra Require Import excl_auth.
 From iris.proofmode Require Import tactics.
-From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
+From trillium.program_logic Require Export weakestpre.
+From trillium.fairness Require Import fairness fair_termination fairness_finiteness trace_utils.
 From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
-From trillium.fairness Require Import trace_utils.
-From trillium.fairness.examples.even_odd Require Import even_odd.
+From trillium.fairness.heap_lang.examples.even_odd Require Import even_odd.
 From stdpp Require Import finite.
 
 (** Helper lemmas for working with even and odd *)

@@ -1,9 +1,9 @@
-From trillium.fairness.examples.yesno Require Import yesno.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
+From trillium.fairness.heap_lang.examples.yesno Require Import yesno.
 
 From stdpp Require Import finite.
 

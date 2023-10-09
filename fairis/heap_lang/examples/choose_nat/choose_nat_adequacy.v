@@ -8,7 +8,7 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode notation adequacy.
-From trillium.fairness.examples Require Import choose_nat.
+From trillium.fairness.heap_lang.examples Require Import choose_nat.
 
 Import derived_laws_later.bi.
 
