@@ -92,8 +92,7 @@ make -jN
 | Non-deterministic nat | [`fairis/heap_lang/examples/choose_nat/choose_nat_adequacy.v`](fairis/heap_lang/examples/choose_nat/choose_nat.v)                     | `ξ_cn`    |
 | Even-Odd              | [`fairis/heap_lang/examples/even_odd/even_odd.v`](fairis/heap_lang/examples/even_odd/even_odd.v)                             | `start`, `the_model`, `evenodd_inv` `start_spec`                                                                        |
 | Even-Odd              | [`fairis/heap_lang/examples/even_odd/even_odd_adequacy.v`](fairis/heap_lang/examples/even_odd/even_odd_adequacy.v)           | `evenodd_mdl_progress`, `evenodd_mdl_mono`, `ξ_evenodd_trace`                                                           |
-| Fuel map ownership (𝜁 ⇒ fs)      | [`fairis/resources.v`](fairis/resources.v) | `has_fuels 𝜁 fs` |
-| Model fragment ownership (◦𝛾M (m))      | [`fairis/resources.v`](fairis/resources.v) | `frag_model_is m` |
+| Fairis resources (𝜁 ⇒ fs, ◦𝛾M (m))      | [`fairis/resources.v`](fairis/resources.v) | `has_fuels 𝜁 fs`, `frag_model_is m` |
 | Aneris-take-step      | [`aneris/aneris_lang/program_logic/aneris_lifting.v`](aneris/aneris_lang/program_logic/aneris_lifting.v) | `aneris_wp_atomic_take_step_model_alt`                                                                                  |
 | Paxos, code           | [`aneris/examples/consensus/paxos_code.v`](aneris/examples/consensus/paxos_code.v)                       | `acceptor`, `proposer`, `learner`, `client`                                                                             |
 | Paxos, model          | [`aneris/examples/consensus/paxos_model.v`](aneris/examples/consensus/paxos_model.v)                     | `PNext`, `paxos_correct`                                                                                                |
