@@ -910,8 +910,6 @@ Section crdt_main_rel.
              ∃ l, ex' = ex +trl+ l ∧
                   gcounter_monotone_locs_resolved locs (trace_last ex :: map snd l)) ex iex).
 
-  (* TODO: put in aneris *)
-
   Lemma monotone_from_now_on_unroll_n n locs ex iex :
     monotone_from_now_on locs ex iex →
     monotone_from_now_on locs (ex +trl+ inflist_take n iex) (inflist_drop n iex).

@@ -24,7 +24,6 @@ Import RecordSetNotations.
 Section state_interpretation.
   Context `{!anerisG Mdl Σ}.
 
-  (* TODO: Move this elsehwere and use it where we now use ad hoc induction *)
   Lemma fupd_elim_laterN E1 E2 n (P:iProp Σ) :
     E2 ⊆ E1 → P -∗ |={E1,E2}=> |={E2}▷=>^n |={E2,E1}=> P.
   Proof.

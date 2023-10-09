@@ -50,7 +50,6 @@ Proof.
     eapply finite_smaller_card_nat=> /=.
     eapply (in_list_finite [(Z_CN (heap c'.2 !!! l), None);
                             (Z_CN (heap c'.2 !!! l), Some ())]).
-    (* TODO: Figure out why this does not unify with typeclass *)
     Unshelve. 2: intros x; apply make_proof_irrel.
     intros [cn o] [cn' [Hextr Hatr]].
     rewrite Hextr Z_CN_CN_Z -Hatr. destruct o; [destruct u|]; set_solver. }

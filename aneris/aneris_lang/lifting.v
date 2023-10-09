@@ -1663,7 +1663,6 @@ Section primitive_laws.
     iNext. iIntros (r) "Hr". iApply "HΦ"; eauto.
   Qed.
 
-  (* TODO: Same as non-alt - Delete? *)
   Lemma wp_receivefrom_nb_alt k a E ζ sh skt R T φ :
     let ip := ip_of_address a in
     saddress skt = Some a →

@@ -21,7 +21,6 @@ Class irisG (Λ : language) (M : Model) (Σ : gFunctors) := IrisG {
 }.
 Global Opaque iris_invGS.
 
-(* TODO: Move this *)
 Definition pre_step_def `{!irisG Λ M Σ} E1 E2 (P:iProp Σ) : iProp Σ :=
   ∀ extr atr, state_interp extr atr ={E1,E2}=∗
               state_interp extr atr ∗ P.

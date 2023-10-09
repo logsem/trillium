@@ -107,7 +107,6 @@ Definition aux_init := PInit : Paxos_model runner_topo.
 
 Import RecordSetNotations.
 
-(* TODO: move *)
 Definition int_deser : string → option Z := ZOfString.
 Definition nat_deser : string → option nat := λ s, Z.to_nat <$> int_deser s.
 Definition inl_deser {A} (f : string → option A) (s : string) :=

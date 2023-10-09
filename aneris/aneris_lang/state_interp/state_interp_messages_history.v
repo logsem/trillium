@@ -18,7 +18,6 @@ Set Default Proof Using "Type".
 Import uPred.
 Import RecordSetNotations.
 
-(* TODO: move to stdpp? *)
 Lemma elem_of_list_to_set_disj `{EqDecision A, Countable A} (x : A) l:
   x ∈ l -> x ∈ (list_to_set_disj l : gmultiset _).
 Proof.
@@ -81,7 +80,6 @@ Proof.
   - by apply map_disjoint_singleton_l_2.
 Qed.
 
-(* TODO: deduplicate all the subseteq lemmas in this file. *)
 Lemma buffers_subseteq_new_socket S Sn ip sh :
   S !! ip = Some Sn →
   Sn !! sh = None →
@@ -230,7 +228,6 @@ Proof.
   set_solver.
 Qed.
 
-(* TODO: add to stdpp *)
 Section more_lemmas.
   Context `{Countable A}.
   Implicit Types x y : A.

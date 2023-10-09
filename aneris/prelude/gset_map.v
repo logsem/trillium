@@ -1,8 +1,6 @@
 From Coq.ssr Require Import ssreflect.
 From stdpp Require Import gmap functions.
 
-(* TODO: outphase this; [set_map] already exists in std++, a few lemmas need
-   upstreaming *)
 Section gset_map.
   Context `{EqDecision A, !Countable A, !EqDecision B, !Countable B}.
 
@@ -54,12 +52,10 @@ Section gset_map.
       rewrite fn_lookup_insert_ne; set_solver.
   Qed.
 
-  (* TODO: upstream? *)
   Lemma gset_map_intersection f `{!Inj (=) (=) f} X Y :
     gset_map f (X ∩ Y) = gset_map f X ∩ gset_map f Y.
   Proof. set_solver. Qed.
 
-  (* TODO: upstream? *)
   Lemma gset_map_size X f `{!Inj (=) (=) f} :
     size (gset_map f X) = size X.
   Proof.
@@ -179,7 +175,6 @@ End gset_flat_map.
 Section elements.
   Context `{Countable A, Countable B}.
 
-  (* TODO: upstream? *)
   Lemma elements_fmap (f : A → B) `{!Inj (=) (=) f} (X : gset A) :
     f <$> elements X ≡ₚ elements (gset_map f X).
   Proof.

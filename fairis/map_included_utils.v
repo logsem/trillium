@@ -1,7 +1,6 @@
 From Coq Require Import ssreflect.
 From stdpp Require Import gmap.
 
-(* TODO: Make context, and generalise lemmas to canonical representation *)
 Lemma map_included_spec `{∀ A, Lookup K A (MAP A)} {A}
       (R : relation A) (m1 m2 : MAP A) :
   map_included R m1 m2 ↔
@@ -45,8 +44,6 @@ Lemma map_included_refl `{∀ A, Lookup K A (MAP A)} {A}
   map_included R m m.
 Proof. rewrite map_included_spec. intros. by eauto. Qed.
 
-(* TODO: Move *)
-(* TODO: Generalise to map_included instead of subseteq? *)
 Lemma map_included_subseteq `{∀ A, Lookup K A (MAP A)} {A}
       (R : relation A) (m1 m2 m3 : MAP A) :
   m1 ⊆ m2 → map_included R m2 m3 → map_included R m1 m3.
@@ -60,7 +57,6 @@ Proof.
   by subst.
 Qed.
 
-(* TODO: Generalise to better typeclasses *)
 Lemma map_included_subseteq_inv `{Countable K} {V}
       (R : relation V) (m1 m2 : gmap K V) :
   map_included R m1 m2 → (dom m1) ⊆ (dom m2).
@@ -84,7 +80,6 @@ Proof.
   by etransitivity.
 Qed.
 
-(* TODO: Generalize types *)
 Lemma map_included_fmap `{Countable K} {A}
       (R : relation A) (m : gmap K A) (f : A → A) :
   (∀ x:A, R x (f x)) → map_included R m (f <$> m).

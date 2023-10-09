@@ -522,7 +522,6 @@ Section model_state_lemmas.
       set_solver.
   Qed.
 
-  (* TODO: Move this *)
   Lemma silent_step_suff_data_weak fl `(δ: LiveState Λ M)
         (fs fs' : gmap _ nat) ζ :
     δ.(ls_map) !! ζ = Some fs →
@@ -541,7 +540,6 @@ Section model_state_lemmas.
     - set_solver.
   Qed.
 
-  (* TODO: Change original lemma to not existentially quantify new state *)
   Lemma silent_step_suff_data_weak_alt fl (δ δ' : LiveState Λ M)
         (fs fs' : gmap _ nat) ζ :
     δ.(ls_under) = δ'.(ls_under) →
@@ -832,7 +830,6 @@ Section model_state_lemmas.
     rewrite map_disjoint_spec in Hdisj. by eapply Hdisj.
   Qed.
 
-  (* TODO: Clean up *)
   Lemma fuel_map_le_live_roles fm fm' (lρs : gset (fmrole M)) ζ ρs ρs' ρ :
     map_inner_disj fm' → fuel_map_le_inner fm fm' →
     fuel_map_preserve_dead fm lρs →
@@ -1316,8 +1313,7 @@ Section model_state_lemmas.
         simplify_eq.
         lia.
       + by rewrite option_guard_False in HSome.
-    - (* TODO: Make a lemma for this *)
-      simpl.
+    - simpl.
       rewrite dom_alter_L.
       rewrite dom_fmap_L.
       clear.
@@ -1789,7 +1785,6 @@ Section model_state_lemmas.
     - set_solver.
   Qed.
 
-  (* TODO: Change original lemma to not existentially quantify new state *)
   Lemma silent_step_suff_data_fork_weak_alt fl (δ δ': LiveState Λ M)
         (fs fs1 fs2 : gmap _ nat) ζ ζf :
     δ.(ls_under) = δ'.(ls_under) →
@@ -1933,7 +1928,6 @@ Section model_state_lemmas.
           rewrite -(dom_fmap_L S).
           eapply fuel_map_le_live_roles; [| | |apply Hagree'|..].
           - intros ????. by apply δ1.(ls_map_disj).
-            (* TODO: Fix this by unifying defs *)
           - rewrite /fuel_map_le_inner map_included_spec.
             eapply Hfmle.
           - done.

@@ -9,7 +9,6 @@ From trillium.program_logic Require Export weakestpre traces.
 Set Default Proof Using "Type".
 Import uPred.
 
-(* TODO: move *)
 Lemma step_tp_length {Λ} c c' oζ:
   locale_step (Λ := Λ) c oζ c' → length c.1 ≤ length c'.1.
 Proof.
@@ -373,7 +372,6 @@ Section from_locale.
 
 End from_locale.
 
-(* TODO: Move *)
 Lemma Forall2_eq {A B} (f : A → B) xs ys :
   Forall2 (λ x y, f x = f y) xs ys ↔ f <$> xs = f <$> ys.
 Proof.
@@ -558,13 +556,10 @@ Section locales_utils.
     done.
   Qed.
 
-  (* TODO: Find an alternative to this. Used to resolve coercions. *)
   Lemma fmap_fmap : forall (A B C:Type)(f:A->B)(g:B->C) (l : list A),
     g <$> (f <$> l) = (fun x => g (f x)) <$> l.
   Proof. apply map_map. Qed.
 
-  (* TODO: this can likely be removed by redefining [locale_of]
-   to take one argument *)
   Lemma locales_of_list_from_fork_post `{!irisG Λ M Σ}
         (xs ys : list ((list $ expr Λ) * (expr Λ))) :
     (λ '(t,e), locale_of t e) <$> xs =
@@ -842,7 +837,6 @@ Section adequacy_helper_lemmas.
       {{ v, fork_post (locale_of (t ++ take i efs) ef) v }})
     ⊣⊢ wptp_from t s efs (newposts t (t ++ efs))).
   Proof.
-    (* TODO: factorize the two halves *)
     rewrite big_sepL2_alt; iSplit.
     - iIntros "H". iSplit.
       { rewrite drop_app_alt // map_length !prefixes_from_length //. }
@@ -1153,7 +1147,6 @@ Proof.
   iMod "Hstp".
   iModIntro.
   iIntros "HFtB".
-  (* TODO: This should be generalisable in a lemma *)
   iInduction n as [|n] "IHlen"; simpl; last first.
   { rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iApply except_0_later.
@@ -1185,7 +1178,6 @@ Proof.
   (* iDestruct ("H" with "Hpost") as "[? Hξ]". *)
   iModIntro.
   iIntros "HFtB".
-  (* TODO: Generalise this as its own lemma *)
   assert (Hlocales: ((λ '(tnew, e), weakestpre.fork_post (locale_of tnew e)) <$>
                      (prefixes_from es (drop (length es) tp))) ++
                     ((λ '(tnew, e), weakestpre.fork_post (locale_of tnew e)) <$>

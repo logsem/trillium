@@ -10,8 +10,7 @@ Definition auxtrace_fairly_terminating {Λ} `{Countable (locale Λ)} {Mdl : Fair
 
 Theorem continued_simulation_fair_termination
         `{FairTerminatingModel FM} `{Countable (locale Λ)} (LM:LiveModel Λ FM)
-        (ξ : execution_trace Λ → auxiliary_trace LM → Prop) a1 r1 extr :
-  (* TODO: This is required for destruttering - Not sure why *)
+        (ξ : execution_trace Λ → auxiliary_trace LM → Prop) a1 r1 extr :  
   (∀ c c', locale_step (Λ := Λ) c None c' -> False) →
   (* The relation must capture that live tids correspond *)
   (forall (ex: execution_trace Λ) (atr: auxiliary_trace LM),

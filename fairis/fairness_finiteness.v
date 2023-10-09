@@ -55,7 +55,6 @@ Section finitary.
     exists (exist _ (δ', ℓ) Hxi). split =>//. apply elem_of_enum.
   Qed.
 
-  (* TODO: move *)
   Fixpoint trace_map {A A' L L'} (sf: A → A') (lf: L -> L') (tr: finite_trace A L): finite_trace A' L' :=
   match tr with
   | trace_singleton x => trace_singleton $ sf x
@@ -380,7 +379,6 @@ Section finitary_simple.
   Qed.
 End finitary_simple.
 
-(* TODO: Why do we need [LM] explicit here? *)
 Definition live_rel `{Countable (locale Λ)} `(LM: LiveModel Λ M)
            (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
   live_tids (LM:=LM) (trace_last ex) (trace_last aux).
@@ -394,7 +392,6 @@ Definition sim_rel_with_user `{Countable (locale Λ)} `(LM: LiveModel Λ M)
   (ex : execution_trace Λ) (aux : auxiliary_trace LM) :=
   sim_rel LM ex aux ∧ ξ ex (map_underlying_trace aux).
 
-(* TODO: Maybe redefine [sim_rel_with_user] in terms of [valid_lift_fairness] *)
 Lemma valid_lift_fairness_sim_rel_with_user
       `{Countable (locale Λ)} `{LM:LiveModel Λ Mdl}
       (ξ : execution_trace Λ → finite_trace Mdl (option $ fmrole Mdl) →
@@ -412,7 +409,6 @@ Proof.
   intros Hrel.
   eapply rel_finitary_impl.
   { intros ex aux. by eapply valid_lift_fairness_sim_rel_with_user.
-    (* TODO: Figure out if these typeclass subgoals should be resolved locally *)
     Unshelve.
     - intros ??. apply make_decision.
     - intros ??. apply make_decision. }

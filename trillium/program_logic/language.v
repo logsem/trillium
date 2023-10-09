@@ -406,8 +406,6 @@ Section language.
 
   Notation pure_steps_tp := (Forall2 (rtc pure_step)).
 
-  (* TODO: Exclude the case of [n=0], either here, or in [wp_pure] to avoid it
-  succeeding when it did not actually do anything. *)
   Class PureExec (φ : Prop) (n : nat) (e1 e2 : expr Λ) :=
     pure_exec : φ → relations.nsteps pure_step n e1 e2.
 

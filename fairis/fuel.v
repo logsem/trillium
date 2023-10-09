@@ -44,7 +44,6 @@ Section fairness.
     rewrite map_union_comm //.
     apply map_disjoint_dom_2. rewrite !dom_gset_to_gmap //.
   Qed.
-  (*TODO: why commute above and comm below? *)
 
   Lemma ls_same_doms δ: dom $ ls_mapping δ = dom $ ls_fuel δ.
   Proof.
@@ -655,7 +654,7 @@ Section aux_trace.
     intros Hval n. revert tr Hval. induction n as [|n]; intros tr Hval;
       destruct (after _ tr) as [trn|] eqn: Heq =>//; simpl in Heq;
       simplify_eq; destruct trn =>//; inversion Hval; simplify_eq; try done.
-    specialize (IHn _ H1) (* TODO *). rewrite Heq in IHn. done.
+    specialize (IHn _ H1). rewrite Heq in IHn. done.
   Qed.
 
 End aux_trace.
@@ -964,7 +963,6 @@ Section fairness_preserved.
                 | [H: P |- _] => inversion H; clear H; simplify_eq
                                           end.
 
-  (* TODO: Why do we need explicit [LM] here? *)
   Definition valid_state_evolution_fairness
              (extr : execution_trace Λ) (auxtr : auxiliary_trace LM) :=
     match extr, auxtr with
@@ -979,7 +977,6 @@ Section fairness_preserved.
              (extr : execution_trace Λ) (auxtr : auxiliary_trace LM) :=
     valid_state_evolution_fairness extr auxtr ∧ φ extr auxtr.
 
-  (* TODO: Why do we need explicit [LM] here? *)
   Lemma valid_inf_system_trace_implies_traces_match_strong
         (φ : execution_trace Λ -> auxiliary_trace LM -> Prop)
         (ψ : _ → _ → Prop)
@@ -1019,7 +1016,6 @@ Section fairness_preserved.
       + eapply IH; eauto.
   Qed.
 
-  (* TODO: Why do we need explicit [LM] here? *)
   Lemma valid_inf_system_trace_implies_traces_match
         (φ: execution_trace Λ -> auxiliary_trace LM -> Prop)
         ex atr iex iatr progtr (auxtr : auxtrace LM):
@@ -1178,7 +1174,7 @@ Section upto_stutter_preserves_fairness_and_termination.
 
   Notation upto_stutter_aux := (upto_stutter (λ x, ls_under (Λ := Λ) (ls_data x)) (Ul (Λ := Λ) (LM := LM))).
 
-  Lemma upto_stutter_mono'' : (* TODO fix this proliferation *)
+  Lemma upto_stutter_mono'' :
     monotone2 (upto_stutter_ind (λ x, ls_under (Λ:=Λ) (M:=M) (ls_data x)) (Ul (LM:=LM))).
   Proof.
     unfold monotone2. intros x0 x1 r r' IN LE.

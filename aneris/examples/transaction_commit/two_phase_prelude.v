@@ -260,7 +260,6 @@ Section tpc_prelude.
     - by iDestruct (pending_discarded_shot with "Hpend Hshot") as %?.
   Qed.
 
-  (* TODO: upstream? *)
   Lemma big_sepS_set_seq `{Countable A} n (P : iProp Σ) (X : gset A) :
     ([∗ set] _ ∈ X, P) ⊢ [∗ set] _ ∈ set_seq n (size X), P.
   Proof.

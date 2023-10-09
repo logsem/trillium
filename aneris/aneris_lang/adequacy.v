@@ -29,7 +29,6 @@ Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :
                              | None => ∅
                              end ∪ A) ∅ skts ∪ A) ∅ skts.
 
-(* TODO: Can this be generalised? *)
 Lemma ports_in_use_empty_map M :
   ports_in_use (gset_to_gmap ∅ M) = ∅.
 Proof.
