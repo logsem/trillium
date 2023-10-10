@@ -106,24 +106,6 @@ Proof.
   - by intros ex atr [[??]?].
 Qed.
 
-Definition rel_always_holds {Σ} `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}
-           (s:stuckness) (ξ : execution_trace heap_lang → finite_trace M
-                  (option $ fmrole M) → Prop) (c1:cfg heap_lang)
-           (c2:live_model_to_model LM) : iProp Σ :=
-  ∀ ex atr c,
-    ⌜valid_system_trace ex atr⌝ -∗
-    ⌜trace_starts_in ex c1⌝ -∗
-    ⌜trace_starts_in atr c2⌝ -∗
-    ⌜trace_ends_in ex c⌝ -∗
-    ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' →
-                      trace_contract atr ℓ atr' →
-                      ξ ex' (map_underlying_trace atr')⌝ -∗
-    ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-    state_interp ex atr -∗
-    posts_of c.1 ((λ _, 0%nat ↦M ∅) :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from c1.1 (drop (length c1.1) c.1)))) -∗
-    |={⊤, ∅}=> ⌜ξ ex (map_underlying_trace atr)⌝.
-
-
 Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
     `{!heapGpreS Σ LM} (s: stuckness) (e1 : expr) σ1 (s1: M) (FR: gset _)
     (ξ : execution_trace heap_lang → finite_trace M (option $ fmrole M) →
@@ -138,7 +120,7 @@ Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1)) ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, 0%nat ↦M ∅ }} ∗
-       rel_always_holds s ξ ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) ->
+       rel_always_holds s [λ _, 0%nat ↦M ∅] (λ extr atr, ξ extr (map_underlying_trace atr)) ([e1], σ1) (initial_ls (LM := LM) s1 0%nat)) ->
   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
   intros Hfin Hfevol H.
@@ -189,7 +171,7 @@ Proof.
                 :: ((λ '(tnew, e), fork_post (language.locale_of tnew e)) <$>
                     prefixes_from [e1] (drop (length [e1]) c.1))))%I with "[Hsi H Hposts]" as "H".
   { iApply fupd_plain_keep_l. iFrame. iIntros "[Hsi Hposts]".
-    iSpecialize ("H" with "Hsi Hposts").
+    iSpecialize ("H" with "[//] Hsi Hposts").
     by iApply fupd_plain_mask_empty. }
   iMod "H" as "[H1 [Hsi Hposts]]".
   destruct ex as [c'|ex' tid (e, σ)].
@@ -322,7 +304,7 @@ Proof.
   iIntros (Hinv) "".
   iPoseProof (H Hinv) as ">H". iModIntro. iIntros "Hσ Hm Hfr Hf". iSplitR "".
   - iApply ("H" with "Hm Hfr Hf").
-  - iIntros "!>%%%????????". iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
+  - iIntros "!>%%%?????????". iApply (fupd_mask_weaken ∅); first set_solver. by iIntros "_ !>".
 Qed.
 
 Theorem simulation_adequacy_inftraces Σ `(LM: LiveModel heap_lang M)

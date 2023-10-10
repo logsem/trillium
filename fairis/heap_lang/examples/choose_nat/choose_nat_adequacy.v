@@ -65,7 +65,7 @@ Proof.
       [lia|lia| |by eauto]=> /=.
     replace (∅ ∖ {[()]}) with (∅:gset unit) by set_solver.
     rewrite gset_to_gmap_set_to_map. iFrame. }
-  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck) "Hσ _".
+  iIntros (ex atr c Hvalid Hex Hatr Hends Hξ Hstuck Hequiv) "Hσ _".
   iInv Ns as ">H".
   iDestruct "H" as (cn) "(Hf & Hl & H●)".
   iDestruct "Hσ" as (Hvalid') "[Hσ Hs]".
