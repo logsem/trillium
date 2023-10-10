@@ -1375,6 +1375,43 @@ Theorem simulation_correspondence Λ M Σ `{!invGpreS Σ}
   continued_simulation ξ {tr[ ([e1], σ1) ]} {tr[δ1]}.
 Proof. by apply simulation_correspondence_multiple. Qed.
 
+Definition rel_always_holds_with_trace_inv `{!irisG Λ M Σ}
+           (s:stuckness) trace_inv Φs
+           (ξ : execution_trace Λ → auxiliary_trace M → Prop) (c1:cfg Λ)
+           (c2:M) : iProp Σ :=
+  (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) (c : cfg Λ),
+         ⌜valid_system_trace ex atr⌝ -∗
+         ⌜trace_starts_in ex c1⌝ -∗
+         ⌜trace_starts_in atr c2⌝ -∗
+         ⌜trace_ends_in ex c⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv c1.1 (take (length c1.1) c.1)⌝ -∗
+         state_interp ex atr -∗
+         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from c1.1 (drop (length c1.1) c.1)))) -∗
+         □ (state_interp ex atr ∗
+             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+            ={⊤}=∗ state_interp ex atr ∗ trace_inv ex atr) ∗
+         ((∀ ex' atr' oζ ℓ,
+              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+          ={⊤, ∅}=∗ ⌜ξ ex atr⌝)).
+
+Definition rel_always_holds `{!irisG Λ M Σ}
+           (s:stuckness) Φs
+           (ξ : execution_trace Λ → auxiliary_trace M → Prop) (c1:cfg Λ)
+           (c2:M) : iProp Σ :=
+  (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) (c : cfg Λ),
+         ⌜valid_system_trace ex atr⌝ -∗
+         ⌜trace_starts_in ex c1⌝ -∗
+         ⌜trace_starts_in atr c2⌝ -∗
+         ⌜trace_ends_in ex c⌝ -∗
+         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+         ⌜locales_equiv c1.1 (take (length c1.1) c.1)⌝ -∗
+         state_interp ex atr -∗
+         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from c1.1 (drop (length c1.1) c.1)))) -∗
+         |={⊤, ∅}=> ⌜ξ ex atr⌝).
+
 Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
         (s: stuckness)
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -1391,22 +1428,7 @@ Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
        wptp s es Φs ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) (c : cfg Λ),
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex (es, σ)⌝ -∗
-         ⌜trace_starts_in atr δ⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from es (drop (length es) c.1)))) -∗
-         □ (stateI ex atr ∗
-             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
-         ((∀ ex' atr' oζ ℓ,
-              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+       rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ) δ) →
   continued_simulation ξ (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
   intros Hlen Hsc Hwptp%wp_strong_adequacy_multiple_helper; [|by done..].
@@ -1428,22 +1450,7 @@ Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
        config_wp ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) (c : cfg Λ),
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr δ1⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
-         □ (stateI ex atr ∗
-             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
-         ((∀ ex' atr' oζ ℓ,
-              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+       rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1], σ1) δ1) →
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
 Proof.
   intros Hsc Hwptp%wp_strong_adequacy_helper; last done.
@@ -1465,17 +1472,7 @@ Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
        wptp s es Φs ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex (es, σ)⌝ -∗
-         ⌜trace_starts_in atr δ⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from es (drop (length es) c.1)))) -∗
-         |={⊤, ∅}=> ⌜ξ ex atr⌝)) ->
+       rel_always_holds s Φs ξ (es, σ) δ) →
   continued_simulation ξ (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
   intros Hlen Hsc Hwptp.
@@ -1504,17 +1501,7 @@ Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
        config_wp ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr δ1⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
-         |={⊤, ∅}=> ⌜ξ ex atr⌝)) ->
+       rel_always_holds s [Φ] ξ ([e1], σ1) δ1) →
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
 Proof.
   intros Hsc Hwptp.
@@ -1643,22 +1630,7 @@ Corollary adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), 
        ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
        wptp s es Φs ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex (es, σ1)⌝ -∗
-         ⌜trace_starts_in atr δ1⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from es (drop (length es) c.1)))) -∗
-         □ (stateI ex atr ∗
-             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
-         ((∀ ex' atr' oζ ℓ,
-              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+       rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ1) δ1) →
   adequate_multiple s es σ1 ((λ φ v _, φ v) <$> φs).
 Proof.
   pose (ξ' := λ ex aux, ξ ex aux ∧ wp_adequacy_relation Λ M s φs ex aux).
@@ -1716,22 +1688,7 @@ Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecisio
        (∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr δ1⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
-         □ (stateI ex atr ∗
-             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
-         ((∀ ex' atr' oζ ℓ,
-              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+       rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1],σ1) δ1) →
   adequate s e1 σ1 (λ v _, φ v).
 Proof.
   intros Hsc Hwptp.
@@ -1767,22 +1724,7 @@ Corollary sim_and_adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mla
        ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
        wptp s es Φs ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex (es, σ1)⌝ -∗
-         ⌜trace_starts_in atr δ1⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv es (take (length es) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from es (drop (length es) c.1)))) -∗
-         □ (stateI ex atr ∗
-             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
-         ((∀ ex' atr' oζ ℓ,
-              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+       rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ1) δ1) →
   (continued_simulation ξ (trace_singleton (es, σ1)) (trace_singleton δ1) ∧
      adequate_multiple s es σ1 ((λ φ v _, φ v) <$> φs)).
 Proof.
@@ -1809,22 +1751,7 @@ Corollary sim_and_adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), E
        (∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr δ1⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
-         □ (stateI ex atr ∗
-             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
-         ((∀ ex' atr' oζ ℓ,
-              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
+       rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1],σ1) δ1) →
   (continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∧
      adequate s e1 σ1 (λ v _, φ v)).
 Proof.
