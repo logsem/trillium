@@ -48,6 +48,11 @@ nix develop
 make -jN
 ```
 
+### Codebase size and estimated compilation time
+
+The repository consists of ~52.000 lines of code,
+and takes ~10 minutes to compile (using 8 cores on an M1 2020 Macbook).
+
 ## Directory Structure
 
 - [`trillium/`](trillium/): The Trillium program logic framework
@@ -104,14 +109,26 @@ make -jN
 
 ## Differences between the paper and formalization
 
+### Validity of model traces
+
+In the paper we let definition 1.1 enforce valid transitions of the model
+(via `last(𝜏) -l> s'`).
+In the formalisation the corresponding definition omits this detail,
+and instead the individual `𝜉` relations include this property.
+The expressibility of the examples and their proofs remain similar.
+
 ### Omitted details
 
-The weakest precondition rules of the formalisation use a continuation passing style as it is easier to
-work with in Coq.
-They are also strengthened by guarding their assumptions using later modalities, to more easily apply them
-in the context of Iris invariants.
+The weakest precondition rules of the formalisation use a continuation passing
+style of the post-condition as it is easier to work with in Coq.
+This approach is common practice in Iris work, and often referred to as
+Texan Triples.
+The weakest preconditions are also strengthened by guarding their assumptions
+using later modalities, to more easily apply them in the context of Iris
+invariants.
 These differences were not reflected in the paper for brevity sake.
-Note that the expressivity of the logic remains the same between the paper and the formalisation.
+Note that the expressivity of the logic remains the same between the paper
+and the formalisation.
 
 ### Improvements since the submission of the paper
 
