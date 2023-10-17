@@ -9,4 +9,4 @@
 	url = https://github.com/snu-sf/paco.git
 [submodule "record-update"]
 	path = external/coq-record-update
-	url = git@github.com:tchajed/coq-record-update.git
+	url = https://github.com/tchajed/coq-record-update.git
