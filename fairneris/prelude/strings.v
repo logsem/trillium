@@ -136,7 +136,7 @@ Proof.
   rewrite pretty_N_go_step; last done.
   destruct (decide (x < 10)%N).
   - rewrite N.mod_small //.
-    rewrite N.div_small // pretty_N_go_0 /= ZOfAscii_pretty //.
+    rewrite N.div_small // pretty_N_go_0 /= ZOfAscii_pretty //. f_equiv. lia.
   - assert (x `div` 10 < x)%N as Hltdv.
     { apply N.div_lt; auto with lia. }
     assert (0 < x `div` 10)%N as Hdvp.
@@ -148,8 +148,7 @@ Proof.
     rewrite (IH _ Hltdv Hdvp) in Hlp.
     rewrite Hlp.
     rewrite /= ZOfAscii_pretty; last by apply N.mod_lt.
-    replace (x `div` 10 * 10)%N with (10 * x `div` 10)%N by lia.
-    rewrite -N.div_mod' //.
+    rewrite {3}(N.div_mod' x 10) //. f_equiv. lia.
 Qed.
 
 Lemma pretty_N_go_nnil m s :
@@ -361,7 +360,7 @@ Lemma append_length_gt (n : nat) s1 s2 :
   String.length s1 < n → get n (s1 +:+ s2) = get (n - String.length s1) s2.
 Proof.
   revert s2 n; induction s1; intros s2 n Hgt.
-  - rewrite append_nil_l -minus_n_O //.
+  - rewrite append_nil_l Nat.sub_0_r //.
   - destruct (gt_exists_S_n _ _ Hgt) as [m ->].
     rewrite -append_cons.
     simpl in *. apply IHs1. lia.
@@ -415,7 +414,7 @@ Proof.
   - rewrite (append_length_gt _ s2) // in Hget.
     destruct (gt_exists_S_n _ _ Hgt) as [n Hn].
     rewrite Hn in Hget.
-    rewrite -minus_Sn_m in Hget; [|lia].
+    rewrite Nat.sub_succ_l in Hget; [|lia].
     simpl in Hget. symmetry in Hget.
     by apply Hs2' in Hget.
 Qed.

@@ -1,5 +1,5 @@
 From stdpp Require Import option.
-From trillium.fairness Require Export inftraces.
+From fairneris Require Export inftraces.
 
 Definition mu_pred (S L : Type) : Type := trace S L → Prop.
 

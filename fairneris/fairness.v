@@ -1,7 +1,6 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.fairness Require Export inftraces.
-From fairneris Require Export trace_utils.
+From fairneris Require Export inftraces trace_utils.
 
 Record FairModel : Type := {
   fmstate: Type;

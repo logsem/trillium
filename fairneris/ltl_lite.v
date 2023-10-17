@@ -1,5 +1,5 @@
 From Paco Require Import paconotation.
-From trillium.fairness Require Export inftraces.
+From fairneris Require Export inftraces.
 
 Declare Scope trace_scope.
 Delimit Scope trace_scope with trace.

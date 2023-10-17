@@ -679,7 +679,7 @@ Proof.
   rewrite Heqn.
   iMod ("H" with "[//] [//] [//] Hσ") as (Hstuck) "H". iModIntro.
   iSplit; [done|].
-  iIntros (????).
+  iIntros (?????).
   iDestruct ("H" with "[//]") as "H"=> /=.
   iMod "H". iIntros "!>!>". iMod "H". iIntros "!>".
   iApply (step_fupdN_wand with "H").

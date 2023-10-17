@@ -1,7 +1,7 @@
 From iris.algebra Require Import auth agree gmap gset list.
 From iris.base_logic Require Export gen_heap.
 From iris.base_logic.lib Require Export own.
-From stdpp Require Export strings decidable coPset gmultiset gmap mapset pmap sets.
+From stdpp Require Export decidable coPset gmultiset gmap mapset pmap sets.
 From fairneris.prelude Require Import gmultiset.
 From RecordUpdate Require Import RecordSet.
 From fairneris.aneris_lang Require Import ast.
