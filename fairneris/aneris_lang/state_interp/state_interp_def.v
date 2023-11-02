@@ -9,7 +9,7 @@ From iris.base_logic.lib Require Import saved_prop gen_heap mono_nat.
 From trillium.program_logic Require Import weakestpre adequacy.
 From trillium.events Require Import event.
 From fairneris Require Import fairness.
-From fairneris.examples Require Import retransmit_model.
+From fairneris.examples Require Import retransmit_model_progress_ltl.
 From fairneris.prelude Require Import collect gset_map gmultiset.
 From fairneris.aneris_lang Require Import resources events.
 From fairneris.lib Require Import gen_heap_light.
@@ -262,26 +262,6 @@ Section Aneris_AS.
 
   Definition mAB := mkMessage saA saB "Hello".
 
-  (* Definition state_get_n s := *)
-  (*   match s with *)
-  (*   | Start => 0 *)
-  (*   | Sent n => n *)
-  (*   | Delivered n _ => n *)
-  (*   | Received n _ => n *)
-  (*   end. *)
-
-  (* Definition state_get_m s := *)
-  (*   match s with *)
-  (*   | Start => 0 *)
-  (*   | Sent _ => 0 *)
-  (*   | Delivered _ m => S m *)
-  (*   | Received _ m => m *)
-  (*   end. *)
-
-  (* Definition mABn n : message_multi_soup := *)
-  (*   Nat.iter n (λ ms, ms ⊎ {[+ mAB +]}) ∅.  *)
-  (* Definition mABm m : list message := repeat mAB m. *)
-
   (* TODO: Should align model and semantic actions / labels *)
   Definition locale_retransmit_label (ζ : ex_label aneris_lang) : option retransmit_label :=
     match ζ with
@@ -314,39 +294,46 @@ Section Aneris_AS.
              (c : cfg aneris_lang) (δ : retransmit_state) :=
     ∀ (ℓ:retransmit_node_label) ζ,
     labels_match (inl ζ) (inl ℓ) →
-    role_enabled_model ℓ δ →
-    is_Some (from_locale c.1 ζ).
+    role_enabled_model (fst ℓ : fmrole retransmit_fair_model) δ →
+    is_Some (from_locale c.1 ζ.1).
 
-  Definition config_state_valid (c : cfg aneris_lang) δ :=
-    state_ms c.2 = mABn (state_get_n δ) ∧
-    ∃ shA shB,
-    state_sockets c.2 =
-      {[ ip_of_address saA := {[shA := (sA,[])]};
-         ip_of_address saB := {[shB := (sB,mABm (state_get_m δ))]} ]}.
+  (* TODO: Can this def be improved? *)
+  Definition state_buffers (skts : gmap ip_address sockets)
+    : gmap socket_address (list message) :=
+    map_fold
+      (λ _ skts cur,
+         map_fold
+           (λ _ skt_buf cur,
+              match saddress skt_buf.1 with
+              | None => cur
+              | Some sa => <[sa := skt_buf.2]>cur
+              end)
+           cur skts)
+      ∅ skts.
+
+  Definition config_state_valid (c : cfg aneris_lang) (δ : retransmit_state) :=
+    state_ms c.2 = δ.1.2 ∧ state_buffers (state_sockets c.2) = δ.2.
 
   Definition auxtr_valid auxtr :=
-    trace_steps simple_trans auxtr.
+    trace_steps retransmit_trans auxtr.
 
   Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
-             (atr : auxiliary_trace (fair_model_to_model simple_fair_model))
+             (atr : auxiliary_trace (fair_model_to_model retransmit_fair_model))
       : Prop :=
     auxtr_valid atr ∧
     labels_match_trace ex atr ∧
     role_enabled_locale_exists (trace_last ex) (trace_last atr) ∧
     config_state_valid (trace_last ex) (trace_last atr).
 
-  Definition config_roles : gset simple_role := {[ Ndup; Ndrop; Ndeliver ]}.
-  Definition all_roles : gset simple_role := {[ A_role; B_role; Ndup; Ndrop; Ndeliver ]}.
+  Definition all_roles : gset retransmit_node_role :=
+    {[ Arole; Brole ]}.
 
-  Definition thread_live_roles_interp (tp : list aneris_expr) (δ : simple_state)
-    : iProp Σ :=
-    live_roles_auth_own (simple_live_roles δ) ∗
-    live_roles_frag_own (simple_live_roles δ ∩ config_roles) ∗
-    dead_roles_auth_own (all_roles ∖ simple_live_roles δ) ∗
-    dead_roles_frag_own (config_roles ∖ simple_live_roles δ).
+  Definition thread_live_roles_interp (δ : retransmit_state) : iProp Σ :=
+    live_roles_auth_own (retransmit_live_roles δ) ∗
+    dead_roles_auth_own (all_roles ∖ retransmit_live_roles δ).
 
   Global Instance anerisG_irisG :
-    irisG aneris_lang (fair_model_to_model simple_fair_model) Σ := {
+    irisG aneris_lang (fair_model_to_model retransmit_fair_model) Σ := {
     iris_invGS := _;
     state_interp ex atr :=
       (⌜simple_valid_state_evolution ex atr⌝ ∗
@@ -354,9 +341,10 @@ Section Aneris_AS.
        aneris_state_interp
          (trace_last ex).2
          (trace_messages_history ex) ∗
-       thread_live_roles_interp (trace_last ex).1 (trace_last atr) ∗
+       thread_live_roles_interp (trace_last atr) ∗
        steps_auth (trace_length ex))%I;
-    fork_post ζ _ := (∃ ℓ, ⌜labels_match (inl ζ) ℓ⌝ ∗ dead_role_frag_own ℓ)%I }.
+    fork_post ζ _ := (∃ α ℓ, ⌜labels_match (inl (ζ,α)) (inl ℓ)⌝ ∗
+                             dead_role_frag_own (ℓ.1))%I }.
 
 End Aneris_AS.
 

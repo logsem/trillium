@@ -82,10 +82,10 @@ Section state_interpretation.
         [done| apply allocEV_impure |done| |done]; done.
   Qed.
 
-  Lemma aneris_events_state_interp_no_triggered' ex tp1 K e1 tp2 efs σ1 e2 σ2 oζ:
+  Lemma aneris_events_state_interp_no_triggered' ex tp1 K e1 tp2 efs σ1 α e2 σ2 oζ:
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     (∀ sag, ¬ sendonEV_groups sag e1 σ1 e2 σ2) →
     (∀ sag, ¬ receiveonEV_groups sag e1 σ1 e2 σ2) →
     (∀ lbl, ¬ allocEV lbl e1 σ1 e2 σ2) →
@@ -98,28 +98,28 @@ Section state_interpretation.
       iExists _, _, _; iFrame "#".
       erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (sendonEV_groups sag) ex));
         first iFrame "Hsend"; last first.
-      { intros sag; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); eauto. }
+      { intros sag; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); eauto. }
       erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (receiveonEV_groups sag) ex));
         first iFrame "Hrec"; last first.
-      { intros sag; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); eauto. }
+      { intros sag; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); eauto. }
       erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (allocEV sag) ex)); first by iFrame.
-      intros lbl; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); eauto.
+      intros lbl; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); eauto.
     - iDestruct 1 as (As Ar lbls) "(#Hown&#HAs&#HAr&Hsend&Hrec&Halloc)".
       iExists _, _, _; iFrame "#".
       erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (sendonEV_groups sag) ex));
         first iFrame "Hsend"; last first.
-      { intros sag; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); eauto. }
+      { intros sag; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); eauto. }
       erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (receiveonEV_groups sag) ex));
         first iFrame "Hrec"; last first.
-      { intros sag; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); eauto. }
+      { intros sag; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); eauto. }
       erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (allocEV sag) ex)); first by iFrame.
-      intros lbl; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); eauto.
+      intros lbl; simpl. rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); eauto.
   Qed.
 
-  Lemma aneris_events_state_interp_no_triggered ex tp1 K e1 tp2 efs σ1 e2 σ2 oζ :
+  Lemma aneris_events_state_interp_no_triggered ex tp1 K e1 tp2 efs σ1 α e2 σ2 oζ :
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     (∀ sh mbody to, expr_e e1 ≠ SendTo sh mbody to ) →
     (∀ sh, expr_e e1 ≠ ReceiveFrom sh) →
     (∀ lbl e', expr_e e1 ≠ ref<< lbl >> e')%E →
@@ -135,11 +135,11 @@ Section state_interpretation.
       eapply Hna; simplify_eq; done.
   Qed.
 
-  Lemma aneris_events_state_interp_alloc_triggered lbl evs ex tp1 K e1 tp2 efs
+  Lemma aneris_events_state_interp_alloc_triggered lbl evs ex tp1 K e1 α tp2 efs
         σ1 e2 σ2 oζ :
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     allocEV lbl e1 σ1 e2 σ2 →
     alloc_evs lbl evs -∗
     aneris_events_state_interp ex ==∗
@@ -156,12 +156,12 @@ Section state_interpretation.
     erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (sendonEV_groups sag) ex));
       first iFrame "Hsend"; last first.
     { intros sag; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_alloc_groups; eauto. }
     erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (receiveonEV_groups sag) ex));
       first iFrame "Hrec"; last first.
     { intros sag; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_alloc_groups; eauto. }
     rewrite -fn_to_gmap_insert //.
     erewrite fn_to_gmap_eq_fns; first iFrame "Halloc"; last first.
@@ -169,17 +169,17 @@ Section state_interpretation.
     destruct (decide (lbl' = lbl)) as [->|Hneq].
     - rewrite fn_lookup_insert.
       rewrite -Hexevs.
-      rewrite (events_of_trace_extend_triggered _ _ _ _ _ e1 _ _ σ1); eauto.
+      rewrite (events_of_trace_extend_triggered _ _ _ _ _ e1 _ α _ σ1); eauto.
     - rewrite fn_lookup_insert_ne //.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); [done|done|done|done|].
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); [done|done|done|done|].
       intros ?; apply Hneq; eapply allocEV_inj; done.
   Qed.
 
-  Lemma aneris_events_state_interp_send_triggered sag evs ex tp1 K e1 tp2 efs
+  Lemma aneris_events_state_interp_send_triggered sag evs ex tp1 K e1 α tp2 efs
   σ1 e2 σ2 oζ:
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     sendonEV_groups sag e1 σ1 e2 σ2 →
     sendon_evs_groups sag evs -∗
     aneris_events_state_interp ex ==∗
@@ -199,12 +199,12 @@ Section state_interpretation.
     erewrite (fn_to_gmap_eq_fns _ (λ lbl, events_of_trace (allocEV lbl) ex));
       first iFrame "Halloc"; last first.
     { intros lbl; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_sendon_groups; eauto. }
     erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (receiveonEV_groups sag) ex));
       first iFrame "Hrec"; last first.
     { intros sag'; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_sendon_groups; eauto. }
     rewrite -fn_to_gmap_insert //.
     erewrite fn_to_gmap_eq_fns; first iFrame "Hsend"; last first.
@@ -212,18 +212,18 @@ Section state_interpretation.
     destruct (decide (sag' = sag)) as [->|Hneq].
     - rewrite fn_lookup_insert.
       rewrite -Hexevs.
-      rewrite (events_of_trace_extend_triggered _ _ _ _ _ e1 _ _ σ1); eauto.
+      rewrite (events_of_trace_extend_triggered _ _ _ _ _ e1 _ α _ σ1); eauto.
     - rewrite fn_lookup_insert_ne //.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); [done|done|done|done|].
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); [done|done|done|done|].
       intros ?. apply Hneq.
       eapply sendonEV_groups_inj; [ apply Hvalid; set_solver | | ]; done.
   Qed.
 
-  Lemma aneris_events_state_interp_send_untracked sag rtrck R T ex tp1 K e1 tp2
+  Lemma aneris_events_state_interp_send_untracked sag rtrck R T ex tp1 K e1 α tp2
         efs σ1 e2 σ2 oζ:
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     sendonEV_groups sag e1 σ1 e2 σ2 →
     sag ⤳*[false, rtrck] (R, T) -∗
     aneris_events_state_interp ex -∗
@@ -247,28 +247,28 @@ Section state_interpretation.
     erewrite (fn_to_gmap_eq_fns _ (λ lbl, events_of_trace (allocEV lbl) ex));
       first iFrame "Halloc"; last first.
     { intros lbl; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_sendon_groups; eauto. }
     erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (receiveonEV_groups sag) ex));
       first iFrame "Hrecv"; last first.
     { intros sag'; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_sendon_groups; eauto. }
     erewrite fn_to_gmap_eq_fns; first iFrame "Hsend"; last first.
     intros sag'.
     destruct (decide (sag' = sag)) as [->|Hneq].
     - rewrite HAssa; done.
     - intros Hsa'.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); [done|done|done|done|].
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); [done|done|done|done|].
       intros ?; apply Hneq. eapply sendonEV_groups_inj; eauto.
       apply Hvalid; set_solver.
   Qed.
 
-  Lemma aneris_events_state_interp_receive_triggered sag evs ex tp1 K e1 tp2
+  Lemma aneris_events_state_interp_receive_triggered sag evs ex tp1 K e1 α tp2
         efs σ1 e2 σ2 oζ :
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     receiveonEV_groups sag e1 σ1 e2 σ2 →
     receiveon_evs_groups sag evs -∗
     aneris_events_state_interp ex ==∗
@@ -289,12 +289,12 @@ Section state_interpretation.
     erewrite (fn_to_gmap_eq_fns _ (λ lbl, events_of_trace (allocEV lbl) ex));
       first iFrame "Halloc"; last first.
     { intros lbl; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_receiveon_groups; eauto. }
     erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (sendonEV_groups sag) ex));
       first iFrame "Hsend"; last first.
     { intros sag'; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_receiveon_groups; eauto. }
     rewrite -fn_to_gmap_insert //.
     erewrite fn_to_gmap_eq_fns; first iFrame "Hrec"; last first.
@@ -302,18 +302,18 @@ Section state_interpretation.
     destruct (decide (sag' = sag)) as [->|Hneq].
     - rewrite fn_lookup_insert.
       rewrite -Hexevs.
-      rewrite (events_of_trace_extend_triggered _ _ _ _ _ e1 _ _ σ1); eauto.
+      rewrite (events_of_trace_extend_triggered _ _ _ _ _ e1 _ α _ σ1); eauto.
     - rewrite fn_lookup_insert_ne //.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); [done|done|done|done|].
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); [done|done|done|done|].
       intros ?; apply Hneq.
       eapply receiveonEV_groups_inj; [ apply Hvalid; set_solver | | ]; done.
   Qed.
 
-  Lemma aneris_events_state_interp_receive_untracked sag strck R T ex tp1 K e1
+  Lemma aneris_events_state_interp_receive_untracked sag strck R T ex tp1 K e1 α
         tp2 efs σ1 e2 σ2 oζ :
     valid_exec ex →
     trace_ends_in ex (tp1 ++ fill K e1 :: tp2, σ1) →
-    head_step e1 σ1 e2 σ2 efs →
+    head_step e1 σ1 α e2 σ2 efs →
     receiveonEV_groups sag e1 σ1 e2 σ2 →
     sag ⤳*[strck, false] (R, T) -∗
     aneris_events_state_interp ex -∗
@@ -337,19 +337,19 @@ Section state_interpretation.
     erewrite (fn_to_gmap_eq_fns _ (λ lbl, events_of_trace (allocEV lbl) ex));
       first iFrame "Halloc"; last first.
     { intros lbl; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_receiveon_groups; eauto. }
     erewrite (fn_to_gmap_eq_fns _ (λ sag, events_of_trace (sendonEV_groups sag) ex));
       first iFrame "Hsend"; last first.
     { intros sag'; simpl.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1);
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1);
         last eapply ev_not_others_receiveon_groups; eauto. }
     erewrite fn_to_gmap_eq_fns; first iFrame "Hrec"; last first.
     intros sag'.
     destruct (decide (sag' = sag)) as [->|Hneq].
     - rewrite HArsa; done.
     - intros  Hsag'.
-      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ _ σ1); [done|done|done|done|].
+      rewrite (events_of_trace_extend_not_triggered _ _ _ _ _ e1 _ α _ σ1); [done|done|done|done|].
       intros ?; apply Hneq; eapply receiveonEV_groups_inj; try eauto.
       apply Hvalid; set_solver.
   Qed.
