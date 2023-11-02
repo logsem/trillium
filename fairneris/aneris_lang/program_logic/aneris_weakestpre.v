@@ -1,7 +1,7 @@
 From iris.proofmode Require Import base tactics classes.
 From fairneris Require Export fairness.
 From trillium.program_logic Require Export weakestpre.
-From fairneris Require Export model_draft.
+From fairneris Require Export retransmit_model_progress_ltl.
 From fairneris.lib Require Import singletons.
 From fairneris.aneris_lang Require Export resources network base_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def state_interp.
@@ -10,15 +10,15 @@ From fairneris.aneris_lang Require Export lifting.
 
 Set Default Proof Using "Type".
 
-Definition aneris_wp_def `{!anerisG simple_fair_model Σ} (ip : ip_address) (E : coPset)
+Definition aneris_wp_def `{!anerisG retransmit_fair_model Σ} (ip : ip_address) (E : coPset)
            (e : expr) (Φ : val → iProp Σ) : iProp Σ:=
   (∀ tid, is_node ip -∗
    wp NotStuck E (ip, tid) (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
-Definition aneris_wp_aux `{!anerisG simple_fair_model Σ} : seal (@aneris_wp_def Σ _).
+Definition aneris_wp_aux `{!anerisG retransmit_fair_model Σ} : seal (@aneris_wp_def Σ _).
 Proof. by eexists. Qed.
-Definition aneris_wp `{!anerisG simple_fair_model Σ} := aneris_wp_aux.(unseal).
-Definition aneris_wp_eq `{!anerisG simple_fair_model Σ} : aneris_wp = @aneris_wp_def Σ _ :=
+Definition aneris_wp `{!anerisG retransmit_fair_model Σ} := aneris_wp_aux.(unseal).
+Definition aneris_wp_eq `{!anerisG retransmit_fair_model Σ} : aneris_wp = @aneris_wp_def Σ _ :=
   aneris_wp_aux.(seal_eq).
 
 Notation "'WP' e '@[' ip ] E {{ Φ } }" := (aneris_wp ip E e%E Φ)
@@ -75,7 +75,7 @@ Notation "'{{{' P } } } e '@[' ip ] {{{ 'RET' pat ; Q } } }" :=
      format "{{{  P  } } }  e  '@[' ip ]  {{{  RET  pat ;  Q } } }") : stdpp_scope.
 
 Section aneris_wp.
-Context `{!anerisG simple_fair_model Σ}.
+Context `{!anerisG retransmit_fair_model Σ}.
 Implicit Types ip : ip_address.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
@@ -111,8 +111,7 @@ Proof.
   do 3 f_equiv.
   apply wp_contractive.
   - rewrite /= /aneris_to_val Htv //.
-  - destruct k; first done.
-    solve_proper.
+  - f_equiv. dist_later_intro. solve_proper.
 Qed.
 
 Lemma aneris_wp_value' ip E Φ v : Φ v ⊢ WP of_val v @[ip] E {{ Φ }}.
@@ -171,7 +170,7 @@ Lemma aneris_wp_atomic_take_step ip E1 E2 e Φ
       `{!Atomic WeaklyAtomic (mkExpr ip e)} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
-   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace (fair_model_to_model simple_fair_model)) c1,
+   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace (fair_model_to_model retransmit_fair_model)) c1,
      ⌜trace_ends_in extr c1⌝ →
      state_interp extr atr ={E2}=∗
      ∃ Q R,
@@ -198,7 +197,7 @@ Proof.
   iModIntro.
   iExists Q, R; iFrame.
   iSplitL "H1".
-  { iIntros (c2 δ2 ℓ). iSpecialize ("H1" $! c2 δ2 ℓ (inl (ip, tid))).
+  { iIntros (α c2 δ2 ℓ). iSpecialize ("H1" $! c2 δ2 ℓ (inl (ip,tid,α))).
     iFrame. }
   rewrite !aneris_wp_unfold /aneris_wp_def.
   iDestruct ("Hwp" with "Hisnode") as "Hwp".
@@ -284,7 +283,7 @@ Proof.
   iMod ("Hwp" with "[//] [//] [//] [$]") as "[% H]".
   iModIntro.
   iSplit; [done|].
-  iIntros (e2 σ2 efs Hstep). simpl.
+  iIntros (α e2 σ2 efs Hstep). simpl.
   iMod ("H" with "[//]") as "H". iIntros "!> !>".
   iMod "H" as "H". iIntros "!>".
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
@@ -312,7 +311,7 @@ Proof.
   iMod ("Hwp" with "[//] [//] [//] [$]") as "[% H]".
   iModIntro.
   iSplit; [done|].
-  iIntros (e2 σ2 efs Hstep). simpl.
+  iIntros (α e2 σ2 efs Hstep). simpl.
   iMod ("H" with "[//]") as "H". iIntros "!> !>".
   iMod "H" as "H". iIntros "!>".
   iApply (step_fupdN_wand with "[H]"); first by iApply "H".
@@ -504,18 +503,19 @@ Proof.
   iIntros "Hwp".
   iLöb as "IH" forall (E ip e Ψ).
   rewrite !wp_unfold /wp_pre /= /aneris_to_val /=.
-  destruct (to_val e); simpl; first by iMod "Hwp"; eauto.
+  destruct (to_val e); simpl.
+  { iMod "Hwp". iModIntro. eauto. }
   iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "Hsi".
   iMod ("Hwp" with "[//] [//] [//] Hsi") as "[% Hstp]".
   iModIntro.
   iSplit; first done.
-  iIntros (e2 σ2 efs Hpstp).
+  iIntros (α e2 σ2 efs Hpstp).
   assert (∃ e2', e2 = mkExpr ip e2') as [e2' ->].
   { inversion Hpstp as [? e1' ? He1' ? Hhstp]; simplify_eq/=.
     destruct e1'.
     rewrite -aneris_base_fill in He1'; simplify_eq/=.
     inversion Hhstp; simplify_eq; rewrite -aneris_base_fill; eauto. }
-  iMod ("Hstp" $! (mkExpr ip e2') σ2 efs with "[//]") as "Hstp".
+  iMod ("Hstp" $! α (mkExpr ip e2') σ2 efs with "[//]") as "Hstp".
   iModIntro; iNext.
   assert (∃ n, n = trace_length ex) as [n Heqn] by eauto.
   rewrite -{1}Heqn. rewrite -{2}Heqn. clear Heqn.
@@ -620,7 +620,7 @@ End aneris_wp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{!anerisG simple_fair_model Σ}.
+  Context `{!anerisG retransmit_fair_model Σ}.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val → iProp Σ.
 

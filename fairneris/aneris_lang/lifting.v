@@ -20,14 +20,14 @@ Ltac inv_head_step :=
     match goal with
     | _ => progress simplify_map_eq/= (* simplify memory stuff *)
     | H : aneris_to_val _ = Some _ |- _ => apply to_base_aneris_val in H
-    | H : base_lang.head_step ?e _ _ _ _ |- _ =>
+    | H : base_lang.head_step ?e _ _ _ _ _ |- _ =>
       try (is_var e; fail 1); (* inversion yields many goals if [e] is a variable
      and can thus better be avoided. *)
       inversion H; subst; clear H
-    | H : head_step ?e _ _ _ _ |- _ =>
+    | H : head_step ?e _ _ _ _ _ |- _ =>
       try (is_var e; fail 1);
       inversion H; subst; clear H
-    | H: socket_step _ ?e _ _ _ _ _ _ _ |- _ =>
+    | H: socket_step _ ?e _ _ _ _ _ _ |- _ =>
       try (is_var e; fail 1);
       inversion H; subst; clear H
     end.
@@ -38,7 +38,7 @@ Local Ltac solve_exec_safe :=
          | H: _ ∧ _ |- _ => destruct H as [??]
          end;
   simplify_eq;
-  do 3 eexists; eapply (LocalStepPureS _ ∅); econstructor; eauto.
+  do 4 eexists; eapply (LocalStepPureS _ ∅); econstructor; eauto.
 Local Ltac solve_exec_puredet :=
   simpl; intros; inv_head_step;
   first (by repeat match goal with
@@ -47,7 +47,7 @@ Local Ltac solve_exec_puredet :=
                      rewrite to_of_val in H; simplify_eq
                    end);
   try by match goal with
-         | H : socket_step _ _ _ _ _ _ _ _ _ |- _ =>
+         | H : socket_step _ _ _ _ _ _ _ _ |- _ =>
            inversion H
          end.
 Local Ltac solve_pure_exec :=
@@ -138,7 +138,7 @@ Proof. solve_atomic. Qed.
 Proof. solve_atomic. Qed.
 
 #[global] Instance setreceivetimeout_atomic n v0 v1 v2 s:
-    Atomic s (mkExpr n (SetReceiveTimeout (Val v0) (Val v1) (Val v2))).
+  Atomic s (mkExpr n (SetReceiveTimeout (Val v0) (Val v1) (Val v2))).
 Proof. solve_atomic. Qed.
 
 #[global] Instance receive_from_stutteringatomic n sh s :
