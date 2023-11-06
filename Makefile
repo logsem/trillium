@@ -46,7 +46,7 @@ clean:
 # project-specific targets
 .PHONY: build clean-trillium clean-fairis clean-fairneris trillium fairis fairneris
 
-VPATH= $(TRILLIUM_DIR) $(FAIRIS_DIR) $(FAINERIS_DIR)
+VPATH= $(TRILLIUM_DIR) $(FAIRIS_DIR) $(FAIRNERIS_DIR)
 VPATH_FILES := $(shell find $(VPATH) -name "*.v")
 
 build: $(VPATH_FILES:.v=.vo)
