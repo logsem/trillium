@@ -250,11 +250,16 @@ Section Aneris_AS.
   Definition mAB := mkMessage saA saB "Hello".
 
   (* TODO: Should align model and semantic actions / labels *)
+  Definition locale_retransmit_role (ζ : locale aneris_lang) : option retransmit_node_role :=
+    match ζ with
+    | ("0.0.0.0",0) => Some Arole
+    | ("0.0.0.1",0) => Some Brole
+    | _ => None
+   end.
+
   Definition locale_retransmit_label (ζ : ex_label aneris_lang) : option retransmit_label :=
     match ζ with
-    | inl (("0.0.0.0",0),α) => Some $ inl $ (Arole,α)
-    | inl (("0.0.0.1",0),α) => Some $ inl $ (Brole,α)
-    | inl _ => None
+    | inl (tid,α) => option_map (λ ρ, inl (ρ,α)) (locale_retransmit_role tid)
     | inr α => Some $ inr $ ((),α)
    end.
 
@@ -267,6 +272,27 @@ Section Aneris_AS.
 
   Definition labels_match (ζ : ex_label aneris_lang) (ℓ : retransmit_label) : Prop :=
     Some ℓ = locale_retransmit_label ζ.
+
+  Definition roles_match (ζ : locale aneris_lang) (ℓ : retransmit_node_role) : Prop :=
+    Some ℓ = locale_retransmit_role ζ.
+
+  Lemma labels_match_roles_match ζ ℓ α :
+    labels_match (inl (ζ,α)) (inl (ℓ,α)) → roles_match ζ ℓ.
+  Proof.
+    inversion 1. rewrite /roles_match.
+    by destruct (locale_retransmit_role ζ); inversion H1.
+  Qed.
+
+  Lemma labels_match_roles_match_alt ζ ℓ :
+    labels_match (inl ζ) (inl ℓ) →
+    ∃ ζ' ℓ' α, ζ = (ζ',α) ∧ ℓ = (ℓ',α) ∧ roles_match ζ' ℓ'.
+  Proof.
+    destruct ζ as [], ℓ as []; inversion 1.
+    destruct (locale_retransmit_role l); inversion H1.
+    simplify_eq.
+    eexists _, _, _. split; [done|]. split; [done|].
+    by eapply labels_match_roles_match.
+  Qed.
 
   Definition labels_match_trace (ex : execution_trace aneris_lang)
              (atr : auxiliary_trace (fair_model_to_model retransmit_fair_model))
@@ -284,22 +310,16 @@ Section Aneris_AS.
     role_enabled_model (fst ℓ : fmrole retransmit_fair_model) δ →
     is_Some (from_locale c.1 ζ.1).
 
-  (* TODO: Can this def be improved? *)
-  Definition state_buffers (skts : gmap ip_address sockets)
-    : gmap socket_address (list message) :=
-    map_fold
-      (λ _ skts cur,
-         map_fold
-           (λ _ skt_buf cur,
-              match saddress skt_buf.1 with
-              | None => cur
-              | Some sa => <[sa := skt_buf.2]>cur
-              end)
-           cur skts)
-      ∅ skts.
+  Definition model_state_socket_coh
+             (skts : gmap ip_address sockets)
+             (bs : gmap socket_address (list message)) :=
+    ∀ ip Sn sh skt sa ms,
+    skts !! ip = Some Sn → Sn !! sh = Some (skt,ms) →
+    saddress skt = Some sa →
+    bs !! sa = Some ms.
 
   Definition config_state_valid (c : cfg aneris_lang) (δ : retransmit_state) :=
-    state_ms c.2 = δ.1.2 ∧ state_buffers (state_sockets c.2) = δ.2.
+    state_ms c.2 = δ.1.2 ∧ model_state_socket_coh (state_sockets c.2) δ.2.
 
   Definition auxtr_valid auxtr :=
     trace_steps retransmit_trans auxtr.
@@ -324,7 +344,6 @@ Section Aneris_AS.
     iris_invGS := _;
     state_interp ex atr :=
       (⌜simple_valid_state_evolution ex atr⌝ ∗
-       aneris_events_state_interp ex ∗
        aneris_state_interp
          (trace_last ex).2
          (trace_messages_history ex) ∗

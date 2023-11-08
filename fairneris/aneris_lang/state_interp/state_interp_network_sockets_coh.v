@@ -17,6 +17,11 @@ Import RecordSetNotations.
 Section state_interpretation.
   Context `{!anerisG Mdl Σ}.
 
+  (* TODO: Find alternative *)
+  Lemma aneris_state_interp_network_sockets_coh_valid σ rt :
+    aneris_state_interp σ rt -∗ ⌜network_sockets_coh (state_sockets σ)⌝.
+  Proof. by iDestruct 1 as (??) "(?&?&?&?)". Qed.
+
   (** socket_handlers_coh *)
   Lemma socket_handlers_coh_alloc_socket Sn sh s :
     saddress s = None →
@@ -54,14 +59,13 @@ Section state_interpretation.
     - eapply Hscoh; eauto. rewrite Heq. eauto.
   Qed.
 
-  Lemma socket_handlers_coh_deliver_message M Sn sh skt a R m :
-    m ∈ messages_to_receive_at a M →
+  Lemma socket_handlers_coh_deliver_message Sn sh skt a R m :
     Sn !! sh = Some (skt, R) →
     saddress skt = Some a →
     socket_handlers_coh Sn  →
     socket_handlers_coh (<[sh:=(skt, m :: R)]> Sn).
   Proof.
-    intros HM Hsh Hskt HSn sh1 sh2 skt1 skt2 r1 r2 Hsh1 Hsh2 Hskt1 Hskt12.
+    intros Hsh Hskt HSn sh1 sh2 skt1 skt2 r1 r2 Hsh1 Hsh2 Hskt1 Hskt12.
     destruct (decide (sh1 = sh)) as [->|];
       destruct (decide (sh2 = sh)) as [->|]; simplify_eq; eauto.
     - rewrite lookup_insert in Hsh1; rewrite lookup_insert_ne in Hsh2;
@@ -111,8 +115,8 @@ Section state_interpretation.
     by eapply Hmcoh.
   Qed.
 
-  Lemma socket_messages_coh_deliver_message M Sn sh skt a R m :
-    m ∈ messages_to_receive_at a M →
+  Lemma socket_messages_coh_deliver_message Sn sh skt a R m :
+    m_destination m = a →
     Sn !! sh = Some (skt, R) →
     saddress skt = Some a →
     socket_messages_coh Sn →
@@ -123,7 +127,7 @@ Section state_interpretation.
     { rewrite lookup_insert_ne // in Hsh'. by eapply HSn. }
     rewrite lookup_insert in Hsh'; simplify_eq.
     intros m' [HR | ?]%elem_of_cons; subst.
-    - apply elem_of_filter in HM as [? ?]; done.
+    - done.
     - by eapply HSn.
   Qed.
 
@@ -167,14 +171,13 @@ Section state_interpretation.
     socket_addresses_coh (<[sh:=(skt, m :: R)]> Sn) (ip_of_address a).
   Proof. intros ?? sh' **; ddeq sh sh'; eauto. Qed.
 
-  Lemma socket_addresses_coh_deliver_message M Sn sh ip skt a R m :
-    m ∈ messages_to_receive_at a M →
+  Lemma socket_addresses_coh_deliver_message Sn sh ip skt a R m :
     Sn !! sh = Some (skt, R) →
     saddress skt = Some a →
     socket_addresses_coh Sn ip →
     socket_addresses_coh (<[sh:=(skt, m :: R)]> Sn) ip.
   Proof.
-    intros HM Hsh Hskt HSn sh' skt' R' sa Hsh' Hskt'.
+    intros Hsh Hskt HSn sh' skt' R' sa Hsh' Hskt'.
     destruct (decide (sh = sh')) as [->|].
     - rewrite lookup_insert in Hsh'; simplify_eq.
       eapply HSn; eauto.
@@ -187,7 +190,6 @@ Section state_interpretation.
     socket_addresses_coh Sn ip →
     socket_addresses_coh (<[sh:=(skt, r)]> Sn) ip.
   Proof. intros Hsn Hcoh sh' skt' r' sa Hsh' Hskt'. ddeq sh sh'; eauto. Qed.
-
 
   Lemma socket_addresses_coh_update_sblock Sn sh skt r b ip:
     Sn !! sh = Some (skt, r) →
@@ -226,14 +228,13 @@ Section state_interpretation.
       eapply HSn; eauto.
   Qed.
 
-  Lemma socket_unbound_empty_buf_coh_deliver_message M Sn sh ip skt a R m :
-    m ∈ messages_to_receive_at a M →
+  Lemma socket_unbound_empty_buf_coh_deliver_message Sn sh ip skt a R m :
     Sn !! sh = Some (skt, R) →
     saddress skt = Some a →
     socket_unbound_empty_buf_coh Sn ip →
     socket_unbound_empty_buf_coh (<[sh:=(skt, m :: R)]> Sn) ip.
   Proof.
-    intros HM Hsh Hskt HSn sh' skt' R' Hsh' Hskt'.
+    intros Hsh Hskt HSn sh' skt' R' Hsh' Hskt'.
     destruct (decide (sh = sh')) as [->|].
     - rewrite lookup_insert in Hsh'; simplify_eq; done.
     - rewrite lookup_insert_ne in Hsh'; last done.
@@ -371,8 +372,8 @@ Section state_interpretation.
     by eapply socket_unbound_empty_buf_coh_receive.
   Qed.
 
-  Lemma network_sockets_coh_deliver_message M S Sn Sn' ip sh skt a r m :
-    m ∈ messages_to_receive_at a M →
+  Lemma network_sockets_coh_deliver_message S Sn Sn' ip sh skt a r m :
+    m_destination m = a →
     S !! ip = Some Sn →
     Sn !! sh = Some (skt, r) →
     Sn' = <[sh:=(skt, m :: r)]> Sn →
@@ -381,7 +382,7 @@ Section state_interpretation.
     network_sockets_coh (<[ip:=Sn']> S).
   Proof.
     rewrite /network_sockets_coh.
-    intros Hm HSn Hsh HSn' Hskt Hnet ip' Sn0 HSn0.
+    intros HM HSn Hsh HSn' Hskt Hnet ip' Sn0 HSn0.
     ddeq ip' ip; [|eauto].
     specialize (Hnet ip Sn HSn)
       as (Hshcoh & Hsmcoh & Hsaddrcoh & Hbufcoh).
