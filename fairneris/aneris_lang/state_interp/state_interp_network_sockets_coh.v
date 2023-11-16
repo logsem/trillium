@@ -47,25 +47,12 @@ Section state_interpretation.
     - destruct skt1, skt2. simplify_map_eq. eapply Hscoh; eauto.
   Qed.
 
-  Lemma socket_handlers_coh_receive Sn sh skt r m :
-    Sn !! sh = Some (skt, r ++ [m]) →
-    socket_handlers_coh Sn →
-    socket_handlers_coh (<[sh:=(skt, r)]> Sn).
-  Proof.
-    intros ? Hscoh sh1 sh2 skt1 skt2 ????? Heq.
-    ddeq sh1 sh; ddeq sh2 sh; simplify_eq=>//.
-    - naive_solver.
-    - eapply Hscoh; eauto. rewrite Heq. eauto.
-    - eapply Hscoh; eauto. rewrite Heq. eauto.
-  Qed.
-
-  Lemma socket_handlers_coh_deliver_message Sn sh skt a R m :
+  Lemma socket_handlers_coh_update_buffer Sn sh skt R R' :
     Sn !! sh = Some (skt, R) →
-    saddress skt = Some a →
-    socket_handlers_coh Sn  →
-    socket_handlers_coh (<[sh:=(skt, m :: R)]> Sn).
+    socket_handlers_coh Sn →
+    socket_handlers_coh (<[sh:=(skt, R')]> Sn).
   Proof.
-    intros Hsh Hskt HSn sh1 sh2 skt1 skt2 r1 r2 Hsh1 Hsh2 Hskt1 Hskt12.
+    intros Hsh HSn sh1 sh2 skt1 skt2 r1 r2 Hsh1 Hsh2 Hskt1 Hskt12.
     destruct (decide (sh1 = sh)) as [->|];
       destruct (decide (sh2 = sh)) as [->|]; simplify_eq; eauto.
     - rewrite lookup_insert in Hsh1; rewrite lookup_insert_ne in Hsh2;
@@ -100,19 +87,18 @@ Section state_interpretation.
     socket_messages_coh (<[sh:=(skt, [])]> Sn).
   Proof. intros ? sh' **. ddeq sh sh'; [set_solver|]. eauto. Qed.
 
-  Lemma socket_messages_coh_insert_received a sh skt m r Sn :
-    Sn !! sh = Some (skt, r) →
-    m_destination m = a →
+  Lemma socket_messages_coh_update_buffer a sh skt Sn R R' :
+    Sn !! sh = Some (skt, R) →
+    Forall (λ m, m_destination m = a) R' →
     saddress skt = Some a →
     socket_messages_coh Sn →
-    socket_messages_coh (<[sh:=(skt, m :: r)]> Sn).
+    socket_messages_coh (<[sh:=(skt, R')]> Sn).
   Proof.
-    intros ??? Hmcoh sh' skt' r' a' Hsh' ?.
+    intros ? Hall ? Hmcoh sh' skt' r' a' Hsh' ?.
     destruct (decide (sh = sh')); simplify_eq; last first.
     { rewrite lookup_insert_ne // in Hsh'. by eapply Hmcoh. }
     rewrite lookup_insert in Hsh'; simplify_eq.
-    intros m' [HR | ?] %elem_of_cons; subst; [done|].
-    by eapply Hmcoh.
+    by rewrite Forall_forall in Hall.
   Qed.
 
   Lemma socket_messages_coh_deliver_message Sn sh skt a R m :
@@ -122,24 +108,27 @@ Section state_interpretation.
     socket_messages_coh Sn →
     socket_messages_coh (<[sh:=(skt, m :: R)]> Sn).
   Proof.
-    intros HM Hsh Hskt HSn sh' kt' r' a' Hsh' Hskt'.
-    destruct (decide (sh = sh')); simplify_eq; last first.
-    { rewrite lookup_insert_ne // in Hsh'. by eapply HSn. }
-    rewrite lookup_insert in Hsh'; simplify_eq.
-    intros m' [HR | ?]%elem_of_cons; subst.
-    - done.
-    - by eapply HSn.
+    intros ??? Hmcoh.
+    eapply socket_messages_coh_update_buffer; [done| |done..].
+    apply Forall_forall.
+    intros m' [HR | ?] %elem_of_cons; subst; [done|].
+    by eapply Hmcoh.
+  Qed.
+
+  Lemma socket_messages_coh_shrink_buffer Sn sh skt R1 R2 :
+    Sn !! sh = Some (skt, R1 ++ R2) →
+    socket_messages_coh Sn →
+    socket_messages_coh (<[sh:=(skt, R1)]> Sn).
+  Proof.
+    intros HSn Hcoh sh' kt' r' a' Hsh' Hskt' m' Hm'.
+    ddeq sh sh'; eapply Hcoh; eauto. set_solver.
   Qed.
 
   Lemma socket_messages_coh_receive Sn sh skt r m :
     Sn !! sh = Some (skt, r ++ [m]) →
     socket_messages_coh Sn →
     socket_messages_coh (<[sh:=(skt, r)]> Sn).
-  Proof.
-    intros HSn Hcoh sh' kt' r' a' Hsh' Hskt' m' Hm'.
-    ddeq sh sh'; eapply Hcoh; eauto.
-    ddeq m m'; set_solver.
-  Qed.
+  Proof. by apply socket_messages_coh_shrink_buffer. Qed.
 
   Lemma socket_messages_coh_update_sblock Sn sh skt r b:
     Sn !! sh = Some (skt, r) →
@@ -171,25 +160,18 @@ Section state_interpretation.
     socket_addresses_coh (<[sh:=(skt, m :: R)]> Sn) (ip_of_address a).
   Proof. intros ?? sh' **; ddeq sh sh'; eauto. Qed.
 
-  Lemma socket_addresses_coh_deliver_message Sn sh ip skt a R m :
-    Sn !! sh = Some (skt, R) →
-    saddress skt = Some a →
+  Lemma socket_addresses_coh_update_buffer Sn sh ip skt R1 R2 :
+    Sn !! sh = Some (skt, R1) →
     socket_addresses_coh Sn ip →
-    socket_addresses_coh (<[sh:=(skt, m :: R)]> Sn) ip.
+    socket_addresses_coh (<[sh:=(skt, R2)]> Sn) ip.
   Proof.
-    intros Hsh Hskt HSn sh' skt' R' sa Hsh' Hskt'.
+    intros Hsh HSn sh' skt' R' sa Hsh' Hskt'.
     destruct (decide (sh = sh')) as [->|].
     - rewrite lookup_insert in Hsh'; simplify_eq.
       eapply HSn; eauto.
     - rewrite lookup_insert_ne in Hsh'; last done.
       eapply HSn; eauto.
   Qed.
-
-  Lemma socket_addresses_coh_receive Sn ip sh skt r m :
-    Sn !! sh = Some (skt, r ++ [m]) →
-    socket_addresses_coh Sn ip →
-    socket_addresses_coh (<[sh:=(skt, r)]> Sn) ip.
-  Proof. intros Hsn Hcoh sh' skt' r' sa Hsh' Hskt'. ddeq sh sh'; eauto. Qed.
 
   Lemma socket_addresses_coh_update_sblock Sn sh skt r b ip:
     Sn !! sh = Some (skt, r) →
@@ -228,11 +210,11 @@ Section state_interpretation.
       eapply HSn; eauto.
   Qed.
 
-  Lemma socket_unbound_empty_buf_coh_deliver_message Sn sh ip skt a R m :
-    Sn !! sh = Some (skt, R) →
+  Lemma socket_unbound_empty_buf_coh_update_buffer Sn sh ip skt a R1 R2 :
+    Sn !! sh = Some (skt, R1) →
     saddress skt = Some a →
     socket_unbound_empty_buf_coh Sn ip →
-    socket_unbound_empty_buf_coh (<[sh:=(skt, m :: R)]> Sn) ip.
+    socket_unbound_empty_buf_coh (<[sh:=(skt, R2)]> Sn) ip.
   Proof.
     intros Hsh Hskt HSn sh' skt' R' Hsh' Hskt'.
     destruct (decide (sh = sh')) as [->|].
@@ -241,13 +223,14 @@ Section state_interpretation.
       eapply HSn; eauto.
   Qed.
 
-  Lemma socket_unbound_empty_buf_coh_receive Sn ip sh skt r m :
-    Sn !! sh = Some (skt, r ++ [m]) →
+  Lemma socket_unbound_empty_buf_coh_shrink_buffer Sn ip sh skt R1 R2 :
+    Sn !! sh = Some (skt, R1 ++ R2) →
     socket_unbound_empty_buf_coh Sn ip →
-    socket_unbound_empty_buf_coh (<[sh:=(skt, r)]> Sn) ip.
-  Proof. intros Hsn Hcoh sh' skt' r' Hsh' Hskt'. ddeq sh sh'; eauto.
-         specialize (Hcoh sh' skt' _ Hsn Hskt').
-         by apply app_eq_nil in Hcoh as [??].
+    socket_unbound_empty_buf_coh (<[sh:=(skt, R1)]> Sn) ip.
+  Proof.
+    intros Hsn Hcoh sh' skt' r' Hsh' Hskt'. ddeq sh sh'; eauto.
+    specialize (Hcoh sh' skt' _ Hsn Hskt').
+    by apply app_eq_nil in Hcoh as [??].
   Qed.
 
   Lemma socket_unbound_empty_buf_coh_update_sblock Sn sh skt r b ip:
@@ -343,7 +326,7 @@ Section state_interpretation.
       assert (ip_of_address a' = ip_of_address a) as Heq.
       { eapply HsaCoh; eauto. }
       assert (port_of_address a' ≠ port_of_address a) as Hnp.
-      { eapply H1; eauto. } 
+      { eapply H1; eauto. }
       set_solver. }
     ddeq ip (ip_of_address a).
     - destruct (Hncoh (ip_of_address a) Sn) as (?&?&?&?); [done|].
@@ -353,7 +336,7 @@ Section state_interpretation.
       apply socket_unbound_empty_buf_coh_socketbind; done.
     - destruct (Hncoh ip Sn') as (HshCoh & HmrCoh & HsaCoh);
       [done|split;[done|split; done]].
-  Qed. 
+  Qed.
 
   Lemma network_sockets_coh_receive S Sn ip sh skt r m :
     S !! ip = Some Sn →
@@ -366,10 +349,10 @@ Section state_interpretation.
     ddeq ip' ip; [|eauto].
     specialize (Hnet ip Sn HS)
       as (Hshcoh & Hsmcoh & Hsaddrcoh & Hbufcoh).
-    split; [by eapply socket_handlers_coh_receive|].
-    split; [by eapply socket_messages_coh_receive|].
-    split; [by eapply socket_addresses_coh_receive |].
-    by eapply socket_unbound_empty_buf_coh_receive.
+    split; [by eapply socket_handlers_coh_update_buffer|].
+    split; [by eapply socket_messages_coh_shrink_buffer|].
+    split; [by eapply socket_addresses_coh_update_buffer|].
+    by eapply socket_unbound_empty_buf_coh_shrink_buffer.
   Qed.
 
   Lemma network_sockets_coh_deliver_message S Sn Sn' ip sh skt a r m :
@@ -386,10 +369,10 @@ Section state_interpretation.
     ddeq ip' ip; [|eauto].
     specialize (Hnet ip Sn HSn)
       as (Hshcoh & Hsmcoh & Hsaddrcoh & Hbufcoh).
-    split; [by eapply socket_handlers_coh_deliver_message|].
+    split; [by eapply socket_handlers_coh_update_buffer|].
     split; [by eapply socket_messages_coh_deliver_message|].
-    split; [by eapply socket_addresses_coh_deliver_message |].
-    by eapply socket_unbound_empty_buf_coh_deliver_message.
+    split; [by eapply socket_addresses_coh_update_buffer |].
+    by eapply socket_unbound_empty_buf_coh_update_buffer.
   Qed.
 
 End state_interpretation.
