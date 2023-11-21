@@ -110,25 +110,26 @@ Section exec_trace.
   Definition locale_enabled (ζ : locale Λ) (c: cfg Λ) :=
     ∃ e, from_locale c.1 ζ = Some e ∧ to_val e = None.
 
-  Definition live_ex_label (ζ : ex_label Λ) (c : cfg Λ) : Prop :=
-    match ζ with
-    | inl (ζ,_) => locale_enabled ζ c
-    (* | inr ζ => config_enabled ζ c.2 *)
-    | inr _ => False
-   end.
+  (* Definition live_ex_label (ζ : ex_label Λ) (c : cfg Λ) : Prop := *)
+  (*   match ζ with *)
+  (*   | inl (ζ,_) => locale_enabled ζ c *)
+  (*   (* | inr ζ => config_enabled ζ c.2 *) *)
+  (*   | inr _ => False *)
+  (*  end. *)
 
   Definition fair_scheduling_ex ζ : extrace Λ → Prop :=
-    trace_implies (λ c _, live_ex_label ζ c)
-                  (λ c otid, ¬ live_ex_label ζ c ∨ otid = Some ζ).
+    trace_implies (λ c _, locale_enabled ζ c)
+                  (λ c otid, ¬ locale_enabled ζ c ∨
+                               option_map (sum_map fst id) otid = Some (inl ζ)).
 
   Lemma fair_scheduling_ex_after ζ tr tr' k:
     after k tr = Some tr' →
     fair_scheduling_ex ζ tr → fair_scheduling_ex ζ tr'.
-  Proof. destruct ζ; apply trace_implies_after. Qed.
+  Proof. apply trace_implies_after. Qed.
 
   Lemma fair_scheduling_ex_cons ζ c ζ' r:
     fair_scheduling_ex ζ (c -[ζ']-> r) → fair_scheduling_ex ζ r.
-  Proof. destruct ζ; apply trace_implies_cons. Qed.
+  Proof. apply trace_implies_cons. Qed.
 
   CoInductive extrace_valid: extrace Λ → Prop :=
   | extrace_valid_singleton c: extrace_valid ⟨c⟩
