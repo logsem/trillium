@@ -281,6 +281,41 @@ Proof.
   intros Hinf. epose proof (infinite_or_finite) as [?|?]; done.
 Qed.
 
+Lemma trace_always_mono_strong_alt
+      {S1 S2 L1 L2}
+      (P : trace S1 L1 → Prop)
+      (Q : trace S2 L2 → Prop)
+      Rℓ Rs trans1 trans2
+      (tr1 : trace S1 L1) (tr2 : trace S2 L2) :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 →
+  (∀ tr1' tr2', traces_match Rℓ Rs trans1 trans2 tr1' tr2' →
+                (P tr1') → (Q tr2')) →
+  (□ P) tr1 → (□ Q) tr2.
+Proof.
+  rewrite !trace_alwaysI. intros Hmatch Himpl HP1 tr2' [n Hafter2].
+  eapply traces_match_after in Hmatch as [tr1' [Hafter1 Hmatch]]; [|done].
+  eapply Himpl; [done|]. apply HP1. by eexists _.
+Qed.
+
+Lemma trace_eventually_mono_strong_alt
+      {S1 S2 L1 L2}
+      (P : trace S1 L1 → Prop)
+      (Q : trace S2 L2 → Prop)
+      Rℓ Rs trans1 trans2
+      (tr1 : trace S1 L1) (tr2 : trace S2 L2) :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 →
+  (∀ tr1' tr2', traces_match Rℓ Rs trans1 trans2 tr1' tr2' →
+                (P tr1') → (Q tr2')) →
+  (◊ P) tr1 → (◊ Q) tr2.
+Proof.
+  rewrite !trace_eventuallyI. intros Hmatch Himpl [tr1' [[n Hafter1] HP1]].
+  eapply traces_match_flip in Hmatch.
+  eapply traces_match_after in Hmatch as [tr2' [Hafter2 Hmatch]]; [|done].
+  exists tr2'. split; [by eexists _|].
+  apply traces_match_flip in Hmatch. by eapply Himpl.
+Qed.
+
+
 Lemma terminating_role_preserved ρ ζ mtr extr :
   extrace_fair extr →
   live_traces_match extr mtr →
@@ -333,33 +368,22 @@ Proof.
   }
   assert ((□ ◊ ↓ (λ _ ℓ, option_map label_role ℓ = Some (inl ρ)))
             mtr) as Hmtr_sched.
-  { (* TODO: Prove lemmas for mixed LTL *)
-    rewrite trace_alwaysI. intros mtr' [n Hmtr_after].
-    clear Hextr'.
-    eapply traces_match_after in Hmatch as [extr' [Hextr_after Hmatch]]; [|done].
-    rewrite trace_alwaysI in Hex_sched.
-    assert (trace_suffix_of extr' extr) as Hextr_suffix by by eexists _.
-    specialize (Hex_sched _ Hextr_suffix).
-    rewrite trace_eventuallyI in Hex_sched.
-    destruct Hex_sched as [extr'' [[m Hextr_after'] Hextr'']].
-    apply traces_match_flip in Hmatch.
-    eapply traces_match_after in Hmatch as [mtr'' [Hmtr_after' Hmatch]]; [|done].
-    rewrite trace_eventuallyI.
-    exists mtr''. split; [by eexists _|].
+  { revert Hex_sched.
+    eapply trace_always_mono_strong_alt; [done|].
+    intros extr' mtr' Hmatch'.
+    eapply trace_eventually_mono_strong_alt; [done|].
+    intros extr'' mtr'' Hmatch''.
+    rewrite /trace_now /pred_at=> /=.
     destruct extr''; [done|].
-    destruct mtr''; [by inversion Hmatch|].
-    apply traces_match_cons_inv in Hmatch as [_ Hmatch].
-    rewrite /trace_now /pred_at in Hextr''.
-    rewrite /trace_now /pred_at.
-    simpl in *.
-    destruct ℓ; [|done].
-    simpl in *. destruct p; simpl in *.
-    simplify_eq.
-    rewrite /labels_match /locale_retransmit_label in Hmatch.
-    simpl in *. simplify_eq. simpl.
+    destruct mtr''; [by inversion Hmatch''|].
+    apply traces_match_cons_inv in Hmatch'' as [_ Hmatch''].
+    intros Heq.
+    destruct ℓ as [[]|]; [|done].
+    rewrite /labels_match /locale_retransmit_label in Hmatch''.
     rewrite /roles_match in Hroles.
+    simpl in *. simplify_eq.
     destruct (locale_retransmit_role ζ) eqn:Heqn; [|done].
-    simpl in *. simplify_eq. done. }
+    simpl in *. by simplify_eq. }
   destruct Hmtr as [Hmtr|Hmtr]; last first.
   { apply NNP_P in Hinf. apply not_infinite_terminating_trace in Hmtr.
     destruct Hmtr as [n Hafter].
@@ -367,7 +391,6 @@ Proof.
     apply traces_match_flip in Hmatch.
     eapply traces_match_after in Hmatch as [mtr'' [Hafter'' _]]; [|done].
     by simplify_eq. }
-  (* Contradiction via traces match *)
   clear Hinf Hextr Hextr' Hex_sched.
   apply disabled_always_disabled in Hmtr.
   rewrite trace_eventuallyI in Hmtr.
