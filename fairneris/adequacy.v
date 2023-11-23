@@ -8,8 +8,8 @@ From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.
 From fairneris.aneris_lang.state_interp Require Import state_interp.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
-From fairneris Require Import from_locale_utils trace_utils ltl_lite.
-From fairneris Require Import partial_termination_alt.
+From fairneris Require Import from_locale_utils trace_utils ltl_lite
+     partial_termination.
 
 (* TODO: Move to stdpp *)
 Lemma gset_union_difference_intersection_L `{Countable A} (X Y : gset A) :

@@ -10,7 +10,6 @@ From fairneris.aneris_lang.state_interp Require Import state_interp.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 From fairneris Require Import from_locale_utils trace_utils ltl_lite.
 
-
 Definition snd_proj {A1 A2 B1 B2} (l : (A1 * A2) + (B1 * B2)) : (A2 + B2) :=
   sum_map snd snd l.
 
@@ -38,7 +37,7 @@ Definition retransmit_fair_network_ex (extr : extrace aneris_lang) : Prop :=
 Definition live_tid (c : cfg aneris_lang) (δ : retransmit_state)
   (ℓ:retransmit_node_role) (ζ:locale aneris_lang) : Prop :=
   roles_match ζ ℓ →
-  role_enabled_model (ℓ:fmrole retransmit_fair_model) δ ↔ locale_enabled ζ c.
+  role_enabled_model (ℓ:fmrole retransmit_fair_model) δ → locale_enabled ζ c.
 
 Definition live_tids (c : cfg aneris_lang) (δ : retransmit_state) : Prop :=
   ∀ ℓ ζ, live_tid c δ ℓ ζ.
@@ -254,44 +253,159 @@ Qed.
 Definition extrace_terminating_locale (ζ : locale aneris_lang) (tr : extrace aneris_lang) : Prop :=
   (◊↓λ st _, ¬ locale_enabled ζ st) tr ∨ ¬ infinite_trace tr.
 
+(* This property is tricky to prove.
+  We might instead want to redefine original lemma *)
+Lemma disabled_always_disabled ρ (mtr : mtrace) :
+  (◊↓λ st _, ρ ∉ retransmit_live_roles st) mtr →
+  (◊□↓λ st _, ρ ∉ retransmit_live_roles st) mtr.
+Proof. Admitted.
+
+Lemma retransmit_trace_valid_live ρ (mtr : mtrace) :
+  mtrace_valid mtr →
+  (↓ (λ (_ : retransmit_state) (ℓ : option retransmit_label),
+        option_map label_role ℓ = Some (inl ρ))) mtr →
+  ρ ∈ retransmit_live_roles (trfirst mtr).
+Proof.
+  intros Hvalid Hlabel.
+  apply trace_always_elim in Hvalid.
+  destruct mtr; [done|].
+  rewrite /trace_now /pred_at in Hlabel. simpl in *.
+  inversion Hvalid; set_solver.
+Qed.
+
+(* TODO: Prove using logic laws instead. *)
+Lemma not_infinite_terminating_trace {S L} (tr : trace S L) :
+  ¬ infinite_trace tr → terminating_trace tr.
+Proof.
+  intros Hinf. epose proof (infinite_or_finite) as [?|?]; done.
+Qed.
+
+Lemma trace_always_mono_strong_alt
+      {S1 S2 L1 L2}
+      (P : trace S1 L1 → Prop)
+      (Q : trace S2 L2 → Prop)
+      Rℓ Rs trans1 trans2
+      (tr1 : trace S1 L1) (tr2 : trace S2 L2) :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 →
+  (∀ tr1' tr2', traces_match Rℓ Rs trans1 trans2 tr1' tr2' →
+                (P tr1') → (Q tr2')) →
+  (□ P) tr1 → (□ Q) tr2.
+Proof.
+  rewrite !trace_alwaysI. intros Hmatch Himpl HP1 tr2' [n Hafter2].
+  eapply traces_match_after in Hmatch as [tr1' [Hafter1 Hmatch]]; [|done].
+  eapply Himpl; [done|]. apply HP1. by eexists _.
+Qed.
+
+Lemma trace_eventually_mono_strong_alt
+      {S1 S2 L1 L2}
+      (P : trace S1 L1 → Prop)
+      (Q : trace S2 L2 → Prop)
+      Rℓ Rs trans1 trans2
+      (tr1 : trace S1 L1) (tr2 : trace S2 L2) :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 →
+  (∀ tr1' tr2', traces_match Rℓ Rs trans1 trans2 tr1' tr2' →
+                (P tr1') → (Q tr2')) →
+  (◊ P) tr1 → (◊ Q) tr2.
+Proof.
+  rewrite !trace_eventuallyI. intros Hmatch Himpl [tr1' [[n Hafter1] HP1]].
+  eapply traces_match_flip in Hmatch.
+  eapply traces_match_after in Hmatch as [tr2' [Hafter2 Hmatch]]; [|done].
+  exists tr2'. split; [by eexists _|].
+  apply traces_match_flip in Hmatch. by eapply Himpl.
+Qed.
+
+
 Lemma terminating_role_preserved ρ ζ mtr extr :
+  extrace_fair extr →
   live_traces_match extr mtr →
   roles_match ζ ρ →
   retransmit_terminating_role ρ mtr →
   extrace_terminating_locale ζ extr.
 Proof.
-  intros Hmatch Hroles [Hρ|Hinf]; last first.
-  { right.
-    intros Hinf'. apply Hinf.
-    intros n. destruct (Hinf' n) as [extr' Hextr_after].
+  intros Hfair Hmatch Hroles Hmtr.
+  assert (extrace_terminating_locale ζ extr ∨
+           ¬ extrace_terminating_locale ζ extr) as HEM.
+  { by apply ExcludedMiddle. }
+  destruct HEM as [|Hextr]; [done|].
+  apply Classical_Prop.not_or_and in Hextr as [Hextr Hinf].
+  assert ((□ ↓ (λ st _, locale_enabled ζ st)) extr) as Hextr'.
+  { apply trace_always_not_not_eventually in Hextr.
+    revert Hextr. apply trace_always_mono.
+    intros tr. apply trace_impliesI. intros Hextr.
+    apply trace_now_not in Hextr.
+    revert Hextr. apply trace_now_mono.
+    intros s _. intros Hextr. by apply NNP_P. }
+  assert ((□ ◊ ↓ (λ _ otid, option_map (sum_map fst id) otid = Some (inl ζ)))
+            extr) as Hex_sched.
+  { pose proof Hextr' as Hextr''.
+    revert Hextr'. apply trace_always_mono_strong.
+    intros extr' Hsuffix. rewrite trace_impliesI.
+    intros Hextr'.
+    destruct Hfair as [Hfair_sched _].
+    specialize (Hfair_sched ζ).
+    (* TODO: Bump fairness to LTL *)
+    destruct Hsuffix as [n Hafter].
+    eapply trace_implies_after in Hfair_sched; [|done].
+    apply Hfair_sched in Hextr' as [m Hextr'].
+    simpl in *.
+    apply trace_eventuallyI.
+    rewrite /pred_at in Hextr'.
+    destruct (after m extr') as [extr''|] eqn:Heqn; last first.
+    { by rewrite Heqn in Hextr'. }
+    rewrite Heqn in Hextr'.
+    exists extr''.
+    split; [by eexists _|].
+    destruct extr''.
+    - destruct Hextr'; [|done].
+      eapply trace_always_suffix_of in Hextr''; [|by eexists _].
+      eapply trace_always_suffix_of in Hextr''; [|by eexists _].
+      apply trace_always_elim in Hextr''. done.
+    - destruct Hextr'; [|done].
+      eapply trace_always_suffix_of in Hextr''; [|by eexists _].
+      eapply trace_always_suffix_of in Hextr''; [|by eexists _].
+      apply trace_always_elim in Hextr''. done.
+  }
+  assert ((□ ◊ ↓ (λ _ ℓ, option_map label_role ℓ = Some (inl ρ)))
+            mtr) as Hmtr_sched.
+  { revert Hex_sched.
+    eapply trace_always_mono_strong_alt; [done|].
+    intros extr' mtr' Hmatch'.
+    eapply trace_eventually_mono_strong_alt; [done|].
+    intros extr'' mtr'' Hmatch''.
+    rewrite /trace_now /pred_at=> /=.
+    destruct extr''; [done|].
+    destruct mtr''; [by inversion Hmatch''|].
+    apply traces_match_cons_inv in Hmatch'' as [_ Hmatch''].
+    intros Heq.
+    destruct ℓ as [[]|]; [|done].
+    rewrite /labels_match /locale_retransmit_label in Hmatch''.
+    rewrite /roles_match in Hroles.
+    simpl in *. simplify_eq.
+    destruct (locale_retransmit_role ζ) eqn:Heqn; [|done].
+    simpl in *. by simplify_eq. }
+  destruct Hmtr as [Hmtr|Hmtr]; last first.
+  { apply NNP_P in Hinf. apply not_infinite_terminating_trace in Hmtr.
+    destruct Hmtr as [n Hafter].
+    specialize (Hinf n) as [extr' Hafter'].
     apply traces_match_flip in Hmatch.
-    eapply traces_match_after in Hmatch; [|done].
-    destruct Hmatch as [mtr' [Hmtr_after Hmatch]].
-    exists mtr'. done. }
-  left.
-  rewrite trace_eventuallyI in Hρ.
-  destruct Hρ as [mtr' [[n Hmtr_after] Hρ]].
-  rewrite trace_eventuallyI.
-  eapply traces_match_after in Hmatch; [|done].
-  destruct Hmatch as [extr' [Hextr_after Hmatch]].
-  exists extr'.
-  split; [by eexists _|].
-  rewrite /trace_now /pred_at.
-  rewrite /trace_now /pred_at in Hρ.
-  simpl in *.
-  destruct mtr'.
-  - destruct extr'; [|by inversion Hmatch].
-    apply traces_match_first in Hmatch.
-    intros Henabled.
-    apply Hρ.
-    clear Hρ.
-    by eapply Hmatch.
-  - destruct extr'; [by inversion Hmatch|].
-    apply traces_match_first in Hmatch.
-    intros Henabled.
-    apply Hρ.
-    clear Hρ.
-    by eapply Hmatch.
+    eapply traces_match_after in Hmatch as [mtr'' [Hafter'' _]]; [|done].
+    by simplify_eq. }
+  clear Hinf Hextr Hextr' Hex_sched.
+  apply disabled_always_disabled in Hmtr.
+  rewrite trace_eventuallyI in Hmtr.
+  destruct Hmtr as [mtr' [Hmtr_suffix Hmtr']].
+  rewrite trace_alwaysI in Hmtr_sched.
+  specialize (Hmtr_sched mtr' Hmtr_suffix).
+  rewrite trace_eventuallyI in Hmtr_sched.
+  destruct Hmtr_sched as [mtr'' [Hmtr_suffix' Hmtr'']].
+  rewrite trace_alwaysI in Hmtr'.
+  specialize (Hmtr' mtr'' Hmtr_suffix').
+  assert (mtrace_valid mtr'').
+  { eapply trace_always_suffix_of; [done|].
+    eapply trace_always_suffix_of; [done|].
+    by eapply traces_match_valid_preserved. }
+  apply retransmit_trace_valid_live in Hmtr''; [|done].
+  by destruct mtr''.
 Qed.
 
 Lemma fair_extrace_terminate extr mtr :
@@ -300,7 +414,7 @@ Lemma fair_extrace_terminate extr mtr :
   extrace_terminating_locale localeB extr.
 Proof.
   intros Hmatch Hvalid Hfair.
-  eapply terminating_role_preserved; [done|done|].
+  eapply terminating_role_preserved; [done|done|done|].
   apply retransmit_fair_traces_terminate;
     [by eapply traces_match_valid_preserved|].
   by eapply traces_match_fairness_preserved.
