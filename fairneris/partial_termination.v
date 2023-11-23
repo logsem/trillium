@@ -257,12 +257,36 @@ Qed.
 Definition extrace_terminating_locale (ζ : locale aneris_lang) (tr : extrace aneris_lang) : Prop :=
   (◊↓λ st _, ¬ locale_enabled ζ st) tr ∨ ¬ infinite_trace tr.
 
-(* This property is tricky to prove.
-  We might instead want to redefine original lemma *)
+(* TODO: Remove eventually in this *)
 Lemma disabled_always_disabled ρ (mtr : mtrace) :
+  mtrace_valid mtr →
   (◊↓λ st _, ρ ∉ retransmit_live_roles st) mtr →
   (◊□↓λ st _, ρ ∉ retransmit_live_roles st) mtr.
-Proof. Admitted.
+Proof.
+  intros Hvalid.
+  rewrite !trace_eventuallyI.
+  intros [mtr' [[n Hafter] Hmtr']].
+  eapply trace_always_suffix_of in Hvalid; [|by eexists _].
+  exists mtr'. split; [by eexists _|].
+  rewrite trace_alwaysI.
+  intros mtr'' [m Hafter'].
+  clear n mtr Hafter.
+  revert mtr' mtr'' Hmtr' Hafter' Hvalid.
+  induction m as [|m Hm]; intros mtr' mtr'' Hmtr' Hafter' Hvalid.
+  { simpl in *. simplify_eq. done. }
+  replace (S m) with (m + 1) in Hafter' by lia.
+  rewrite after_sum' in Hafter'.
+  destruct (after m mtr') as [mtr'''|] eqn:Heqn; [|done].
+  eapply Hm in Hmtr'; [|done|done].  
+  eapply trace_always_suffix_of in Hvalid; [|by eexists _].
+  apply trace_always_elim in Hvalid.
+  destruct mtr'''; [done|]. simpl in *. simplify_eq.
+  rewrite /trace_now /pred_at in Hmtr'. simpl in *.
+  rewrite /trace_now /pred_at. simpl in *.
+  destruct mtr''.
+  - inversion Hvalid; try set_solver. 
+  - inversion Hvalid; try set_solver. 
+Qed.
 
 Lemma retransmit_trace_valid_live ρ (mtr : mtrace) :
   mtrace_valid mtr →
@@ -395,7 +419,8 @@ Proof.
     eapply traces_match_after in Hmatch as [mtr'' [Hafter'' _]]; [|done].
     by simplify_eq. }
   clear Hinf Hextr Hextr' Hex_sched.
-  apply disabled_always_disabled in Hmtr.
+  apply disabled_always_disabled in Hmtr;
+    [|by eapply traces_match_valid_preserved].
   rewrite trace_eventuallyI in Hmtr.
   destruct Hmtr as [mtr' [Hmtr_suffix Hmtr']].
   rewrite trace_alwaysI in Hmtr_sched.
