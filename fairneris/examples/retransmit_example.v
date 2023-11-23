@@ -173,7 +173,7 @@ Section with_Σ.
       split; [done|].
       split; last first.
       { split; [done|]. by eapply state_buffers_delete. }
-      intros [ℓ α] ζ Hlabels Henabled.
+      intros ℓ ζ Hlabels Henabled.
       rewrite Hex in Hlive. rewrite Heqn in Hlive. simpl.
       assert (ℓ = Arole).
       { rewrite /role_enabled_model in Henabled. simpl in *.
@@ -191,51 +191,3 @@ Section with_Σ.
   Qed.
 
 End with_Σ.
-
-(* Definition initial_state shA shB := *)
-(*   ([mkExpr ipA (Aprog shA); mkExpr ipB (Bprog shB)], *)
-(*      {| state_heaps := {[ipA:=∅; ipB:=∅]}; *)
-(*        state_sockets := {[ipA := {[shA := (sA, [])]}; *)
-(*                           ipB := {[shB := (sB, [])]}]}; *)
-(*        state_ms := ∅; |}). *)
-
-(* Lemma no_drop_dup_continued_simulation shA shB : *)
-(*   fairly_terminating (initial_state shA shB). *)
-(* Proof. *)
-(*   assert (anerisPreG simple_fair_model (anerisΣ simple_fair_model)) as HPreG. *)
-(*   { apply _. } *)
-(*   eapply (simulation_adequacy_fair_termination_multiple _ _ _ _ _ {[saA;saB]}); *)
-(*     [simpl; lia| |set_solver|set_solver| |set_solver|set_solver|..| |]=> /=. *)
-(*   { intros ℓ ζ Hmatch Henabled. rewrite /role_enabled_model in Henabled. simpl. *)
-(*     assert (ℓ = A_role ∨ ℓ = B_role) as [Heq|Heq] by set_solver; simplify_eq. *)
-(*     - assert (ζ = ("0.0.0.0", 0%nat)) as ->. *)
-(*       { rewrite /labels_match /locale_simple_label in Hmatch. *)
-(*         by repeat case_match; simplify_eq. } *)
-(*       eexists _. simpl. done. *)
-(*     - assert (ζ = ("0.0.0.1", 0%nat)) as ->. *)
-(*       { rewrite /labels_match /locale_simple_label in Hmatch. *)
-(*         by repeat case_match; simplify_eq. } *)
-(*       eexists _. simpl. done. } *)
-(*   { iIntros (Hinv) "!> Hunallocated Hrt Hlive Hdead Hfree Hnode Hlbl Hsendevs Hrecvevs". *)
-(*     iIntros "Hsend_obs Hrecv_obs". *)
-(*     iIntros "!>". *)
-(*     iDestruct (unallocated_split with "Hunallocated") as "[HA HB]"; [set_solver|]. *)
-(*     rewrite big_sepS_union; [|set_solver]. *)
-(*     iDestruct "Hrt" as "[HrtA HrtB]". *)
-(*     rewrite !big_sepS_singleton. *)
-(*     rewrite /simple_live_roles=> /=. *)
-(*     replace ({[A_role; B_role]} ∖ config_roles) with (({[A_role; B_role]}):gset _) *)
-(*                                                      by set_solver. *)
-(*     iDestruct (live_roles_own_split with "Hlive") as "[HliveA HliveB]"; *)
-(*       [set_solver|]. *)
-(*     iSplitL "HrtA". *)
-(*     { iApply (wp_A with "[HrtA]"); [admit|]. *)
-(*       iIntros "!>" (v) "H". *)
-(*       iExists _. by iFrame. } *)
-(*     iSplitL "HrtB". *)
-(*     { iApply (wp_B with "[HrtB]"); [admit|]. *)
-(*       iIntros "!>" (v) "H". *)
-(*       iExists _. by iFrame. } *)
-(*     done. } *)
-(*   (* Needs to simplify requirements on initial node in Aneris adequacy *) *)
-(* Admitted. *)

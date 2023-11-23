@@ -187,4 +187,17 @@ Section gen_heap_light.
       by rewrite /to_gen_heap lookup_fmap Hl. }
     iModIntro. iFrame "Hl". rewrite to_gen_heap_insert. iFrame.
   Qed.
+
+  Lemma gen_heap_light_init_strong σ :
+    ⊢ |==> ∃ γ, gen_heap_light_ctx γ σ ∗
+                [∗ map] l ↦ v ∈ σ, lmapsto γ l 1 v.
+  Proof.
+    iInduction σ as [|σ Hnin] "IHσ" using map_ind.
+    { iMod (gen_heap_light_init ∅) as (γ) "Hγ".
+      iExists γ. rewrite big_sepM_empty. by iFrame. }
+    iMod "IHσ" as (γ) "[Hσ Hσs]".
+    iMod (gen_heap_light_alloc with "Hσ") as "[Hσ Hs]"; [done|].
+    iModIntro. iExists γ. rewrite big_sepM_insert; [|done]. by iFrame.
+  Qed.
+
 End gen_heap_light.

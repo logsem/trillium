@@ -305,10 +305,10 @@ Section Aneris_AS.
 
   Definition role_enabled_locale_exists
              (c : cfg aneris_lang) (δ : retransmit_state) :=
-    ∀ (ℓ:retransmit_node_label) ζ,
-    labels_match (inl ζ) (inl ℓ) →
-    role_enabled_model (fst ℓ : fmrole retransmit_fair_model) δ →
-    is_Some (from_locale c.1 ζ.1).
+    ∀ (ℓ:retransmit_node_role) ζ,
+    roles_match ζ ℓ →
+    role_enabled_model (ℓ : fmrole retransmit_fair_model) δ →
+    is_Some (from_locale c.1 ζ).
 
   Definition model_state_socket_coh
              (skts : gmap ip_address sockets)
@@ -349,8 +349,7 @@ Section Aneris_AS.
          (trace_messages_history ex) ∗
        thread_live_roles_interp (trace_last atr) ∗
        steps_auth (trace_length ex))%I;
-    fork_post ζ _ := (∃ α ℓ, ⌜labels_match (inl (ζ,α)) (inl ℓ)⌝ ∗
-                             dead_role_frag_own (ℓ.1))%I }.
+    fork_post ζ _ := (∃ ℓ, ⌜roles_match ζ ℓ⌝ ∗ dead_role_frag_own ℓ)%I }.
 
 End Aneris_AS.
 

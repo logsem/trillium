@@ -52,14 +52,14 @@ Lemma posts_of_idx
   from_locale tp ζ = Some e → aneris_to_val e = Some v →
   posts_of tp
            (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes tp)) -∗
-  (∃ α ℓ, ⌜labels_match (inl (ζ,α)) (inl ℓ)⌝ ∗ dead_role_frag_own (ℓ.1))%I.
+  (∃ ℓ, ⌜roles_match ζ ℓ⌝ ∗ dead_role_frag_own ℓ)%I.
 Proof.
   iIntros (Hlocale Hval) "Hposts".
   apply from_locale_elem_of' in Hlocale as [i [Hlookup Hlocale]].
   iDestruct (big_sepL_elem_of _ _ _ with "Hposts") as "H".
   { rewrite elem_of_list_omap.
-    eexists (e, (λ _, ∃ α ℓ, ⌜labels_match (inl (ζ,α)) (inl ℓ)⌝ ∗
-                             dead_role_frag_own ((ℓ.1):
+    eexists (e, (λ _, ∃ ℓ, ⌜roles_match ζ ℓ⌝ ∗
+                             dead_role_frag_own (ℓ:
                                                   fmrole retransmit_fair_model))%I).
     split; last first.
     - simpl. apply fmap_Some. exists v. split; done.
