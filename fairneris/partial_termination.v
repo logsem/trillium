@@ -45,13 +45,6 @@ Definition live_tids (c : cfg aneris_lang) (δ : retransmit_state) : Prop :=
 Definition live_traces_match : extrace aneris_lang → mtrace → Prop :=
   traces_match labels_match live_tids language.locale_step retransmit_trans.
 
-Lemma traces_match_valid_preserved extr mtr :
-  live_traces_match extr mtr → mtrace_valid mtr.
-Proof. Admitted.
-
-Definition extrace_fair (extr : extrace aneris_lang) :=
-  (∀ ζ, fair_scheduling_ex ζ extr) ∧ retransmit_fair_network_ex extr.
-
 Lemma traces_match_cons_inv {S1 S2 L1 L2}
       (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
       (trans1: S1 -> L1 -> S1 -> Prop)
@@ -60,6 +53,17 @@ Lemma traces_match_cons_inv {S1 S2 L1 L2}
   traces_match Rℓ Rs trans1 trans2 (s1 -[l1]-> tr1) (s2 -[l2]-> tr2) ->
   Rs s1 s2 ∧ Rℓ l1 l2.
 Proof. intros Hm. inversion Hm; done. Qed.
+
+Lemma traces_match_valid_preserved extr mtr :
+  live_traces_match extr mtr → mtrace_valid mtr.
+Proof.
+  rewrite /mtrace_valid trace_alwaysI. intros Hmatch tr [n Hsuffix].
+  eapply traces_match_after in Hmatch as [? [? Hmatch]]; [|done].
+  by inversion Hmatch.
+Qed.
+
+Definition extrace_fair (extr : extrace aneris_lang) :=
+  (∀ ζ, fair_scheduling_ex ζ extr) ∧ retransmit_fair_network_ex extr.
 
 Lemma labels_match_deliver_filter_impl msg s1 s2 ℓ1 ℓ2 extr mtr :
   labels_match ℓ1 ℓ2 →
