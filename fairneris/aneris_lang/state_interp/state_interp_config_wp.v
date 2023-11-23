@@ -59,7 +59,7 @@ Section state_interpretation.
     { by eapply Hscoh'. }
     destruct (decide (sa = sa')) as [<-|Hsaneq].
     { destruct sa.
-      rewrite lookup_insert.
+      rewrite lookup_total_insert.
       rewrite lookup_insert in Hip'.
       simplify_eq.
       assert(sh = sh') as <-.
@@ -70,7 +70,7 @@ Section state_interpretation.
         - rewrite Hsa. rewrite Hskt'. done. }
       rewrite lookup_insert in Hsh'.
       simplify_eq. done. }
-    rewrite lookup_insert_ne; [|done].
+    rewrite lookup_total_insert_ne; [|done].
     destruct (decide (ip_of_address sa = ip_of_address sa')) as [Heq|Hneq].
     { rewrite Heq in Hip'. rewrite lookup_insert in Hip'.
       simplify_eq.
@@ -101,7 +101,7 @@ Section state_interpretation.
     { by eapply Hscoh'. }
     destruct (decide (sa = sa')) as [<-|Hsaneq].
     { destruct sa.
-      rewrite lookup_insert.
+      rewrite lookup_total_insert.
       rewrite lookup_insert in Hip'.
       simplify_eq.
       assert(sh = sh') as <-.
@@ -112,7 +112,7 @@ Section state_interpretation.
         - rewrite Hsa. rewrite Hskt'. done. }
       rewrite lookup_insert in Hsh'.
       simplify_eq. done. }
-    rewrite lookup_insert_ne; [|done].
+    rewrite lookup_total_insert_ne; [|done].
     destruct (decide (ip_of_address sa = ip_of_address sa')) as [Heq|Hneq].
     { rewrite Heq in Hip'. rewrite lookup_insert in Hip'.
       simplify_eq.
@@ -162,7 +162,6 @@ Section state_interpretation.
             set_solver.
           - destruct Hσ as [Hσ1 Hσ2].
             simpl in *.
-            rewrite lookup_total_alt.
             assert (a = m_destination m) as ->.
             { by apply elem_of_filter in Hm as [-> _]. }
             by erewrite Hσ2. }

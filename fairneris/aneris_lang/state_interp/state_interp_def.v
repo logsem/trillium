@@ -316,7 +316,7 @@ Section Aneris_AS.
     ∀ ip Sn sh skt sa ms,
     skts !! ip = Some Sn → Sn !! sh = Some (skt,ms) →
     saddress skt = Some sa →
-    bs !! sa = Some ms.
+    bs !!! sa = ms.
 
   Definition config_state_valid (c : cfg aneris_lang) (δ : retransmit_state) :=
     state_ms c.2 = δ.1.2 ∧ model_state_socket_coh (state_sockets c.2) δ.2.

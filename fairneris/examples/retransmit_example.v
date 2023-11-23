@@ -6,7 +6,6 @@ From fairneris.examples Require Import retransmit_model_progress_ltl.
 From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
-(* From fairneris Require Import adequacy. *)
 
 Definition Aprog shA : expr := SendToRepeat #(LitSocket shA) #"Hello" #saB.
 Definition Bprog shB : expr := ReceiveFrom #(LitSocket shB).
@@ -97,7 +96,7 @@ Section with_Σ.
     rewrite Hex in Hskts. rewrite Heqn in Hskts.
     simpl in *.
     subst.
-    assert (bs !! saB = Some r) as Hbs.
+    assert (bs !!! saB = r) as Hbs.
     { by eapply Hskts. }
     destruct (decide (r = [])) as [-> | Hneq].
     - iMod (fupd_mask_intro_subseteq _ ∅ True%I with "[]") as "Hmk";
@@ -122,8 +121,7 @@ Section with_Σ.
       iPureIntro.
       rewrite /trace_ends_in in Hex.
       rewrite /trace_ends_in in Hex.
-      split; [econstructor;[done|econstructor|done]|].
-      { rewrite lookup_total_alt. by rewrite Hbs. }
+      split; [econstructor;[done|by econstructor|done]|].
       rewrite Hex in Hms. rewrite Heqn in Hms.
       split; [done|].
       split; [|done].
@@ -142,7 +140,7 @@ Section with_Σ.
       iMod "Hmk" as "_".
       iAssert (socket_address_group_own {[saB]})%I as "#HsaB".
       { iDestruct "Hrt" as "[(%send & %recv & _ & _ & _ & $ & _) _]". }
-
+      rewrite -H1 in Hr.
       iPoseProof (aneris_state_interp_receive_some saB {[saB]} _ _ _ _ (Some _)
                    with "[] [$HΨ] [$Hσ] [$Hsh] [Hrt]")
         as (R' sagT) "(%HinT & #HownT & %Hhist & %HR & Hrt & Hrest)";
@@ -154,7 +152,7 @@ Section with_Σ.
       iMod (dead_role_auth_extend _ (Brole : fmrole retransmit_fair_model) with "Hdead_auth")
         as "[Hdead_auth Hdead_own]"; [by set_solver|].
       iModIntro.
-      iExists (retransmit_model_base.Received, ms, <[saB:=r0]>bs),
+      iExists (retransmit_model_base.Received, ms, <[saB:=r]>bs),
                 (inl (Brole, None)).
       rewrite Heqn Hhist=> /=.
       rewrite /thread_live_roles_interp /retransmit_live_roles. simpl in *.
@@ -167,8 +165,7 @@ Section with_Σ.
       iSplitR "HΦ Hdead_own"; last first.
       { iSplit; [|done]. iApply wp_value. by iApply "HΦ". }
       iPureIntro.
-      split; [econstructor;[done|econstructor|done]|].
-      { rewrite lookup_total_alt. by rewrite Hbs. }
+      split; [econstructor;[done|by econstructor|done]|].
       rewrite Hex in Hms. rewrite Heqn in Hms.
       split; [done|].
       split; last first.
