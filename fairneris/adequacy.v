@@ -75,9 +75,6 @@ Definition continued_simulation_init {Λ M}
            (c : cfg Λ) (s : mstate M) :=
   continued_simulation ξ {tr[c]} {tr[s]}.
 
-Definition get_ips (es : list aneris_expr) : gset ip_address :=
-  list_to_set $ expr_n <$> es.
-
 Definition addrs_to_ip_ports_map (A : gset socket_address) : gmap ip_address (gset port) :=
   fold_right union ∅ $
              (λ sa, {[ip_of_address sa := {[port_of_address sa]}]}) <$> (elements A).
@@ -91,11 +88,12 @@ Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :
                              end ∪ A) ∅ skts ∪ A) ∅ skts.
 
 Definition wp_proto_multiple_strong `{anerisPreG retransmit_fair_model Σ} A
-           σ (s:stuckness) (es : list aneris_expr) (* (φs : list (aneris_val → Prop)) *) st :=
+           σ (s:stuckness) (es : list aneris_expr) st :=
   (∀ (aG : anerisG retransmit_fair_model Σ), ⊢ |={⊤}=>
      unallocated A -∗
      ([∗ set] sa ∈ A, sa ⤳ (∅, ∅)) -∗
      live_roles_frag_own (retransmit_live_roles st) -∗
+     dead_roles_frag_own ((all_roles ∖ retransmit_live_roles st) : gset $ fmrole retransmit_fair_model) -∗
      ([∗ set] ip ∈ dom (state_heaps σ),
         ([∗ map] l ↦ v ∈ (state_heaps σ !!! ip), l ↦[ip] v) ∗
         ([∗ map] sh ↦ s ∈ (state_sockets σ !!! ip), sh ↪[ip] s.1)) -∗
@@ -220,7 +218,7 @@ Proof.
                Hunallocated_auth Hsi HIPsCtx HPiu") as "Hinterp";
     [set_solver|set_solver|set_solver|done|done|done|done|done|done|done| |..].
   { iPureIntro. apply to_singletons_is_ne. }
-  iDestruct ("Hwp" with "Hunallocated [HB] Hlivefrag Hσ HPs Hmfrag Hn Hinterp")
+  iDestruct ("Hwp" with "Hunallocated [HB] Hlivefrag Hdeadfrag Hσ HPs Hmfrag Hn Hinterp")
     as ">[Hσ $]".
   { iApply (big_sepS_to_singletons with "[] HB").
     iIntros "!>" (sa).

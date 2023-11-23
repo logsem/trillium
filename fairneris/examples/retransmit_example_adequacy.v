@@ -41,7 +41,6 @@ Proof.
     intros.
     (* OBS: Might be able to make this simpler with a total lookup *)
     rewrite insert_union_singleton_l in H.
-    (* rewrite lookup_union in H. *)
     apply lookup_union_Some in H; [|apply map_disjoint_dom; set_solver].
     destruct H as [H|H].
     - destruct (decide (ip = ipA)) as [->|Hneq]; last first.
@@ -160,7 +159,7 @@ Proof.
       destruct (decide (sh = shB)) as [->|Hneq]; last first.
       { by rewrite lookup_insert_ne in Hsh. }
       rewrite lookup_insert in Hsh. simplify_eq. set_solver. }
-  iIntros (Hinv) "!> Hunallocated Hrt Hlive Hσ _ Hfrag Hnode Hst".
+  iIntros (Hinv) "!> Hunallocated Hrt Hlive Hdead Hσ _ Hfrag Hnode Hst".
   iDestruct (unallocated_split with "Hunallocated") as "[HA HB]"; [set_solver|].
   iMod (aneris_state_interp_socket_interp_allocate_singleton with "Hst [HB]")
     as "[$ #HB]".
