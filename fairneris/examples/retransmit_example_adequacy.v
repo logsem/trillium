@@ -6,7 +6,9 @@ From fairneris.examples Require Import retransmit_model_progress_ltl.
 From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
-From fairneris Require Import retransmit_example adequacy.
+From fairneris.aneris_lang Require Import aneris_lang adequacy.
+From fairneris Require Import retransmit_example.
+
 From fairneris.lib Require Import singletons.
 
 Definition initial_state shA shB :=
