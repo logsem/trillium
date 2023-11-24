@@ -257,35 +257,29 @@ Qed.
 Definition extrace_terminating_locale (ζ : locale aneris_lang) (tr : extrace aneris_lang) : Prop :=
   (◊↓λ st _, ¬ locale_enabled ζ st) tr ∨ ¬ infinite_trace tr.
 
-(* TODO: Remove eventually in this *)
 Lemma disabled_always_disabled ρ (mtr : mtrace) :
   mtrace_valid mtr →
-  (◊↓λ st _, ρ ∉ retransmit_live_roles st) mtr →
-  (◊□↓λ st _, ρ ∉ retransmit_live_roles st) mtr.
+  (↓λ st _, ρ ∉ retransmit_live_roles st) mtr →
+  (□↓λ st _, ρ ∉ retransmit_live_roles st) mtr.
 Proof.
-  intros Hvalid.
-  rewrite !trace_eventuallyI.
-  intros [mtr' [[n Hafter] Hmtr']].
-  eapply trace_always_suffix_of in Hvalid; [|by eexists _].
-  exists mtr'. split; [by eexists _|].
+  intros Hvalid Hmtr.
   rewrite trace_alwaysI.
-  intros mtr'' [m Hafter'].
-  clear n mtr Hafter.
-  revert mtr' mtr'' Hmtr' Hafter' Hvalid.
-  induction m as [|m Hm]; intros mtr' mtr'' Hmtr' Hafter' Hvalid.
+  intros mtr' [m Hafter].
+  revert mtr' Hmtr Hafter Hvalid.
+  induction m as [|m Hm]; intros mtr' Hmtr Hafter Hvalid.
   { simpl in *. simplify_eq. done. }
-  replace (S m) with (m + 1) in Hafter' by lia.
-  rewrite after_sum' in Hafter'.
-  destruct (after m mtr') as [mtr'''|] eqn:Heqn; [|done].
-  eapply Hm in Hmtr'; [|done|done].  
+  replace (S m) with (m + 1) in Hafter by lia.
+  rewrite after_sum' in Hafter.
+  destruct (after m mtr) as [mtr''|] eqn:Heqn; [|done].
+  eapply Hm in Hmtr; [|done|done].
   eapply trace_always_suffix_of in Hvalid; [|by eexists _].
   apply trace_always_elim in Hvalid.
-  destruct mtr'''; [done|]. simpl in *. simplify_eq.
-  rewrite /trace_now /pred_at in Hmtr'. simpl in *.
+  destruct mtr''; [done|]. simpl in *. simplify_eq.
+  rewrite /trace_now /pred_at in Hmtr. simpl in *.
   rewrite /trace_now /pred_at. simpl in *.
-  destruct mtr''.
-  - inversion Hvalid; try set_solver. 
-  - inversion Hvalid; try set_solver. 
+  destruct mtr'.
+  - inversion Hvalid; try set_solver.
+  - inversion Hvalid; try set_solver.
 Qed.
 
 Lemma retransmit_trace_valid_live ρ (mtr : mtrace) :
@@ -342,7 +336,6 @@ Proof.
   apply traces_match_flip in Hmatch. by eapply Himpl.
 Qed.
 
-
 Lemma terminating_role_preserved ρ ζ mtr extr :
   extrace_fair extr →
   live_traces_match extr mtr →
@@ -354,7 +347,7 @@ Proof.
   assert (extrace_terminating_locale ζ extr ∨
            ¬ extrace_terminating_locale ζ extr) as HEM.
   { by apply ExcludedMiddle. }
-  destruct HEM as [|Hextr]; [done|].
+  destruct HEM as [|Hextr]; [done|]. exfalso.
   apply Classical_Prop.not_or_and in Hextr as [Hextr Hinf].
   assert ((□ ↓ (λ st _, locale_enabled ζ st)) extr) as Hextr'.
   { apply trace_always_not_not_eventually in Hextr.
@@ -419,8 +412,11 @@ Proof.
     eapply traces_match_after in Hmatch as [mtr'' [Hafter'' _]]; [|done].
     by simplify_eq. }
   clear Hinf Hextr Hextr' Hex_sched.
-  apply disabled_always_disabled in Hmtr;
-    [|by eapply traces_match_valid_preserved].
+  eapply trace_eventually_mono_strong in Hmtr; last first.
+  { intros mtr' Hsuffix Hmtr'.
+    eapply disabled_always_disabled; [|done].
+    eapply trace_always_suffix_of; [done|].
+    by eapply traces_match_valid_preserved. }
   rewrite trace_eventuallyI in Hmtr.
   destruct Hmtr as [mtr' [Hmtr_suffix Hmtr']].
   rewrite trace_alwaysI in Hmtr_sched.
