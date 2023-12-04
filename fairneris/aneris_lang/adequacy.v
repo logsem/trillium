@@ -33,7 +33,8 @@ Definition valid_state_evolution_fairness
            (auxtr : auxiliary_trace (fair_model_to_model retransmit_fair_model)) :=
   auxtr_valid auxtr ∧
   labels_match_trace extr auxtr ∧
-  live_tids (trace_last extr) (trace_last auxtr).
+  live_tids (trace_last extr) (trace_last auxtr) ∧
+  config_state_valid (trace_last extr) (trace_last auxtr).
 
 Lemma rel_finitary_valid_state_evolution_fairness :
   rel_finitary valid_state_evolution_fairness.
@@ -255,33 +256,50 @@ Proof.
     set_solver. }
   iPureIntro.
   pose proof Hvalid as Hvalid'.
-  destruct Hvalid as (Htrace&Hlabels&Hstate).
+  destruct Hvalid as (Htrace&Hlabels&Hstate&Hconfig').
   split; [done|].
   split; [done|].
+  split; [|done].
   apply valid_state_live_tids; [done|].
   by rewrite Hendex.
 Qed.
 
-(* TODO: Clean this up - Currently just ported directly from Fairness *)
-Lemma valid_inf_system_trace_implies_traces_match
-      ex atr iex iatr progtr (auxtr : mtrace) :
-  exec_trace_match ex iex progtr ->
-  exec_trace_match atr iatr auxtr ->
-  valid_inf_system_trace (continued_simulation valid_state_evolution_fairness) ex atr iex iatr ->
-  live_traces_match progtr auxtr.
+Definition auxtrace (M : Model) := trace (M.(mstate)) (M.(mlabel)).
+
+Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
+  match ft with
+  | {tr[a]} => None
+  | _ :tr[ℓ]: _ => Some ℓ
+  end.
+
+Lemma valid_inf_system_trace_implies_traces_match_strong {Λ} {Mdl:Model}
+      (φ : execution_trace Λ → auxiliary_trace Mdl → Prop)
+      (Rs : _ → _ → Prop) (Rℓ : _ → _ → Prop)
+      ex atr iex iatr progtr auxtr :
+  (∀ extr auxtr, φ extr auxtr → Rs (trace_last extr) (trace_last auxtr)) →
+  (∀ extr auxtr, φ extr auxtr →
+                 ∀ ζ ℓ, trace_last_label extr = Some ζ →
+                        trace_last_label auxtr = Some ℓ →
+                        Rℓ ζ ℓ) →
+  (∀ extr auxtr, φ extr auxtr →
+                 match extr, auxtr with
+                 | _ :tr[_]: _, auxtr :tr[ℓ]: ρ =>
+                     Mdl.(mtrans) (trace_last auxtr) ℓ ρ
+                 | _,_ => True
+                 end) →
+  exec_trace_match ex iex progtr →
+  exec_trace_match atr iatr auxtr →
+  valid_inf_system_trace φ ex atr iex iatr →
+  traces_match Rℓ Rs locale_step mtrans progtr auxtr.
 Proof.
+  intros Hφ1 Hφ2 Hφ3.
   revert ex atr iex iatr auxtr progtr. cofix IH.
   intros ex atr iex iatr auxtr progtr Hem Ham Hval.
-  inversion Hval as [?? Hphi |
-                      ex' atr' c [? σ'] δ' iex' iatr' oζ ℓ Hphi [=] ? Hinf];
-    simplify_eq.
-  - inversion Hem; inversion Ham. econstructor.
-    apply continued_simulation_rel in Hphi as (Hsteps&Hmatch&Hlive).
-    by simplify_eq.
+  inversion Hval as [?? Hphi |ex' atr' c [? σ'] δ' iex' iatr' oζ ℓ Hphi [=] ? Hinf]; simplify_eq.
+  - inversion Hem; inversion Ham. econstructor; eauto.
+    pose proof (Hφ1 ex atr Hphi). simplify_eq. by eapply Hφ1.
   - inversion Hem; inversion Ham. subst.
     pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
-    apply continued_simulation_rel in Hphi as (Hmatch&Hsteps&Hlive).
-    apply continued_simulation_rel in Hphi' as (Hsteps'&Hmatch'&Hlive').
     econstructor.
     + eauto.
     + eauto.
@@ -290,27 +308,57 @@ Proof.
       end; done.
     + match goal with
       | [H: exec_trace_match _ iatr' _ |- _] => inversion H; clear H; simplify_eq
-      end.
-      * inversion Hsteps'; simplify_eq.
-        rewrite /trace_ends_in in H3. rewrite H3. done.
-      * simpl. inversion Hsteps'; simplify_eq.
-        rewrite /trace_ends_in in H4. rewrite H4. done.
+      end; by eapply (Hφ3 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ')).
     + eapply IH; eauto.
 Qed.
 
-Definition extrace_matching_mtrace_exists st extr :=
-  ∃ mtr, trfirst mtr = st ∧ live_traces_match extr mtr.
-
-Lemma continued_simulation_traces_match extr st :
-  extrace_valid extr →
-  continued_simulation valid_state_evolution_fairness
-                       {tr[trfirst extr]} {tr[st]} →
-  extrace_matching_mtrace_exists st extr.
+(* OBS: This is not needed. *)
+Lemma valid_inf_system_trace_implies_traces_match
+      ex atr iex iatr progtr auxtr :
+  exec_trace_match ex iex progtr →
+  exec_trace_match atr iatr auxtr →
+  valid_inf_system_trace
+    (continued_simulation valid_state_evolution_fairness) ex atr iex iatr →
+  live_traces_match progtr auxtr.
 Proof.
-  intros Hvalid Hsim.
+  intros.
+  eapply (valid_inf_system_trace_implies_traces_match_strong
+          (continued_simulation valid_state_evolution_fairness)); [| | |done..].
+  - by intros ?? (?&?&?&?)%continued_simulation_rel.
+  - intros [][] (?&?&?)%continued_simulation_rel; try done.
+    intros. simpl in *. by simplify_eq.
+  - intros [][] (Hvalid&?&?)%continued_simulation_rel; try done.
+    simpl in *. inversion Hvalid. simplify_eq. by rewrite H7.
+Qed.
+
+Definition extrace_matching_mtrace_exists
+           {Λ} {M} (Rs : cfg Λ → M.(mstate) → Prop) Rℓ st extr :=
+  ∃ mtr, trfirst mtr = st ∧
+         traces_match Rℓ Rs language.locale_step (M.(mtrans)) extr mtr.
+
+Lemma continued_simulation_traces_match {Λ} {M}
+      (ξ : _ → _ → Prop) (Rs : cfg Λ → M.(mstate) → Prop) (Rℓ : _ → _ → Prop)
+      extr st :
+  (∀ extr auxtr, continued_simulation ξ extr auxtr →
+                 Rs (trace_last extr) (trace_last auxtr)) →
+  (∀ extr auxtr, continued_simulation ξ extr auxtr →
+                 ∀ ζ ℓ, trace_last_label extr = Some ζ →
+                        trace_last_label auxtr = Some ℓ →
+                        Rℓ ζ ℓ) →
+  (∀ extr auxtr, continued_simulation ξ extr auxtr →
+                 match extr, auxtr with
+                 | _ :tr[_]: _, auxtr :tr[ℓ]: ρ =>
+                     mtrans (trace_last auxtr) ℓ ρ
+                 | _,_ => True
+                 end) →
+  extrace_valid extr →
+  continued_simulation_init ξ (trfirst extr) st →
+  extrace_matching_mtrace_exists Rs Rℓ st extr.
+Proof.
+  intros HRs HRℓ Htrans Hvalid Hsim.
   assert (∃ iatr,
              valid_inf_system_trace
-               (continued_simulation valid_state_evolution_fairness)
+               (continued_simulation ξ)
                (trace_singleton (trfirst extr))
                (trace_singleton (st))
                (from_trace extr)
@@ -321,14 +369,31 @@ Proof.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
   eexists _.
   split; last first.
-  { eapply (valid_inf_system_trace_implies_traces_match); eauto.
+  { eapply (valid_inf_system_trace_implies_traces_match_strong); eauto.
     - by apply from_trace_spec.
     - by apply to_trace_spec. }
   destruct iatr; [done|by destruct x].
 Qed.
 
+Definition extrace_matching_mtrace_exists_live st extr :=
+  extrace_matching_mtrace_exists (live_tids : cfg aneris_lang → mstate (fair_model_to_model retransmit_fair_model) → Prop) labels_match st extr.
+
+Lemma continued_simulation_traces_match_live extr st :
+  extrace_valid extr →
+  continued_simulation_init valid_state_evolution_fairness
+                       (trfirst extr) st →
+  extrace_matching_mtrace_exists_live st extr.
+Proof.
+  intros. eapply continued_simulation_traces_match; eauto.
+  - by intros ?? (?&?&?&?)%continued_simulation_rel.
+  - intros [][] (?&?&?)%continued_simulation_rel; try done.
+    intros. simpl in *. by simplify_eq.
+  - intros [][] (Hvalid&?&?)%continued_simulation_rel; try done.
+    simpl in *. inversion Hvalid. simplify_eq. by rewrite H6.
+Qed.
+
 Definition matching_mtrace_exists c st :=
-  extrace_property c (extrace_matching_mtrace_exists st).
+  extrace_property c (extrace_matching_mtrace_exists_live st).
 
 (** A continued simulation exists between some initial configuration [c]
     and the initial state [init_state] of a fair model. *)
@@ -339,7 +404,7 @@ Lemma continued_simulation_traces_match_init c st :
   live_simulation c st → matching_mtrace_exists c st.
 Proof.
   intros Hsim extr <- Hvalid.
-  apply (continued_simulation_traces_match) in Hsim
+  apply (continued_simulation_traces_match_live) in Hsim
       as (mtr & Hmtr & Hmatch); [by eexists _|done].
 Qed.
 
