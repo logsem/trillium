@@ -2053,7 +2053,7 @@ Section model_state_lemmas.
       iPureIntro. apply not_elem_of_dom. apply Htp.
       apply locale_step_equiv in Hstep. simpl in *.
       apply not_elem_of_locale_of_from_list. }
-    pose proof (model_update_fork_valid) as [δ2 Hδ];
+    epose proof (model_update_fork_valid _ _ _ _ _) as [δ2 Hδ];
       [by apply elem_of_dom|done|].
     iDestruct (model_state_interp_can_fork_step with "Hm Hfuel") as %Hcan_step;
       [done..|].
