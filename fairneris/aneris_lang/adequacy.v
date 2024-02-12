@@ -2,7 +2,7 @@ From Paco Require Import pacotac.
 From stdpp Require Import finite.
 From iris.proofmode Require Import proofmode.
 From trillium Require Import adequacy.
-From fairneris Require Import fairness retransmit_model_progress_ltl.
+From fairneris Require Import fairness retransmit_model.
 From fairneris.aneris_lang Require Import aneris_lang resources.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.
@@ -35,6 +35,12 @@ Definition valid_state_evolution_fairness
   labels_match_trace extr auxtr ∧
   live_tids (trace_last extr) (trace_last auxtr) ∧
   config_state_valid (trace_last extr) (trace_last auxtr).
+
+Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
+  match ft with
+  | {tr[a]} => None
+  | _ :tr[ℓ]: _ => Some ℓ
+  end.
 
 Lemma rel_finitary_valid_state_evolution_fairness :
   rel_finitary valid_state_evolution_fairness.
@@ -145,7 +151,8 @@ Theorem simulation_adequacy_multiple_strong
   continued_simulation_init valid_state_evolution_fairness (es, σ) st.
 Proof.
   intros Hexists Hconfig Hlen Hdom Hport_coh Hbuf_coh Hsh_coh Hsa_coh Hms Hwp.
-  apply (wp_strong_adequacy_multiple aneris_lang (fair_model_to_model retransmit_fair_model) Σ s);
+  apply (wp_strong_adequacy_multiple aneris_lang
+                                     (fair_model_to_model retransmit_fair_model) Σ s);
     [done| |].
   { apply rel_finitary_valid_state_evolution_fairness. }
   iIntros (?) "".
@@ -265,12 +272,6 @@ Proof.
 Qed.
 
 Definition auxtrace (M : Model) := trace (M.(mstate)) (M.(mlabel)).
-
-Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
-  match ft with
-  | {tr[a]} => None
-  | _ :tr[ℓ]: _ => Some ℓ
-  end.
 
 Lemma valid_inf_system_trace_implies_traces_match_strong {Λ} {Mdl:Model}
       (φ : execution_trace Λ → auxiliary_trace Mdl → Prop)

@@ -110,7 +110,7 @@ Section ltl_lemmas.
   Proof.
     intros Hle Haftern Hafterm.
     pose proof (Nat.le_exists_sub n m Hle) as [p [-> Hle']].
-    rewrite Nat.add_comm Nat.sub_add'.
+    rewrite Nat.add_comm Nat.add_sub'.
     by rewrite after_sum Haftern in Hafterm.
   Qed.
 

@@ -225,7 +225,7 @@ Section locales_helpers.
     - replace (t1 ++ e2 :: t2 ++ efs) with ((t1 ++ e2 :: t2) ++ efs); last by list_simplifier.
       replace (length (t1 ++ e1 :: t2)) with (length (t1 ++ e2 :: t2)); last first.
       { rewrite !app_length //=. }
-      rewrite take_app. apply locales_equiv_middle.
+      rewrite take_app_length. apply locales_equiv_middle.
       eapply locale_step_preserve =>//.
     - rewrite take_ge =>//. apply locales_equiv_refl.
   Qed.
@@ -685,7 +685,7 @@ Section adequacy_helper_lemmas.
   Proof.
     iIntros (Hsame Hexvalid Hex) "HSI Ht".
     rewrite assoc.
-    rewrite (wptp_from_same_locales t0') =>//.
+    iDestruct (wptp_from_same_locales with "Ht") as "Ht"=>//.
     iApply fupd_plain_keep_r; iFrame.
     iIntros "[HSI Ht]".
     iIntros (e He).
@@ -840,9 +840,9 @@ Section adequacy_helper_lemmas.
     (* TODO: factorize the two halves *)
     rewrite big_sepL2_alt; iSplit.
     - iIntros "H". iSplit.
-      { rewrite drop_app_alt // map_length !prefixes_from_length //. }
+      { rewrite drop_app_length // map_length !prefixes_from_length //. }
       iInduction efs as [|ef efs] "IH" forall (t); first done.
-      rewrite /= !drop_app_alt //=.
+      rewrite /= !drop_app_length //=.
       iDestruct "H" as "[H1 H]". rewrite (right_id [] (++)). iFrame.
       replace (map (λ '(tnew, e), fork_post (locale_of tnew e))
                    (prefixes_from (t ++ [ef]) efs))
@@ -852,10 +852,10 @@ Section adequacy_helper_lemmas.
         iIntros "!>" (k e Hin) "H". by list_simplifier.
       + list_simplifier.
         replace (t ++ ef :: efs) with ((t ++ [ef]) ++ efs); last by list_simplifier.
-        rewrite drop_app_alt //.
+        rewrite drop_app_length //.
     - iIntros "[_ H]".
       iInduction efs as [|ef efs] "IH" forall (t); first done.
-      rewrite /= !drop_app_alt //=.
+      rewrite /= !drop_app_length //=.
       iDestruct "H" as "[H1 H]". rewrite (right_id [] (++)). iFrame.
       replace (map (λ '(tnew, e), fork_post (locale_of tnew e))
                    (prefixes_from (t ++ [ef]) efs))
@@ -865,7 +865,7 @@ Section adequacy_helper_lemmas.
         iIntros "!>" (k e Hin) "H". by list_simplifier.
       + list_simplifier.
         replace (t ++ ef :: efs) with ((t ++ [ef]) ++ efs); last by list_simplifier.
-        rewrite drop_app_alt //.
+        rewrite drop_app_length //.
   Qed.
 
   Lemma take_step s Φs ex atr c c' oζ:
@@ -999,7 +999,7 @@ Qed.
 
 Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
   (∀ `{Hinv: !invGS_gen HasNoLc Σ}, fupd_to_bupd ⊤ -∗ Q) → ⊢ Q.
-Proof. by iIntros; iApply bupd_plain; iApply fupd_to_bupd_soundness_no_lc. Qed.
+Proof. by iIntros; iApply bupd_elim; iApply fupd_to_bupd_soundness_no_lc. Qed.
 
 Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -1042,7 +1042,7 @@ Proof.
   iApply fupd_to_bupd_soundness_no_lc'.
   iIntros (Hinv) "HFtB".
   rewrite fupd_to_bupd_unfold /fupd_to_bupd_aux.
-  iApply bupd_plain.
+  iApply bupd_elim.
   iApply "HFtB".
   iPoseProof (Hwp Hinv) as "Hwp".
   iMod "Hwp" as (stateI trace_inv Φs fork_post)
@@ -1134,7 +1134,7 @@ Proof.
   clear Hn.
   rewrite -> fupd_to_bupd_unfold; rewrite /fupd_to_bupd_aux.
   iApply except_0_later.
-  iApply bupd_plain.
+  iApply bupd_elim.
   iApply "HFtB".
   iMod "Hstp"; simpl.
   iMod "Hstp".
@@ -1143,7 +1143,7 @@ Proof.
   rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
   iNext.
   iApply except_0_later.
-  iApply bupd_plain.
+  iApply bupd_elim.
   iApply "HFtB".
   iMod "Hstp".
   iModIntro.
@@ -1152,7 +1152,7 @@ Proof.
   iInduction n as [|n] "IHlen"; simpl; last first.
   { rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iApply except_0_later.
-    iApply bupd_plain.
+    iApply bupd_elim.
     iApply "HFtB".
     iMod "Hstp".
     iModIntro.
@@ -1160,7 +1160,7 @@ Proof.
     rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iNext.
     iApply except_0_later.
-    iApply bupd_plain.
+    iApply bupd_elim.
     iApply "HFtB".
     iMod "Hstp".
     iModIntro.
@@ -1169,7 +1169,7 @@ Proof.
     iApply ("IHlen" with "Hstep HTI Hstp"); done. }
   rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
   iApply except_0_later.
-  iApply bupd_plain.
+  iApply bupd_elim.
   iApply "HFtB".
   iMod "Hstp" as "(% & H)".
   iDestruct "H" as (δ'' ℓ) "(HSI & Hpost & Hback)"; simpl in *.
@@ -1214,7 +1214,7 @@ Proof.
     - rewrite -app_assoc Hlocales.
       rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
       iApply except_0_later.
-      iApply bupd_plain.
+      iApply bupd_elim.
       iApply "HFtB".
       iDestruct "Hback" as "(Hpost & Hwptp)".
       iDestruct ("H" with "Hpost") as "[? Hξ]".
@@ -1226,7 +1226,7 @@ Proof.
   iExists _, _.
   rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
   iApply except_0_later.
-  iApply bupd_plain.
+  iApply bupd_elim.
   iApply "HFtB".
   iMod ("IH" with "[] [] Hstep HSI [HTI] [Hback]") as "IH'".
   - iPureIntro; split_and!.

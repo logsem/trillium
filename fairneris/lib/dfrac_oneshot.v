@@ -139,7 +139,7 @@ Section dfrac_oneshot_lemmas.
   Proof.
     rewrite pending_eq /pending_def
             pending_discarded_eq /pending_discarded_def.
-    apply own_update, csum_update_l, dfrac_discard_update.
+    iApply own_update. apply csum_update_l, dfrac_discard_update.
   Qed.
 
   Lemma pending_discarded_shot `{OfeDiscrete A} a γ :

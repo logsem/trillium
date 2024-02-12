@@ -15,7 +15,7 @@ From fairneris.aneris_lang.state_interp Require Import
      state_interp_events
      state_interp_messages_history.
 From fairneris Require Import fairness.
-From fairneris Require Import retransmit_model_progress_ltl.
+From fairneris.examples Require Import retransmit_model.
 
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".

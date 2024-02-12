@@ -249,6 +249,6 @@ Lemma free_ips_coh_update_msg sh a skt Sn r m σ1 :
       state_sockets := skts;
       state_ms := ms2;
     |}.
-  Proof. done. Qed.
+  Proof. by eauto. Qed.
 
 End state_interpretation.

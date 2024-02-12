@@ -220,7 +220,7 @@ Section state_interpretation.
                        <| state_sockets := <[n:=∅]> (state_sockets σ) |>) n' x.
   Proof.
     intros ?.
-    rewrite big_sepM_mono; [done|].
+    iApply big_sepM_mono.
     intros n' x Hdel.
     destruct (decide (n = n')); simplify_eq.
     rewrite /local_state_coh !lookup_insert_ne //.
@@ -233,7 +233,7 @@ Section state_interpretation.
     [∗ map] n' ↦ x ∈ γm, local_state_coh σ2 n' x.
   Proof.
     simpl. intros ?.
-    rewrite big_sepM_mono; [done|].
+    iApply big_sepM_mono.
     intros n' x Hdel.
     destruct (decide (n = n')); simplify_eq.
     rewrite /local_state_coh lookup_insert_ne //.
@@ -247,7 +247,7 @@ Section state_interpretation.
     [∗ map] n' ↦ x ∈ γm, local_state_coh σ2 n' x.
   Proof.
     simpl. intros ?.
-    rewrite big_sepM_mono; [done|].
+    iApply big_sepM_mono.
     intros n' x Hdel.
     destruct (decide (n = n')); simplify_eq.
     rewrite /local_state_coh lookup_insert_ne //.

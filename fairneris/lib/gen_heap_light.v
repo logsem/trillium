@@ -88,10 +88,12 @@ Section gen_heap_light.
   Lemma lmapsto_agree l γ q1 q2 v1 v2 :
     l ; γ ↦{q1} v1 -∗ l ; γ ↦{q2} v2 -∗ ⌜v1 = v2⌝.
   Proof.
-    apply wand_intro_r.
-    rewrite lmapsto_eq /lmapsto_def -own_op -auth_frag_op own_valid discrete_valid.
-    f_equiv. rewrite auth_frag_valid singleton_op singleton_valid -pair_op.
-    intros [_ ?%to_agree_op_inv_L]; done.
+    iIntros "H1 H2".
+    rewrite lmapsto_eq /lmapsto_def.
+    iDestruct (own_valid_2 with "H1 H2") as %Hvalid.
+    iPureIntro.
+    rewrite auth_frag_valid singleton_op singleton_valid -pair_op in Hvalid.
+    by destruct Hvalid as [_ ?%to_agree_op_inv_L].
   Qed.
 
   Lemma lmapsto_combine l γ q1 q2 v1 v2 :
@@ -101,9 +103,9 @@ Section gen_heap_light.
     iCombine "Hl1 Hl2" as "Hl". eauto with iFrame.
   Qed.
 
-  Global Instance frame_lmapsto p γ l v q1 q2 RES :
-    FrameFractionalHyps p (l ; γ ↦{q1} v) (λ q, l ; γ ↦{q} v)%I RES q1 q2 →
-    Frame p (l ; γ ↦{q1} v) (l ; γ ↦{q2} v) RES | 5.
+  Global Instance frame_pointsto p γ l v q1 q2 q :
+    FrameFractionalQp q1 q2 q →
+    Frame p (l ; γ ↦{q1} v) (l ; γ ↦{q2} v) (l ; γ ↦{q} v) | 5.
   Proof. apply: frame_fractional. Qed.
 
   Global Instance ex_lmapsto_fractional l γ : Fractional (λ q, l ; γ ↦{q} -)%I.
@@ -120,7 +122,7 @@ Section gen_heap_light.
   Lemma lmapsto_valid l γ q v : l ; γ ↦{q} v -∗ ✓ q.
   Proof.
     rewrite lmapsto_eq /lmapsto_def own_valid !discrete_valid auth_frag_valid.
-    apply pure_mono=> /singleton_valid [??]; done.
+    iPureIntro. rewrite singleton_valid. destruct 1 as [??]; done.
   Qed.
   Lemma lmapsto_valid_2 l γ q1 q2 v1 v2 :
     l ; γ ↦{q1} v1 -∗ l ; γ ↦{q2} v2 -∗ ✓ (q1 + q2)%Qp.

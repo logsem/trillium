@@ -9,14 +9,13 @@ From iris.base_logic.lib Require Import saved_prop gen_heap mono_nat.
 From trillium.program_logic Require Import weakestpre adequacy.
 From trillium.events Require Import event.
 From fairneris Require Import fairness.
-From fairneris.examples Require Import retransmit_model_progress_ltl.
 From fairneris.prelude Require Import collect gset_map gmultiset.
+From fairneris.algebra Require Import disj_gsets.
+From fairneris.examples Require Import retransmit_model.
 From fairneris.aneris_lang Require Import resources events.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.aneris_lang Require Export aneris_lang network resources.
 From fairneris.aneris_lang.state_interp Require Export messages_history.
-From fairneris.algebra Require Import disj_gsets.
-(* From fairneris Require Import model_draft. *)
 
 Set Default Proof Using "Type".
 

@@ -20,3 +20,4 @@
 -arg -w -arg -deprecated-instance-without-locality
 -arg -w -arg -deprecated-typeclasses-transparency-without-locality
 -arg -w -arg -future-coercion-class-field
+-arg -w -arg -argument-scope-delimiter

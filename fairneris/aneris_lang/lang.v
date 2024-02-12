@@ -498,7 +498,7 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
   | LitV (LitString s1), LitV (LitString s2), StringApp =>
     Some $ LitV $ LitString (String.append s1 s2)
   | v1, v2, op =>
-    guard (op = EqOp); Some $ LitV $ LitBool $ bool_decide (v1 = v2)
+    guard (op = EqOp);; Some $ LitV $ LitBool $ bool_decide (v1 = v2)
   end.
 
 Lemma bin_op_eval_eq_val k k' :

@@ -999,10 +999,13 @@ Section resource_lemmas.
   Lemma mapsto_node_agree ip γn γn' :
     mapsto_node ip γn -∗ mapsto_node ip γn' -∗ ⌜γn = γn'⌝.
   Proof.
-    apply wand_intro_r.
-    rewrite /node_gnames_auth mapsto_node_eq -own_op own_valid discrete_valid.
-    f_equiv=> /auth_frag_valid /=. rewrite singleton_op singleton_valid.
-    apply (to_agree_op_inv_L (A := node_gnamesO)).
+    iIntros "H1 H2".
+    rewrite /node_gnames_auth mapsto_node_eq.
+    iDestruct (own_valid_2 with "H1 H2") as %Hvalid.
+    iPureIntro.    
+    rewrite -auth_frag_op singleton_op in Hvalid.
+    rewrite auth_frag_valid singleton_valid in Hvalid.
+    by apply (to_agree_op_inv_L (A := node_gnamesO)).
   Qed.
 
   Lemma node_gnames_valid ip γn m :

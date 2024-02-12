@@ -135,7 +135,7 @@ Proof.
   iIntros (Hstuck). iApply wp_lift_stuck.
   - destruct(to_val e) as [v|] eqn:He; last done.
     rewrite -He. by case: (Hstuck inhabitant).
-  - iIntros (ex atr K ? tp1 tp2 σ) "_".
+  - iIntros (ex atr K tp1 tp2 σ ? ?) "_".
     iMod (fupd_mask_subseteq ∅) as "_"; first set_solver; eauto.
 Qed.
 

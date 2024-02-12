@@ -2,7 +2,7 @@ From stdpp Require Import list fin_maps.
 From iris.proofmode Require Import proofmode.
 From trillium.program_logic Require Import ectx_lifting.
 From fairneris Require Import fairness.
-From fairneris.examples Require Import retransmit_model_progress_ltl.
+From fairneris.examples Require Import retransmit_model.
 From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
@@ -112,7 +112,7 @@ Section with_Σ.
       iNext.
       iMod "Hmk" as "_".
       iModIntro.
-      iExists (retransmit_model_base.Start, ms, bs), (inl (Brole, None)).
+      iExists (retransmit_model.Start, ms, bs), (inl (Brole, None)).
       rewrite -message_history_evolution_id.
       rewrite Heqn.
       iFrame.
@@ -152,7 +152,7 @@ Section with_Σ.
       iMod (dead_role_auth_extend _ (Brole : fmrole retransmit_fair_model) with "Hdead_auth")
         as "[Hdead_auth Hdead_own]"; [by set_solver|].
       iModIntro.
-      iExists (retransmit_model_base.Received, ms, <[saB:=r]>bs),
+      iExists (retransmit_model.Received, ms, <[saB:=r]>bs),
                 (inl (Brole, None)).
       rewrite Heqn Hhist=> /=.
       rewrite /thread_live_roles_interp /retransmit_live_roles. simpl in *.
@@ -183,7 +183,7 @@ Section with_Σ.
         set_solver. }
       eapply locale_step_atomic; eauto.
       { f_equiv; [|done].
-        f_equiv. f_equiv. apply app_nil_end. }
+        f_equiv. f_equiv. symmetry. apply app_nil_r. }
       repeat econstructor; set_solver.
   Qed.
 

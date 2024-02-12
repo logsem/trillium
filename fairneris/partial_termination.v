@@ -2,7 +2,7 @@ From Paco Require Import pacotac.
 From stdpp Require Import finite.
 From iris.proofmode Require Import proofmode.
 From trillium Require Import adequacy.
-From fairneris Require Import fairness retransmit_model_progress_ltl.
+From fairneris Require Import fairness retransmit_model.
 From fairneris.aneris_lang Require Import aneris_lang resources.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.
@@ -18,14 +18,11 @@ Definition ex_send_filter msg : cfg aneris_lang → option $ ex_label aneris_lan
 Instance ex_send_filter_decision msg st l : Decision (ex_send_filter msg st l).
 Proof. apply make_decision. Qed.
 
-
 Definition ex_deliver_filter msg : cfg aneris_lang → option $ ex_label aneris_lang → Prop :=
   λ _ l, option_map (sum_map snd id) l = Some $ inr $ Some msg.
 Instance ex_deliver_filter_decision msg st l : Decision (ex_deliver_filter msg st l).
 Proof. apply make_decision. Qed.
 
-(* Definition retransmit_fair_network_delivery msg : mtrace → Prop := *)
-(*   □ (□◊↓send_filter msg → ◊↓deliver_filter msg). *)
 Definition retransmit_fair_network_delivery_ex msg : extrace aneris_lang → Prop :=
   □ (□◊↓ex_send_filter msg → ◊↓ex_deliver_filter msg).
 
@@ -254,6 +251,8 @@ Proof.
   split; [by eapply fair_scheduling_impl|by eapply fair_network_impl].
 Qed.
 
+(* TODO: This needs updating to capture spawned threads *)
+(* TODO: Can likely get rid of right disjunct if we assume maximality *)
 Definition extrace_terminating_locale (ζ : locale aneris_lang) (tr : extrace aneris_lang) : Prop :=
   (◊↓λ st _, ¬ locale_enabled ζ st) tr ∨ ¬ infinite_trace tr.
 
