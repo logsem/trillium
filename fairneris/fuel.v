@@ -262,11 +262,9 @@ Section fairness.
       ∧ a.(ls_under) = b.(ls_under)
     | Config_step fmact act =>
       M.(fmtrans) a (inr fmact) b
-      ∧ fuel_decr None None a b
-      ∧ fuel_must_not_incr None a b
-      ∧ (∀ ρ, ρ ∈ M.(live_roles) b ∖ M.(live_roles) a -> oleq (ls_fuel b !! ρ) (Some (fuel_limit b)))
-      ∧ False (* TODO: add support for config steps later! *)
-    end.
+      ∧ a.(ls_map) = b.(ls_map)
+      ∧ live_roles _ a = live_roles _ b
+   end.
 
   Lemma silent_step_suff_data fl (δ: LiveState) (fs fs' fs'': gmap _ nat) ζ (oζ' : option $ locale Λ) act :
     δ.(ls_map) !! ζ = Some fs →
@@ -811,10 +809,23 @@ Section fairness_preserved.
       destruct (decide (ρ ∈ live_roles M δ)) as [Hρlive|]; last first.
       { exists 0. left. unfold pred_at. simpl. intros contra. eauto. }
       destruct ζ' as [[ζ' act]|cfg]; last first.
-      { (* TODO: handle config steps! *)
-        simplify_eq. simpl in Htm. exfalso.
-        inversion Htm; simplify_eq. destruct ℓ as [| |]=>//.
-        simpl in *. simplify_eq. naive_solver. }
+      { simplify_eq. simpl in Htm.
+        inversion Htm as [|??????? Hlive ? Htrans]; simplify_eq. destruct ℓ as [| |]=>//.
+        simpl in *. simplify_eq. destruct Htrans as [?[Hmap ?]].
+        destruct m as [|m].
+        { exfalso. rewrite /pred_at /= in Hexen. destruct Hexen as [Hlocale|]; [|naive_solver].
+          destruct Hlive as [Hen Hlive].
+          assert (ρ ∉ live_roles M δ); last set_solver.
+          destruct (Hen _ _ Hmapping). rewrite /locale_enabled in Hlocale. naive_solver. }
+        apply pred_at_S in Hexen.
+        ospecialize (IH (f, m) _).
+        { rewrite /strict /lt_lex. lia. }
+        rewrite /fairness_induction_stmt in IH.
+        odestruct (IH f m ζ extr' _ _ _ _ _ _ _ _ _ _ _ Hexen) as [M' HM']; try done.
+        { by eapply infinite_cons. }
+        { rewrite /ls_fuel -Hmap //. }
+        { rewrite /ls_mapping -Hmap //. }
+        exists (S M'). by apply pred_at_S. }
       destruct (decide (ζ = ζ')) as [Hζ|Hζ].
       - rewrite <- Hζ in *. simplify_eq.
         destruct (traces_match_labels _ _ _ _ _ _ _ Htm) as [[ρ' [? ->]]| ->]; last first.
@@ -1153,7 +1164,11 @@ Section upto_preserves.
           destruct Htrans as [??].
           have <- //: ls_under $ trfirst btr = trfirst str.
           destruct IH as [IH|]; last done. punfold IH. inversion IH =>//.
-        * inversion Htrans. naive_solver.
+        * destruct Htrans as [Htrans [Hmap Hlive]].
+          destruct ℓ'=>//. rewrite /= in H1. simplify_eq.
+          suff -> : trfirst str = trfirst btr; first by naive_solver.
+          destruct IH as [IH|]=>//.
+          punfold IH. inversion IH; simplify_eq=>//.
       + right. eapply CH.
         { destruct IH =>//. }
         subst. by inversion Hval.
