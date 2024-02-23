@@ -220,7 +220,7 @@ Proof.
   rewrite /trace_now /pred_at=> /=.
   destruct mtr''.
   - destruct extr''; [|by inversion Hmatch].
-    destruct Hextr' as [Hextr'|Hextr']; [|done].
+    destruct Hextr' as [Hextr'|Hextr']; [|naive_solver].
     left. intros Hs. apply Hextr'.
     apply traces_match_first in Hmatch.
     eapply (Hmatch ρ).
@@ -236,11 +236,10 @@ Proof.
     right. simpl in *. simplify_eq.
     apply traces_match_cons_inv in Hmatch as [_ Hmatch].
     rewrite /labels_match in Hmatch.
-    destruct ℓ0; [|done].
-    simpl in *. destruct l. simpl in *. simplify_eq.
+    destruct ℓ0 as [[ζ act]|]; [|naive_solver].
+    simpl in *. destruct Hextr'. simplify_eq.
     rewrite locale_retransmit_role_cancel in Hmatch.
-    simpl in *. simplify_eq.
-    done.
+    simpl in *. simplify_eq. done.
 Qed.
 
 Lemma traces_match_fairness_preserved extr mtr :
@@ -376,11 +375,11 @@ Proof.
     exists extr''.
     split; [by eexists _|].
     destruct extr''.
-    - destruct Hextr'; [|done].
+    - destruct Hextr'; [|naive_solver].
       eapply trace_always_suffix_of in Hextr''; [|by eexists _].
       eapply trace_always_suffix_of in Hextr''; [|by eexists _].
       apply trace_always_elim in Hextr''. done.
-    - destruct Hextr'; [|done].
+    - destruct Hextr'; [|naive_solver].
       eapply trace_always_suffix_of in Hextr''; [|by eexists _].
       eapply trace_always_suffix_of in Hextr''; [|by eexists _].
       apply trace_always_elim in Hextr''. done.

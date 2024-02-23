@@ -3,7 +3,7 @@ From Paco Require Import paco1 paco2 pacotac.
 From fairneris Require Export inftraces trace_utils.
 
 Record FairModel : Type := {
-  fmstate: Type;
+  fmstate:> Type;
   fmstate_eqdec: EqDecision fmstate;
   fmstate_inhabited: Inhabited fmstate;
 
@@ -61,8 +61,8 @@ Section model_traces.
    end.
 
   Definition fair_scheduling_mtr ρ : mtrace M → Prop :=
-    trace_implies (λ δ _, live_mdl_role ρ δ)
-                  (λ δ ℓ, ¬ live_mdl_role ρ δ ∨ ℓ = Some ρ).
+    trace_implies (λ δ _, role_enabled_model ρ δ)
+                  (λ δ ℓ,  ¬role_enabled_model ρ δ ∨ ∃ act, ℓ = Some $ inl (ρ, act)).
 
   Lemma fair_scheduling_mtr_after ℓ tr tr' k:
     after k tr = Some tr' →
@@ -119,8 +119,7 @@ Section exec_trace.
 
   Definition fair_scheduling_ex ζ : extrace Λ → Prop :=
     trace_implies (λ c _, locale_enabled ζ c)
-                  (λ c otid, ¬ locale_enabled ζ c ∨
-                               option_map (sum_map fst id) otid = Some (inl ζ)).
+                  (λ c otid, ¬ locale_enabled ζ c ∨ ∃ act, otid = Some (inl (ζ, act))).
 
   Lemma fair_scheduling_ex_after ζ tr tr' k:
     after k tr = Some tr' →

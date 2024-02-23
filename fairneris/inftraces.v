@@ -482,11 +482,11 @@ Section lex_ind.
   Section Lexicographic.
 
     Variables (A B : Type) (leA : relation A) (leB : relation B).
-    
+
     Inductive lexprod : A * B -> A * B -> Prop :=
     | left_lex  : forall x x' y y', leA x x' -> lexprod (x, y) (x', y')
     | right_lex : forall x y y',    leB y y' -> lexprod (x, y) (x, y').
-    
+
     Theorem wf_trans :
       transitive _ leA ->
       transitive _ leB ->
