@@ -1,5 +1,4 @@
 -Q trillium trillium
--Q fairis trillium.fairness
 -Q fairneris fairneris
 
 -Q external/stdpp/stdpp stdpp
@@ -9,6 +8,7 @@
 -Q external/iris/iris_unstable iris.unstable
 -Q external/iris/iris_heap_lang iris.heap_lang
 -Q external/paco/src Paco
+-Q external/coq-record-update/src RecordUpdate
 
 -arg -w -arg -notation-overridden
 -arg -w -arg -redundant-canonical-projection

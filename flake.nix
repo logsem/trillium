@@ -18,7 +18,7 @@
       with pkgs;
       {
         devShell = mkShell rec {
-          buildInputs = with coqPackages_8_17; [
+          buildInputs = with coqPackages_8_19; [
             coq
 
           # coq-lsp.packages.${system}.coq-lsp

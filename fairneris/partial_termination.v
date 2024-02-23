@@ -298,7 +298,7 @@ Qed.
 Lemma not_infinite_terminating_trace {S L} (tr : trace S L) :
   ¬ infinite_trace tr → terminating_trace tr.
 Proof.
-  intros Hinf. epose proof (infinite_or_finite) as [?|?]; done.
+  intros Hinf. epose proof (infinite_or_finite tr) as [?|?]; done.
 Qed.
 
 Lemma trace_always_mono_strong_alt

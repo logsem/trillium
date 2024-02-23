@@ -1,7 +1,6 @@
 TRILLIUM_DIR := 'trillium'
-FAIRIS_DIR := 'fairis'
 FAIRNERIS_DIR := 'fairneris'
-LOCAL_SRC_DIRS := $(TRILLIUM_DIR) $(FAIRIS_DIR) $(FAIRNERIS_DIR)
+LOCAL_SRC_DIRS := $(TRILLIUM_DIR) $(FAIRNERIS_DIR)
 SRC_DIRS := $(LOCAL_SRC_DIRS) 'external'
 
 ALL_VFILES := $(shell find $(SRC_DIRS) -name "*.v")
@@ -46,16 +45,13 @@ clean:
 # project-specific targets
 .PHONY: build clean-trillium clean-fairis clean-fairneris trillium fairis fairneris
 
-VPATH= $(TRILLIUM_DIR) $(FAIRIS_DIR) $(FAIRNERIS_DIR)
+VPATH= $(TRILLIUM_DIR) $(FAIRNERIS_DIR)
 VPATH_FILES := $(shell find $(VPATH) -name "*.v")
 
 build: $(VPATH_FILES:.v=.vo)
 
 fairneris :
 	@$(MAKE) build VPATH=$(FAIRNERIS_DIR)
-
-fairis :
-	@$(MAKE) build VPATH=$(FAIRIS_DIR)
 
 trillium :
 	@$(MAKE) build VPATH=$(TRILLIUM_DIR)
@@ -67,9 +63,6 @@ clean-local:
 
 clean-trillium:
 	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(TRILLIUM_DIR)
-
-clean-fairis:
-	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(FAIRIS_DIR)
 
 clean-fairneris:
 	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(FAIRNERIS_DIR)

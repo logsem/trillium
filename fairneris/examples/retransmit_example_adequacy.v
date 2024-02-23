@@ -19,7 +19,7 @@ Definition initial_state shA shB :=
         state_ms := ∅; |}).
 
 Definition initial_model_state : retransmit_state :=
-  (retransmit_model_base.Start, ∅, ∅).
+  (retransmit_model.Start, ∅, ∅).
 
 Lemma retransmit_continued_simulation shA shB :
   fairly_terminating localeB (initial_state shA shB).
