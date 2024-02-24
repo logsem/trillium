@@ -567,7 +567,7 @@ Section fairness.
       lm_ls_trans (δ: LiveState) (ℓ: FairLabel M) := ls_trans lm_fl δ ℓ;
     }.
 
-  Definition fair_model_model `(LM : LiveModel) : Model := {|
+  Definition live_model_model `(LM : LiveModel) : Model := {|
     mstate := lm_ls LM;
     mlabel := lm_lbl LM;
     mtrans := lm_ls_trans LM;
@@ -605,10 +605,10 @@ End fairness.
 Arguments LiveState _ _ {_ _}.
 Arguments LiveStateData _ _ {_ _}.
 Arguments LiveModel _ _ {_ _}.
-Arguments fair_model_model _ {_ _ _} _.
+Arguments live_model_model _ {_ _ _} _.
 
 Definition live_model_to_model Λ M `{Countable (locale Λ)} : LiveModel Λ M -> Model :=
-  λ lm, fair_model_model Λ lm.
+  λ lm, live_model_model Λ lm.
 Coercion live_model_to_model : LiveModel >-> Model.
 Arguments live_model_to_model {_ _ _ _}.
 

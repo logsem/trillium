@@ -12,6 +12,7 @@ From fairneris Require Import fairness.
 From fairneris.aneris_lang Require Import events.
 From fairneris.prelude Require Import gset_map.
 From fairneris.lib Require Export singletons.
+From fairneris Require Import fuel fair_resources.
 
 Set Default Proof Using "Type".
 
@@ -30,7 +31,7 @@ Import ast.
 (*   mlabel := unit; *)
 (*   mtrans x ℓ y := model_rel M ℓ y; *)
 (* |}. *)
-  
+
 Record node_gnames := Node_gname {
   heap_name : gname;
   sockets_name : gname;
@@ -85,9 +86,10 @@ Definition live_roleUR (FM : FairModel) :=
   authUR (gset_disjUR $ FM.(fmrole)).
 
 (** The system CMRA *)
-Class anerisG (FM : FairModel) Σ :=
+Class anerisG `{M: FairModel} (FM : LiveModel aneris_lang M) Σ :=
   AnerisG {
       aneris_invG :> invGS_gen HasNoLc Σ;
+      aneris_fairnessG :> fairnessGS FM Σ;
       (** global tracking of the ghost names of node-local heaps *)
       aneris_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
       aneris_node_gnames_name : gname;
@@ -118,13 +120,6 @@ Class anerisG (FM : FairModel) Σ :=
       (** message history *)
       aneris_messagesG :> inG Σ (authR messagesUR);
       aneris_messages_name : gname;
-      (** model *)
-      aneris_model_name : gname;
-      anerisG_model :> inG Σ (authUR (optionUR (exclR (ModelO (fair_model_to_model FM)))));
-      (** live and dead roles *)
-      aneris_live_roles_name : gname;
-      aneris_dead_roles_name : gname;
-      anerisG_live_roles :> inG Σ (live_roleUR FM);
       (** steps *)
       aneris_steps_name : gname;
       anerisG_steps :> mono_natG Σ;
@@ -139,9 +134,10 @@ Class anerisG (FM : FairModel) Σ :=
       aneris_observed_recv_name : gname;
     }.
 
-Class anerisPreG (FM : FairModel) Σ :=
+Class anerisPreG `{M: FairModel} (FM : LiveModel aneris_lang M) Σ :=
   AnerisPreG {
       anerisPre_invGS :> invGpreS Σ;
+      anerisPre_fairnessGS :> fairnessGpreS FM Σ;
       anerisPre_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
       anerisPre_heapG :> inG Σ (authR local_heapUR);
       anerisPre_socketG :> inG Σ (authR local_socketsUR);
@@ -155,8 +151,6 @@ Class anerisPreG (FM : FairModel) Σ :=
       anerisPre_tracked_socket_address_groupsG :>
         inG Σ (tracked_socket_address_groupsUR);
       anerisPre_messagesG :> inG Σ (authR messagesUR);
-      anerisPre_model :> inG Σ (authUR (optionUR (exclR (ModelO (fair_model_to_model FM)))));
-      anerisPre_live_roles :> inG Σ (live_roleUR FM);
       anerisPre_steps :> mono_natG Σ;
       anerisPre_allocEVSG :>
         inG Σ (authUR (gmapUR string (exclR aneris_eventsO)));
@@ -164,39 +158,32 @@ Class anerisPreG (FM : FairModel) Σ :=
         inG Σ (authUR (gmapUR socket_address_group (exclR aneris_eventsO)));
     }.
 
-Definition anerisΣ (FM : FairModel) : gFunctors :=
+Definition anerisΣ (M: FairModel) : gFunctors :=
   #[invΣ;
-   GFunctor (authR node_gnames_mapUR);
-   GFunctor (authR local_heapUR);
-   GFunctor (authR local_socketsUR);
-   GFunctor (authUR free_ipsUR);
-   GFunctor (authUR free_portsUR);
-   GFunctor (authUR socket_address_groupUR);
-   GFunctor (authR socket_interpUR);
-   savedPredΣ message;
-   GFunctor (unallocated_socket_address_groupsUR);
-   GFunctor (tracked_socket_address_groupsUR);
-   GFunctor (authR messagesUR);
-   GFunctor (authUR (optionUR (exclR (ModelO (fair_model_to_model FM)))));
-   GFunctor (live_roleUR FM);
-   mono_natΣ;
-   GFunctor (authUR (gmapUR string (exclR aneris_eventsO)));
-   GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)))
+    fairnessΣ aneris_lang M;
+    GFunctor (authR node_gnames_mapUR);
+    GFunctor (authR local_heapUR);
+    GFunctor (authR local_socketsUR);
+    GFunctor (authUR free_ipsUR);
+    GFunctor (authUR free_portsUR);
+    GFunctor (authUR socket_address_groupUR);
+    GFunctor (authR socket_interpUR);
+    savedPredΣ message;
+    GFunctor (unallocated_socket_address_groupsUR);
+    GFunctor (tracked_socket_address_groupsUR);
+    GFunctor (authR messagesUR);
+    mono_natΣ;
+    GFunctor (authUR (gmapUR string (exclR aneris_eventsO)));
+    GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)))
    ].
 
-#[global] Instance subG_anerisPreG {Σ Mdl} :
-  subG (anerisΣ Mdl) Σ → anerisPreG Mdl Σ.
+#[global] Instance subG_anerisPreG {Σ: gFunctors} {M: FairModel} (LM: LiveModel aneris_lang M) :
+  subG (anerisΣ M) Σ → anerisPreG LM Σ.
 Proof. solve_inG. Qed.
 
 Section definitions.
-  Context `{aG : !anerisG FM Σ}.
-
-  Definition auth_st (st : fair_model_to_model FM) : iProp Σ :=
-    (* own aneris_model_name (● Excl' st) ∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝. *)
-    own aneris_model_name (● Excl' st).
-  Definition frag_st (st : fair_model_to_model FM) : iProp Σ :=
-    own aneris_model_name (◯ Excl' st).
-    (* own aneris_model_name (◯ Excl' st) ∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝. *)
+  Context `{LM: LiveModel aneris_lang M}.
+  Context `{aG : !anerisG LM Σ}.
 
   (** Authoritative view of the system ghost names *)
   Definition node_gnames_auth (m : gmap ip_address node_gnames) :=
@@ -259,7 +246,7 @@ Section definitions.
 
   Definition socket_address_group_own (sag : socket_address_group) : iProp Σ :=
     own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
-        (◯ (DGSets {[sag]})).  
+        (◯ (DGSets {[sag]})).
 
   (** Ghost names of saved socket interpretations *)
   Definition saved_si_auth
@@ -442,29 +429,13 @@ Section definitions.
   Definition steps_auth n := mono_nat_auth_own aneris_steps_name 1 n.
   Definition steps_lb n := mono_nat_lb_own aneris_steps_name n.
 
-  (* (** Live roles *) *)
-  (* Definition live_roles_auth_own (M : gmap aneris_locale (option simple_role)) : iProp Σ := *)
-  (*   own (A := authUR (gmapUR aneris_localeO (exclR $ optionO simple_roleO))) *)
-  (*       aneris_live_roles_name (● (Excl <$> M)). *)
-  (* Definition live_roles_frag_own (tid : aneris_locale) (role : option simple_role) : iProp Σ := *)
-  (*   own (A := authUR (gmapUR aneris_localeO (exclR $ optionO simple_roleO))) *)
-        (* aneris_live_roles_name (◯ {[ tid := Excl role ]}). *)
-
-  (** Live roles *)
-  Definition live_roles_auth_own (A : gset $ FM.(fmrole)) : iProp Σ :=
-    own (A := live_roleUR FM) aneris_live_roles_name (● GSet A).
-  Definition live_roles_frag_own (roles : gset $ FM.(fmrole)) : iProp Σ :=
-    own (A := live_roleUR FM) aneris_live_roles_name (◯ GSet roles).
-  Definition live_role_frag_own (role : FM.(fmrole)) : iProp Σ :=
-    live_roles_frag_own {[role]}.
-
-  Definition dead_roles_auth_own (A : gset FM.(fmrole)) : iProp Σ :=
-    own (A := live_roleUR FM) aneris_dead_roles_name (● GSet A).
-  Definition dead_roles_frag_own (roles : gset FM.(fmrole)) : iProp Σ :=
-    own (A := live_roleUR FM) aneris_dead_roles_name (◯ GSet roles).
-  Definition dead_role_frag_own (role : FM.(fmrole)) : iProp Σ :=
-    dead_roles_frag_own {[role]}.
-
+  (* TODO: move to fair_resources.v *)
+  (* Definition dead_roles_auth_own (A : gset FM.(fmrole)) : iProp Σ := *)
+  (*   own (A := live_roleUR FM) aneris_dead_roles_name (● GSet A). *)
+  (* Definition dead_roles_frag_own (roles : gset FM.(fmrole)) : iProp Σ := *)
+  (*   own (A := live_roleUR FM) aneris_dead_roles_name (◯ GSet roles). *)
+  (* Definition dead_role_frag_own (role : FM.(fmrole)) : iProp Σ := *)
+  (*   dead_roles_frag_own {[role]}. *)
 
 End definitions.
 
@@ -513,7 +484,8 @@ Notation "sa ⤳1[ bs , br ] s" := (sa ⤳1[bs,br]{ 1 } s)%I (at level 20) : bi_
 Notation "sa ⤇1 Φ" := ({[sa]} ⤇* Φ) (at level 20).
 
 Section singleton_to_singleton_connectives.
-  Context `{anerisG Mdl Σ}.
+  Context `{LM: LiveModel aneris_lang M}.
+  Context `{aG : !anerisG LM Σ}.
 
   Definition message_history_singleton (sag : socket_address_group) q
              (send_obs receive_obs : bool) rt : iProp Σ :=
@@ -941,7 +913,8 @@ Proof.
 Qed.
 
 Section resource_lemmas.
-  Context `{aG : !anerisG FM Σ}.
+  Context `{LM: LiveModel aneris_lang Mdl}.
+  Context `{aG : !anerisG LM Σ}.
 
   #[global] Instance mapsto_node_persistent ip γn : Persistent (mapsto_node ip γn).
   Proof. rewrite mapsto_node_eq /mapsto_node_def. apply _. Qed.
@@ -951,58 +924,13 @@ Section resource_lemmas.
   #[global] Instance is_node_persistent ip : Persistent (is_node ip).
   Proof. apply _. Qed.
 
-  Lemma auth_frag_st_agree st st' :
-    auth_st st -∗ frag_st st' -∗ ⌜st = st'⌝.
-  Proof.
-    iIntros "Ha Hf".
-    by iDestruct (own_valid_2 with "Ha Hf") as
-        %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete.
-  Qed.
-
-  (* Lemma auth_frag_st_agree st st' : *)
-  (*   auth_st st -∗ frag_st st' -∗ ⌜st = st'⌝. *)
-  (* Proof. *)
-  (*   iIntros "[Ha %] [Hf %]". *)
-  (*   by iDestruct (own_valid_2 with "Ha Hf") as *)
-  (*       %[Heq%Excl_included%leibniz_equiv ?]%auth_both_valid_discrete. *)
-  (* Qed. *)
-
-  Lemma auth_frag_st_update st st' :
-    auth_st st -∗ frag_st st ==∗ auth_st st' ∗ frag_st st'.
-  Proof.
-    iIntros "Hauth Hfrag".
-    iMod ((own_update _ (● (Excl' st) ⋅ ◯ (Excl' st))
-                      (● (Excl' st') ⋅ ◯ (Excl' st')))
-            with "[Hauth Hfrag]") as "[??]".
-    { by apply auth_update, option_local_update, exclusive_local_update. }
-    { rewrite own_op //. iFrame. }
-    by iFrame "∗ %".
-  Qed.
-
- (* Lemma auth_frag_st_update st st' : *)
- (*    rtc Mdl Mdl.(model_state_initial) st' → *)
- (*    auth_st st -∗ frag_st st ==∗ auth_st st' ∗ frag_st st'. *)
- (*  Proof. *)
- (*    iIntros (?) "[Hauth %] [Hfrag %]". *)
- (*    iMod ((own_update _ (● (Excl' st) ⋅ ◯ (Excl' st)) *)
- (*                      (● (Excl' st') ⋅ ◯ (Excl' st'))) *)
- (*            with "[Hauth Hfrag]") as "[??]". *)
- (*    { by apply auth_update, option_local_update, exclusive_local_update. } *)
- (*    { rewrite own_op //. iFrame. } *)
- (*    by iFrame "∗ %". *)
- (*  Qed. *)
-
-  (* Lemma frag_st_rtc st : *)
-  (*   frag_st st -∗ ⌜rtc Mdl Mdl.(model_state_initial) st⌝. *)
-  (* Proof. by iIntros "[_ %]". Qed. *)
-
   Lemma mapsto_node_agree ip γn γn' :
     mapsto_node ip γn -∗ mapsto_node ip γn' -∗ ⌜γn = γn'⌝.
   Proof.
     iIntros "H1 H2".
     rewrite /node_gnames_auth mapsto_node_eq.
     iDestruct (own_valid_2 with "H1 H2") as %Hvalid.
-    iPureIntro.    
+    iPureIntro.
     rewrite -auth_frag_op singleton_op in Hvalid.
     rewrite auth_frag_valid singleton_valid in Hvalid.
     by apply (to_agree_op_inv_L (A := node_gnamesO)).
@@ -1483,7 +1411,7 @@ Section resource_lemmas.
     rewrite -gset_disj_union; [|done].
     replace ((B ∪ C) ∖ B) with C; [|set_solver].
     iMod (own_update_2 with "HA HB") as "HA"; [|done].
-    apply auth_update_dealloc. 
+    apply auth_update_dealloc.
     apply gset_disj_dealloc_empty_local_update.
   Qed.
 
@@ -1496,7 +1424,7 @@ Section resource_lemmas.
     replace (A ∪ B) with (B ∪ A) by set_solver.
     rewrite /unallocated_groups_auth -gset_op -gset_disj_union; [|done].
     iMod (own_update_2 with "HA HB") as "HA"; [|done].
-    apply auth_update_dealloc. 
+    apply auth_update_dealloc.
     by apply gset_disj_dealloc_empty_local_update.
   Qed.
 
@@ -1514,7 +1442,7 @@ Section resource_lemmas.
     Proper ((≡) ==> (≡)) (@saved_pred_own Σ A _ γ dq
                           : (A -d> iPropO Σ) -d> iPropO Σ).
   Proof. solve_proper. Qed.
-  #[global] Instance si_pred_prop `{anerisG Mdl Σ} a :
+  #[global] Instance si_pred_prop `{anerisG _ LM Σ} a :
     Proper ((≡) ==> (≡)) (si_pred a).
   Proof. solve_proper. Qed.
 
@@ -1810,146 +1738,76 @@ Section resource_lemmas.
     iMod (mono_nat_own_update with "Hauth") as "[$ _]"; [lia|done].
   Qed.
 
-  Lemma live_roles_auth_subseteq A roles :
-    live_roles_auth_own A -∗ live_roles_frag_own roles -∗ ⌜roles ⊆ A⌝.
-  Proof.
-    iIntros "Hauth Hown".
-    iDestruct (own_valid_2 with "Hauth Hown") as %Hvalid%auth_both_valid_discrete.
-    destruct Hvalid as [Hvalid%gset_disj_included _].
-    iPureIntro. set_solver.
-  Qed.
+  (* TODO: move to fair_resources.v *)
+  (* (* Dead Roles *) *)
 
-  Lemma live_roles_auth_extend A roles :
-    roles ## A →
-    live_roles_auth_own A ==∗
-    live_roles_auth_own (roles ∪ A) ∗
-    live_roles_frag_own roles.
-  Proof.
-    iIntros (Hnin) "Hauth".
-    iMod (own_update with "Hauth") as "[$ $]"; [|done].
-    apply auth_update_alloc.
-    apply gset_disj_alloc_empty_local_update.
-    set_solver.
-  Qed.
+  (* Lemma dead_roles_auth_subseteq A roles : *)
+  (*   dead_roles_auth_own A -∗ dead_roles_frag_own roles -∗ ⌜roles ⊆ A⌝. *)
+  (* Proof. *)
+  (*   iIntros "Hauth Hown". *)
+  (*   iDestruct (own_valid_2 with "Hauth Hown") as %Hvalid%auth_both_valid_discrete. *)
+  (*   destruct Hvalid as [Hvalid%gset_disj_included _]. *)
+  (*   iPureIntro. set_solver. *)
+  (* Qed. *)
 
-  Lemma live_roles_auth_delete A roles :
-    live_roles_auth_own A -∗ live_roles_frag_own roles ==∗
-    live_roles_auth_own (A ∖ roles).
-  Proof.
-    iIntros "Hauth Hown".
-    iMod (own_update_2 _ _ with "Hauth Hown") as "$"; [|done].
-    apply auth_update_dealloc, gset_disj_dealloc_local_update.
-  Qed.
+  (* Lemma dead_roles_auth_extend A roles : *)
+  (*   roles ## A → *)
+  (*   dead_roles_auth_own A ==∗ *)
+  (*   dead_roles_auth_own (roles ∪ A) ∗ *)
+  (*   dead_roles_frag_own roles. *)
+  (* Proof. *)
+  (*   iIntros (Hnin) "Hauth". *)
+  (*   iMod (own_update with "Hauth") as "[$ $]"; [|done]. *)
+  (*   apply auth_update_alloc. *)
+  (*   apply gset_disj_alloc_empty_local_update. *)
+  (*   set_solver. *)
+  (* Qed. *)
 
-  Lemma live_role_auth_elem_of A role :
-    live_roles_auth_own A -∗ live_role_frag_own role -∗ ⌜role ∈ A⌝.
-  Proof.
-    iIntros "Hauth Hown".
-    iDestruct (live_roles_auth_subseteq with "Hauth Hown") as %Hle.
-    iPureIntro. set_solver.
-  Qed.
+  (* Lemma dead_roles_auth_delete A roles : *)
+  (*   dead_roles_auth_own A -∗ dead_roles_frag_own roles ==∗ *)
+  (*   dead_roles_auth_own (A ∖ roles). *)
+  (* Proof. *)
+  (*   iIntros "Hauth Hown". *)
+  (*   iMod (own_update_2 _ _ with "Hauth Hown") as "$"; [|done]. *)
+  (*   apply auth_update_dealloc, gset_disj_dealloc_local_update. *)
+  (* Qed. *)
 
-  Lemma live_role_auth_extend A role :
-    role ∉ A →
-    live_roles_auth_own A ==∗
-    live_roles_auth_own ({[role]} ∪ A) ∗
-    live_role_frag_own role.
-  Proof.
-    iIntros (Hnin) "Hauth".
-    by iMod (live_roles_auth_extend with "Hauth") as "[$ $]"; [set_solver|].
-  Qed.
+  (* Lemma dead_role_auth_elem_of A role : *)
+  (*   dead_roles_auth_own A -∗ dead_role_frag_own role -∗ ⌜role ∈ A⌝. *)
+  (* Proof. *)
+  (*   iIntros "Hauth Hown". *)
+  (*   iDestruct (dead_roles_auth_subseteq with "Hauth Hown") as %Hle. *)
+  (*   iPureIntro. set_solver. *)
+  (* Qed. *)
 
-  Lemma live_role_auth_delete A role :
-    live_roles_auth_own A -∗ live_role_frag_own role ==∗
-    live_roles_auth_own (A ∖ {[role]}).
-  Proof.
-    iIntros "Hauth Hown".
-    by iMod (live_roles_auth_delete with "Hauth Hown") as "$".
-  Qed.
+  (* Lemma dead_role_auth_extend A role : *)
+  (*   role ∉ A → *)
+  (*   dead_roles_auth_own A ==∗ *)
+  (*   dead_roles_auth_own ({[role]} ∪ A) ∗ *)
+  (*   dead_role_frag_own role. *)
+  (* Proof. *)
+  (*   iIntros (Hnin) "Hauth". *)
+  (*   by iMod (dead_roles_auth_extend with "Hauth") as "[$ $]"; [set_solver|]. *)
+  (* Qed. *)
 
-  Lemma live_roles_own_split roles1 roles2 :
-    roles1 ## roles2 →
-    ⊢ live_roles_frag_own (roles1 ∪ roles2) ∗-∗
-      live_roles_frag_own roles1 ∗ live_roles_frag_own roles2.
-  Proof.
-    intros Hdisj.
-    iSplit.
-    - rewrite /live_roles_frag_own -gset_disj_union /=; [|done].
-      iDestruct 1 as "[Hroles1 Hroles2]". iFrame.
-    - rewrite /live_roles_frag_own -gset_disj_union /=; [|done].
-      rewrite -own_op -auth_frag_op. by eauto.
-  Qed.
+  (* Lemma dead_role_auth_delete A role : *)
+  (*   dead_roles_auth_own A -∗ dead_role_frag_own role ==∗ *)
+  (*   dead_roles_auth_own (A ∖ {[role]}). *)
+  (* Proof. *)
+  (*   iIntros "Hauth Hown". *)
+  (*   by iMod (dead_roles_auth_delete with "Hauth Hown") as "$". *)
+  (* Qed. *)
 
-  (* Dead Roles *)
-
-  Lemma dead_roles_auth_subseteq A roles :
-    dead_roles_auth_own A -∗ dead_roles_frag_own roles -∗ ⌜roles ⊆ A⌝.
-  Proof.
-    iIntros "Hauth Hown".
-    iDestruct (own_valid_2 with "Hauth Hown") as %Hvalid%auth_both_valid_discrete.
-    destruct Hvalid as [Hvalid%gset_disj_included _].
-    iPureIntro. set_solver.
-  Qed.
-
-  Lemma dead_roles_auth_extend A roles :
-    roles ## A →
-    dead_roles_auth_own A ==∗
-    dead_roles_auth_own (roles ∪ A) ∗
-    dead_roles_frag_own roles.
-  Proof.
-    iIntros (Hnin) "Hauth".
-    iMod (own_update with "Hauth") as "[$ $]"; [|done].
-    apply auth_update_alloc.
-    apply gset_disj_alloc_empty_local_update.
-    set_solver.
-  Qed.
-
-  Lemma dead_roles_auth_delete A roles :
-    dead_roles_auth_own A -∗ dead_roles_frag_own roles ==∗
-    dead_roles_auth_own (A ∖ roles).
-  Proof.
-    iIntros "Hauth Hown".
-    iMod (own_update_2 _ _ with "Hauth Hown") as "$"; [|done].
-    apply auth_update_dealloc, gset_disj_dealloc_local_update.
-  Qed.
-
-  Lemma dead_role_auth_elem_of A role :
-    dead_roles_auth_own A -∗ dead_role_frag_own role -∗ ⌜role ∈ A⌝.
-  Proof.
-    iIntros "Hauth Hown".
-    iDestruct (dead_roles_auth_subseteq with "Hauth Hown") as %Hle.
-    iPureIntro. set_solver.
-  Qed.
-
-  Lemma dead_role_auth_extend A role :
-    role ∉ A →
-    dead_roles_auth_own A ==∗
-    dead_roles_auth_own ({[role]} ∪ A) ∗
-    dead_role_frag_own role.
-  Proof.
-    iIntros (Hnin) "Hauth".
-    by iMod (dead_roles_auth_extend with "Hauth") as "[$ $]"; [set_solver|].
-  Qed.
-
-  Lemma dead_role_auth_delete A role :
-    dead_roles_auth_own A -∗ dead_role_frag_own role ==∗
-    dead_roles_auth_own (A ∖ {[role]}).
-  Proof.
-    iIntros "Hauth Hown".
-    by iMod (dead_roles_auth_delete with "Hauth Hown") as "$".
-  Qed.
-
-  Lemma dead_roles_own_split roles1 roles2 :
-    roles1 ## roles2 →
-    ⊢ dead_roles_frag_own (roles1 ∪ roles2) ∗-∗
-      dead_roles_frag_own roles1 ∗ dead_roles_frag_own roles2.
-  Proof.
-    intros Hdisj.
-    iSplit.
-    - rewrite /dead_roles_frag_own -gset_disj_union /=; [|done].
-      iDestruct 1 as "[Hroles1 Hroles2]". iFrame.
-    - rewrite /dead_roles_frag_own -gset_disj_union /=; [|done].
-      rewrite -own_op -auth_frag_op. by eauto.
-  Qed.
-
+  (* Lemma dead_roles_own_split roles1 roles2 : *)
+  (*   roles1 ## roles2 → *)
+  (*   ⊢ dead_roles_frag_own (roles1 ∪ roles2) ∗-∗ *)
+  (*     dead_roles_frag_own roles1 ∗ dead_roles_frag_own roles2. *)
+  (* Proof. *)
+  (*   intros Hdisj. *)
+  (*   iSplit. *)
+  (*   - rewrite /dead_roles_frag_own -gset_disj_union /=; [|done]. *)
+  (*     iDestruct 1 as "[Hroles1 Hroles2]". iFrame. *)
+  (*   - rewrite /dead_roles_frag_own -gset_disj_union /=; [|done]. *)
+  (*     rewrite -own_op -auth_frag_op. by eauto. *)
+  (* Qed. *)
 End resource_lemmas.
