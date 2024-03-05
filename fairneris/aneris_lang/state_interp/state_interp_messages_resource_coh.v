@@ -1,5 +1,6 @@
 From stdpp Require Import fin_maps gmap.
 From iris.proofmode Require Import tactics.
+From fairneris Require Import fuel.
 From fairneris.prelude Require Import collect.
 From fairneris.aneris_lang Require Import aneris_lang network resources.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
@@ -12,7 +13,8 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Mdl Σ}.
+  Context `{LM: LiveModel aneris_lang M}.
+  Context `{aG : !anerisG LM Σ}.
 
   Lemma messages_resource_coh_init B :
     own (A:=authUR socket_address_groupUR) aneris_socket_address_group_name
@@ -295,7 +297,7 @@ Section state_interpretation.
     ∃ φ m', ⌜m ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ ▷ φ m'.
   Proof.
     iIntros (Hmha Hmhb HmR HmT' (Hdisj & Hne & Hmacoh)).
-    iIntros "[%Hmdest _] [%Hmsend _]". 
+    iIntros "[%Hmdest _] [%Hmsend _]".
     iDestruct 1 as "[#Hown Hrcoh]". rewrite /messages_resource_coh.
     iDestruct "Hrcoh" as (ms Hle) "[#HrcohT Hrcoh]".
     iAssert (⌜∃ m', m ≡g{sagT,sagR} m' ∧ m' ∈ ms⌝%I) as %(m' & Hmeq & Hmin).

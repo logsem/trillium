@@ -2,6 +2,7 @@ From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
+From fairneris Require Import fairness fuel.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.aneris_lang Require Export aneris_lang network resources.
 From fairneris.aneris_lang.state_interp Require Export state_interp_def.
@@ -13,7 +14,8 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Mdl Σ}.
+  Context `{LM: LiveModel aneris_lang M}.
+  Context `{aG : !anerisG LM Σ}.
 
   (** local_state_coh *)
   Lemma local_state_coh_heaps n γs γm σ :
@@ -253,8 +255,8 @@ Section state_interpretation.
     rewrite /local_state_coh lookup_insert_ne //.
   Qed.
 
-  Lemma local_state_coh_deliver_message γm σ M Sn Sn' ip sh skt a R m :
-    m ∈ messages_to_receive_at a M →
+  Lemma local_state_coh_deliver_message γm σ Ms Sn Sn' ip sh skt a R m :
+    m ∈ messages_to_receive_at a Ms →
     (state_sockets σ) !! ip = Some Sn →
     Sn !! sh = Some (skt, R) →
     Sn' = <[sh:=(skt, m :: R)]> Sn →

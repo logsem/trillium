@@ -1,5 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export adequacy.
+From fairneris Require Import fuel.
 From fairneris.aneris_lang Require Import
      aneris_lang network resources.
 From fairneris.prelude Require Import gmultiset.
@@ -15,7 +16,6 @@ From fairneris.aneris_lang.state_interp Require Import
      state_interp_events
      state_interp_messages_history.
 From fairneris Require Import fairness.
-From fairneris.examples Require Import retransmit_model.
 
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
@@ -24,7 +24,8 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG retransmit_fair_model Σ}.
+  Context `{LM: LiveModel aneris_lang Mod}.
+  Context `{aG : !anerisG LM Σ}.
 
   (* TODO: Move this elsehwere and use it where we now use ad hoc induction *)
   Lemma fupd_elim_laterN E1 E2 n (P:iProp Σ) :

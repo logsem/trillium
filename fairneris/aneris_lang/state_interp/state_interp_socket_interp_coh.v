@@ -2,6 +2,7 @@ From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
+From fairneris Require Import fuel.
 From fairneris.prelude Require Import misc.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.aneris_lang Require Import
@@ -18,7 +19,8 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{!anerisG Mdl Σ}.
+  Context `{LM: LiveModel aneris_lang M}.
+  Context `{aG : !anerisG LM Σ}.
 
   (* socket_interp_coh *)
   Lemma socket_interp_coh_init C :
@@ -45,11 +47,11 @@ Section state_interpretation.
       rewrite auth_both_valid_discrete in Hvalid.
       destruct Hvalid as [Hincluded Hvalid].
       rewrite gset_disj_included in Hincluded.
-      iPureIntro. set_solver. }    
+      iPureIntro. set_solver. }
     iAssert (socket_address_group_own sag) as "#Hsag'".
     { rewrite /socket_address_group_own.
       iApply (socket_address_group_own_subseteq sags); [set_solver|].
-      by iApply socket_address_groups_ctx_own. }    
+      by iApply socket_address_groups_ctx_own. }
     iMod (unallocated_update_dealloc with "[$Hunallocated $Hsag]") as "Hunallocated".
     iDestruct "Hsis" as (sis) "(Hsaved & %Hdom & Hsis)".
     iMod (socket_interp_alloc with "Hsag' Hsaved")
@@ -58,7 +60,7 @@ Section state_interpretation.
     iModIntro. iFrame "#∗".
     iExists sags, (A ∖ {[sag]}).
     iSplit; [iPureIntro; set_solver|].
-    iFrame. iExists _. iSplit; [done|].    
+    iFrame. iExists _. iSplit; [done|].
     iSplit; [iPureIntro|].
     { rewrite dom_insert_L.
       rewrite Hdom. rewrite difference_difference_union; set_solver. }

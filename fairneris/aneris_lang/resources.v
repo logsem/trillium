@@ -428,15 +428,6 @@ Section definitions.
   (** Steps *)
   Definition steps_auth n := mono_nat_auth_own aneris_steps_name 1 n.
   Definition steps_lb n := mono_nat_lb_own aneris_steps_name n.
-
-  (* TODO: move to fair_resources.v *)
-  (* Definition dead_roles_auth_own (A : gset FM.(fmrole)) : iProp Σ := *)
-  (*   own (A := live_roleUR FM) aneris_dead_roles_name (● GSet A). *)
-  (* Definition dead_roles_frag_own (roles : gset FM.(fmrole)) : iProp Σ := *)
-  (*   own (A := live_roleUR FM) aneris_dead_roles_name (◯ GSet roles). *)
-  (* Definition dead_role_frag_own (role : FM.(fmrole)) : iProp Σ := *)
-  (*   dead_roles_frag_own {[role]}. *)
-
 End definitions.
 
 (** Heap points-to (LaTeX: [\mapsto]) *)
@@ -1737,77 +1728,4 @@ Section resource_lemmas.
     iIntros "Hauth".
     iMod (mono_nat_own_update with "Hauth") as "[$ _]"; [lia|done].
   Qed.
-
-  (* TODO: move to fair_resources.v *)
-  (* (* Dead Roles *) *)
-
-  (* Lemma dead_roles_auth_subseteq A roles : *)
-  (*   dead_roles_auth_own A -∗ dead_roles_frag_own roles -∗ ⌜roles ⊆ A⌝. *)
-  (* Proof. *)
-  (*   iIntros "Hauth Hown". *)
-  (*   iDestruct (own_valid_2 with "Hauth Hown") as %Hvalid%auth_both_valid_discrete. *)
-  (*   destruct Hvalid as [Hvalid%gset_disj_included _]. *)
-  (*   iPureIntro. set_solver. *)
-  (* Qed. *)
-
-  (* Lemma dead_roles_auth_extend A roles : *)
-  (*   roles ## A → *)
-  (*   dead_roles_auth_own A ==∗ *)
-  (*   dead_roles_auth_own (roles ∪ A) ∗ *)
-  (*   dead_roles_frag_own roles. *)
-  (* Proof. *)
-  (*   iIntros (Hnin) "Hauth". *)
-  (*   iMod (own_update with "Hauth") as "[$ $]"; [|done]. *)
-  (*   apply auth_update_alloc. *)
-  (*   apply gset_disj_alloc_empty_local_update. *)
-  (*   set_solver. *)
-  (* Qed. *)
-
-  (* Lemma dead_roles_auth_delete A roles : *)
-  (*   dead_roles_auth_own A -∗ dead_roles_frag_own roles ==∗ *)
-  (*   dead_roles_auth_own (A ∖ roles). *)
-  (* Proof. *)
-  (*   iIntros "Hauth Hown". *)
-  (*   iMod (own_update_2 _ _ with "Hauth Hown") as "$"; [|done]. *)
-  (*   apply auth_update_dealloc, gset_disj_dealloc_local_update. *)
-  (* Qed. *)
-
-  (* Lemma dead_role_auth_elem_of A role : *)
-  (*   dead_roles_auth_own A -∗ dead_role_frag_own role -∗ ⌜role ∈ A⌝. *)
-  (* Proof. *)
-  (*   iIntros "Hauth Hown". *)
-  (*   iDestruct (dead_roles_auth_subseteq with "Hauth Hown") as %Hle. *)
-  (*   iPureIntro. set_solver. *)
-  (* Qed. *)
-
-  (* Lemma dead_role_auth_extend A role : *)
-  (*   role ∉ A → *)
-  (*   dead_roles_auth_own A ==∗ *)
-  (*   dead_roles_auth_own ({[role]} ∪ A) ∗ *)
-  (*   dead_role_frag_own role. *)
-  (* Proof. *)
-  (*   iIntros (Hnin) "Hauth". *)
-  (*   by iMod (dead_roles_auth_extend with "Hauth") as "[$ $]"; [set_solver|]. *)
-  (* Qed. *)
-
-  (* Lemma dead_role_auth_delete A role : *)
-  (*   dead_roles_auth_own A -∗ dead_role_frag_own role ==∗ *)
-  (*   dead_roles_auth_own (A ∖ {[role]}). *)
-  (* Proof. *)
-  (*   iIntros "Hauth Hown". *)
-  (*   by iMod (dead_roles_auth_delete with "Hauth Hown") as "$". *)
-  (* Qed. *)
-
-  (* Lemma dead_roles_own_split roles1 roles2 : *)
-  (*   roles1 ## roles2 → *)
-  (*   ⊢ dead_roles_frag_own (roles1 ∪ roles2) ∗-∗ *)
-  (*     dead_roles_frag_own roles1 ∗ dead_roles_frag_own roles2. *)
-  (* Proof. *)
-  (*   intros Hdisj. *)
-  (*   iSplit. *)
-  (*   - rewrite /dead_roles_frag_own -gset_disj_union /=; [|done]. *)
-  (*     iDestruct 1 as "[Hroles1 Hroles2]". iFrame. *)
-  (*   - rewrite /dead_roles_frag_own -gset_disj_union /=; [|done]. *)
-  (*     rewrite -own_op -auth_frag_op. by eauto. *)
-  (* Qed. *)
 End resource_lemmas.
