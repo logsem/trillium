@@ -1,7 +1,7 @@
 From stdpp Require Import list fin_maps.
 From iris.proofmode Require Import proofmode.
 From trillium.program_logic Require Import ectx_lifting.
-From fairneris Require Import fairness.
+From fairneris Require Import fairness fair_resources fuel.
 From fairneris.examples Require Import retransmit_model.
 From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
@@ -10,14 +10,38 @@ From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 Definition Aprog shA : expr := SendToRepeat #(LitSocket shA) #"Hello" #saB.
 Definition Bprog shB : expr := ReceiveFrom #(LitSocket shB).
 
+Definition model_state_socket_coh
+           (skts : gmap ip_address sockets)
+           (bs : gmap socket_address (list message)) :=
+  ∀ ip Sn sh skt sa ms,
+  skts !! ip = Some Sn → Sn !! sh = Some (skt,ms) →
+  saddress skt = Some sa →
+  bs !!! sa = ms.
+
+Definition config_state_valid (c : cfg aneris_lang) (δ : retransmit_state) :=
+  state_ms c.2 = δ.1.2 ∧ model_state_socket_coh (state_sockets c.2) δ.2.
+
+Program Definition retransmit_live_model : LiveModel aneris_lang retransmit_fair_model :=
+  {|
+    lm_fl _ := 1%nat;
+    lm_cfg_action m1 lab := (((), lab), m1);
+    lm_cfg_labels_match cl fl := cl = fl.2;
+    lm_cfg_states_match c m := config_state_valid c m;
+  |}.
+Next Obligation. Admitted.
+Next Obligation. Admitted.
+Next Obligation. Admitted.
+Next Obligation. Admitted.
+
 Section with_Σ.
-  Context `{anerisG retransmit_fair_model Σ}.
+  Context `{anerisG _ retransmit_live_model Σ}.
+
+  Notation loA := (ip_of_address saA,tidA).
 
   Lemma wp_A s E shA :
-    {{{ shA ↪[ip_of_address saA] sA ∗ saA ⤳ (∅,∅) ∗ saB ⤇ (λ _, True) ∗
-        live_role_frag_own Arole }}}
-      (mkExpr (ip_of_address saA) (Aprog shA)) @ s; (ip_of_address saA,tidA); E
-    {{{ v, RET v; dead_role_frag_own Arole }}}.
+    {{{ shA ↪[ip_of_address saA] sA ∗ saA ⤳ (∅,∅) ∗ saB ⤇ (λ _, True) ∗ loA ↦M {[ Arole := 1%nat ]} }}}
+      (mkExpr (ip_of_address saA) (Aprog shA)) @ s; loA; E
+    {{{ v, RET v; loA ↦M ∅ }}}.
   Proof.
     iIntros (Φ) "(Hsh & Hrt & #Hmsg & HA) HΦ".
     iAssert (∃ R T, saA ⤳ (R, T) ∗

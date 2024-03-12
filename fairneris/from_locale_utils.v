@@ -46,40 +46,40 @@ Lemma from_locale_elem_of' tp ζ e :
   from_locale tp ζ = Some e → ∃ i, tp !! i = Some e ∧ locale_of (take i tp) e = ζ.
 Proof. apply from_locale_from_elem_of'. Qed.
 
-Lemma posts_of_idx
-      `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ}
-      (e : aneris_expr) v (tp : list aneris_expr) ζ :
-  from_locale tp ζ = Some e → aneris_to_val e = Some v →
-  posts_of tp
-           (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes tp)) -∗
-  (∃ ℓ, ⌜roles_match ζ ℓ⌝ ∗ dead_role_frag_own ℓ)%I.
-Proof.
-  iIntros (Hlocale Hval) "Hposts".
-  apply from_locale_elem_of' in Hlocale as [i [Hlookup Hlocale]].
-  iDestruct (big_sepL_elem_of _ _ _ with "Hposts") as "H".
-  { rewrite elem_of_list_omap.
-    eexists (e, (λ _, ∃ ℓ, ⌜roles_match ζ ℓ⌝ ∗
-                             dead_role_frag_own (ℓ:
-                                                  fmrole retransmit_fair_model))%I).
-    split; last first.
-    - simpl. apply fmap_Some. exists v. split; done.
-    - destruct tp as [|e1' tp]; [set_solver|]. simpl.
-      apply elem_of_cons.
-      destruct i as [|i]; [left|right].
-      * simpl in *. simplify_eq. done.
-      * apply elem_of_lookup_zip_with.
-        eexists i, e, _.
-        do 2 split=> //.
-        rewrite /locale_of /=.
-        rewrite list_lookup_fmap fmap_Some. simpl in Hlookup.
-        exists (e1' :: take i tp, e). simpl in *.
-        split.
-        -- erewrite prefixes_from_lookup =>//.
-        -- rewrite /locale_of in Hlocale.
-           rewrite Hlocale.
-           done. }
-  done.
-Qed.
+(* Lemma posts_of_idx *)
+(*       `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ} *)
+(*       (e : aneris_expr) v (tp : list aneris_expr) ζ : *)
+(*   from_locale tp ζ = Some e → aneris_to_val e = Some v → *)
+(*   posts_of tp *)
+(*            (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes tp)) -∗ *)
+(*   (∃ ℓ, ⌜roles_match ζ ℓ⌝ ∗ dead_role_frag_own ℓ)%I. *)
+(* Proof. *)
+(*   iIntros (Hlocale Hval) "Hposts". *)
+(*   apply from_locale_elem_of' in Hlocale as [i [Hlookup Hlocale]]. *)
+(*   iDestruct (big_sepL_elem_of _ _ _ with "Hposts") as "H". *)
+(*   { rewrite elem_of_list_omap. *)
+(*     eexists (e, (λ _, ∃ ℓ, ⌜roles_match ζ ℓ⌝ ∗ *)
+(*                              dead_role_frag_own (ℓ: *)
+(*                                                   fmrole retransmit_fair_model))%I). *)
+(*     split; last first. *)
+(*     - simpl. apply fmap_Some. exists v. split; done. *)
+(*     - destruct tp as [|e1' tp]; [set_solver|]. simpl. *)
+(*       apply elem_of_cons. *)
+(*       destruct i as [|i]; [left|right]. *)
+(*       * simpl in *. simplify_eq. done. *)
+(*       * apply elem_of_lookup_zip_with. *)
+(*         eexists i, e, _. *)
+(*         do 2 split=> //. *)
+(*         rewrite /locale_of /=. *)
+(*         rewrite list_lookup_fmap fmap_Some. simpl in Hlookup. *)
+(*         exists (e1' :: take i tp, e). simpl in *. *)
+(*         split. *)
+(*         -- erewrite prefixes_from_lookup =>//. *)
+(*         -- rewrite /locale_of in Hlocale. *)
+(*            rewrite Hlocale. *)
+(*            done. } *)
+(*   done. *)
+(* Qed. *)
 
 (* TODO: Should likely move this to [lang.v] *)
 Definition locale_of' (ips : list ip_address) ip :=
@@ -128,8 +128,8 @@ Proof.
   destruct n; [done|]=> /=. by f_equiv.
 Qed.
 
-Lemma locales_of_list_from_drop Σ
-    `{!anerisG retransmit_fair_model Σ} es es' tp :
+Lemma locales_of_list_from_drop
+  `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ} es es' tp :
   locales_equiv_prefix_from es' es tp →
   (λ '(t,e) v, fork_post (locale_of t e) v) <$>
       (prefixes_from es' tp) =
@@ -140,8 +140,8 @@ Proof.
   by apply locales_of_list_equiv, locales_equiv_prefix_from_drop.
 Qed.
 
-Lemma posts_of_length_drop Σ
-    `{!anerisG retransmit_fair_model Σ} es es' tp :
+Lemma posts_of_length_drop
+    `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ} es es' tp :
   locales_equiv_prefix_from es' es tp →
   posts_of tp ((λ '(t,e) v, fork_post (locale_of t e) v) <$>
                    (prefixes_from es' (es ++ drop (length es) tp))) -∗
