@@ -149,7 +149,7 @@ Section state_interpretation.
         σ];
       simplify_eq/=.
     (* Deliver *)
-    - destruct H as (Hsteps & Hmatch & Htids & Hsm).
+    - destruct H as (Hsteps & Hmatch & Htids).
       destruct (LM.(lm_cfg_action) (trace_last atr) (Some m)) as [ℓ δ'] eqn:Heq.
       unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}).
       { admit. }
@@ -164,8 +164,7 @@ Section state_interpretation.
           - by eapply lm_cfg_spec_trans.
           - split=>//. by eapply lm_cfg_spec_live_roles. }
         split; first (split; [done|by eapply lm_cfg_spec_labels_match]).
-        split; first by rewrite /tids_smaller ?Hex //= in Htids *.
-        simpl. eapply lm_cfg_spec_states_match; by [apply Heq | econstructor | ]. }
+        by rewrite /tids_smaller ?Hex //= in Htids *. }
       iFrame "Hauth". simpl.
       iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)".
       iMod ("Hupd" $! _ _ _ _ Heq with "Hst").
@@ -184,7 +183,7 @@ Section state_interpretation.
       iSplitL "Hlcoh";
         [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
       by iApply (free_ips_coh_deliver_message with "Hfreeips").
-    - destruct H as (Hsteps & Hmatch & Htids & Hsmatch).
+    - destruct H as (Hsteps & Hmatch & Htids).
       destruct (LM.(lm_cfg_action) (trace_last atr) None) as [ℓ δ'] eqn:Heq.
       unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}).
       { admit. }
@@ -198,8 +197,7 @@ Section state_interpretation.
           - by eapply lm_cfg_spec_trans.
           - split=>//. by eapply lm_cfg_spec_live_roles. }
         split; first (split; [done|by eapply lm_cfg_spec_labels_match]).
-        split; first by rewrite /tids_smaller ?Hex //= in Htids *.
-        simpl. eapply lm_cfg_spec_states_match; by [apply Heq | econstructor | ]. }
+        by rewrite /tids_smaller ?Hex //= in Htids *. }
       iFrame "Hauth". simpl.
       iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)".
       iMod ("Hupd" $! _ _ _ _ Heq with "Hst").
@@ -213,7 +211,7 @@ Section state_interpretation.
       iSplitR; [eauto using gnames_coh_update_sockets|].
       iSplitR; [eauto using network_sockets_coh_deliver_message|].
       eauto using messages_history_coh_duplicate_message.
-    - destruct H as (Hsteps & Hmatch & Htids & Hsmatch).
+    - destruct H as (Hsteps & Hmatch & Htids).
       destruct (LM.(lm_cfg_action) (trace_last atr) None) as [ℓ δ'] eqn:Heq.
       unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}).
       { admit. }
@@ -227,8 +225,7 @@ Section state_interpretation.
           - by eapply lm_cfg_spec_trans.
           - split=>//. by eapply lm_cfg_spec_live_roles. }
         split; first (split; [done|by eapply lm_cfg_spec_labels_match]).
-        split; first by rewrite /tids_smaller ?Hex //= in Htids *.
-        simpl. eapply lm_cfg_spec_states_match; by [apply Heq | econstructor | ]. }
+        by rewrite /tids_smaller ?Hex //= in Htids *. }
       iFrame "Hauth". simpl.
       iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)".
       iMod ("Hupd" $! _ _ _ _ Heq with "Hst").

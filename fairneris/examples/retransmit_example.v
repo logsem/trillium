@@ -26,9 +26,7 @@ Program Definition retransmit_live_model : LiveModel aneris_lang retransmit_fair
     lm_fl _ := 1%nat;
     lm_cfg_action m1 lab := (((), lab), m1);
     lm_cfg_labels_match cl fl := cl = fl.2;
-    lm_cfg_states_match c m := config_state_valid c m;
   |}.
-Next Obligation. Admitted.
 Next Obligation. Admitted.
 Next Obligation. Admitted.
 Next Obligation. Admitted.

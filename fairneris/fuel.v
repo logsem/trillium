@@ -567,13 +567,7 @@ Section fairness.
       lm_ls_trans (δ: LiveState) (ℓ: FairLabel M) := ls_trans lm_fl δ ℓ;
       lm_cfg_action : M → config_label Λ → (fmconfig M * M);
       lm_cfg_labels_match : config_label Λ → fmconfig M → Prop;
-      lm_cfg_states_match : cfg Λ → M → Prop;
       lm_cfg_spec_labels_match : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → lm_cfg_labels_match cl fl;
-      lm_cfg_spec_states_match : ∀ c1 m1 cl fl c2 m2,
-        lm_cfg_action m1 cl = (fl, m2) →
-        locale_step c1 (inr cl) c2 →
-        lm_cfg_states_match c1 m1 →
-        lm_cfg_states_match c2 m2;
       lm_cfg_spec_trans : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → fmtrans _ m1 (inr fl) m2;
       lm_cfg_spec_live_roles : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → live_roles _ m1 = live_roles _ m2;
     }.
@@ -986,8 +980,7 @@ Section fairness_preserved.
       : Prop :=
     trace_steps LM.(lm_ls_trans) atr ∧
     trace_labels_match ex atr ∧
-    tids_smaller (trace_last ex).1 (trace_last atr) ∧
-    LM.(lm_cfg_states_match) (trace_last ex) (trace_last atr).
+    tids_smaller (trace_last ex).1 (trace_last atr).
 
   Definition valid_lift_fairness
              (φ: execution_trace Λ -> auxiliary_trace LM -> Prop)
@@ -1021,7 +1014,7 @@ Section fairness_preserved.
       split; [by simplify_eq|]. simplify_eq. by apply Hφψ.
     - inversion Hem; inversion Ham. subst.
       pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
-      destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?&?).
+      destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?).
       econstructor.
       + naive_solver.
       + eauto.

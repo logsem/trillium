@@ -782,11 +782,10 @@ Section model_state_lemmas.
           (model_update_locale_fuel (trace_last auxtr) ζ) ρs).
   Proof.
     intros Hvse Hstep Htids Hexstep. destruct c2 as [tp σ].
-    destruct Hvse as (?&?&?&?).
-    split; [| split; [| split]]=>//.
-    - econstructor=>//; first by apply model_can_fuel_step_trans.
-    - simpl. admit.
-  Admitted.
+    destruct Hvse as (?&?&?).
+    split; [| split]=>//.
+    econstructor=>//; first by apply model_can_fuel_step_trans.
+  Qed.
 
   Definition map_disj (m : gmap (locale Λ) (gmap (fmrole M) nat)) :=
     ∀ ζ ζ' fs fs', ζ ≠ ζ' → m !! ζ = Some fs → m !! ζ' = Some fs' → fs ##ₘ fs'.
@@ -1356,11 +1355,10 @@ Section model_state_lemmas.
       (auxtr :tr[Take_step ρ fmact ζ act]: δ2).
   Proof.
     intros Hstep Htids Hvse. destruct c2.
-    destruct Hvse as (?&?&?&?).
-    split; [| split; [| split]]=>//.
-    - econstructor=>//; first by apply model_can_model_step_trans.
-    - simpl. admit.
-  Admitted.
+    destruct Hvse as (?&?&?).
+    split; [| split]=>//.
+    econstructor=>//; first by apply model_can_model_step_trans.
+  Qed.
 
   Lemma update_model_step
         (extr : execution_trace Λ)
@@ -2031,11 +2029,10 @@ Section model_state_lemmas.
       (auxtr :tr[Silent_step ζ act]: δ2).
   Proof.
     intros Hvse Hstep Htids. destruct c2.
-    destruct Hvse as (?&?&?&?).
-    split; [| split; [| split]]=>//.
-    - econstructor=>//; first by eapply model_can_fork_step_trans.
-    - simpl. admit.
-  Admitted.
+    destruct Hvse as (?&?&?).
+    split; [| split]=>//.
+    econstructor=>//; first by eapply model_can_fork_step_trans.
+  Qed.
 
   Lemma model_state_interp_has_fuels_agree es δ ζ (fs : gmap (fmrole M) nat) :
     model_state_interp es δ -∗ has_fuels ζ fs -∗
