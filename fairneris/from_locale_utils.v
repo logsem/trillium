@@ -47,7 +47,7 @@ Lemma from_locale_elem_of' tp ζ e :
 Proof. apply from_locale_from_elem_of'. Qed.
 
 Lemma posts_of_idx
-      `{!anerisG retransmit_fair_model Σ}
+      `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ}
       (e : aneris_expr) v (tp : list aneris_expr) ζ :
   from_locale tp ζ = Some e → aneris_to_val e = Some v →
   posts_of tp

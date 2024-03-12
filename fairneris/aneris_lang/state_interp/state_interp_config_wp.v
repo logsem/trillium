@@ -125,6 +125,7 @@ Section state_interpretation.
   (*   by eapply Hcoh. *)
   (* Qed. *)
 
+  (*TODO: lots of copy pasta! *)
   Lemma config_wp_correct : ⊢ config_wp.
   Proof.
     rewrite /config_wp. iModIntro.
@@ -139,6 +140,7 @@ Section state_interpretation.
     destruct c as [tp1 σ1]=> /=.
     rewrite /valid_state_evolution_fairness in H.
     rewrite /trace_ends_in in Hex.
+    have Hlstep: locale_step (tp1, σ1) (inr lbl) (tp1, σ2) by econstructor.
     destruct σ1; simpl in *; simplify_eq.
     pose (trace_last atr) as δ.
     inversion Hstep as
@@ -148,42 +150,27 @@ Section state_interpretation.
       simplify_eq/=.
     (* Deliver *)
     - destruct H as (Hsteps & Hmatch & Htids & Hsm).
-      destruct (LM.(lm_cfg_action) (trace_last atr) (Some m)) as [ℓ δ'].
+      destruct (LM.(lm_cfg_action) (trace_last atr) (Some m)) as [ℓ δ'] eqn:Heq.
       unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}).
       { admit. }
       { admit. }
       iExists (Config_step ℓ (Some m : config_label aneris_lang)).
       iSplitR.
       { iPureIntro.
-        rewrite /simple_valid_state_evolution.
+        rewrite /valid_state_evolution_fairness.
         rewrite /messages_to_receive_at_multi_soup in Hm.
         split.
-        { econstructor; [done|econstructor|done].
-          - destruct Hσ as [Hσ1 Hσ2].
-            simpl in *. rewrite Hσ1 in Hm.
-            apply elem_of_filter in Hm as [? Hm].
-            apply elem_of_gset_of_gmultiset in Hm.
-            set_solver.
-          - destruct Hσ as [Hσ1 Hσ2].
-            simpl in *.
-            assert (a = m_destination m) as ->.
-            { by apply elem_of_filter in Hm as [-> _]. }
-            by erewrite Hσ2. }
-        split; [done|].
-        split; [done|].
-        split.
-        { simpl. destruct Hσ as [Hσ1 Hσ2].
-          simpl in *. by rewrite Hσ1. }
-        simpl.
-        destruct Hσ as [Hσ1 Hσ2].
-        assert (a = m_destination m) as ->.
-        { by apply elem_of_filter in Hm as [-> _]. }
-        simpl in *.
-        apply state_buffers_insert; try done.
-        symmetry.
-        by eapply Hnscoh. }
-      iFrame "Hauth Hlive".
-      iModIntro.
+        { econstructor; [done|econstructor|done]; simpl.
+          - by eapply lm_cfg_spec_trans.
+          - split=>//. by eapply lm_cfg_spec_live_roles. }
+        split; first (split; [done|by eapply lm_cfg_spec_labels_match]).
+        split; first by rewrite /tids_smaller ?Hex //= in Htids *.
+        simpl. eapply lm_cfg_spec_states_match; by [apply Heq | econstructor | ]. }
+      iFrame "Hauth". simpl.
+      iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)".
+      iMod ("Hupd" $! _ _ _ _ Heq with "Hst").
+      iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first.
+      { iSplit; iFrame "#". iExists fm. erewrite lm_cfg_spec_live_roles=>//. iFrame. }
       iExists γm, mh. iFrame.
       iSplit.
       { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -197,24 +184,27 @@ Section state_interpretation.
       iSplitL "Hlcoh";
         [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
       by iApply (free_ips_coh_deliver_message with "Hfreeips").
-    - destruct H as (Hsteps & Hmatch & Hlive & Hσ).
-      iExists (δ, ms ⊎ {[+ m +]}, bs), (inr ((), None)).
+    - destruct H as (Hsteps & Hmatch & Htids & Hsmatch).
+      destruct (LM.(lm_cfg_action) (trace_last atr) None) as [ℓ δ'] eqn:Heq.
+      unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}).
+      { admit. }
+      { admit. }
+      iExists (Config_step ℓ (None : config_label aneris_lang)).
       iSplitR.
       { iPureIntro.
-        rewrite /simple_valid_state_evolution.
+        rewrite /valid_state_evolution_fairness.
         split.
-        { econstructor; [done|econstructor|done].
-          destruct Hσ as [Hσ1 Hσ2].
-          simpl in *. by rewrite Hσ1 in H0. }
-        split; [done|].
-        split; [done|].
-        split.
-        { simpl. destruct Hσ as [Hσ1 Hσ2].
-          simpl in *. by rewrite Hσ1. }
-        simpl. by destruct Hσ as [Hσ1 Hσ2].
-      }
-      iFrame "Hauth Hlive".
-      iModIntro.
+        { econstructor; [done|econstructor|done]; simpl.
+          - by eapply lm_cfg_spec_trans.
+          - split=>//. by eapply lm_cfg_spec_live_roles. }
+        split; first (split; [done|by eapply lm_cfg_spec_labels_match]).
+        split; first by rewrite /tids_smaller ?Hex //= in Htids *.
+        simpl. eapply lm_cfg_spec_states_match; by [apply Heq | econstructor | ]. }
+      iFrame "Hauth". simpl.
+      iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)".
+      iMod ("Hupd" $! _ _ _ _ Heq with "Hst").
+      iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first.
+      { iSplit; iFrame "#". iExists fm. erewrite lm_cfg_spec_live_roles=>//. iFrame. }
       iExists γm, mh. iFrame.
       iSplit.
       { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -223,24 +213,27 @@ Section state_interpretation.
       iSplitR; [eauto using gnames_coh_update_sockets|].
       iSplitR; [eauto using network_sockets_coh_deliver_message|].
       eauto using messages_history_coh_duplicate_message.
-    - destruct H as (Hsteps & Hmatch & Hlive & Hσ).
-      iExists (δ, ms ∖ {[+ m +]}, bs), (inr ((), None)).
+    - destruct H as (Hsteps & Hmatch & Htids & Hsmatch).
+      destruct (LM.(lm_cfg_action) (trace_last atr) None) as [ℓ δ'] eqn:Heq.
+      unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}).
+      { admit. }
+      { admit. }
+      iExists (Config_step ℓ (None : config_label aneris_lang)).
       iSplitR.
       { iPureIntro.
-        rewrite /simple_valid_state_evolution.
+        rewrite /valid_state_evolution_fairness.
         split.
-        { econstructor; [done|econstructor|done].
-          destruct Hσ as [Hσ1 Hσ2].
-          simpl in *. by rewrite Hσ1 in H0. }
-        split; [done|].
-        split; [done|].
-        split.
-        { simpl. destruct Hσ as [Hσ1 Hσ2].
-          simpl in *. by rewrite Hσ1. }
-        simpl. by destruct Hσ as [Hσ1 Hσ2].
-      }
-      iFrame "Hauth Hlive".
-      iModIntro.
+        { econstructor; [done|econstructor|done]; simpl.
+          - by eapply lm_cfg_spec_trans.
+          - split=>//. by eapply lm_cfg_spec_live_roles. }
+        split; first (split; [done|by eapply lm_cfg_spec_labels_match]).
+        split; first by rewrite /tids_smaller ?Hex //= in Htids *.
+        simpl. eapply lm_cfg_spec_states_match; by [apply Heq | econstructor | ]. }
+      iFrame "Hauth". simpl.
+      iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)".
+      iMod ("Hupd" $! _ _ _ _ Heq with "Hst").
+      iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first.
+      { iSplit; iFrame "#". iExists fm. erewrite lm_cfg_spec_live_roles=>//. iFrame. }
       iExists γm, mh. iFrame.
       iSplit.
       { apply (last_eq_trace_ends_in) in Hex as ->.
@@ -249,6 +242,6 @@ Section state_interpretation.
       iSplitR; [eauto using gnames_coh_update_sockets|].
       iSplitR; [eauto using network_sockets_coh_deliver_message|].
       eauto using messages_history_coh_drop_message.
-  Qed.
+  Admitted.
 
 End state_interpretation.

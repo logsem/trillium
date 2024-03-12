@@ -5,7 +5,7 @@ From iris.base_logic.lib Require Import saved_prop gen_heap.
 From iris.algebra Require Import auth excl.
 From fairneris.prelude Require Import collect gset_map gmultiset.
 From trillium.program_logic Require Export weakestpre.
-From fairneris Require Export fairness.
+From fairneris Require Export fairness fuel.
 From fairneris Require Import retransmit_model.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.algebra Require Import disj_gsets.
@@ -30,7 +30,8 @@ Import uPred.
 Import RecordSetNotations.
 
 Section aneris_state_interpretation.
-  Context `{!anerisG Mdl Σ}.
+  Context `{LM: LiveModel aneris_lang Mod}.
+  Context `{aG : !anerisG LM Σ}.
 
   (** aneris_state_interp *)
   Lemma mapsto_node_heap_valid n γs σ mh :
@@ -986,7 +987,8 @@ Section aneris_state_interpretation.
 End aneris_state_interpretation.
 
 Section state_interpretation.
-  Context `{!anerisG retransmit_fair_model Σ}.
+  Context `{LM: LiveModel aneris_lang Mod}.
+  Context `{aG : !anerisG LM Σ}.
 
   (* Lemma aneris_state_interp_model_agree m ex atr : *)
   (*   state_interp ex atr -∗ frag_st m -∗ ⌜(trace_last atr) = m⌝. *)

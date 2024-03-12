@@ -568,13 +568,14 @@ Section fairness.
       lm_cfg_action : M → config_label Λ → (fmconfig M * M);
       lm_cfg_labels_match : config_label Λ → fmconfig M → Prop;
       lm_cfg_states_match : cfg Λ → M → Prop;
-      lm_cfg_spec_labels_match : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2);
+      lm_cfg_spec_labels_match : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → lm_cfg_labels_match cl fl;
       lm_cfg_spec_states_match : ∀ c1 m1 cl fl c2 m2,
         lm_cfg_action m1 cl = (fl, m2) →
         locale_step c1 (inr cl) c2 →
         lm_cfg_states_match c1 m1 →
         lm_cfg_states_match c2 m2;
       lm_cfg_spec_trans : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → fmtrans _ m1 (inr fl) m2;
+      lm_cfg_spec_live_roles : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → live_roles _ m1 = live_roles _ m2;
     }.
 
   Definition live_model_model `(LM : LiveModel) : Model := {|
@@ -976,7 +977,7 @@ Section fairness_preserved.
              (extr : execution_trace Λ) (auxtr : auxiliary_trace LM) :=
     match extr, auxtr with
     | (extr :tr[oζ]: (es, σ)), auxtr :tr[ℓ]: δ =>
-        labels_match (LM:=LM) oζ ℓ ∧ tids_smaller es δ
+        labels_match (LM:=LM) oζ ℓ
     | _, _ => True
     end.
 
