@@ -2,14 +2,13 @@ From Paco Require Import pacotac.
 From stdpp Require Import finite.
 From iris.proofmode Require Import proofmode.
 From trillium Require Import adequacy.
-From fairneris Require Import fairness retransmit_model.
+From fairneris Require Import fairness retransmit_model fair_resources.
 From fairneris.aneris_lang Require Import aneris_lang resources.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.
 From fairneris.aneris_lang.state_interp Require Import state_interp.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
-From fairneris Require Import from_locale_utils trace_utils ltl_lite
-     partial_termination.
+From fairneris Require Import from_locale_utils trace_utils ltl_lite.
 
 (* TODO: Move to stdpp *)
 Lemma gset_union_difference_intersection_L `{Countable A} (X Y : gset A) :
@@ -28,13 +27,12 @@ Lemma extrace_property_impl {Λ} c (Φ Ψ : extrace Λ → Prop) :
   extrace_property c Ψ.
 Proof. intros HΦ Himpl extr Hstarts Hvalid. by apply Himpl, HΦ. Qed.
 
-Definition valid_state_evolution_fairness
+Definition valid_state_evolution_fairness `(LM: LiveModel aneris_lang M)
            (extr : execution_trace aneris_lang)
-           (auxtr : auxiliary_trace (fair_model_to_model retransmit_fair_model)) :=
-  auxtr_valid auxtr ∧
-  labels_match_trace extr auxtr ∧
-  live_tids (trace_last extr) (trace_last auxtr) ∧
-  config_state_valid (trace_last extr) (trace_last auxtr).
+           (auxtr : auxiliary_trace (live_model_to_model LM)) :=
+  trace_steps LM.(lm_ls_trans) auxtr ∧
+  trace_labels_match extr auxtr ∧
+  live_tids (LM := LM) (trace_last extr) (trace_last auxtr).
 
 Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
   match ft with
@@ -42,40 +40,33 @@ Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
   | _ :tr[ℓ]: _ => Some ℓ
   end.
 
-Lemma rel_finitary_valid_state_evolution_fairness :
-  rel_finitary valid_state_evolution_fairness.
+Lemma rel_finitary_valid_state_evolution_fairness `(LM: LiveModel aneris_lang M):
+  rel_finitary (valid_state_evolution_fairness LM).
 Proof. Admitted.
 
-Definition locale_dead_role_disabled (c : cfg aneris_lang)
-           (δ : retransmit_state) :=
-  ∀ (ℓ:fmrole retransmit_fair_model) ζ,
-  roles_match ζ ℓ →
-  ∀ e, from_locale c.1 ζ = Some e → is_Some (language.to_val e) →
-       ¬ role_enabled_model ℓ δ.
+(* Lemma derive_live_tid_inl c δ (ℓ : fmrole retransmit_fair_model) ζ : *)
+(*   role_enabled_locale_exists c δ → *)
+(*   locale_dead_role_disabled c δ → *)
+(*   live_tid c δ ℓ ζ. *)
+(* Proof. *)
+(*   intros Himpl1 Himpl2 Hmatch Hrole. *)
+(*   specialize (Himpl1 _ _ Hmatch Hrole) as [e He]. *)
+(*   exists e. *)
+(*   split; [done|]. *)
+(*   destruct (language.to_val e) eqn:Heqn; [|done]. *)
+(*   specialize (Himpl2 _ _ Hmatch e He). *)
+(*   assert (is_Some $ language.to_val e) as Hsome by done. *)
+(*   by specialize (Himpl2 Hsome). *)
+(* Qed. *)
 
-Lemma derive_live_tid_inl c δ (ℓ : fmrole retransmit_fair_model) ζ :
-  role_enabled_locale_exists c δ →
-  locale_dead_role_disabled c δ →
-  live_tid c δ ℓ ζ.
-Proof.
-  intros Himpl1 Himpl2 Hmatch Hrole.
-  specialize (Himpl1 _ _ Hmatch Hrole) as [e He].
-  exists e.
-  split; [done|].
-  destruct (language.to_val e) eqn:Heqn; [|done].
-  specialize (Himpl2 _ _ Hmatch e He).
-  assert (is_Some $ language.to_val e) as Hsome by done.
-  by specialize (Himpl2 Hsome).
-Qed.
-
-Lemma valid_state_live_tids ex atr :
-  simple_valid_state_evolution ex atr →
-  locale_dead_role_disabled (trace_last ex) (trace_last atr) →
-  live_tids (trace_last ex) (trace_last atr).
-Proof.
-  intros (_&_&Hlive1&Hnm) Hlive2 ℓ ζ Hlabels.
-  by apply derive_live_tid_inl.
-Qed.
+(* Lemma valid_state_live_tids ex atr : *)
+(*   simple_valid_state_evolution ex atr → *)
+(*   locale_dead_role_disabled (trace_last ex) (trace_last atr) → *)
+(*   live_tids (trace_last ex) (trace_last atr). *)
+(* Proof. *)
+(*   intros (_&_&Hlive1&Hnm) Hlive2 ℓ ζ Hlabels. *)
+(*   by apply derive_live_tid_inl. *)
+(* Qed. *)
 
 Definition continued_simulation_init {Λ M}
            (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -94,22 +85,22 @@ Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :
                              | None => ∅
                              end ∪ A) ∅ skts ∪ A) ∅ skts.
 
-Definition wp_proto_multiple_strong `{anerisPreG retransmit_fair_model Σ} A
+Definition wp_proto_multiple_strong `(LM: LiveModel aneris_lang M) `{anerisPreG _ LM Σ} A
            σ (s:stuckness) (es : list aneris_expr) st :=
-  (∀ (aG : anerisG retransmit_fair_model Σ), ⊢ |={⊤}=>
+  (∀ (aG : anerisG LM Σ), ⊢ |={⊤}=>
      unallocated A -∗
      ([∗ set] sa ∈ A, sa ⤳ (∅, ∅)) -∗
-     live_roles_frag_own (retransmit_live_roles st) -∗
-     dead_roles_frag_own ((all_roles ∖ retransmit_live_roles st) : gset $ fmrole retransmit_fair_model) -∗
      ([∗ set] ip ∈ dom (state_heaps σ),
         ([∗ map] l ↦ v ∈ (state_heaps σ !!! ip), l ↦[ip] v) ∗
         ([∗ map] sh ↦ s ∈ (state_sockets σ !!! ip), sh ↪[ip] s.1)) -∗
      ([∗ map] ip ↦ ports ∈ (addrs_to_ip_ports_map
                               (A ∖ (ports_in_use $ state_sockets σ))),
         free_ports ip ports)%I -∗
-     frag_st st -∗
+     frag_model_is st -∗
+     (* initial allocation of roles to threads... see my notebook... *)
      ([∗ set] ip ∈ dom (state_heaps σ), is_node ip) -∗
      aneris_state_interp σ (∅, ∅) ={⊤}=∗
+     □ config_update_state ∗
      aneris_state_interp σ (∅, ∅) ∗
      wptp s es (map (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v)
                     (prefixes es))).
