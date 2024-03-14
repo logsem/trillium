@@ -18,7 +18,7 @@ Section ectx_language_mixin.
   Context (empty_ectx : ectx).
   Context (comp_ectx : ectx → ectx → ectx).
   Context (fill : ectx → expr → expr).
-  Context (head_step : expr → state → action → expr → state → list expr → Prop).
+  Context (head_step : expr → state → option action → expr → state → list expr → Prop).
   Context (config_step : state → config_label → state → Prop).
   Context (locale_of : list expr → expr → locale).
   Context (config_enabled : config_label → state → Prop).
@@ -85,7 +85,7 @@ Structure ectxLanguage := EctxLanguage {
   empty_ectx : ectx;
   comp_ectx : ectx → ectx → ectx;
   fill : ectx → expr → expr;
-  head_step : expr → state → action → expr → state → list expr → Prop;
+  head_step : expr → state → option action → expr → state → list expr → Prop;
   config_step : state → config_label → state → Prop;
   locale_of : list expr → expr → locale;
   (* config_enabled : config_label → state → Prop; *)
@@ -159,7 +159,7 @@ Section ectx_language.
   Definition sub_redexes_are_values (e : expr Λ) :=
     ∀ K e', e = fill K e' → to_val e' = None → K = empty_ectx.
 
-  Inductive prim_step (e1 : expr Λ) (σ1 : state Λ) (α : action Λ) 
+  Inductive prim_step (e1 : expr Λ) (σ1 : state Λ) (α : option (action Λ))
       (e2 : expr Λ) (σ2 : state Λ) (efs : list (expr Λ)) : Prop :=
     Ectx_step K e1' e2' :
       e1 = fill K e1' → e2 = fill K e2' →

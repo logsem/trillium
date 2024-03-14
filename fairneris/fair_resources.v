@@ -771,14 +771,14 @@ Section model_state_lemmas.
              (δ : LM) (ζ : locale Λ) (ρs : gset (fmrole M)) : LM :=
     model_update_decr ζ $ model_update_filter ζ ρs δ.
 
-  Lemma model_update_locale_spec extr (auxtr : auxiliary_trace LM) act ζ c2 ρs:
+  Lemma model_update_locale_spec extr (auxtr : auxiliary_trace LM) ζ c2 ρs:
     valid_state_evolution_fairness extr auxtr →
     model_can_fuel_step (trace_last auxtr) ζ ((model_update_locale_fuel (trace_last auxtr) ζ) ρs) →
     tids_smaller c2.1 (model_update_locale_fuel (trace_last auxtr) ζ ρs) →
-    locale_step (trace_last extr) (inl (ζ, act)) c2 →
+    locale_step (trace_last extr) (inl (ζ, None)) c2 →
     valid_state_evolution_fairness
-      (extr :tr[inl (ζ, act)]: c2)
-      (auxtr :tr[Silent_step ζ act]:
+      (extr :tr[inl (ζ, None)]: c2)
+      (auxtr :tr[Silent_step ζ None]:
           (model_update_locale_fuel (trace_last auxtr) ζ) ρs).
   Proof.
     intros Hvse Hstep Htids Hexstep. destruct c2 as [tp σ].
@@ -999,15 +999,15 @@ Section model_state_lemmas.
       apply elem_of_dom_2 in Hagree. by set_solver.
   Qed.
 
-  Lemma update_fuel_step extr (auxtr : auxiliary_trace LM) act c2 fs ζ :
+  Lemma update_fuel_step extr (auxtr : auxiliary_trace LM) c2 fs ζ :
     fs ≠ ∅ →
-    locale_step (trace_last extr) (inl (ζ, act)) c2 →
+    locale_step (trace_last extr) (inl (ζ, None)) c2 →
     has_fuels_S ζ fs -∗
     ⌜ valid_state_evolution_fairness extr auxtr ⌝ -∗
     model_state_interp (trace_last extr).1 (trace_last auxtr) ==∗
     ∃ δ2,
       ⌜ valid_state_evolution_fairness
-        (extr :tr[inl (ζ, act)]: c2) (auxtr :tr[Silent_step ζ act]: δ2) ⌝ ∗
+        (extr :tr[inl (ζ, None)]: c2) (auxtr :tr[Silent_step ζ None]: δ2) ⌝ ∗
       has_fuels ζ fs ∗ model_state_interp c2.1 δ2.
   Proof.
     iIntros (Hdom Hstep) "Hfuel %Hvse Hm".
@@ -2018,15 +2018,15 @@ Section model_state_lemmas.
       apply not_elem_of_dom in Hes. set_solver.
   Qed.
 
-  Lemma model_update_locale_spec_fork act extr
+  Lemma model_update_locale_spec_fork extr
         (auxtr : auxiliary_trace LM) ζ ζf c2 ρs1 ρs2 δ2 :
     valid_state_evolution_fairness extr auxtr →
     δ2.(ls_data) = model_update_fork ζ ζf ρs1 ρs2 (trace_last auxtr) →
     model_can_fork_step (trace_last auxtr) ζ ζf δ2 →
     tids_smaller c2.1 δ2 →
     valid_state_evolution_fairness
-      (extr :tr[inl (ζ, act)]: c2)
-      (auxtr :tr[Silent_step ζ act]: δ2).
+      (extr :tr[inl (ζ, None)]: c2)
+      (auxtr :tr[Silent_step ζ None]: δ2).
   Proof.
     intros Hvse Hstep Htids. destruct c2.
     destruct Hvse as (?&?&?).
@@ -2046,18 +2046,18 @@ Section model_state_lemmas.
     iPureIntro. by eexists _.
   Qed.
 
-  Lemma update_fork_step act fs1 fs2 tp1 tp2 (extr : execution_trace Λ)
+  Lemma update_fork_step fs1 fs2 tp1 tp2 (extr : execution_trace Λ)
         (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 :
     fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 →
     trace_last extr = (tp1, σ1) →
-    locale_step (tp1, σ1) (inl (ζ, act)) (tp2, σ2) →
+    locale_step (tp1, σ1) (inl (ζ, None)) (tp2, σ2) →
     valid_state_evolution_fairness extr auxtr →
     has_forked tp1 tp2 efork →
     has_fuels_S ζ (fs1 ∪ fs2) -∗
     model_state_interp tp1 (trace_last auxtr) ==∗
     ∃ δ2,
       ⌜valid_state_evolution_fairness
-        (extr :tr[inl (ζ, act)]: (tp2, σ2)) (auxtr :tr[Silent_step ζ act]: δ2)⌝ ∗
+        (extr :tr[inl (ζ, None)]: (tp2, σ2)) (auxtr :tr[Silent_step ζ None]: δ2)⌝ ∗
       has_fuels ζ fs1 ∗ has_fuels (locale_of tp1 efork) fs2 ∗
       model_state_interp tp2 δ2.
   Proof.

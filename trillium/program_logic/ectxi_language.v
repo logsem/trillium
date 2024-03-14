@@ -30,7 +30,7 @@ Section ectxi_language_mixin.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
   Context (fill_item : ectx_item → expr → expr).
-  Context (head_step : expr → state → action → expr → state → list expr → Prop).
+  Context (head_step : expr → state → option action → expr → state → list expr → Prop).
   Context (config_step : state → config_label → state → Prop).
   Context (locale_of : list expr → expr → locale).
   (* Context (config_enabled : config_label → state → Prop). *)
@@ -83,7 +83,7 @@ Structure ectxiLanguage := EctxiLanguage {
   of_val : val → expr;
   to_val : expr → option val;
   fill_item : ectx_item → expr → expr;
-  head_step : expr → state → action → expr → state → list expr → Prop;
+  head_step : expr → state → option action → expr → state → list expr → Prop;
   config_step : state → config_label → state → Prop;
   locale_of : list expr → expr → locale;
   (* config_enabled : config_label → state → Prop; *)

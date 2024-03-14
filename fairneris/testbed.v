@@ -1,4 +1,3 @@
-
 From stdpp Require Import option countable.
 From fairneris Require Export inftraces trace_utils fairness.
 
@@ -8,7 +7,7 @@ Record Lts lab : Type := {
   lts_state_inhabited :: Inhabited lts_state;
 
   lts_lab_eqdec :: EqDecision lab;
-  lts_lab_countable :: Countable lab;
+  lts_lab_countable : Countable lab;
   lts_lab_inhabited :: Inhabited lab;
 
   lts_trans: lts_state → lab → lts_state → Prop;
@@ -32,63 +31,43 @@ Arguments env_lts {_}.
 
 Record UserModel (Λ : language) := {
     usr_role : Type;
-    usr_lts : Lts (usr_role * action Λ);
+    usr_lts :> Lts (usr_role * option (action Λ));
 
     usr_eqdec: EqDecision usr_role;
     usr_countable: Countable usr_role;
     usr_inhabited: Inhabited usr_role;
+    usr_live_roles: usr_lts.(lts_state) → gset usr_role;
+    usr_live_spec: ∀ s ρ α s', usr_lts.(lts_trans) s (ρ,α) s' → ρ ∈ usr_live_roles s;
 }.
 
 Arguments usr_role {_}.
 Arguments usr_lts {_}.
+Arguments usr_live_roles {_ _}.
 
-Program Definition join_model {Λ: language} (M: UserModel Λ) (N: EnvModel Λ) : FairModel :=
+Inductive joint_trans {Λ: language} {M: UserModel Λ} {N: EnvModel Λ} :
+  (M * N) → ((usr_role M * option (action Λ)) + config_label Λ) → (M * N) → Prop :=
+| UsrTrans n u1 u2 ρ : lts_trans M u1 (ρ, None) u2 → joint_trans (u1, n) (inl (ρ, None)) (u2, n)
+| NetTrans u n1 n2 ℓ : lts_trans N n1 (inr ℓ) n2 → joint_trans (u, n2) (inr ℓ) (u, n2)
+| SyncTrans u1 u2 n1 n2 ρ α :
+  lts_trans M u1 (ρ, Some α) u2 → lts_trans N n1 (inl α) n2 →
+  joint_trans (u1, n2) (inl (ρ, Some α)) (u2, n2)
+.
+
+Program Definition joint_model {Λ: language} (M: UserModel Λ) (N: EnvModel Λ) : FairModel :=
 {|
   fmstate := lts_state (usr_lts M) * lts_state N;
   (* Why doesn't this work??? *)
   fmrole := usr_role M;
-  (* The error is:
-Error: Cannot infer an instance of type "Lts (usr_role M)" for the variable l in
-environment:
-Λ : language
-M : UserModel Λ
-N : EnvModel Λ
-
-What is `l`? why would anyone want such an instance?
-   *)
-  fmaction := action Λ;
+  fmaction := option (action Λ);
   fmconfig := config_label Λ;
+  fmtrans s1 ℓ s2 := joint_trans s1 ℓ s2;
+  live_roles s := usr_live_roles s.1;
+
+  fmrole_eqdec := usr_eqdec _ M;
+  fmrole_countable := usr_countable _ M;
+  fmrole_inhabited := usr_inhabited _ M;
+
+  (* let's see what to do later... *)
+  fmfairness _ := True;
 |}.
-Next Obligation.
-  intros ? UM _. exact (usr_role UM). (* this works, if one comments fmrole := above *)
-Defined.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-
-Eval simpl in join_model.
-Print join_model_obligation_1.
-
-Record FairModel : Type := {
-  fmrole: Type;
-  fmaction: Type;
-  fmconfig: Type;
-  fmrole_eqdec: EqDecision fmrole;
-  fmrole_countable: Countable fmrole;
-  fmrole_inhabited: Inhabited fmrole;
-
-  fmtrans: fmstate → ((fmrole * fmaction) + fmconfig) → fmstate → Prop;
-  fmfairness : trace fmstate ((fmrole * fmaction) + fmconfig) → Prop;
-  live_roles: fmstate → gset fmrole;
-  fm_live_spec: ∀ s ρ α s', fmtrans s (inl (ρ,α)) s' → ρ ∈ live_roles s;
-}.
-
-#[global] Existing Instance fmstate_eqdec.
-
-(* From fairneris.aneris_lang Require Import aneris_lang. *)
-
-(* Lemma test (X: EnvModel aneris_lang) : Countable X.(lts_state _). *)
+Next Obligation. by intros ???????; inversion 1; simplify_eq; eapply usr_live_spec. Qed.

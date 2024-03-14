@@ -197,8 +197,8 @@ Section fairness.
   Proof. rewrite ls_same_doms. apply ls_fuel_dom. Qed.
 
   Inductive FairLabel {FM: FairModel} :=
-  | Take_step: FM.(fmrole) -> FM.(fmaction) → locale Λ -> action Λ → FairLabel
-  | Silent_step: locale Λ -> action Λ → FairLabel
+  | Take_step: FM.(fmrole) -> FM.(fmaction) → locale Λ -> option (action Λ) → FairLabel
+  | Silent_step: locale Λ -> option (action Λ) → FairLabel
   | Config_step: FM.(fmconfig) → config_label Λ → FairLabel
   .
   Arguments FairLabel : clear implicits.
@@ -600,7 +600,7 @@ Section fairness.
   Definition labels_match `{LM:LiveModel} (pl : locale_label Λ + config_label Λ) (ℓ : LM.(lm_lbl)) : Prop :=
     match pl, ℓ with
     | inr cfg, Config_step fmcfg cfg' => cfg = cfg' ∧ LM.(lm_cfg_labels_match) cfg fmcfg
-    | inl (ζ, act), Silent_step ζ' act' => ζ = ζ' ∧ act = act'
+    | inl (ζ, act), Silent_step ζ' act' => ζ = ζ' ∧ act = act' ∧ act = None
     | inl (ζ, act), Take_step ρ fmact ζ' act' => ζ = ζ' ∧ act = act'
     | _, _ => False
     end.
@@ -718,7 +718,7 @@ Section fairness_preserved.
     ((∃ ρ fmact, ℓ = Take_step ρ fmact tid act) ∨ (ℓ = Silent_step tid act)).
   Proof.
     intros Hm. inversion Hm as [|?????? Hlab]; simplify_eq.
-    destruct ℓ; eauto; inversion Hlab; simplify_eq; eauto.
+    destruct ℓ; eauto; inversion Hlab; simplify_eq; naive_solver.
   Qed.
 
   Lemma mapping_live_role (δ: LiveState Λ M) ρ:
