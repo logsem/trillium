@@ -197,8 +197,8 @@ Section fairness.
   Proof. rewrite ls_same_doms. apply ls_fuel_dom. Qed.
 
   Inductive FairLabel {FM: FairModel} :=
-  | Take_step: FM.(fmrole) -> FM.(fmaction) → locale Λ -> action Λ → FairLabel
-  | Silent_step: locale Λ -> action Λ → FairLabel
+  | Take_step: FM.(fmrole) -> FM.(fmaction) → locale Λ -> option (action Λ) → FairLabel
+  | Silent_step: locale Λ -> option (action Λ) → FairLabel
   | Config_step: FM.(fmconfig) → config_label Λ → FairLabel
   .
   Arguments FairLabel : clear implicits.
@@ -565,9 +565,14 @@ Section fairness.
       lm_ls := LiveState;
       lm_lbl := FairLabel M;
       lm_ls_trans (δ: LiveState) (ℓ: FairLabel M) := ls_trans lm_fl δ ℓ;
+      lm_cfg_action : M → config_label Λ → (fmconfig M * M);
+      lm_cfg_labels_match : config_label Λ → fmconfig M → Prop;
+      lm_cfg_spec_labels_match : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → lm_cfg_labels_match cl fl;
+      lm_cfg_spec_trans : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → fmtrans _ m1 (inr fl) m2;
+      lm_cfg_spec_live_roles : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → live_roles _ m1 = live_roles _ m2;
     }.
 
-  Definition fair_model_model `(LM : LiveModel) : Model := {|
+  Definition live_model_model `(LM : LiveModel) : Model := {|
     mstate := lm_ls LM;
     mlabel := lm_lbl LM;
     mtrans := lm_ls_trans LM;
@@ -594,8 +599,8 @@ Section fairness.
 
   Definition labels_match `{LM:LiveModel} (pl : locale_label Λ + config_label Λ) (ℓ : LM.(lm_lbl)) : Prop :=
     match pl, ℓ with
-    | inr cfg, Config_step fmcfg cfg' => cfg = cfg'
-    | inl (ζ, act), Silent_step ζ' act' => ζ = ζ' ∧ act = act'
+    | inr cfg, Config_step fmcfg cfg' => cfg = cfg' ∧ LM.(lm_cfg_labels_match) cfg fmcfg
+    | inl (ζ, act), Silent_step ζ' act' => ζ = ζ' ∧ act = act' ∧ act = None
     | inl (ζ, act), Take_step ρ fmact ζ' act' => ζ = ζ' ∧ act = act'
     | _, _ => False
     end.
@@ -605,10 +610,10 @@ End fairness.
 Arguments LiveState _ _ {_ _}.
 Arguments LiveStateData _ _ {_ _}.
 Arguments LiveModel _ _ {_ _}.
-Arguments fair_model_model _ {_ _ _} _.
+Arguments live_model_model _ {_ _ _} _.
 
 Definition live_model_to_model Λ M `{Countable (locale Λ)} : LiveModel Λ M -> Model :=
-  λ lm, fair_model_model Λ lm.
+  λ lm, live_model_model Λ lm.
 Coercion live_model_to_model : LiveModel >-> Model.
 Arguments live_model_to_model {_ _ _ _}.
 
@@ -713,7 +718,7 @@ Section fairness_preserved.
     ((∃ ρ fmact, ℓ = Take_step ρ fmact tid act) ∨ (ℓ = Silent_step tid act)).
   Proof.
     intros Hm. inversion Hm as [|?????? Hlab]; simplify_eq.
-    destruct ℓ; eauto; inversion Hlab; simplify_eq; eauto.
+    destruct ℓ; eauto; inversion Hlab; simplify_eq; naive_solver.
   Qed.
 
   Lemma mapping_live_role (δ: LiveState Λ M) ρ:
@@ -962,14 +967,20 @@ Section fairness_preserved.
                                           end.
 
   (* TODO: Why do we need explicit [LM] here? *)
-  Definition valid_state_evolution_fairness
+  Definition trace_labels_match
              (extr : execution_trace Λ) (auxtr : auxiliary_trace LM) :=
     match extr, auxtr with
     | (extr :tr[oζ]: (es, σ)), auxtr :tr[ℓ]: δ =>
-        labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) (trace_last auxtr) ℓ δ ∧
-        tids_smaller es δ
+        labels_match (LM:=LM) oζ ℓ
     | _, _ => True
     end.
+
+  Definition valid_state_evolution_fairness (ex : execution_trace Λ)
+             (atr : auxiliary_trace (live_model_to_model LM))
+      : Prop :=
+    trace_steps LM.(lm_ls_trans) atr ∧
+    trace_labels_match ex atr ∧
+    tids_smaller (trace_last ex).1 (trace_last atr).
 
   Definition valid_lift_fairness
              (φ: execution_trace Λ -> auxiliary_trace LM -> Prop)
@@ -1005,14 +1016,17 @@ Section fairness_preserved.
       pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
       destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?).
       econstructor.
-      + eauto.
+      + naive_solver.
       + eauto.
       + match goal with
         | [H: exec_trace_match _ iex' _ |- _] => inversion H; clear H; simplify_eq
         end; done.
       + match goal with
         | [H: exec_trace_match _ iatr' _ |- _] => inversion H; clear H; simplify_eq
-        end; done.
+        end;
+        match goal with
+        | [H: trace_steps _ _ |- _] => inversion H; clear H; simplify_eq
+        end; unfold trace_ends_in in *; simplify_eq; done.
       + eapply IH; eauto.
   Qed.
 
@@ -1040,14 +1054,17 @@ Section fairness_preserved.
       pose proof (valid_inf_system_trace_inv _ _ _ _ _ Hinf) as Hphi'.
       destruct (Hφ2 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ') Hphi') as (?&?&?).
       econstructor.
-      + eauto.
+      + naive_solver.
       + eauto.
       + match goal with
         | [H: exec_trace_match _ iex' _ |- _] => inversion H; clear H; simplify_eq
         end; done.
       + match goal with
         | [H: exec_trace_match _ iatr' _ |- _] => inversion H; clear H; simplify_eq
-        end; done.
+        end;
+        match goal with
+        | [H: trace_steps _ _ |- _] => inversion H; clear H; simplify_eq
+        end; unfold trace_ends_in in *; simplify_eq; done.
       + eapply IH; eauto.
   Qed.
 

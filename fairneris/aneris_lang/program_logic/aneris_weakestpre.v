@@ -10,15 +10,17 @@ From fairneris.aneris_lang Require Export lifting.
 
 Set Default Proof Using "Type".
 
-Definition aneris_wp_def `{!anerisG retransmit_fair_model Σ} (ip : ip_address) (E : coPset)
-           (e : expr) (Φ : val → iProp Σ) : iProp Σ:=
+Definition aneris_wp_def `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ}
+  (ip : ip_address) (E : coPset)
+  (e : expr) (Φ : val → iProp Σ) : iProp Σ :=
   (∀ tid, is_node ip -∗
    wp NotStuck E (ip, tid) (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
-Definition aneris_wp_aux `{!anerisG retransmit_fair_model Σ} : seal (@aneris_wp_def Σ _).
+Definition aneris_wp_aux `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ} : seal (@aneris_wp_def _ _ Σ _).
 Proof. by eexists. Qed.
-Definition aneris_wp `{!anerisG retransmit_fair_model Σ} := aneris_wp_aux.(unseal).
-Definition aneris_wp_eq `{!anerisG retransmit_fair_model Σ} : aneris_wp = @aneris_wp_def Σ _ :=
+Definition aneris_wp `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ} := aneris_wp_aux.(unseal).
+Definition aneris_wp_eq `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ} : aneris_wp =
+                                      @aneris_wp_def _ _ Σ _ :=
   aneris_wp_aux.(seal_eq).
 
 Notation "'WP' e '@[' ip ] E {{ Φ } }" := (aneris_wp ip E e%E Φ)
@@ -75,7 +77,8 @@ Notation "'{{{' P } } } e '@[' ip ] {{{ 'RET' pat ; Q } } }" :=
      format "{{{  P  } } }  e  '@[' ip ]  {{{  RET  pat ;  Q } } }") : stdpp_scope.
 
 Section aneris_wp.
-Context `{!anerisG retransmit_fair_model Σ}.
+Context `{LM: LiveModel aneris_lang Mod}.
+Context `{aG : !anerisG LM Σ}.
 Implicit Types ip : ip_address.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
@@ -170,7 +173,7 @@ Lemma aneris_wp_atomic_take_step ip E1 E2 e Φ
       `{!Atomic WeaklyAtomic (mkExpr ip e)} :
   TCEq (to_val e) None →
   (|={E1,E2}=>
-   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace (fair_model_to_model retransmit_fair_model)) c1,
+   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace (live_model_to_model LM)) c1,
      ⌜trace_ends_in extr c1⌝ →
      state_interp extr atr ={E2}=∗
      ∃ Q R,
@@ -620,7 +623,9 @@ End aneris_wp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{!anerisG retransmit_fair_model Σ}.
+  Context `{LM: LiveModel aneris_lang Mod}.
+  Context `{aG : !anerisG LM Σ}.
+
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val → iProp Σ.
 

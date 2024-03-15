@@ -8,10 +8,9 @@ From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap mono_nat.
 From trillium.program_logic Require Import weakestpre adequacy.
 From trillium.events Require Import event.
-From fairneris Require Import fairness.
+From fairneris Require Import fairness fuel fair_resources.
 From fairneris.prelude Require Import collect gset_map gmultiset.
 From fairneris.algebra Require Import disj_gsets.
-From fairneris.examples Require Import retransmit_model.
 From fairneris.aneris_lang Require Import resources events.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.aneris_lang Require Export aneris_lang network resources.
@@ -23,7 +22,8 @@ Import uPred.
 Import RecordSetNotations.
 
 Section definitions.
-  Context `{anerisG FM Σ}.
+  Context `{LM: LiveModel aneris_lang M}.
+  Context `{aG : !anerisG LM Σ}.
   Implicit Types σ : state.
   Implicit Types h : heap.
   Implicit Types H : gmap ip_address heap.
@@ -232,7 +232,8 @@ Section definitions.
 End definitions.
 
 Section Aneris_AS.
-  Context `{aG : !anerisG retransmit_fair_model Σ}.
+  Context `{LM: LiveModel aneris_lang M}.
+  Context `{aG : !anerisG LM Σ}.
 
   Definition ipA := "0.0.0.0".
   Definition saA := SocketAddressInet ipA 80.
@@ -248,108 +249,17 @@ Section Aneris_AS.
 
   Definition mAB := mkMessage saA saB "Hello".
 
-  (* TODO: Should align model and semantic actions / labels *)
-  Definition locale_retransmit_role (ζ : locale aneris_lang) : option retransmit_node_role :=
-    match ζ with
-    | ("0.0.0.0",0) => Some Arole
-    | ("0.0.0.1",0) => Some Brole
-    | _ => None
-   end.
-
-  Definition locale_retransmit_label (ζ : ex_label aneris_lang) : option retransmit_label :=
-    match ζ with
-    | inl (tid,α) => option_map (λ ρ, inl (ρ,α)) (locale_retransmit_role tid)
-    | inr α => Some $ inr $ ((),α)
-   end.
-
-  Definition retransmit_label_locale (ℓ : retransmit_label) : ex_label aneris_lang :=
-    match ℓ with
-    | inl (Arole,α) => inl (("0.0.0.0",0),α)
-    | inl (Brole,α) => inl (("0.0.0.1",0),α)
-    | inr ((),α) => inr α
-    end.
-
-  Definition labels_match (ζ : ex_label aneris_lang) (ℓ : retransmit_label) : Prop :=
-    Some ℓ = locale_retransmit_label ζ.
-
-  Definition roles_match (ζ : locale aneris_lang) (ℓ : retransmit_node_role) : Prop :=
-    Some ℓ = locale_retransmit_role ζ.
-
-  Lemma labels_match_roles_match ζ ℓ α :
-    labels_match (inl (ζ,α)) (inl (ℓ,α)) → roles_match ζ ℓ.
-  Proof.
-    inversion 1. rewrite /roles_match.
-    by destruct (locale_retransmit_role ζ); inversion H1.
-  Qed.
-
-  Lemma labels_match_roles_match_alt ζ ℓ :
-    labels_match (inl ζ) (inl ℓ) →
-    ∃ ζ' ℓ' α, ζ = (ζ',α) ∧ ℓ = (ℓ',α) ∧ roles_match ζ' ℓ'.
-  Proof.
-    destruct ζ as [], ℓ as []; inversion 1.
-    destruct (locale_retransmit_role l); inversion H1.
-    simplify_eq.
-    eexists _, _, _. split; [done|]. split; [done|].
-    by eapply labels_match_roles_match.
-  Qed.
-
-  Definition labels_match_trace (ex : execution_trace aneris_lang)
-             (atr : auxiliary_trace (fair_model_to_model retransmit_fair_model))
-    : Prop :=
-    match ex, atr with
-    | _ :tr[ζ]: _, _ :tr[ℓ]: _ => labels_match ζ ℓ
-    | {tr[_]}, {tr[_]} => True
-    | _, _ => False
-    end.
-
-  Definition role_enabled_locale_exists
-             (c : cfg aneris_lang) (δ : retransmit_state) :=
-    ∀ (ℓ:retransmit_node_role) ζ,
-    roles_match ζ ℓ →
-    role_enabled_model (ℓ : fmrole retransmit_fair_model) δ →
-    is_Some (from_locale c.1 ζ).
-
-  Definition model_state_socket_coh
-             (skts : gmap ip_address sockets)
-             (bs : gmap socket_address (list message)) :=
-    ∀ ip Sn sh skt sa ms,
-    skts !! ip = Some Sn → Sn !! sh = Some (skt,ms) →
-    saddress skt = Some sa →
-    bs !!! sa = ms.
-
-  Definition config_state_valid (c : cfg aneris_lang) (δ : retransmit_state) :=
-    state_ms c.2 = δ.1.2 ∧ model_state_socket_coh (state_sockets c.2) δ.2.
-
-  Definition auxtr_valid auxtr :=
-    trace_steps retransmit_trans auxtr.
-
-  Definition simple_valid_state_evolution (ex : execution_trace aneris_lang)
-             (atr : auxiliary_trace (fair_model_to_model retransmit_fair_model))
-      : Prop :=
-    auxtr_valid atr ∧
-    labels_match_trace ex atr ∧
-    role_enabled_locale_exists (trace_last ex) (trace_last atr) ∧
-    config_state_valid (trace_last ex) (trace_last atr).
-
-  Definition all_roles : gset retransmit_node_role :=
-    {[ Arole; Brole ]}.
-
-  Definition thread_live_roles_interp (δ : retransmit_state) : iProp Σ :=
-    live_roles_auth_own (retransmit_live_roles δ) ∗
-    dead_roles_auth_own (all_roles ∖ retransmit_live_roles δ).
-
   Global Instance anerisG_irisG :
-    irisG aneris_lang (fair_model_to_model retransmit_fair_model) Σ := {
+    irisG aneris_lang (live_model_to_model LM) Σ := {
     iris_invGS := _;
     state_interp ex atr :=
-      (⌜simple_valid_state_evolution ex atr⌝ ∗
+      (⌜valid_state_evolution_fairness ex atr⌝ ∗
        aneris_state_interp
          (trace_last ex).2
          (trace_messages_history ex) ∗
-       thread_live_roles_interp (trace_last atr) ∗
+       model_state_interp (trace_last ex).1 (trace_last atr) ∗
        steps_auth (trace_length ex))%I;
-    fork_post ζ _ := (∃ ℓ, ⌜roles_match ζ ℓ⌝ ∗ dead_role_frag_own ℓ)%I }.
-
+    fork_post ζ _ := (ζ ↦M ∅)%I }.
 End Aneris_AS.
 
 Global Opaque iris_invGS.

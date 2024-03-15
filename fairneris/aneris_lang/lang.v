@@ -519,86 +519,86 @@ Definition option_nat_to_val (v : option nat) :=
   end.
 
 Inductive head_step
-  : expr → state → unit → expr → state → list expr → Prop :=
+  : expr → state → option Empty_set → expr → state → list expr → Prop :=
   | RecS f x e σ :
-     head_step (Rec f x e) σ () (Val $ RecV f x e) σ []
+     head_step (Rec f x e) σ None (Val $ RecV f x e) σ []
   | PairS v1 v2 σ :
-     head_step (Pair (Val v1) (Val v2)) σ () (Val $ PairV v1 v2) σ []
+     head_step (Pair (Val v1) (Val v2)) σ None (Val $ PairV v1 v2) σ []
   | InjLS v σ :
-     head_step (InjL $ Val v) σ () (Val $ InjLV v) σ []
+     head_step (InjL $ Val v) σ None (Val $ InjLV v) σ []
   | InjRS v σ :
-     head_step (InjR $ Val v) σ () (Val $ InjRV v) σ []
+     head_step (InjR $ Val v) σ None (Val $ InjRV v) σ []
   | BetaS f x e1 v2 e' σ :
      e' = subst' x v2 (subst' f (RecV f x e1) e1) →
-     head_step (App (Val $ RecV f x e1) (Val v2)) σ () e' σ []
+     head_step (App (Val $ RecV f x e1) (Val v2)) σ None e' σ []
   | UnOpS op v v' σ :
      un_op_eval op v = Some v' →
-     head_step (UnOp op (Val v)) σ () (Val v') σ []
+     head_step (UnOp op (Val v)) σ None (Val v') σ []
   | BinOpS op v1 v2 v' σ :
      bin_op_eval op v1 v2 = Some v' →
-     head_step (BinOp op (Val v1) (Val v2)) σ () (Val v') σ []
+     head_step (BinOp op (Val v1) (Val v2)) σ None (Val v') σ []
   | IfTrueS e1 e2 σ :
-     head_step (If (Val $ LitV $ LitBool true) e1 e2) σ () e1 σ []
+     head_step (If (Val $ LitV $ LitBool true) e1 e2) σ None e1 σ []
   | IfFalseS e1 e2 σ :
-      head_step (If (Val $ LitV $ LitBool false) e1 e2) σ () e2 σ []
+      head_step (If (Val $ LitV $ LitBool false) e1 e2) σ None e2 σ []
   | FindFromS v0 v1 v2 σ :
       head_step (FindFrom
                    (Val $ LitV $ LitString v0)
                    (Val $ LitV $ LitInt (Z.of_nat v1))
-                   (Val $ LitV $ LitString v2)) σ ()
+                   (Val $ LitV $ LitString v2)) σ None
                 (of_val (option_nat_to_val (index v1 v2 v0))) σ
                 []
   | SubstringS v0 v1 v2 σ :
       head_step (Substring (Val (LitV $ LitString v0))
                            (Val (LitV $ LitInt (Z.of_nat v1)))
-                           (Val (LitV $ LitInt (Z.of_nat v2)))) σ ()
+                           (Val (LitV $ LitInt (Z.of_nat v2)))) σ None
                 (Val $ LitV $ LitString (substring v1 v2 v0)) σ
                 []
  | RandS n n' σ :
       n' >= 0 ->
       n' < n ->
-      head_step (Rand $ Val $ LitV $ LitInt n) σ () (Val $ LitV $ LitInt n') σ []
+      head_step (Rand $ Val $ LitV $ LitInt n) σ None (Val $ LitV $ LitInt n') σ []
   | FstS v1 v2 σ :
-     head_step (Fst (Val $ PairV v1 v2)) σ () (Val v1) σ []
+     head_step (Fst (Val $ PairV v1 v2)) σ None (Val v1) σ []
   | SndS v1 v2 σ :
-     head_step (Snd (Val $ PairV v1 v2)) σ () (Val v2) σ []
+     head_step (Snd (Val $ PairV v1 v2)) σ None (Val v2) σ []
   | CaseLS v e1 e2 σ :
-     head_step (Case (Val $ InjLV v) e1 e2) σ () (App e1 (Val v)) σ []
+     head_step (Case (Val $ InjLV v) e1 e2) σ None (App e1 (Val v)) σ []
   | CaseRS v e1 e2 σ :
-     head_step (Case (Val $ InjRV v) e1 e2) σ () (App e2 (Val v)) σ []
+     head_step (Case (Val $ InjRV v) e1 e2) σ None (App e2 (Val v)) σ []
   | ForkS e σ :
-     head_step (Fork e) σ () (Val $ LitV LitUnit) σ [e]
+     head_step (Fork e) σ None (Val $ LitV LitUnit) σ [e]
   | AllocS lbl v σ l :
       σ !! l = None →
-      head_step (Alloc lbl (Val v)) σ () (Val $ LitV $ LitLoc l) (<[l:=v]>σ) []
+      head_step (Alloc lbl (Val v)) σ None (Val $ LitV $ LitLoc l) (<[l:=v]>σ) []
   | LoadS l v σ :
       σ !! l = Some v →
-      head_step (Load (Val $ LitV $ LitLoc l)) σ () (Val v) σ []
+      head_step (Load (Val $ LitV $ LitLoc l)) σ None (Val v) σ []
   | StoreS l v σ :
       head_step (Store (Val $ LitV $ LitLoc l) (Val v)) σ
-                () (Val $ LitV $ LitUnit) (<[l:=v]>σ)
+                None (Val $ LitV $ LitUnit) (<[l:=v]>σ)
                 []
   | CasFailS l v1 v2 vl σ :
       σ !! l = Some vl → vl ≠ v1 →
       head_step (CAS (Val $ LitV $ LitLoc l) (Val v1) (Val v2)) σ
-                () (Val $ LitV $ LitBool false) σ
+                None (Val $ LitV $ LitBool false) σ
                 []
   | CasSucS l v1 v2 σ :
       σ !! l = Some v1 →
       head_step (CAS (Val $ LitV $ LitLoc l) (Val v1) (Val v2)) σ
-                () (Val $ LitV $ LitBool true) (<[l:=v2]>σ)
+                None (Val $ LitV $ LitBool true) (<[l:=v2]>σ)
                 []
   | MakeAddressS s p σ :
       head_step (MakeAddress
                    (Val $ LitV $ (LitString s))
                    (Val $ LitV $ (LitInt p))) σ
-                () (Val $ LitV $ LitSocketAddress
+                None (Val $ LitV $ LitSocketAddress
                      (SocketAddressInet s (Z.to_pos p))) σ
                 []
   | GetAddressInfoS s σ :
       head_step (GetAddressInfo
                    (Val $ LitV $ (LitSocketAddress s))) σ
-                () (Val $ PairV #(ip_of_address s) #(Zpos (port_of_address s))) σ [].
+                None (Val $ PairV #(ip_of_address s) #(Zpos (port_of_address s))) σ [].
 
 (** Basic properties about the language *)
 #[global] Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).
@@ -623,7 +623,7 @@ Proof. revert Ki1. induction Ki2, Ki1; naive_solver eauto with f_equal. Qed.
 
 Lemma alloc_fresh lbl v σ :
   let l := fresh (dom σ) in
-  head_step (Alloc lbl (Val v)) σ () (Val $ LitV (LitLoc l)) (<[l:=v]>σ) [].
+  head_step (Alloc lbl (Val v)) σ None (Val $ LitV (LitLoc l)) (<[l:=v]>σ) [].
 Proof. by intros; apply AllocS, (not_elem_of_dom (D:=gset loc)), is_fresh. Qed.
 
 Definition base_locale := nat.
@@ -708,7 +708,7 @@ Record state := mkState {
 }.
 
 (* Definition for helping us decide wheter ports are free *)
-Definition port_not_in_use (p : port) (sockets : gmap socket_handle (socket * list message)) : Prop := 
+Definition port_not_in_use (p : port) (sockets : gmap socket_handle (socket * list message)) : Prop :=
   ∀ sh skt a r,
   sockets !! sh = Some (skt, r) →
   saddress skt = Some a →
@@ -741,9 +741,21 @@ Implicit Types ip : ip_address.
 Implicit Types sh : socket_handle.
 Implicit Types skt : socket.
 
+Inductive aneris_action :=
+| Send : message → aneris_action
+| Recv : option message → aneris_action
+.
+
+#[global] Instance aneris_action_eqdec : EqDecision aneris_action.
+Proof. solve_decision. Defined.
+#[global] Instance aneris_action_countable : Countable aneris_action.
+Proof. Admitted.
+#[global] Instance aneris_action_inhabited : Inhabited aneris_action :=
+  populate (Recv None).
+
 (* The network-aware reduction step relation for a given node *)
 Inductive socket_step ip :
-  expr -> sockets -> message_multi_soup -> option message →
+  expr -> sockets -> message_multi_soup -> option aneris_action →
   expr -> sockets -> message_multi_soup ->
   Prop :=
 | NewSocketS sh Sn M :
@@ -784,7 +796,7 @@ Inductive socket_step ip :
               (Val $ LitV $ LitString mbody)
               (Val $ LitV $ LitSocketAddress a))
       Sn M
-      (Some new_message)
+      (Some (Send new_message))
       (* reduces to *)
       (Val $ LitV $ LitInt (String.length mbody))
       Sn ({[+ new_message +]} ⊎ M)
@@ -800,7 +812,7 @@ Inductive socket_step ip :
               (Val $ LitV $ LitString mbody)
               (Val $ LitV $ LitSocketAddress a))
       Sn M
-      (Some new_message)
+      (Some (Send new_message))
       (* reduces to *)
       (SendToRepeat (Val $ LitV $ LitSocket sh)
               (Val $ LitV $ LitString mbody)
@@ -815,7 +827,7 @@ Inductive socket_step ip :
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh))
-      Sn M None
+      Sn M (Some (Recv (Some m)))
       (* reduces to *)
       (Val $ InjRV (PairV (LitV $ LitString (m_body m))
                           (LitV $ LitSocketAddress (m_sender m))))
@@ -831,7 +843,7 @@ Inductive socket_step ip :
     ip = ip_of_address a →
     socket_step
       ip
-      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M None
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M (Some (Recv None))
       (* reduces to *)
       (Val $ InjLV (LitV LitUnit)) Sn M
 | ReceiveFromBlockS sh skt a Sn M :
@@ -845,7 +857,7 @@ Inductive socket_step ip :
     ip = ip_of_address a →
     socket_step
       ip
-      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M None
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M (Some (Recv None))
       (* reduces to *)
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M
 | SetReceiveTimeoutPositiveS sh skt a R Sn M m n :
@@ -891,7 +903,7 @@ Definition is_head_step_pure (e : expr) : bool :=
   | _ => true
   end.
 
-Inductive head_step : aneris_expr → state → option message →
+Inductive head_step : aneris_expr → state → option aneris_action →
                       aneris_expr → state → list aneris_expr → Prop :=
 | LocalStepPureS n h e α e' ef σ
                  (is_pure : is_head_step_pure e = true)
@@ -1003,29 +1015,42 @@ Proof. by intros ?? Hv; apply (inj Some); rewrite -!aneris_to_of_val Hv. Qed.
 Proof. destruct Ki; move => [? ?] [? ?] [? ?];
                              simplify_eq/=; auto with f_equal. Qed.
 
-Definition config_label : Type := option message.
+Inductive aneris_config_label : Type :=
+| Deliver : message → aneris_config_label
+| Duplicate : message → aneris_config_label
+| Drop : message → aneris_config_label.
+
+#[global] Instance message_inhabited : Inhabited message.
+Proof. Admitted.
+
+#[global] Instance aneris_config_label_eqdec : EqDecision aneris_config_label.
+Proof. solve_decision. Defined.
+#[global] Instance aneris_config_label_countable : Countable aneris_config_label.
+Proof. Admitted.
+#[global] Instance aneris_config_label_inhabited : Inhabited aneris_config_label :=
+  populate (Deliver inhabitant).
 
 Inductive config_step :
-  state → config_label → state → Prop :=
+  state → aneris_config_label → state → Prop :=
 | MessageDeliverStep n σ Sn Sn' sh a skt r m:
     m ∈ messages_to_receive_at_multi_soup a (state_ms σ) →
     state_sockets σ !! n = Some Sn ->
     Sn !! sh = Some (skt, r) →
     Sn' = <[sh := (skt, m :: r)]>Sn →
     saddress skt = Some a →
-    config_step σ (Some m)
+    config_step σ (Deliver m)
                 {| state_heaps := state_heaps σ;
                    state_sockets := <[n:=Sn']>(state_sockets σ);
                    state_ms := state_ms σ ∖ {[+ m +]}; |}
 | MessageDuplicateStep σ m :
     m ∈ state_ms σ →
-    config_step σ None
+    config_step σ (Duplicate m)
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ms := state_ms σ ⊎ {[+ m +]}; |}
 | MessageDropStep σ m :
     m ∈ state_ms σ →
-    config_step σ None
+    config_step σ (Drop m)
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ms := state_ms σ ∖ {[+ m +]}; |}.
@@ -1093,7 +1118,7 @@ Proof.
 Qed.
 
 (* Needs to be refined for support multiple messages *)
-Definition config_enabled (lbl : config_label) (σ : state) := σ.(state_ms) ≠ ∅.
+Definition config_enabled (lbl : aneris_config_label) (σ : state) := σ.(state_ms) ≠ ∅.
 
 Lemma aneris_lang_mixin :
   EctxiLanguageMixin aneris_of_val aneris_to_val aneris_fill_item head_step locale_of.

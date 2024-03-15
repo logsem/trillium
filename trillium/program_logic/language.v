@@ -63,7 +63,7 @@ Section language_mixin.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
 
-  Context (prim_step : expr → state → action → expr → state → list expr → Prop).
+  Context (prim_step : expr → state → option action → expr → state → list expr → Prop).
   Context (config_step : state → config_label → state → Prop).
 
   Context (locale_of : list expr -> expr -> locale).
@@ -104,7 +104,7 @@ Section language_mixin.
     mixin_locale_fill e K t1: locale_of t1 (ectx_fill K e) = locale_of t1 e;
     mixin_locale_equiv t t' e: locales_equiv t t' -> locale_of t e = locale_of t' e;
     mixin_locale_injective tp0 e0 tp1 tp e:
-      (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e;    
+      (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e;
   (* Might need something like this to prove fair derivation for generic
      programs and models *)
   (*   mixin_config_enabled σ lbl : *)
@@ -122,7 +122,7 @@ Structure language := Language {
   config_label : Type;
   of_val : val → expr;
   to_val : expr → option val;
-  prim_step : expr → state → action → expr → state → list expr → Prop;
+  prim_step : expr → state → option action → expr → state → list expr → Prop;
   config_step : state → config_label → state → Prop;
   locale_of : list expr → expr → locale;
   (* config_enabled : config_label → state → Prop; *)
@@ -239,7 +239,7 @@ Section language.
   Proof. apply language_mixin. Qed.
   Lemma locale_injective  tp0 e0 tp1 tp e :
       (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 -> locale_of tp0 e0 ≠ locale_of tp e.
-  Proof. eapply language_mixin. Qed.  
+  Proof. eapply language_mixin. Qed.
 
   Definition reducible (e : expr Λ) (σ : state Λ) :=
     ∃ α e' σ' efs, prim_step e σ α e' σ' efs.
@@ -293,7 +293,7 @@ Section language.
        step ρ1 ρ2.
   Hint Constructors step : core.
 
-  Definition locale_label Λ : Type := locale Λ * action Λ.
+  Definition locale_label Λ : Type := locale Λ * option (action Λ).
 
   Inductive locale_step: cfg Λ -> (locale_label Λ + config_label Λ) -> cfg Λ -> Prop :=
   | locale_step_atomic ρ1 ρ2 e1 σ1 α e2 σ2 efs t1 t2 :
