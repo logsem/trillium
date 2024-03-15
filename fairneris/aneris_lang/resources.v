@@ -8,11 +8,10 @@ From fairneris.lib Require Import gen_heap_light.
 From fairneris.aneris_lang Require Export aneris_lang network.
 From fairneris.algebra Require Import disj_gsets.
 From trillium.events Require Import event.
-From fairneris Require Import fairness.
 From fairneris.aneris_lang Require Import events.
 From fairneris.prelude Require Import gset_map.
 From fairneris.lib Require Export singletons.
-From fairneris Require Import fuel fair_resources.
+From fairneris Require Import fairness fuel fair_resources env_model.
 
 Set Default Proof Using "Type".
 
@@ -85,11 +84,16 @@ Definition aneris_localeO := leibnizO aneris_locale.
 Definition live_roleUR (FM : FairModel) :=
   authUR (gset_disjUR $ FM.(fmrole)).
 
+Instance aneris_good: GoodLang aneris_lang.
+Proof. Qed.
+
+(* Instance aneris_inh: Inhabited (action aneris_lang). *)
+
 (** The system CMRA *)
-Class anerisG `{M: FairModel} (FM : LiveModel aneris_lang M) Σ :=
+Class anerisG `(LM : LiveModel aneris_lang (joint_model M Net)) Σ :=
   AnerisG {
       aneris_invG :> invGS_gen HasNoLc Σ;
-      aneris_fairnessG :> fairnessGS FM Σ;
+      aneris_fairnessG :> fairnessGS LM Σ;
       (** global tracking of the ghost names of node-local heaps *)
       aneris_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
       aneris_node_gnames_name : gname;
@@ -134,10 +138,10 @@ Class anerisG `{M: FairModel} (FM : LiveModel aneris_lang M) Σ :=
       aneris_observed_recv_name : gname;
     }.
 
-Class anerisPreG `{M: FairModel} (FM : LiveModel aneris_lang M) Σ :=
+Class anerisPreG `(LM : LiveModel aneris_lang (joint_model M Net)) Σ :=
   AnerisPreG {
       anerisPre_invGS :> invGpreS Σ;
-      anerisPre_fairnessGS :> fairnessGpreS FM Σ;
+      anerisPre_fairnessGS :> fairnessGpreS LM Σ;
       anerisPre_node_gnames_mapG :> inG Σ (authR node_gnames_mapUR);
       anerisPre_heapG :> inG Σ (authR local_heapUR);
       anerisPre_socketG :> inG Σ (authR local_socketsUR);
@@ -158,7 +162,7 @@ Class anerisPreG `{M: FairModel} (FM : LiveModel aneris_lang M) Σ :=
         inG Σ (authUR (gmapUR socket_address_group (exclR aneris_eventsO)));
     }.
 
-Definition anerisΣ (M: FairModel) : gFunctors :=
+Definition anerisΣ `(LM : LiveModel aneris_lang (joint_model M Net)) : gFunctors :=
   #[invΣ;
     fairnessΣ aneris_lang M;
     GFunctor (authR node_gnames_mapUR);
@@ -177,12 +181,12 @@ Definition anerisΣ (M: FairModel) : gFunctors :=
     GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)))
    ].
 
-#[global] Instance subG_anerisPreG {Σ: gFunctors} {M: FairModel} (LM: LiveModel aneris_lang M) :
-  subG (anerisΣ M) Σ → anerisPreG LM Σ.
+#[global] Instance subG_anerisPreG {Σ: gFunctors} `(LM : LiveModel aneris_lang (joint_model M Net)) :
+  subG (anerisΣ LM) Σ → anerisPreG LM Σ.
 Proof. solve_inG. Qed.
 
 Section definitions.
-  Context `{LM: LiveModel aneris_lang M}.
+  Context `{LM: LiveModel aneris_lang (joint_model M Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   (** Authoritative view of the system ghost names *)
@@ -475,7 +479,7 @@ Notation "sa ⤳1[ bs , br ] s" := (sa ⤳1[bs,br]{ 1 } s)%I (at level 20) : bi_
 Notation "sa ⤇1 Φ" := ({[sa]} ⤇* Φ) (at level 20).
 
 Section singleton_to_singleton_connectives.
-  Context `{LM: LiveModel aneris_lang M}.
+  Context `{LM: LiveModel aneris_lang (joint_model M Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   Definition message_history_singleton (sag : socket_address_group) q
@@ -756,41 +760,22 @@ Proof.
   rewrite !bool_decide_eq_true; eauto.
 Qed.
 
-Lemma model_init `{anerisPreG FM Σ} (st : fair_model_to_model FM) :
-  ⊢ |==> ∃ γ, own γ (● Excl' st) ∗ own γ (◯ Excl' st).
-Proof.
-  iMod (own_alloc (● Excl' st ⋅ ◯ Excl' st)) as (γ) "[Hfl Hfr]".
-  { by apply auth_both_valid_2. }
-  iExists _. by iFrame.
-Qed.
-
 Lemma steps_init `{anerisPreG FM Σ} n :
   ⊢ |==> ∃ γ, mono_nat_auth_own γ 1 n ∗ mono_nat_lb_own γ n.
 Proof. iApply mono_nat_own_alloc. Qed.
 
-Local Lemma roles_auth_extend_pre `{anerisPreG FM Σ} γ A roles :
-  roles ## A →
-  own (A := live_roleUR FM) γ (● GSet A) ==∗
-  own (A := live_roleUR FM) γ (● GSet (roles ∪ A)) ∗
-  own (A := live_roleUR FM) γ (◯ GSet roles).
-Proof.
-  iIntros (Hnin) "Hauth".
-  iMod (own_update with "Hauth") as "[$ $]"; [|done].
-  apply auth_update_alloc.
-  apply gset_disj_alloc_empty_local_update.
-  set_solver.
-Qed.
-
-Lemma roles_init `{anerisPreG FM Σ} A :
-  ⊢ |==> ∃ γ, own (A := live_roleUR FM) γ (● GSet A) ∗
-              own (A := live_roleUR FM) γ (◯ GSet A).
-Proof.
-  iMod (own_alloc (● GSet (∅:gset $ FM.(fmrole)))) as (γ) "Hauth";
-    [by apply auth_auth_valid|].
-  iExists γ.
-  iMod (roles_auth_extend_pre with "Hauth") as "[Hauth $]"; [set_solver|].
-  by rewrite union_empty_r_L.
-Qed.
+(* Local Lemma roles_auth_extend_pre `{anerisPreG  Σ} γ A roles : *)
+(*   roles ## A → *)
+(*   own (A := live_roleUR ()) γ (● GSet A) ==∗ *)
+(*   own (A := live_roleUR _) γ (● GSet (roles ∪ A)) ∗ *)
+(*   own (A := live_roleUR _) γ (◯ GSet roles). *)
+(* Proof. *)
+(*   iIntros (Hnin) "Hauth". *)
+(*   iMod (own_update with "Hauth") as "[$ $]"; [|done]. *)
+(*   apply auth_update_alloc. *)
+(*   apply gset_disj_alloc_empty_local_update. *)
+(*   set_solver. *)
+(* Qed. *)
 
 Lemma unallocated_init `{anerisPreG FM Σ} (A : gset socket_address_group) :
   ⊢ |==> ∃ γ, own γ (● (GSet A)) ∗ own γ (◯ (GSet A)).
@@ -904,7 +889,7 @@ Proof.
 Qed.
 
 Section resource_lemmas.
-  Context `{LM: LiveModel aneris_lang Mdl}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   #[global] Instance mapsto_node_persistent ip γn : Persistent (mapsto_node ip γn).
@@ -1433,7 +1418,7 @@ Section resource_lemmas.
     Proper ((≡) ==> (≡)) (@saved_pred_own Σ A _ γ dq
                           : (A -d> iPropO Σ) -d> iPropO Σ).
   Proof. solve_proper. Qed.
-  #[global] Instance si_pred_prop `{anerisG _ LM Σ} a :
+  #[global] Instance si_pred_prop `{anerisG _ _ LM Σ} a :
     Proper ((≡) ==> (≡)) (si_pred a).
   Proof. solve_proper. Qed.
 

@@ -1,6 +1,6 @@
 From stdpp Require Import fin_maps gmap.
 From iris.proofmode Require Import tactics.
-From fairneris Require Import fuel.
+From fairneris Require Import fuel env_model.
 From fairneris.prelude Require Import collect.
 From fairneris.aneris_lang Require Import aneris_lang network resources.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
@@ -13,7 +13,7 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{LM: LiveModel aneris_lang M}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   Lemma messages_resource_coh_init B :
