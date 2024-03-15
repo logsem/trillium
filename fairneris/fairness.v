@@ -18,7 +18,10 @@ Record FairModel : Type := {
   fmfairness : trace fmstate ((fmrole * fmaction) + fmconfig) → Prop;
   live_roles: fmstate → gset fmrole;
   fm_live_spec: ∀ s ρ α s', fmtrans s (inl (ρ,α)) s' → ρ ∈ live_roles s;
+  fm_fl : fmstate → nat;
 }.
+
+Arguments fm_fl {_}.
 
 #[global] Existing Instance fmstate_eqdec.
 #[global] Existing Instance fmstate_inhabited.

@@ -1,6 +1,14 @@
 From stdpp Require Import option countable.
 From fairneris Require Export inftraces trace_utils fairness.
 
+Class GoodLang (Λ : language)
+  `{Countable (config_label Λ), Inhabited (config_label Λ)}
+  `{Countable (action Λ), Inhabited (action Λ)}
+  `{Countable (locale Λ)}
+  := {}.
+
+
+
 Record Lts lab `{Countable lab, Inhabited lab}: Type := {
   lts_state :> Type;
   lts_state_eqdec :: EqDecision lts_state;
@@ -14,10 +22,7 @@ Arguments lts_trans {_ _ _ _}.
 
 Section models.
   Context (Λ: language).
-  Context `{Countable (config_label Λ)}.
-  Context `{Countable (action Λ)}.
-  Context `{Inhabited (config_label Λ)}.
-  Context `{Inhabited (action Λ)}.
+  Context `{GoodLang Λ}.
 
 Record EnvModel := {
     env_lts :> Lts (action Λ + config_label Λ);
@@ -44,6 +49,8 @@ Record UserModel := {
 
     usr_live_roles: usr_lts.(lts_state) → gset usr_role;
     usr_live_spec: ∀ s ρ α s', usr_lts.(lts_trans) s (ρ,α) s' → ρ ∈ usr_live_roles s;
+
+    usr_fl : usr_lts.(lts_state) → nat;
 }.
 
 Arguments usr_live_roles {_}.
@@ -66,6 +73,7 @@ Program Definition joint_model (M: UserModel) (N: EnvModel) : FairModel :=
   fmconfig := config_label Λ;
   fmtrans s1 ℓ s2 := joint_trans s1 ℓ s2;
   live_roles s := usr_live_roles s.1;
+  fm_fl s := usr_fl _ s.1;
 
   (* We want somehting like: *)
   (* fmfairness tr := env_fairness _ tr; *)
@@ -76,3 +84,11 @@ Program Definition joint_model (M: UserModel) (N: EnvModel) : FairModel :=
 Next Obligation. by intros ??????; inversion 1; simplify_eq; eapply usr_live_spec. Qed.
 
 End models.
+
+Arguments usr_role {_ _ _}.
+Arguments usr_lts {_ _ _}.
+Arguments usr_fl {_ _ _ _}.
+Arguments usr_live_roles {_ _ _ _}.
+Arguments env_lts {_ _ _}.
+Arguments joint_model {_ _ _ _ _ _}.
+Arguments joint_trans {_ _ _ _ _ _}.

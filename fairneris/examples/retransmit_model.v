@@ -175,7 +175,7 @@ Definition mtrace_fair (mtr : mtrace) : Prop :=
 
 Lemma mtrace_fair_always mtr :
   mtrace_fair mtr ↔ (□ mtrace_fair) mtr.
-Proof. 
+Proof.
   split.
   - rewrite /mtrace_fair.
     intros [Hmtr1 Hmtr2].
@@ -194,10 +194,10 @@ Proof.
     intros Htr.
     apply trace_always_and in Htr as [Htr1 Htr2].
     split.
-    + intros x. revert Htr1. 
+    + intros x. revert Htr1.
       apply trace_always_mono. intros tr'. apply trace_impliesI.
       intros Htr'. done.
-    + intros x. revert Htr2. 
+    + intros x. revert Htr2.
       apply trace_always_mono. intros tr'. apply trace_impliesI.
       intros Htr'. done.
   - by intros Hfair%trace_always_elim.
@@ -525,5 +525,6 @@ Proof.
             fmfairness := retransmit_fair_network;
             live_roles := retransmit_live_roles;
             fm_live_spec := retransmit_live_spec_holds;
+            fm_fl _ := 10;
           |}).
 Defined.
