@@ -561,10 +561,9 @@ Section fairness.
   Qed.
 
   Record LiveModel := {
-      lm_fl : M → nat;
       lm_ls := LiveState;
       lm_lbl := FairLabel M;
-      lm_ls_trans (δ: LiveState) (ℓ: FairLabel M) := ls_trans lm_fl δ ℓ;
+      lm_ls_trans (δ: LiveState) (ℓ: FairLabel M) := ls_trans fm_fl δ ℓ;
       lm_cfg_action : M → config_label Λ → (fmconfig M * M);
       lm_cfg_labels_match : config_label Λ → fmconfig M → Prop;
       lm_cfg_spec_labels_match : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → lm_cfg_labels_match cl fl;
@@ -584,7 +583,7 @@ Section fairness.
   Program Definition initial_ls `{LM: LiveModel} (s0: M) (ζ0: locale Λ)
     : LM.(lm_ls) :=
     {| ls_data := {| ls_under := s0;
-      ls_map := {[ζ0 := gset_to_gmap (LM.(lm_fl) s0) (M.(live_roles) s0)]};
+      ls_map := {[ζ0 := gset_to_gmap (fm_fl s0) (M.(live_roles) s0)]};
     |} |}.
   Next Obligation.
     intros ???????? Hlk1 Hlk2. simpl in *. exfalso.
