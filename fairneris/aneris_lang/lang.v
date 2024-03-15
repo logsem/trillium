@@ -741,9 +741,21 @@ Implicit Types ip : ip_address.
 Implicit Types sh : socket_handle.
 Implicit Types skt : socket.
 
+Inductive aneris_action :=
+| Send : message → aneris_action
+| Recv : option message → aneris_action
+.
+
+#[global] Instance aneris_action_eqdec : EqDecision aneris_action.
+Proof. solve_decision. Defined.
+#[global] Instance aneris_action_countable : Countable aneris_action.
+Proof. Admitted.
+#[global] Instance aneris_action_inhabited : Inhabited aneris_action :=
+  populate (Recv None).
+
 (* The network-aware reduction step relation for a given node *)
 Inductive socket_step ip :
-  expr -> sockets -> message_multi_soup -> option message →
+  expr -> sockets -> message_multi_soup -> option aneris_action →
   expr -> sockets -> message_multi_soup ->
   Prop :=
 | NewSocketS sh Sn M :
@@ -784,7 +796,7 @@ Inductive socket_step ip :
               (Val $ LitV $ LitString mbody)
               (Val $ LitV $ LitSocketAddress a))
       Sn M
-      (Some new_message)
+      (Some (Send new_message))
       (* reduces to *)
       (Val $ LitV $ LitInt (String.length mbody))
       Sn ({[+ new_message +]} ⊎ M)
@@ -800,7 +812,7 @@ Inductive socket_step ip :
               (Val $ LitV $ LitString mbody)
               (Val $ LitV $ LitSocketAddress a))
       Sn M
-      (Some new_message)
+      (Some (Send new_message))
       (* reduces to *)
       (SendToRepeat (Val $ LitV $ LitSocket sh)
               (Val $ LitV $ LitString mbody)
@@ -815,7 +827,7 @@ Inductive socket_step ip :
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh))
-      Sn M None
+      Sn M (Some (Recv (Some m)))
       (* reduces to *)
       (Val $ InjRV (PairV (LitV $ LitString (m_body m))
                           (LitV $ LitSocketAddress (m_sender m))))
@@ -831,7 +843,7 @@ Inductive socket_step ip :
     ip = ip_of_address a →
     socket_step
       ip
-      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M None
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M (Some (Recv None))
       (* reduces to *)
       (Val $ InjLV (LitV LitUnit)) Sn M
 | ReceiveFromBlockS sh skt a Sn M :
@@ -845,7 +857,7 @@ Inductive socket_step ip :
     ip = ip_of_address a →
     socket_step
       ip
-      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M None
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M (Some (Recv None))
       (* reduces to *)
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M
 | SetReceiveTimeoutPositiveS sh skt a R Sn M m n :
@@ -891,7 +903,7 @@ Definition is_head_step_pure (e : expr) : bool :=
   | _ => true
   end.
 
-Inductive head_step : aneris_expr → state → option message →
+Inductive head_step : aneris_expr → state → option aneris_action →
                       aneris_expr → state → list aneris_expr → Prop :=
 | LocalStepPureS n h e α e' ef σ
                  (is_pure : is_head_step_pure e = true)
@@ -1003,29 +1015,42 @@ Proof. by intros ?? Hv; apply (inj Some); rewrite -!aneris_to_of_val Hv. Qed.
 Proof. destruct Ki; move => [? ?] [? ?] [? ?];
                              simplify_eq/=; auto with f_equal. Qed.
 
-Definition config_label : Type := option message.
+Inductive aneris_config_label : Type :=
+| Deliver : message → aneris_config_label
+| Duplicate : message → aneris_config_label
+| Drop : message → aneris_config_label.
+
+#[global] Instance message_inhabited : Inhabited message.
+Proof. Admitted.
+
+#[global] Instance aneris_config_label_eqdec : EqDecision aneris_config_label.
+Proof. solve_decision. Defined.
+#[global] Instance aneris_config_label_countable : Countable aneris_config_label.
+Proof. Admitted.
+#[global] Instance aneris_config_label_inhabited : Inhabited aneris_config_label :=
+  populate (Deliver inhabitant).
 
 Inductive config_step :
-  state → config_label → state → Prop :=
+  state → aneris_config_label → state → Prop :=
 | MessageDeliverStep n σ Sn Sn' sh a skt r m:
     m ∈ messages_to_receive_at_multi_soup a (state_ms σ) →
     state_sockets σ !! n = Some Sn ->
     Sn !! sh = Some (skt, r) →
     Sn' = <[sh := (skt, m :: r)]>Sn →
     saddress skt = Some a →
-    config_step σ (Some m)
+    config_step σ (Deliver m)
                 {| state_heaps := state_heaps σ;
                    state_sockets := <[n:=Sn']>(state_sockets σ);
                    state_ms := state_ms σ ∖ {[+ m +]}; |}
 | MessageDuplicateStep σ m :
     m ∈ state_ms σ →
-    config_step σ None
+    config_step σ (Duplicate m)
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ms := state_ms σ ⊎ {[+ m +]}; |}
 | MessageDropStep σ m :
     m ∈ state_ms σ →
-    config_step σ None
+    config_step σ (Drop m)
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
                    state_ms := state_ms σ ∖ {[+ m +]}; |}.
@@ -1093,7 +1118,7 @@ Proof.
 Qed.
 
 (* Needs to be refined for support multiple messages *)
-Definition config_enabled (lbl : config_label) (σ : state) := σ.(state_ms) ≠ ∅.
+Definition config_enabled (lbl : aneris_config_label) (σ : state) := σ.(state_ms) ≠ ∅.
 
 Lemma aneris_lang_mixin :
   EctxiLanguageMixin aneris_of_val aneris_to_val aneris_fill_item head_step locale_of.
