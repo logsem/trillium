@@ -2,7 +2,7 @@ From fairneris.aneris_lang Require Import aneris_lang network resources.
 From fairneris.prelude  Require Import gset_map.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Import traces.
-From fairneris Require Import fuel.
+From fairneris Require Import fuel env_model.
 From fairneris.aneris_lang Require Import events.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.algebra Require Import disj_gsets.
@@ -11,7 +11,7 @@ From iris.algebra Require Import auth.
 Set Default Proof Using "Type".
 
 Section state_interpretation.
-  Context `{LM: LiveModel aneris_lang Mod}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   Lemma aneris_events_state_interp_same_tp ex c oζ c':

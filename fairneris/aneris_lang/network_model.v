@@ -75,3 +75,6 @@ Program Definition net_model : EnvModel aneris_lang :=
 Next Obligation.
   (* Correctness of [net_apply_trans] *)
 Admitted.
+Next Obligation.
+  (* Unlabeled steps don't change the network state *)
+Admitted.

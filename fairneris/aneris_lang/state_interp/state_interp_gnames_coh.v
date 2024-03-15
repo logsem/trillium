@@ -1,5 +1,5 @@
 From stdpp Require Import fin_maps gmap.
-From fairneris Require Import fuel.
+From fairneris Require Import fuel env_model.
 From fairneris.aneris_lang Require Import aneris_lang network resources.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From RecordUpdate Require Import RecordSet.
@@ -9,7 +9,7 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{LM: LiveModel aneris_lang M}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   (** gnames_coh *)

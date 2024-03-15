@@ -33,6 +33,10 @@ Record EnvModel := {
       locale_step c1 (sum_map (λ α, (ζ, Some α)) id cl) c2 →
       env_states_match c1 m1 →
       env_states_match c2 m2;
+    env_match_internal_step : ∀ ζ c1 m c2,
+      locale_step c1 (inl (ζ, None)) c2 →
+      env_states_match c1 m →
+      env_states_match c2 m;
     env_fairness: trace env_lts.(lts_state) (action Λ + config_label Λ) → Prop;
 }.
 
@@ -90,5 +94,6 @@ Arguments usr_lts {_ _ _}.
 Arguments usr_fl {_ _ _ _}.
 Arguments usr_live_roles {_ _ _ _}.
 Arguments env_lts {_ _ _}.
+Arguments env_states_match {_ _ _ _ _ _ _}.
 Arguments joint_model {_ _ _ _ _ _}.
 Arguments joint_trans {_ _ _ _ _ _}.

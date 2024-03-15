@@ -8,7 +8,7 @@ From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap mono_nat.
 From trillium.program_logic Require Import weakestpre adequacy.
 From trillium.events Require Import event.
-From fairneris Require Import fairness fuel fair_resources.
+From fairneris Require Import fairness fuel fair_resources env_model.
 From fairneris.prelude Require Import collect gset_map gmultiset.
 From fairneris.algebra Require Import disj_gsets.
 From fairneris.aneris_lang Require Import resources events.
@@ -22,8 +22,9 @@ Import uPred.
 Import RecordSetNotations.
 
 Section definitions.
-  Context `{LM: LiveModel aneris_lang M}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
+
   Implicit Types σ : state.
   Implicit Types h : heap.
   Implicit Types H : gmap ip_address heap.
@@ -232,7 +233,7 @@ Section definitions.
 End definitions.
 
 Section Aneris_AS.
-  Context `{LM: LiveModel aneris_lang M}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   Definition ipA := "0.0.0.0".
@@ -257,7 +258,7 @@ Section Aneris_AS.
        aneris_state_interp
          (trace_last ex).2
          (trace_messages_history ex) ∗
-       model_state_interp (trace_last ex).1 (trace_last atr) ∗
+       model_state_interp (trace_last ex) (trace_last atr) ∗
        steps_auth (trace_length ex))%I;
     fork_post ζ _ := (ζ ↦M ∅)%I }.
 End Aneris_AS.

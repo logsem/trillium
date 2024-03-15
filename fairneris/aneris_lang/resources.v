@@ -760,41 +760,22 @@ Proof.
   rewrite !bool_decide_eq_true; eauto.
 Qed.
 
-Lemma model_init `{anerisPreG FM Σ} (st : live_model_to_model LM) :
-  ⊢ |==> ∃ γ, own γ (● Excl' st) ∗ own γ (◯ Excl' st).
-Proof.
-  iMod (own_alloc (● Excl' st ⋅ ◯ Excl' st)) as (γ) "[Hfl Hfr]".
-  { by apply auth_both_valid_2. }
-  iExists _. by iFrame.
-Qed.
-
 Lemma steps_init `{anerisPreG FM Σ} n :
   ⊢ |==> ∃ γ, mono_nat_auth_own γ 1 n ∗ mono_nat_lb_own γ n.
 Proof. iApply mono_nat_own_alloc. Qed.
 
-Local Lemma roles_auth_extend_pre `{anerisPreG FM Σ} γ A roles :
-  roles ## A →
-  own (A := live_roleUR FM) γ (● GSet A) ==∗
-  own (A := live_roleUR FM) γ (● GSet (roles ∪ A)) ∗
-  own (A := live_roleUR FM) γ (◯ GSet roles).
-Proof.
-  iIntros (Hnin) "Hauth".
-  iMod (own_update with "Hauth") as "[$ $]"; [|done].
-  apply auth_update_alloc.
-  apply gset_disj_alloc_empty_local_update.
-  set_solver.
-Qed.
-
-Lemma roles_init `{anerisPreG FM Σ} A :
-  ⊢ |==> ∃ γ, own (A := live_roleUR FM) γ (● GSet A) ∗
-              own (A := live_roleUR FM) γ (◯ GSet A).
-Proof.
-  iMod (own_alloc (● GSet (∅:gset $ FM.(fmrole)))) as (γ) "Hauth";
-    [by apply auth_auth_valid|].
-  iExists γ.
-  iMod (roles_auth_extend_pre with "Hauth") as "[Hauth $]"; [set_solver|].
-  by rewrite union_empty_r_L.
-Qed.
+(* Local Lemma roles_auth_extend_pre `{anerisPreG  Σ} γ A roles : *)
+(*   roles ## A → *)
+(*   own (A := live_roleUR ()) γ (● GSet A) ==∗ *)
+(*   own (A := live_roleUR _) γ (● GSet (roles ∪ A)) ∗ *)
+(*   own (A := live_roleUR _) γ (◯ GSet roles). *)
+(* Proof. *)
+(*   iIntros (Hnin) "Hauth". *)
+(*   iMod (own_update with "Hauth") as "[$ $]"; [|done]. *)
+(*   apply auth_update_alloc. *)
+(*   apply gset_disj_alloc_empty_local_update. *)
+(*   set_solver. *)
+(* Qed. *)
 
 Lemma unallocated_init `{anerisPreG FM Σ} (A : gset socket_address_group) :
   ⊢ |==> ∃ γ, own γ (● (GSet A)) ∗ own γ (◯ (GSet A)).
@@ -908,7 +889,7 @@ Proof.
 Qed.
 
 Section resource_lemmas.
-  Context `{LM: LiveModel aneris_lang Mdl}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   #[global] Instance mapsto_node_persistent ip γn : Persistent (mapsto_node ip γn).
@@ -1437,7 +1418,7 @@ Section resource_lemmas.
     Proper ((≡) ==> (≡)) (@saved_pred_own Σ A _ γ dq
                           : (A -d> iPropO Σ) -d> iPropO Σ).
   Proof. solve_proper. Qed.
-  #[global] Instance si_pred_prop `{anerisG _ LM Σ} a :
+  #[global] Instance si_pred_prop `{anerisG _ _ LM Σ} a :
     Proper ((≡) ==> (≡)) (si_pred a).
   Proof. solve_proper. Qed.
 

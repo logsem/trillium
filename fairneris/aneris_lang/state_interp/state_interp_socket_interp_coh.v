@@ -2,7 +2,7 @@ From stdpp Require Import fin_maps gmap.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap.
-From fairneris Require Import fuel.
+From fairneris Require Import fuel env_model.
 From fairneris.prelude Require Import misc.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.aneris_lang Require Import
@@ -19,7 +19,7 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{LM: LiveModel aneris_lang M}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   (* socket_interp_coh *)
