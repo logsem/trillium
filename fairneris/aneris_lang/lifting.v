@@ -253,7 +253,7 @@ Proof. solve_pure_exec. Qed.
 Opaque aneris_state_interp.
 
 Section primitive_laws.
-  Context `{LM: LiveModel aneris_lang Mod}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{aG : !anerisG LM Σ}.
 
   Implicit Types P Q : iProp Σ.

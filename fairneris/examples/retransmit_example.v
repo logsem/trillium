@@ -23,7 +23,6 @@ Definition config_state_valid (c : cfg aneris_lang) (δ : retransmit_state) :=
 
 Program Definition retransmit_live_model : LiveModel aneris_lang retransmit_fair_model :=
   {|
-    lm_fl _ := 1%nat;
     lm_cfg_action m1 lab := (((), lab), m1);
     lm_cfg_labels_match cl fl := cl = fl.2;
   |}.
