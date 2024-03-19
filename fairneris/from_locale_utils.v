@@ -129,7 +129,7 @@ Proof.
 Qed.
 
 Lemma locales_of_list_from_drop
-  `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ} es es' tp :
+  `{LM: LiveModel aneris_lang (joint_model Mod Net)} `{aG : !anerisG LM Σ} es es' tp :
   locales_equiv_prefix_from es' es tp →
   (λ '(t,e) v, fork_post (locale_of t e) v) <$>
       (prefixes_from es' tp) =
@@ -141,7 +141,7 @@ Proof.
 Qed.
 
 Lemma posts_of_length_drop
-    `{LM: LiveModel aneris_lang Mod} `{aG : !anerisG LM Σ} es es' tp :
+    `{LM: LiveModel aneris_lang (joint_model Mod Net)} `{aG : !anerisG LM Σ} es es' tp :
   locales_equiv_prefix_from es' es tp →
   posts_of tp ((λ '(t,e) v, fork_post (locale_of t e) v) <$>
                    (prefixes_from es' (es ++ drop (length es) tp))) -∗
