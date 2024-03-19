@@ -14,6 +14,10 @@ Section ltl_constructors.
 
   (* Primitive operators *)
   Definition trace_now P : ltl_pred := λ tr, pred_at tr 0 P.
+  Definition trace_now_label P : ltl_pred := λ tr, pred_at tr 0 (λ st lab, match lab with
+                                                                           | Some l => P st l
+                                                                           | None => False
+                                                                           end).
   Definition trace_not P : ltl_pred := λ tr, ¬ P tr.
   Definition trace_or P Q : ltl_pred := λ tr, P tr ∨ Q tr.
   Definition trace_next P : ltl_pred :=
@@ -64,6 +68,7 @@ Notation "○ P" := (trace_next P) (at level 20, right associativity) : trace_sc
 Notation "□ P" := (trace_always P) (at level 20, right associativity) : trace_scope.
 Notation "◊ P" := (trace_eventually P) (at level 20, right associativity) : trace_scope.
 Notation "↓ P" := (trace_now P) (at level 20, right associativity) : trace_scope.
+Notation "!↓ P" := (trace_now_label P) (at level 20, right associativity) : trace_scope.
 Notation "P → Q" := (trace_implies P Q)
                       (at level 99, Q at level 200,
                          format "'[' P  →  '/' '[' Q ']' ']'") : trace_scope.
@@ -141,7 +146,7 @@ Section ltl_lemmas.
   Qed.
 
   (** trace_true lemmas *)
-  
+
   Lemma trace_trueI (tr : trace S L) : trace_true tr.
   Proof. destruct tr; done. Qed.
 
@@ -158,7 +163,7 @@ Section ltl_lemmas.
   Lemma trace_not_mono (P Q : trace S L → Prop) tr :
     (Q tr → P tr) → trace_not P tr → trace_not Q tr.
   Proof. intros HQP HP HQ. apply HP. by apply HQP. Qed.
-  
+
   (** trace_next lemmas *)
 
   Lemma trace_next_intro (P : trace S L → Prop) s l (tr : trace S L) :

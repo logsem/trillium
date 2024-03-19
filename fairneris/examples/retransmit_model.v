@@ -85,8 +85,18 @@ Definition send_filter msg : retransmit_state → retransmit_label → Prop :=
 Instance send_filter_decision msg st l : Decision (send_filter msg st l).
 Proof. apply make_decision. Qed.
 
+Definition recv_filter msg : retransmit_state → retransmit_label → Prop :=
+  λ _ l, snd l = Some $ Recv (Some msg).
+Instance recv_filter_decision msg st l : Decision (recv_filter msg st l).
+Proof. apply make_decision. Qed.
+
+Definition any_recv_filter : retransmit_state → retransmit_label → Prop :=
+  λ _ l, exists rcv, snd l = Some $ Recv rcv.
+Instance any_recv_filter_decision st l : Decision (any_recv_filter st l).
+Proof. apply make_decision. Qed.
+
 Definition retransmit_fair_network_delivery msg : mtrace → Prop :=
-  □ (□◊↓send_filter msg → ◊↓deliver_filter msg).
+  □ (□◊!↓send_filter msg → □◊!↓ any_recv_filter → ◊!↓ recv_filter msg).
 
 Definition retransmit_fair_network (mtr : mtrace) : Prop :=
   ∀ msg, retransmit_fair_network_delivery msg mtr.
