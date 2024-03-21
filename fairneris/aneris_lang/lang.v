@@ -743,15 +743,15 @@ Implicit Types skt : socket.
 
 Inductive aneris_action :=
 | Send : message → aneris_action
-| Recv : option message → aneris_action
+| Recv : socket_address → option message → aneris_action
 .
 
 #[global] Instance aneris_action_eqdec : EqDecision aneris_action.
 Proof. solve_decision. Defined.
 #[global] Instance aneris_action_countable : Countable aneris_action.
 Proof. Admitted.
-#[global] Instance aneris_action_inhabited : Inhabited aneris_action :=
-  populate (Recv None).
+#[global] Instance aneris_action_inhabited : Inhabited aneris_action.
+Proof. Admitted.
 
 (* The network-aware reduction step relation for a given node *)
 Inductive socket_step ip :
@@ -827,7 +827,7 @@ Inductive socket_step ip :
     socket_step
       ip
       (ReceiveFrom (Val $ LitV $ LitSocket sh))
-      Sn M (Some (Recv (Some m)))
+      Sn M (Some (Recv a (Some m)))
       (* reduces to *)
       (Val $ InjRV (PairV (LitV $ LitString (m_body m))
                           (LitV $ LitSocketAddress (m_sender m))))
@@ -843,7 +843,7 @@ Inductive socket_step ip :
     ip = ip_of_address a →
     socket_step
       ip
-      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M (Some (Recv None))
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M (Some (Recv a None))
       (* reduces to *)
       (Val $ InjLV (LitV LitUnit)) Sn M
 | ReceiveFromBlockS sh skt a Sn M :
@@ -857,7 +857,7 @@ Inductive socket_step ip :
     ip = ip_of_address a →
     socket_step
       ip
-      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M (Some (Recv None))
+      (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M (Some (Recv a None))
       (* reduces to *)
       (ReceiveFrom (Val $ LitV $ LitSocket sh)) Sn M
 | SetReceiveTimeoutPositiveS sh skt a R Sn M m n :
