@@ -20,10 +20,10 @@ Inductive net_trans : net_state → (action aneris_lang + config_label aneris_la
   net_trans (ms, bs) (inr (Deliver msg)) (ms ∖ {[+ msg +]}, <[m_destination msg := msg::ms']>bs)
 | NetRecvFail ms bs sa :
   bs !!! sa = [] →
-  net_trans (ms, bs) (inl $ (Recv None)) (ms, bs)
+  net_trans (ms, bs) (inl $ (Recv sa None)) (ms, bs)
 | NetRecvSucc ms bs msg ms' sa :
   bs !!! sa = ms'++[msg] →
-  net_trans (ms, bs) (inl $ Recv (Some msg)) (ms, <[sa := ms']>bs).
+  net_trans (ms, bs) (inl $ Recv sa (Some msg)) (ms, <[sa := ms']>bs).
 
 Program Definition net_lts : Lts (action aneris_lang + config_label aneris_lang) :=
   {|
@@ -59,8 +59,8 @@ Definition net_apply_trans (s: net_state) (l: action aneris_lang + config_label 
   | inr (Deliver msg) =>
       let ms' := bs !!! m_destination msg in
       (ms ∖ {[+ msg +]}, <[m_destination msg := msg::ms']>bs)
-  | inl (Recv None) => (ms, bs)
-  | inl (Recv (Some msg)) =>
+  | inl (Recv _ None) => (ms, bs)
+  | inl (Recv _ (Some msg)) =>
       let ms' := bs !!! m_destination msg in
       (ms, <[m_destination msg := take (length ms' - 1) ms']>bs)
   end.
