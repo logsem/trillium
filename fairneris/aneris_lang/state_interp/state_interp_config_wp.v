@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export adequacy.
 From fairneris Require Import fuel env_model.
 From fairneris.aneris_lang Require Import
-     aneris_lang network resources.
+     aneris_lang network resources network_model.
 From fairneris.prelude Require Import gmultiset.
 From fairneris.aneris_lang.state_interp Require Import
      state_interp_def
@@ -15,8 +15,7 @@ From fairneris.aneris_lang.state_interp Require Import
      state_interp_messages_history_coh
      state_interp_events
      state_interp_messages_history.
-From fairneris Require Import fairness.
-
+From fairneris Require Import fairness fair_resources.
 From RecordUpdate Require Import RecordSet.
 Set Default Proof Using "Type".
 
@@ -24,7 +23,8 @@ Import uPred.
 Import RecordSetNotations.
 
 Section state_interpretation.
-  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod net_model)}.
+  Context `{LMeq: !LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   (* TODO: Move this elsehwere and use it where we now use ad hoc induction *)
@@ -127,118 +127,121 @@ Section state_interpretation.
 
   (*TODO: lots of copy pasta! *)
   Lemma config_wp_correct : ⊢ config_wp.
-  Proof.
-    (* rewrite /config_wp. iModIntro. *)
-    (* iIntros (ex atr c lbl σ2 Hexvalid Hex Hstep) "(% & Hsi & Hlive & Hauth)". *)
-    (* rewrite (last_eq_trace_ends_in ex c); [|done]. *)
-    (* rewrite /aneris_state_interp. *)
-    (* iDestruct "Hsi" as (γm mh) *)
-    (*                      "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh & *)
-    (*                        Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)". *)
-    (* iMod (steps_auth_update_S with "Hauth") as "Hauth". *)
-    (* iApply fupd_elim_laterN; [solve_ndisj|]. *)
-    (* destruct c as [tp1 σ1]=> /=. *)
-    (* rewrite /valid_state_evolution_fairness in H. *)
-    (* rewrite /trace_ends_in in Hex. *)
-    (* have Hlstep: locale_step (tp1, σ1) (inr lbl) (tp1, σ2) by econstructor. *)
-    (* destruct σ1; simpl in *; simplify_eq. *)
-    (* pose (trace_last atr) as δ. *)
-    (* inversion Hstep as *)
-    (*   [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr| *)
-    (*     σ| *)
-    (*     σ]; *)
-    (*   simplify_eq/=. *)
-    (* (* Deliver *) *)
-    (* - destruct H as (Hsteps & Hmatch & Htids). *)
-    (*   destruct (LM.(lm_cfg_action) (trace_last atr) (Some m)) as [ℓ δ'] eqn:Heq. *)
-    (*   unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}). *)
-    (*   { admit. } *)
-    (*   { admit. } *)
-    (*   iExists (Config_step ℓ (Some m : config_label aneris_lang)). *)
-    (*   iSplitR. *)
-    (*   { iPureIntro. *)
-    (*     rewrite /valid_state_evolution_fairness. *)
-    (*     rewrite /messages_to_receive_at_multi_soup in Hm. *)
-    (*     split. *)
-    (*     { econstructor; [done|econstructor|done]; simpl. *)
-    (*       - by eapply lm_cfg_spec_trans. *)
-    (*       - split=>//. by eapply lm_cfg_spec_live_roles. } *)
-    (*     split; first (split; [done|by eapply lm_cfg_spec_labels_match]). *)
-    (*     by rewrite /tids_smaller ?Hex //= in Htids *. } *)
-    (*   iFrame "Hauth". simpl. *)
-    (*   iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)". *)
-    (*   iMod ("Hupd" $! _ _ _ _ Heq with "Hst"). *)
-    (*   iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first. *)
-    (*   { iSplit; iFrame "#". iExists fm. erewrite lm_cfg_spec_live_roles=>//. iFrame. } *)
-    (*   iExists γm, mh. iFrame. *)
-    (*   iSplit. *)
-    (*   { apply (last_eq_trace_ends_in) in Hex as ->. *)
-    (*     erewrite <- message_history_evolution_deliver_message; *)
-    (*       eauto with set_solver. } *)
-    (*   iSplitR; [eauto using gnames_coh_update_sockets|]. *)
-    (*   assert (m_destination m = a) by set_solver. (* TODO: Remove filter thing *) *)
-    (*   iSplitR; [eauto using network_sockets_coh_deliver_message|]. *)
-    (*   iSplitR; [iPureIntro; apply messages_history_coh_drop_message; *)
-    (*             eauto using messages_history_coh_deliver_message|]. *)
-    (*   iSplitL "Hlcoh"; *)
-    (*     [by iApply (local_state_coh_deliver_message with "Hlcoh")|]. *)
-    (*   by iApply (free_ips_coh_deliver_message with "Hfreeips"). *)
-    (* - destruct H as (Hsteps & Hmatch & Htids). *)
-    (*   destruct (LM.(lm_cfg_action) (trace_last atr) None) as [ℓ δ'] eqn:Heq. *)
-    (*   unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}). *)
-    (*   { admit. } *)
-    (*   { admit. } *)
-    (*   iExists (Config_step ℓ (None : config_label aneris_lang)). *)
-    (*   iSplitR. *)
-    (*   { iPureIntro. *)
-    (*     rewrite /valid_state_evolution_fairness. *)
-    (*     split. *)
-    (*     { econstructor; [done|econstructor|done]; simpl. *)
-    (*       - by eapply lm_cfg_spec_trans. *)
-    (*       - split=>//. by eapply lm_cfg_spec_live_roles. } *)
-    (*     split; first (split; [done|by eapply lm_cfg_spec_labels_match]). *)
-    (*     by rewrite /tids_smaller ?Hex //= in Htids *. } *)
-    (*   iFrame "Hauth". simpl. *)
-    (*   iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)". *)
-    (*   iMod ("Hupd" $! _ _ _ _ Heq with "Hst"). *)
-    (*   iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first. *)
-    (*   { iSplit; iFrame "#". iExists fm. erewrite lm_cfg_spec_live_roles=>//. iFrame. } *)
-    (*   iExists γm, mh. iFrame. *)
-    (*   iSplit. *)
-    (*   { apply (last_eq_trace_ends_in) in Hex as ->. *)
-    (*     erewrite <- message_history_evolution_duplicate_message; *)
-    (*       eauto with set_solver. multiset_solver. } *)
-    (*   iSplitR; [eauto using gnames_coh_update_sockets|]. *)
-    (*   iSplitR; [eauto using network_sockets_coh_deliver_message|]. *)
-    (*   eauto using messages_history_coh_duplicate_message. *)
-    (* - destruct H as (Hsteps & Hmatch & Htids). *)
-    (*   destruct (LM.(lm_cfg_action) (trace_last atr) None) as [ℓ δ'] eqn:Heq. *)
-    (*   unshelve iExists ({| ls_data := {| ls_under := δ'; ls_map := δ.(ls_data).(ls_map) |} |}). *)
-    (*   { admit. } *)
-    (*   { admit. } *)
-    (*   iExists (Config_step ℓ (None : config_label aneris_lang)). *)
-    (*   iSplitR. *)
-    (*   { iPureIntro. *)
-    (*     rewrite /valid_state_evolution_fairness. *)
-    (*     split. *)
-    (*     { econstructor; [done|econstructor|done]; simpl. *)
-    (*       - by eapply lm_cfg_spec_trans. *)
-    (*       - split=>//. by eapply lm_cfg_spec_live_roles. } *)
-    (*     split; first (split; [done|by eapply lm_cfg_spec_labels_match]). *)
-    (*     by rewrite /tids_smaller ?Hex //= in Htids *. } *)
-    (*   iFrame "Hauth". simpl. *)
-    (*   iDestruct "Hlive" as "(#Hupd&%fm&?&?&?&Hst&?)". *)
-    (*   iMod ("Hupd" $! _ _ _ _ Heq with "Hst"). *)
-    (*   iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first. *)
-    (*   { iSplit; iFrame "#". iExists fm. erewrite lm_cfg_spec_live_roles=>//. iFrame. } *)
-    (*   iExists γm, mh. iFrame. *)
-    (*   iSplit. *)
-    (*   { apply (last_eq_trace_ends_in) in Hex as ->. *)
-    (*     erewrite <- message_history_evolution_drop_message; *)
-    (*       eauto with set_solver. multiset_solver. } *)
-    (*   iSplitR; [eauto using gnames_coh_update_sockets|]. *)
-    (*   iSplitR; [eauto using network_sockets_coh_deliver_message|]. *)
-    (*   eauto using messages_history_coh_drop_message. *)
-  Admitted.
+  Proof using LM LMeq Mod aG Σ.
+    rewrite /config_wp. iModIntro.
+    iIntros (ex atr c lbl σ2 Hexvalid Hex Hstep) "(% & Hsi & Hlive & Hauth)".
+    rewrite (last_eq_trace_ends_in ex c); [|done].
+    rewrite /aneris_state_interp.
+    iDestruct "Hsi" as (γm mh)
+                         "(%Hhist & %Hgcoh & %Hnscoh & %Hmhcoh &
+                           Hnauth & Hsi & Hlcoh & Hfreeips & Hmctx & Hmres)".
+    iMod (steps_auth_update_S with "Hauth") as "Hauth".
+    iApply fupd_elim_laterN; [solve_ndisj|].
+    destruct c as [tp1 σ1]=> /=.
+    rewrite /valid_state_evolution_fairness in H.
+    rewrite /trace_ends_in in Hex.
+    have Hlstep: locale_step (tp1, σ1) (inr lbl) (tp1, σ2) by econstructor.
+    destruct σ1; simpl in *; simplify_eq.
+    pose (trace_last atr) as δ.
+    pose net' := (env_apply_trans aneris_lang net_model (env_state δ) (inr lbl)).
+    unshelve iExists ({| ls_data :=
+        {| ls_under := (usr_state δ, net'): fmstate (joint_model Mod net_model); ls_map := δ.(ls_data).(ls_map) |} |}).
+    { intros **. eapply ls_map_disj=>//. }
+    { intros **. eapply ls_map_live=>//. }
+    simpl.
+    iExists (Config_step (lbl : fmconfig (joint_model Mod net_model)) lbl).
+    inversion Hstep as
+      [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|
+        σ|
+        σ];
+      simplify_eq/=.
+    (* Deliver *)
+    - destruct H as (Hsteps & Hmatch & Htids).
+      iSplitR.
+      { simpl. iPureIntro.
+        rewrite /valid_state_evolution_fairness.
+        rewrite /messages_to_receive_at_multi_soup in Hm.
+        split.
+        { econstructor; [done|econstructor|done]; simpl.
+          - destruct (trace_last atr) as [[[??]]] eqn:Heq. simpl.
+            rewrite /usr_state. simpl.
+            apply NetTrans.
+            by eapply env_apply_trans_spec_trans.
+          - split=>//.  }
+        split; [|].
+        simpl. split=>//. by apply cfg_labels_match_is_eq.
+        by rewrite /tids_smaller ?Hex //= in Htids *. }
+      iFrame "Hauth".
+      iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres".
+      + iExists γm, mh. iFrame. iSplit.
+        { apply (last_eq_trace_ends_in) in Hex as ->.
+            erewrite <- message_history_evolution_deliver_message;
+            eauto with set_solver. }
+        iSplitR; [eauto using gnames_coh_update_sockets|].
+        assert (m_destination m = a) by set_solver. (* TODO: Remove filter thing *)
+        iSplitR; [eauto using network_sockets_coh_deliver_message|].
+        iSplitR; [iPureIntro; apply messages_history_coh_drop_message;
+                    eauto using messages_history_coh_deliver_message|].
+        iSplitL "Hlcoh";
+            [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
+        by iApply (free_ips_coh_deliver_message with "Hfreeips").
+      + iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
+        iExists _. iFrame. iPureIntro. unshelve by eapply env_apply_trans_spec_both.
+        exact inhabitant.
+    - destruct H as (Hsteps & Hmatch & Htids).
+      iSplitR.
+      { simpl. iPureIntro.
+        rewrite /valid_state_evolution_fairness.
+        split.
+        { econstructor; [done|econstructor|done]; simpl.
+          - destruct (trace_last atr) as [[[??]]] eqn:Heq. simpl.
+            rewrite /usr_state. simpl.
+            apply NetTrans.
+            by eapply env_apply_trans_spec_trans.
+          - split=>//.  }
+        split; [|].
+        simpl. split=>//. by apply cfg_labels_match_is_eq.
+        by rewrite /tids_smaller ?Hex //= in Htids *. }
+      iFrame "Hauth". simpl.
+      iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first.
+      { iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
+        iExists _. iFrame. iPureIntro. unshelve by eapply env_apply_trans_spec_both.
+        exact inhabitant. }
+      iExists γm, mh. iFrame.
+      iSplit.
+      { apply (last_eq_trace_ends_in) in Hex as ->.
+        erewrite <- message_history_evolution_duplicate_message;
+          eauto with set_solver. multiset_solver. }
+      iSplitR; [eauto using gnames_coh_update_sockets|].
+      iSplitR; [eauto using network_sockets_coh_deliver_message|].
+      eauto using messages_history_coh_duplicate_message.
+    - destruct H as (Hsteps & Hmatch & Htids).
+      iSplitR.
+      { simpl. iPureIntro.
+        rewrite /valid_state_evolution_fairness.
+        split.
+        { econstructor; [done|econstructor|done]; simpl.
+          - destruct (trace_last atr) as [[[??]]] eqn:Heq. simpl.
+            rewrite /usr_state. simpl.
+            apply NetTrans.
+            by eapply env_apply_trans_spec_trans.
+          - split=>//.  }
+        split; [|].
+        simpl. split=>//. by apply cfg_labels_match_is_eq.
+        by rewrite /tids_smaller ?Hex //= in Htids *. }
+      iFrame "Hauth". simpl.
+      iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first.
+      { iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
+        iExists _. iFrame. iPureIntro. unshelve by eapply env_apply_trans_spec_both.
+        exact inhabitant. }
+      iExists γm, mh. iFrame.
+      iSplit.
+      { apply (last_eq_trace_ends_in) in Hex as ->.
+        erewrite <- message_history_evolution_drop_message;
+          eauto with set_solver. multiset_solver. }
+      iSplitR; [eauto using gnames_coh_update_sockets|].
+      iSplitR; [eauto using network_sockets_coh_deliver_message|].
+      eauto using messages_history_coh_drop_message.
+  Qed.
 
 End state_interpretation.

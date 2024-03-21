@@ -1,5 +1,5 @@
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From fairneris Require Export trace_utils fairness env_model.
+From fairneris Require Export trace_utils fairness env_model fuel.
 From fairneris.aneris_lang Require Import ast network lang aneris_lang.
 
 
@@ -76,5 +76,14 @@ Next Obligation.
   (* Correctness of [net_apply_trans] *)
 Admitted.
 Next Obligation.
+  (* Correctness of [net_apply_trans] *)
+Admitted.
+Next Obligation.
   (* Unlabeled steps don't change the network state *)
 Admitted.
+
+Class LiveModelEq `(LM: LiveModel aneris_lang (joint_model Mod network_model)) := {
+    cfg_labels_match_is_eq: ∀ x y, lm_cfg_labels_match LM x y ↔ x = y;
+    actions_match_is_eq: ∀ x y, lm_actions_match LM x y ↔ Some x = y;
+}.
+Arguments LiveModelEq {_ _}.

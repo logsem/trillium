@@ -21,6 +21,7 @@
           buildInputs = with coqPackages_8_19; [
             coq
             coq-lsp
+            coq-elpi
           ];
         };
       }
