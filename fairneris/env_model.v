@@ -28,6 +28,9 @@ Record EnvModel := {
     env_lts :> Lts (action Λ + config_label Λ);
     env_states_match : cfg Λ → env_lts.(lts_state) → Prop;
     env_apply_trans : env_lts.(lts_state) → (action Λ + config_label Λ) → env_lts.(lts_state);
+    env_apply_trans_spec_trans : ∀ m1 m2 cl,
+      env_apply_trans m1 cl = m2 →
+      lts_trans env_lts m1 cl m2;
     env_apply_trans_spec_both : ∀ ζ c1 m1 cl c2 m2,
       env_apply_trans m1 cl = m2 →
       locale_step c1 (sum_map (λ α, (ζ, Some α)) id cl) c2 →
@@ -62,7 +65,7 @@ Arguments usr_live_roles {_}.
 Inductive joint_trans {M: UserModel} {N: EnvModel} :
   (M * N) → ((usr_role M * option (action Λ)) + config_label Λ) → (M * N) → Prop :=
 | UsrTrans n u1 u2 ρ : lts_trans M u1 (ρ, None) u2 → joint_trans (u1, n) (inl (ρ, None)) (u2, n)
-| NetTrans u n1 n2 ℓ : lts_trans N n1 (inr ℓ) n2 → joint_trans (u, n2) (inr ℓ) (u, n2)
+| NetTrans u n1 n2 ℓ : lts_trans N n1 (inr ℓ) n2 → joint_trans (u, n1) (inr ℓ) (u, n2)
 | SyncTrans u1 u2 n1 n2 ρ α :
   lts_trans M u1 (ρ, Some α) u2 → lts_trans N n1 (inl α) n2 →
   joint_trans (u1, n1) (inl (ρ, Some α)) (u2, n2)

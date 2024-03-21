@@ -1399,11 +1399,12 @@ Section model_state_lemmas.
     model_can_model_step (trace_last auxtr) ζ ρ δ2 fmact →
     valid_state_evolution_fairness extr auxtr →
     tids_smaller c2.1 δ2 →
+    lm_actions_match LM act fmact →
     valid_state_evolution_fairness
-      (extr :tr[inl (ζ, act)]: c2)
-      (auxtr :tr[Take_step ρ fmact ζ act]: δ2).
+      (extr :tr[inl (ζ, Some act)]: c2)
+      (auxtr :tr[Take_step ρ fmact ζ (Some act)]: δ2).
   Proof.
-    intros Hstep Htids Hvse. destruct c2.
+    intros Hstep Htids Hvse ?. destruct c2.
     destruct Hvse as (?&?&?).
     split; [| split]=>//.
     econstructor=>//; first by apply model_can_model_step_trans.

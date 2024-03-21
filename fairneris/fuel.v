@@ -564,11 +564,8 @@ Section fairness.
       lm_ls := LiveState;
       lm_lbl := FairLabel M;
       lm_ls_trans (δ: LiveState) (ℓ: FairLabel M) := ls_trans fm_fl δ ℓ;
-      lm_cfg_action : M → config_label Λ → (fmconfig M * M);
       lm_cfg_labels_match : config_label Λ → fmconfig M → Prop;
-      lm_cfg_spec_labels_match : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → lm_cfg_labels_match cl fl;
-      lm_cfg_spec_trans : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → fmtrans _ m1 (inr fl) m2;
-      lm_cfg_spec_live_roles : ∀ m1 cl fl m2, lm_cfg_action m1 cl = (fl, m2) → live_roles _ m1 = live_roles _ m2;
+      lm_actions_match : action Λ → fmaction M → Prop;
     }.
 
   Definition live_model_model `(LM : LiveModel) : Model := {|
@@ -598,9 +595,9 @@ Section fairness.
 
   Definition labels_match `{LM:LiveModel} (pl : locale_label Λ + config_label Λ) (ℓ : LM.(lm_lbl)) : Prop :=
     match pl, ℓ with
-    | inr cfg, Config_step fmcfg cfg' => cfg = cfg' ∧ LM.(lm_cfg_labels_match) cfg fmcfg
+    | inr cfg, Config_step fmcfg cfg' => cfg = cfg' ∧ lm_cfg_labels_match LM cfg fmcfg
     | inl (ζ, act), Silent_step ζ' act' => ζ = ζ' ∧ act = act' ∧ act = None
-    | inl (ζ, act), Take_step ρ fmact ζ' act' => ζ = ζ' ∧ act = act'
+    | inl (ζ, Some act), Take_step ρ fmact ζ' act' => ζ = ζ' ∧ Some act = act' ∧ lm_actions_match LM act fmact
     | _, _ => False
     end.
 
@@ -717,7 +714,8 @@ Section fairness_preserved.
     ((∃ ρ fmact, ℓ = Take_step ρ fmact tid act) ∨ (ℓ = Silent_step tid act)).
   Proof.
     intros Hm. inversion Hm as [|?????? Hlab]; simplify_eq.
-    destruct ℓ; eauto; inversion Hlab; simplify_eq; naive_solver.
+    destruct ℓ; destruct act;
+    inversion Hlab; simplify_eq; naive_solver.
   Qed.
 
   Lemma mapping_live_role (δ: LiveState Λ M) ρ:
@@ -864,8 +862,8 @@ Section fairness_preserved.
         destruct (decide (ζ = ζ'')) as [<-|Hchange].
         + have [f' [Hfuel' Hff']] : exists f', ls_fuel (trfirst auxtr') !! ρ = Some f' ∧ f' ≤ f.
           { inversion Htm as [|s1 ℓ1 r1 s2 ℓ2 r2 Hl Hs Hts Hls Hmatchrest]; simplify_eq.
-            simpl in *. destruct ℓ as [ρ0 ζ0| ζ0|]; try done.
-            + destruct Hls as (?&?&?&Hnoninc&?).
+            simpl in *. destruct ℓ as [ρ0 ζ0| ζ0|].
+            + destruct Hls as (?&?&?&Hnoninc&?); destruct act;
               destruct Hl; simplify_eq.
               unfold fuel_must_not_incr in Hnoninc.
               have Hneq: Some ρ ≠ Some ρ0 by congruence.
@@ -874,16 +872,17 @@ Section fairness_preserved.
               destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq; [|set_solver].
               eexists; split =>//. destruct Hnoninc as [Hnoninc|Hnoninc]=>//.
               apply elem_of_dom_2 in Heq. set_solver.
-            + destruct Hls as (?&?&Hnoninc&?).
-              destruct Hl; simplify_eq.
+            + destruct Hls as (?&?&Hnoninc&?); destruct act;
+              destruct Hl; simplify_eq; first naive_solver.
               unfold fuel_must_not_incr in Hnoninc.
               have Hneq: Some ρ ≠ None by congruence.
               specialize (Hnoninc ρ ltac:(SS) Hneq).
               unfold oleq in Hnoninc. rewrite Hfuel in Hnoninc.
               destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq; [|set_solver].
               eexists; split =>//. destruct Hnoninc as [Hnoninc|Hnoninc]=>//.
-              apply elem_of_dom_2 in Heq. set_solver. }
-
+              apply elem_of_dom_2 in Heq. set_solver.
+            + destruct act=>//.
+          }
           unfold fair_scheduling_ex in *.
           have Hζ'en: pred_at extr' 0 (λ (c : cfg Λ) _, locale_enabled ζ c).
           { rewrite /pred_at /= pred_first_trace. inversion Htm; eauto. }
@@ -901,9 +900,9 @@ Section fairness_preserved.
           exists (1+P). rewrite !pred_at_sum. simpl. done.
         + have [f' [Hfuel' Hff']] : exists f', ls_fuel (trfirst auxtr') !! ρ = Some f' ∧ f' < f.
           { inversion Htm as [|s1 ℓ1 r1 s2 ℓ2 r2 Hl Hs Hts Hls Hmatchrest]; simplify_eq.
-              simpl in *. destruct ℓ as [ρ0 ? ζ0 ?| ζ0|]; try done.
-              + destruct Hls as (?&?&Hdec&?&?).
-                unfold fuel_decr in Hdec. destruct Hl; simplify_eq.
+              simpl in *. destruct ℓ as [ρ0 ? ζ0 ?| ζ0|].
+              + destruct Hls as (?&?&Hdec&?&?); destruct act;
+                unfold fuel_decr in Hdec; destruct Hl; simplify_eq.
                 have Hmd: must_decrease ρ (Some ρ0) δ (trfirst auxtr') (Some ζ0).
                 { econstructor 2. congruence. rewrite Hζ''; eauto. }
                 specialize (Hdec ρ ltac:(SS) ltac:(SS) Hmd).
@@ -915,7 +914,8 @@ Section fairness_preserved.
                 { econstructor 2. congruence. rewrite Hζ''; eauto. }
                 specialize (Hdec ρ ltac:(SS) ltac:(SS) Hmd).
                 unfold oleq in Hdec. rewrite Hfuel in Hdec.
-                destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq; [by eexists|done]. }
+                destruct (ls_fuel (trfirst auxtr') !! ρ) as [f'|] eqn:Heq; [by eexists|done].
+              + destruct act=>//. }
 
           unfold fair_scheduling_ex in *.
           have: pred_at extr' 0 (λ c _, locale_enabled ζ'' c).
