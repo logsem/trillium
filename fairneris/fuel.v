@@ -1081,7 +1081,8 @@ Section fuel_dec_unless.
     | _ => None
     end.
 
-  Definition Ψ (δ: LiveState Λ Mdl) :=
+  Definition Ψ (tr: trace (LiveState Λ Mdl) LM.(mlabel)) :=
+    let δ := trfirst tr in
     (size $ ls_fuel δ) + [^ Nat.add map] ρ ↦ f ∈ ls_fuel δ, f.
 
   Lemma fuel_dec_unless (auxtr: auxtrace LM) :
@@ -1189,7 +1190,6 @@ Section upto_preserves.
         { destruct IH =>//. }
         subst. by inversion Hval.
   Qed.
-
 End upto_preserves.
 
 Section upto_stutter_preserves_fairness_and_termination.
