@@ -258,7 +258,7 @@ Section dec_unless.
          | Some ⟨ _ ⟩ | None => True
          | Some (s -[ℓ]-> tr') =>
            (∃ ℓ', Ul ℓ = Some ℓ') ∨
-           (Ψ (trfirst tr') < Ψ s ∧ Us s = Us (trfirst tr'))
+           (Ψ tr') < Ψ (s -[ℓ]-> tr') ∧ Us s = Us (trfirst tr')
          end.
 
   Lemma dec_unless_next Ψ s ℓ tr (Hdec: dec_unless Ψ (s -[ℓ]-> tr)): dec_unless Ψ tr.
@@ -279,7 +279,6 @@ Section destuttering.
       upto_stutter_ind upto_stutter_coind ⟨s⟩ ⟨Us s⟩
   | upto_stutter_stutter btr str s ℓ:
       Ul ℓ = None ->
-      (* (Us s = Us (trfirst btr) -> (or something like this...?) *)
       Us s = Us (trfirst btr) ->
       Us s = trfirst str ->
       upto_stutter_ind upto_stutter_coind btr str ->
@@ -358,11 +357,11 @@ Section destuttering.
   Qed.
 
   Program Fixpoint destutter_once_step N Ψ (btr: trace St L) :
-    Ψ (trfirst btr) < N →
+    Ψ btr < N →
     dec_unless Us Ul Ψ btr →
     S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) :=
     match N as n return
-          Ψ (trfirst btr) < n →
+          Ψ btr < n →
           dec_unless Us Ul Ψ btr →
           S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'})
     with
@@ -396,19 +395,19 @@ Section destuttering.
   Qed.
 
   CoFixpoint destutter_gen Ψ N (btr: trace St L) :
-    Ψ (trfirst btr) < N ->
+    Ψ btr < N ->
     dec_unless Us Ul Ψ btr → trace S' L' :=
     λ Hlt Hdec,
     match destutter_once_step N Ψ btr Hlt Hdec with
     | inl s' => tr_singl s'
-    | inr (s', l', z) => tr_cons s' l' (destutter_gen Ψ  (S (Ψ (trfirst $ proj1_sig z)))
+    | inr (s', l', z) => tr_cons s' l' (destutter_gen Ψ  (S (Ψ $ proj1_sig z))
                                                  (proj1_sig z) (Nat.lt_succ_diag_r _) (proj2_sig z))
     end.
 
   Definition destutter Ψ (btr: trace St L) :
     dec_unless Us Ul Ψ btr → trace S' L' :=
     λ Hdec,
-    destutter_gen Ψ (S (Ψ (trfirst btr))) btr (Nat.lt_succ_diag_r _) Hdec.
+    destutter_gen Ψ (S (Ψ btr)) btr (Nat.lt_succ_diag_r _) Hdec.
 
   Lemma destutter_same_Us N Ψ btr Hlt Hdec:
     match destutter_once_step N Ψ btr Hlt Hdec with
@@ -430,7 +429,7 @@ Section destuttering.
   Qed.
 
   Lemma destutter_spec_ind N Ψ (btr: trace St L) (Hdec: dec_unless Us Ul Ψ btr)
-    (Hlt: Ψ (trfirst btr) < N):
+    (Hlt: Ψ btr < N):
     upto_stutter btr (destutter_gen Ψ N btr Hlt Hdec).
   Proof.
     revert N btr Hlt Hdec.
@@ -448,7 +447,7 @@ Section destuttering.
     generalize (destutter_once_step_obligation_3 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
     intros HunlessNone HltNone HdecSome.
     destruct (Ul ℓ) as [ℓ'|] eqn:Heq; cbn.
-    - econstructor 3 =>//. right. apply (CH (S (Ψ $ trfirst btr'))).
+    - econstructor 3 =>//. right. apply (CH (S (Ψ btr'))).
     - econstructor 2=>//.
       + destruct (Hdec 0) as [[??]|[??]];congruence.
       + have ?: Us s = Us (trfirst btr').
