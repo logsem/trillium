@@ -584,6 +584,19 @@ Section ltl_lemmas.
       + apply trace_eventuallyI. naive_solver.
       + apply IH. by eapply trace_suffix_of_cons_l.
   Qed.
+
+  Lemma trace_always_eventually_label_infinite P (tr : trace S L) :
+    (□◊ℓ↓P) tr → infinite_trace tr.
+  Proof.
+    intros Hltl n. revert tr Hltl. induction n as [|n IH]; first naive_solver.
+    intros tr Hltl.
+    destruct tr as [s|s ℓ tr].
+    - apply trace_always_elim in Hltl.
+      rewrite trace_eventuallyI in Hltl.
+      destruct Hltl as (tr'&Hsuff&Hltl).
+      destruct Hsuff as [[|m] Hafter]=>//. simpl in Hafter. by simplify_eq.
+    - simpl. apply IH. by eapply trace_always_cons.
+  Qed.
 End ltl_lemmas.
 
 Section ltl_theorems.

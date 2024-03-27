@@ -221,6 +221,17 @@ Section simulation.
     inversion Hm; simplify_eq. by eapply IHn.
   Qed.
 
+  Lemma traces_match_after_None tr1 tr2 n :
+    traces_match tr1 tr2 ->
+    after n tr1 = None ->
+    after n tr2 = None.
+  Proof.
+    revert tr1 tr2; induction n; intros tr1 tr2; first naive_solver.
+    move=> /= Hm Ha. destruct tr1 as [|s ℓ tr1''] eqn:Heq; simplify_eq.
+    - by inversion Hm.
+    - inversion Hm; simplify_eq. naive_solver.
+  Qed.
+
   Lemma traces_match_suffix_of tr1 tr2 tr2':
     traces_match tr1 tr2 ->
     trace_suffix_of tr2' tr2 →
@@ -243,8 +254,59 @@ Section simulation.
     traces_match tr1 tr2 ->
     Rs (trfirst tr1) (trfirst tr2).
   Proof. intros Hm. inversion Hm; done. Qed.
-
 End simulation.
+
+Section equiv.
+  Context {St L: Type}.
+
+  Definition trace_equiv (tr1 tr2: trace St L) : Prop :=
+    traces_match eq eq (λ _ _ _, True) (λ _ _ _, True) tr1 tr2.
+
+  Lemma trace_equiv_singleton n tr1 tr2 s :
+    trace_equiv tr1 tr2 →
+    after n tr1 = Some ⟨s⟩ →
+    after n tr2 = Some ⟨s⟩.
+  Proof.
+    intros Heq Hafter.
+    eapply traces_match_after_inv in Hafter as (?&->&Heq')=>//.
+    by inversion Heq'; simplify_eq.
+  Qed.
+
+  Lemma trace_equiv_cons n tr1 tr2 s ℓ tr1' :
+    trace_equiv tr1 tr2 →
+    after n tr1 = Some (s -[ℓ]-> tr1') →
+    ∃ tr2', after n tr2 = Some (s -[ℓ]-> tr2') ∧ trace_equiv tr1' tr2'.
+  Proof.
+    intros Heq Hafter.
+    eapply traces_match_after_inv in Hafter as (?&->&Heq')=>//.
+    inversion Heq'; simplify_eq. eexists. naive_solver.
+  Qed.
+
+  Lemma trace_equiv_None n tr1 tr2:
+    trace_equiv tr1 tr2 →
+    after n tr1 = None →
+    after n tr2 = None.
+  Proof.
+    intros Heq Hafter.
+    eapply traces_match_after_None=>//.
+  Qed.
+
+  Global Instance trace_equiv_sym : Symmetric trace_equiv.
+  Proof.
+    cofix CH; intros tr1 tr2 Heq.
+    inversion Heq as [?? Heqs Heq1 Heq2|?????? Heq1 Heq2].
+    - rewrite -Heqs {2}Heqs Heq1 Heq2. apply Heq.
+    - rewrite Heq1 Heq2. constructor=>//.
+  Qed.
+
+  Global Instance trace_equiv_refl : Reflexive trace_equiv.
+  Proof.
+    cofix CH; intros tr.
+    destruct tr.
+    - constructor. done.
+    - constructor=>//.
+  Qed.
+End equiv.
 
 Section execs_and_traces.
   Context {S L: Type}.

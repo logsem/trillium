@@ -142,8 +142,6 @@ Section fuel_fairness.
   Qed.
 End fuel_fairness.
 
-Eval cbv in (ex_label aneris_lang).
-
 Definition ex_send_filter msg : ex_label aneris_lang → Prop :=
   λ l, sum_map snd id l = inl $ Some $ Send msg.
 Instance ex_send_filter_decision msg l : Decision (ex_send_filter msg l).
