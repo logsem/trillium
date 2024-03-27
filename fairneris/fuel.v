@@ -1,7 +1,7 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From fairneris Require Export inftraces fairness.
+From fairneris Require Export inftraces fairness ltl_lite.
 
 Section fairness.
   Context {Λ : language}.
@@ -677,6 +677,12 @@ Definition exaux_traces_match  `{Countable (locale Λ)} `{LM:LiveModel Λ M} :
                locale_step
                LM.(lm_ls_trans).
 
+Definition exaux_tme  `{Countable (locale Λ)} `{LM:LiveModel Λ M} :=
+  ltl_tme (labels_match (LM := LM))
+          (live_tids (LM := LM))
+          locale_step
+          LM.(lm_ls_trans).
+
 Section fairness_preserved.
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
@@ -1142,6 +1148,12 @@ Section destuttering_auxtr.
   Definition upto_stutter_auxtr :=
     upto_stutter (λ x, ls_under (Λ:=Λ) (M:=M) (ls_data x)) (Ul (LM := LM)).
 
+  (* Stutter equivalence for fuel *)
+  Definition fuel_se :=
+    ltl_se (λ x, ls_under (Λ:=Λ) (M:=M) (ls_data x)) (Ul (LM := LM)).
+  Hint Unfold fuel_se : core.
+  Global Hint Constants Transparent : fuel_se.
+
   Lemma can_destutter_auxtr auxtr:
     auxtrace_valid auxtr →
     ∃ mtr, upto_stutter_auxtr auxtr mtr.
@@ -1251,7 +1263,7 @@ Section upto_stutter_preserves_fairness_and_termination.
             ** exists (S m). by apply pred_at_S.
     Qed.
 
-  Lemma upto_stutter_fairness (auxtr:auxtrace LM) (mtr: mtrace M):
+  Lemma upto_stutter_fairness (auxtr: auxtrace LM) (mtr: mtrace M):
     upto_stutter_aux auxtr mtr ->
     (∀ ρ, fair_aux ρ auxtr) ->
     (∀ ρ, fair_scheduling_mtr ρ mtr).

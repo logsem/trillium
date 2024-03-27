@@ -1,4 +1,4 @@
-From Paco Require Import paconotation.
+From Paco Require Import paconotation pacotac paco2.
 From fairneris Require Export inftraces.
 
 Declare Scope trace_scope.
@@ -14,8 +14,8 @@ Section ltl_constructors.
 
   (* Primitive operators *)
   Definition trace_now P : ltl_pred := λ tr, pred_at tr 0 P.
-  Definition trace_now_label P : ltl_pred := λ tr, pred_at tr 0 (λ st lab, match lab with
-                                                                           | Some l => P st l
+  Definition trace_label P : ltl_pred := λ tr, pred_at tr 0 (λ st lab, match lab with
+                                                                           | Some l => P l
                                                                            | None => False
                                                                            end).
   Definition trace_not P : ltl_pred := λ tr, ¬ P tr.
@@ -57,9 +57,6 @@ Section ltl_constructors.
     eapply (trace_until_ind trace_true); [done|by intros; apply IH|done].
   Qed.
 
-  Definition trace_suffix_of (tr1 tr2 : trace S L) : Prop :=
-    ∃ n, after n tr2 = Some tr1.
-
 End ltl_constructors.
 
 Arguments trace_eventually_ind : clear implicits.
@@ -68,7 +65,7 @@ Notation "○ P" := (trace_next P) (at level 20, right associativity) : trace_sc
 Notation "□ P" := (trace_always P) (at level 20, right associativity) : trace_scope.
 Notation "◊ P" := (trace_eventually P) (at level 20, right associativity) : trace_scope.
 Notation "↓ P" := (trace_now P) (at level 20, right associativity) : trace_scope.
-Notation "!↓ P" := (trace_now_label P) (at level 20, right associativity) : trace_scope.
+Notation "ℓ↓ P" := (trace_label P) (at level 20, right associativity) : trace_scope.
 Notation "P → Q" := (trace_implies P Q)
                       (at level 99, Q at level 200,
                          format "'[' P  →  '/' '[' Q ']' ']'") : trace_scope.
@@ -117,32 +114,6 @@ Section ltl_lemmas.
     pose proof (Nat.le_exists_sub n m Hle) as [p [-> Hle']].
     rewrite Nat.add_comm Nat.add_sub'.
     by rewrite after_sum Haftern in Hafterm.
-  Qed.
-
-  (** trace_suffix_of lemmas  *)
-
-  Lemma trace_suffix_of_refl (tr : trace S L) :
-    trace_suffix_of tr tr.
-  Proof. by exists 0. Qed.
-
-  Lemma trace_suffix_of_cons_l s l (tr tr' : trace S L) :
-    trace_suffix_of (s -[l]-> tr) tr' → trace_suffix_of tr tr'.
-  Proof.
-    intros [n Hafter]. exists (Datatypes.S n).
-    replace (Datatypes.S n) with (n + 1) by lia.
-    rewrite after_sum'. rewrite Hafter. done.
-  Qed.
-
-  Lemma trace_suffix_of_cons_r s l (tr tr' : trace S L) :
-    trace_suffix_of tr tr' → trace_suffix_of tr (s -[l]-> tr').
-  Proof. intros [n Hafter]. by exists (Datatypes.S n). Qed.
-
-  Lemma trace_suffix_of_trans (tr tr' tr'' : trace S L) :
-    trace_suffix_of tr'' tr' → trace_suffix_of tr' tr → trace_suffix_of tr'' tr.
-  Proof.
-    intros [n Hsuffix1] [m Hsuffix2].
-    exists (n+m). rewrite after_sum. rewrite Hsuffix2.
-    rewrite Hsuffix1. done.
   Qed.
 
   (** trace_true lemmas *)
@@ -603,6 +574,16 @@ Section ltl_lemmas.
     intros ?. apply trace_impliesI, HPQ.
   Qed.
 
+  Lemma trace_eventually_until_eventually (Q P : trace S L → Prop) tr :
+    (◊ P) tr ↔ (◊ (trace_until Q P)) tr.
+  Proof.
+    split.
+    - intros [tr' [Hsuff HP]]%trace_eventuallyI. apply trace_eventuallyI.
+      exists tr'; split=>//. by constructor.
+    - intros [tr' [Hsuff HP]]%trace_eventuallyI. induction HP as [|????? IH].
+      + apply trace_eventuallyI. naive_solver.
+      + apply IH. by eapply trace_suffix_of_cons_l.
+  Qed.
 End ltl_lemmas.
 
 Section ltl_theorems.
@@ -654,3 +635,149 @@ Section ltl_theorems.
   Qed.
 
 End ltl_theorems.
+
+Section stutter.
+  Context {St S' L L': Type}.
+  Context (Us: St -> S').
+  Context (Ul: L -> option L').
+
+  Notation upto_stutter := (upto_stutter Us Ul).
+
+  Definition ltl_se (P: ltl_pred St L) (Q: ltl_pred S' L') :=
+    ∀ tr tr', upto_stutter tr tr' → (P tr ↔ Q tr').
+
+  #[local] Lemma upto_stutter_mono' :
+    monotone2 (upto_stutter_ind Us Ul).
+  Proof. exact (upto_stutter_mono Us Ul). Qed.
+  Hint Resolve upto_stutter_mono' : paco.
+
+  Definition trace_silent_filter : St → option L → Prop :=
+    λ _ ℓ, match ℓ with | Some ℓ' => Ul ℓ' = None | None => False end.
+  Instance trace_silent_filter_decision st ℓ : Decision (trace_silent_filter st ℓ).
+  Proof. unfold trace_silent_filter. destruct ℓ; solve_decision. Defined.
+
+  Definition trace_silent := ↓ trace_silent_filter.
+
+  Lemma ltl_se_now P P':
+    (∀ l, P l ↔ (∃ l', Ul l = Some l' ∧ P' l')) →
+    ltl_se (trace_until trace_silent (ℓ↓ P)) (ℓ↓ P').
+  Proof.
+    intros Hp tr tr' Hupto; split.
+    - induction 1 as [tr Hnow| s ℓ tr Hsil Htu IH].
+      + destruct tr as [s|s ℓ tr], tr' as [s'|s' ℓ' tr'] =>//=.
+        * punfold Hupto. inversion Hupto; simplify_eq.
+          rewrite /trace_label /pred_at /= in Hnow. naive_solver.
+        * punfold Hupto. inversion Hupto; simplify_eq;
+          rewrite /trace_label /pred_at /= in Hnow; naive_solver.
+      + rewrite /trace_silent /trace_now /pred_at /= in Hsil.
+        punfold Hupto. inversion Hupto; simplify_eq.
+        apply IH. by pfold.
+    - punfold Hupto. induction Hupto as [s|tr tr' s ℓ Hsil Hs1 Hs2 IH|tr tr' s ℓ s' ℓ' Hs Hl].
+      + rewrite /trace_label /pred_at //=.
+      + intros Hnow. constructor 2; naive_solver.
+      + rewrite {1}/trace_label /pred_at //=. intros Hnow. constructor 1.
+        apply Hp. naive_solver.
+  Qed.
+
+  Lemma ltl_se_always P P':
+    ltl_se P P' →
+    ltl_se (□ P) (□ P').
+  Proof.
+    intros Hse tr1 tr2 Hupto. rewrite !trace_alwaysI. split.
+    - intros Hal tr2' Hsuff. destruct (upto_stutter_suffix_of _ _ _ _ _ Hupto Hsuff) as (?&?&Hupto').
+      apply (Hse _ _ Hupto'). by apply Hal.
+    - intros Hal tr1' Hsuff. destruct (upto_stutter_suffix_of_inv _ _ _ _ _ Hupto Hsuff) as (?&?&Hupto').
+      apply (Hse _ _ Hupto'). by apply Hal.
+  Qed.
+
+  Lemma ltl_se_eventually P P':
+    ltl_se P P' →
+    ltl_se (◊ P) (◊ P').
+  Proof.
+    intros Hse tr1 tr2 Hupto. rewrite !trace_eventuallyI. split.
+    - intros (?&Hsuff&?). destruct (upto_stutter_suffix_of_inv _ _ _ _ _ Hupto Hsuff) as (?&?&Hupto').
+      eexists _; split=>//. apply (Hse _ _ Hupto'). naive_solver.
+    - intros (?&Hsuff&?). destruct (upto_stutter_suffix_of _ _ _ _ _ Hupto Hsuff) as (?&?&Hupto').
+      eexists _; split=>//. apply (Hse _ _ Hupto'). naive_solver.
+  Qed.
+
+  Lemma ltl_se_eventually_now P P':
+    (∀ l, P l ↔ (∃ l', Ul l = Some l' ∧ P' l')) →
+    ltl_se (◊ ((ℓ↓ P))) (◊ (ℓ↓ P')).
+  Proof.
+    intros ?. have Hccl: ltl_se (◊ (trace_until trace_silent (ℓ↓ P))) (◊ (ℓ↓ P')).
+    { by apply ltl_se_eventually, ltl_se_now. }
+    intros tr tr' ?. rewrite (trace_eventually_until_eventually trace_silent).
+    by apply Hccl.
+  Qed.
+
+  Lemma ltl_se_impl P P' Q Q':
+    ltl_se P P' →
+    ltl_se Q Q' →
+    ltl_se (P → Q) (P' → Q').
+  Proof.
+    intros HseP HseQ tr1 tr2 Hupto. rewrite !trace_impliesI.
+    split; intros Himpl H%(HseP _ _ Hupto); apply (HseQ _ _ Hupto); naive_solver.
+  Qed.
+
+  Lemma ltl_se_forall {X} P P':
+    (∀ (x : X), ltl_se (P x) (P' x)) →
+    ltl_se (λ tr, ∀ x, P x tr) (λ tr, ∀ x, P' x tr).
+  Proof. intros Hse tr1 tr2 Hupto. naive_solver. Qed.
+End stutter.
+
+Section traces_match.
+  Context {L1 L2 S1 S2: Type}.
+  Context (Rl: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop).
+  Context (trans1: S1 -> L1 -> S1 -> Prop).
+  Context (trans2: S2 -> L2 -> S2 -> Prop).
+
+  Notation tm := (traces_match Rl Rs trans1 trans2).
+
+  Definition ltl_tme (P: ltl_pred S1 L1) (Q: ltl_pred S2 L2) :=
+    ∀ tr tr', tm tr tr' → (P tr ↔ Q tr').
+
+  Lemma ltl_tme_now P P':
+    (∀ l1 l2, Rl l1 l2 → (P l1 ↔ P' l2)) →
+    ltl_tme (ℓ↓ P) (ℓ↓ P').
+  Proof.
+    intros Heq tr1 tr2 Htm. rewrite /trace_label /pred_at.
+    destruct tr1, tr2=>//=; inversion Htm; simplify_eq. naive_solver.
+  Qed.
+
+  Lemma ltl_tme_always P P':
+    ltl_tme P P' →
+    ltl_tme (□ P) (□ P').
+  Proof.
+    intros Hse tr1 tr2 Htm. rewrite !trace_alwaysI. split.
+    - intros Hal tr2' Hsuff. destruct (traces_match_suffix_of _ _ _ _ _ _ _ Htm Hsuff) as (?&?&Htm').
+      apply (Hse _ _ Htm'). by apply Hal.
+    - intros Hal tr1' Hsuff. destruct (traces_match_suffix_of_inv _ _ _ _ _ _ _ Htm Hsuff) as (?&?&Htm').
+      apply (Hse _ _ Htm'). by apply Hal.
+  Qed.
+
+  Lemma ltl_tme_eventually P P':
+    ltl_tme P P' →
+    ltl_tme (◊ P) (◊ P').
+  Proof.
+    intros Hse tr1 tr2 Htm. rewrite !trace_eventuallyI. split.
+    - intros (?&Hsuff&?). destruct (traces_match_suffix_of_inv _ _ _ _ _ _ _ Htm Hsuff) as (?&?&Htm').
+      eexists _; split=>//. apply (Hse _ _ Htm'). naive_solver.
+    - intros (?&Hsuff&?). destruct (traces_match_suffix_of _ _ _ _ _ _ _ Htm Hsuff) as (?&?&Htm').
+      eexists _; split=>//. apply (Hse _ _ Htm'). naive_solver.
+  Qed.
+
+  Lemma ltl_tme_impl P P' Q Q':
+    ltl_tme P P' →
+    ltl_tme Q Q' →
+    ltl_tme (P → Q) (P' → Q').
+  Proof.
+    intros HseP HseQ tr1 tr2 Htm. rewrite !trace_impliesI.
+    split; intros Himpl H%(HseP _ _ Htm); apply (HseQ _ _ Htm); naive_solver.
+  Qed.
+
+  Lemma ltl_tme_forall {X} P P':
+    (∀ (x : X), ltl_tme (P x) (P' x)) →
+    ltl_tme (λ tr, ∀ x, P x tr) (λ tr, ∀ x, P' x tr).
+  Proof. intros Hse tr1 tr2 Hupto. naive_solver. Qed.
+End traces_match.

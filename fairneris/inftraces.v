@@ -140,6 +140,36 @@ Section traces.
       intros Hinf n. specialize (Hinf (1+n)).
       rewrite (after_sum' _ 1) // in Hinf.
     Qed.
+
+  Definition trace_suffix_of tr1 tr2 : Prop :=
+    ∃ n, after n tr2 = Some tr1.
+
+  (** trace_suffix_of lemmas  *)
+
+  Lemma trace_suffix_of_refl (tr : trace St L) :
+    trace_suffix_of tr tr.
+  Proof. by exists 0. Qed.
+
+  Lemma trace_suffix_of_cons_l s l (tr tr' : trace St L) :
+    trace_suffix_of (s -[l]-> tr) tr' → trace_suffix_of tr tr'.
+  Proof.
+    intros [n Hafter]. exists (Datatypes.S n).
+    replace (Datatypes.S n) with (n + 1) by lia.
+    rewrite after_sum'. rewrite Hafter. done.
+  Qed.
+
+  Lemma trace_suffix_of_cons_r s l (tr tr' : trace St L) :
+    trace_suffix_of tr tr' → trace_suffix_of tr (s -[l]-> tr').
+  Proof. intros [n Hafter]. by exists (Datatypes.S n). Qed.
+
+  Lemma trace_suffix_of_trans (tr tr' tr'' : trace St L) :
+    trace_suffix_of tr'' tr' → trace_suffix_of tr' tr → trace_suffix_of tr'' tr.
+  Proof.
+    intros [n Hsuffix1] [m Hsuffix2].
+    exists (n+m). rewrite after_sum. rewrite Hsuffix2.
+    rewrite Hsuffix1. done.
+  Qed.
+
   End after.
 
 End traces.
@@ -176,6 +206,37 @@ Section simulation.
     move=> /= Hm Ha. destruct tr2 as [|s ℓ tr2''] eqn:Heq; first done.
     destruct tr1; first by inversion Hm.
     inversion Hm; simplify_eq. by eapply IHn.
+  Qed.
+
+  Lemma traces_match_after_inv tr1 tr2 n tr1':
+    traces_match tr1 tr2 ->
+    after n tr1 = Some tr1' ->
+    (exists tr2', after n tr2 = Some tr2' ∧ traces_match tr1' tr2').
+  Proof.
+    revert tr1 tr2.
+    induction n; intros tr1 tr2.
+    { simpl. intros. exists tr2. simplify_eq. done. }
+    move=> /= Hm Ha. destruct tr1 as [|s ℓ tr1''] eqn:Heq; first done.
+    destruct tr2; first by inversion Hm.
+    inversion Hm; simplify_eq. by eapply IHn.
+  Qed.
+
+  Lemma traces_match_suffix_of tr1 tr2 tr2':
+    traces_match tr1 tr2 ->
+    trace_suffix_of tr2' tr2 →
+    (exists tr1', trace_suffix_of tr1' tr1 ∧ traces_match tr1' tr2').
+  Proof.
+    rewrite /trace_suffix_of.
+    intros ? [? Hafter]. eapply traces_match_after in Hafter; naive_solver.
+  Qed.
+
+  Lemma traces_match_suffix_of_inv tr1 tr2 tr1':
+    traces_match tr1 tr2 ->
+    trace_suffix_of tr1' tr1 →
+    (exists tr2', trace_suffix_of tr2' tr2 ∧ traces_match tr1' tr2').
+  Proof.
+    rewrite /trace_suffix_of.
+    intros ? [? Hafter]. eapply traces_match_after_inv in Hafter; naive_solver.
   Qed.
 
   Lemma traces_match_first tr1 tr2:
@@ -316,6 +377,40 @@ Section destuttering.
     - intros str' Hafter. simpl in Hafter.
       apply Hw. simpl. eapply IH =>//.
       by destruct Hind.
+  Qed.
+
+  Lemma upto_stutter_suffix_of btr str str':
+    upto_stutter btr str ->
+    trace_suffix_of str' str ->
+    ∃ btr', trace_suffix_of btr' btr ∧ upto_stutter btr' str'.
+  Proof.
+    unfold trace_suffix_of. intros ? [? Hafter]. eapply upto_stutter_after in Hafter; naive_solver.
+  Qed.
+
+  Lemma upto_stutter_after_inv {btr str} n {btr'}:
+    upto_stutter btr str ->
+    after n btr = Some btr' ->
+    ∃ n' str', after n' str = Some str' ∧ upto_stutter btr' str'.
+  Proof.
+    have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
+    { intros P [x ?]. by exists (S x). }
+    revert str btr btr'. induction n as [|n IH]; intros str btr btr' Hupto Hafter.
+    { injection Hafter => <-. clear Hafter. exists 0, str. done. }
+    revert btr' Hafter. punfold Hupto. induction Hupto as
+        [s|btr str s ℓ HUl HUs1 HUs2 Hind IHH|btr str s ℓ s' ℓ' ?? Hind].
+    - intros str' Hafter. done.
+    - intros btr' Hafter. eapply IH=>//. by pfold.
+    - intros str' Hafter. simpl in Hafter.
+      apply Hw. simpl. eapply IH =>//.
+      by destruct Hind.
+  Qed.
+
+  Lemma upto_stutter_suffix_of_inv btr str btr':
+    upto_stutter btr str ->
+    trace_suffix_of btr' btr ->
+    ∃ str', trace_suffix_of str' str ∧ upto_stutter btr' str'.
+  Proof.
+    unfold trace_suffix_of. intros ? [? Hafter]. eapply upto_stutter_after_inv in Hafter; naive_solver.
   Qed.
 
   Lemma upto_stutter_after_None {btr str} n:

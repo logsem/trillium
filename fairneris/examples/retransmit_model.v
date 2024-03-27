@@ -80,23 +80,23 @@ Lemma retransmit_live_spec_holds s ρ α s' :
   retransmit_trans s (ρ,α) s' → ρ ∈ retransmit_live_roles s.
 Proof. inversion 1; set_solver. Qed.
 
-Definition send_filter msg : retransmit_state → retransmit_label → Prop :=
-  λ _ l, snd l = Some $ Send msg.
-Instance send_filter_decision msg st l : Decision (send_filter msg st l).
+Definition send_filter msg : retransmit_label → Prop :=
+  λ l, snd l = Some $ Send msg.
+Instance send_filter_decision msg l : Decision (send_filter msg l).
 Proof. apply make_decision. Qed.
 
-Definition recv_filter msg : retransmit_state → retransmit_label → Prop :=
-  λ _ l, snd l = Some $ Recv (m_destination msg) (Some msg).
-Instance recv_filter_decision msg st l : Decision (recv_filter msg st l).
+Definition recv_filter msg : retransmit_label → Prop :=
+  λ l, snd l = Some $ Recv (m_destination msg) (Some msg).
+Instance recv_filter_decision msg l : Decision (recv_filter msg l).
 Proof. apply make_decision. Qed.
 
-Definition any_recv_filter sa : retransmit_state → retransmit_label → Prop :=
-  λ _ l, exists rcv, snd l = Some $ Recv sa rcv.
-Instance any_recv_filter_decision st l sa : Decision (any_recv_filter sa st l).
+Definition any_recv_filter sa : retransmit_label → Prop :=
+  λ l, exists rcv, snd l = Some $ Recv sa rcv.
+Instance any_recv_filter_decision l sa : Decision (any_recv_filter sa l).
 Proof. apply make_decision. Qed.
 
 Definition retransmit_fair_network_delivery msg : mtrace → Prop :=
-  □ (□◊!↓send_filter msg → □◊!↓ any_recv_filter (m_destination msg) → ◊!↓ recv_filter msg).
+  □ (□◊ℓ↓send_filter msg → □◊ℓ↓ any_recv_filter (m_destination msg) → ◊ℓ↓ recv_filter msg).
 
 Definition retransmit_fair_network (mtr : mtrace) : Prop :=
   ∀ msg, retransmit_fair_network_delivery msg mtr.
@@ -187,7 +187,7 @@ Lemma B_always_live_always_eventually_receive (mtr : mtrace) :
   mtrace_fair mtr →
   mtrace_valid mtr →
   (□ (trace_now (λ s _, retransmit_role_enabled_model Brole s))) mtr →
-  (□◊!↓ any_recv_filter saB) mtr.
+  (□◊ℓ↓ any_recv_filter saB) mtr.
 Proof.
   intros Hf Hval Hae. apply trace_alwaysI. intros mtr' Hsuff.
   have Hfs': retransmit_fair_scheduling mtr'.
@@ -212,7 +212,7 @@ Proof.
     eapply trace_always_elim in Hae. by destruct mtr''. }
   destruct mtr'' as [|s [ρ α]]; destruct Hfs''=>//.
   apply trace_eventually_intro=>//=.
-  rewrite /trace_now_label /pred_at /any_recv_filter /=.
+  rewrite /trace_label /pred_at /any_recv_filter /=.
   apply (trace_always_suffix_of _ _ _ Hsuff2), trace_always_elim in Hval.
   inversion Hval; simplify_eq; naive_solver.
 Qed.
@@ -221,7 +221,7 @@ Lemma B_always_receives (mtr : mtrace) :
   mtrace_fair mtr →
   mtrace_valid mtr →
   ¬ retransmit_terminating_role Brole mtr →
-  (□◊!↓ any_recv_filter saB) mtr.
+  (□◊ℓ↓ any_recv_filter saB) mtr.
 Proof.
   intros Hf Hval Hnt.
   apply B_always_live_infinite in Hnt.
@@ -247,7 +247,7 @@ Qed.
 
 Lemma retransmit_fair_traces_eventually_mAB mtr :
   mtrace_valid mtr → retransmit_fair_scheduling_mtr Arole mtr →
-  (◊ !↓ send_filter mAB) mtr.
+  (◊ ℓ↓ send_filter mAB) mtr.
 Proof.
   intros Hvalid Hfair.
   pose proof (retransmit_fair_traces_eventually_A mtr Hfair) as Htr.
@@ -264,7 +264,7 @@ Qed.
 
 Lemma retransmit_fair_traces_always_eventually_mAB mtr :
   mtrace_valid mtr → retransmit_fair_scheduling_mtr Arole mtr →
-  (□ ◊ !↓ send_filter mAB) mtr.
+  (□ ◊ ℓ↓ send_filter mAB) mtr.
 Proof.
   intros Hvalid Hfair. eapply trace_always_implies_always;
     [|apply trace_always_and; split; [apply Hvalid|apply Hfair]].
@@ -281,9 +281,9 @@ Proof.
   intros Hf Hval. apply NNP_P. intros Hnt.
   have Haer := Hnt.
   apply B_always_receives in Haer =>//.
-  have Haes: (□ ◊ !↓ send_filter mAB) mtr.
+  have Haes: (□ ◊ ℓ↓ send_filter mAB) mtr.
   { apply retransmit_fair_traces_always_eventually_mAB =>//. destruct Hf =>//. }
-  have Har: (◊ !↓ recv_filter mAB) mtr.
+  have Har: (◊ ℓ↓ recv_filter mAB) mtr.
   { destruct Hf as [Hsf Hnf].
     specialize (Hnf mAB).
     apply trace_always_elim in Hnf.
@@ -298,7 +298,7 @@ Proof.
 
   apply (trace_always_suffix_of _ _ _ Hsuff), trace_always_elim in Hval.
   have ? : Brole ∉ retransmit_live_roles (trfirst mtr'').
-  { rewrite /trace_now_label /pred_at /recv_filter /= in Hr.
+  { rewrite /trace_label /pred_at /recv_filter /= in Hr.
     inversion Hval; simplify_eq; try set_solver. }
   rewrite /trace_now /pred_at /=. destruct mtr''=>//.
 Qed.
