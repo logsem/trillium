@@ -192,12 +192,42 @@ Section measure.
          | _ => True
         end.
 
-  Definition trace_is_trimmed_alt (tr: jmtrace) :=
-    ∀ n, match after n tr with
-         | Some (s -[ℓ]-> tr') =>
-             ∃ ρ, ρ ∈ live_roles _ (trfirst tr')
-         | _ => True
-        end.
+  #[local] Instance decide_for_trimming tr:
+    Decision (∃ m : nat, pred_at tr m is_usr_step).
+  Proof. apply make_decision. Qed.
+
+  CoFixpoint trim_trace (tr: jmtrace) : jmtrace :=
+    match tr with
+    | ⟨ s ⟩ => ⟨ s ⟩
+    | s -[ℓ]-> tr' =>
+        if decide (∃ m, pred_at (s -[ℓ]-> tr') m is_usr_step) then
+          s -[ℓ]-> (trim_trace tr')
+        else
+          ⟨ s ⟩
+    end.
+
+  Definition match_trace (tr : jmtrace) :=
+    match tr with
+    | ⟨ s ⟩ => ⟨ s ⟩
+    | s -[ℓ]-> tr' => s -[ℓ]-> tr'
+    end.
+
+  Lemma unfold_trace tr :
+    tr = match_trace tr.
+  Proof. by destruct tr. Qed.
+
+  Lemma trim_trace_is_trimmed tr:
+    trace_is_trimmed tr.
+  Proof.
+  (*
+    Maybe, define a coinductive predicate to say that
+     ttr is the trimmed version of tr
+    and then:
+    1. prove that trimed_of tr (trim_trace tr)
+    2. trimed_of tr ttr → trace_is_trimmed ttr
+    ???
+   *)
+  Admitted.
 
   Lemma trace_no_roles_no_usr tr:
     jmtrace_valid tr →
