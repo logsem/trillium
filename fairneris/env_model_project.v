@@ -1,6 +1,7 @@
 From stdpp Require Import option countable.
 From fairneris Require Export inftraces trace_utils fairness env_model ltl_lite.
 From trillium.prelude Require Import classical classical_instances.
+From Paco Require Import paco2 pacotac.
 
 Section measure.
   Context {Λ: language}.
@@ -178,7 +179,7 @@ Section measure.
         let ρ := choose _ Hin in
         match decide (jmtrace_valid tr ∧ fair_scheduling tr) with
         | left (conj Hval Hf) =>
-            env_steps_count_good tr ρ Hval Hf (choose_correct (λ ρ, ρ ∈ live_roles _ (trfirst tr)) _)
+            S $ env_steps_count_good tr ρ Hval Hf (choose_correct (λ ρ, ρ ∈ live_roles _ (trfirst tr)) _)
         | right _ => 0
         end
     | right _ =>
@@ -188,7 +189,7 @@ Section measure.
   Definition trace_is_trimmed (tr: jmtrace) :=
     ∀ n, match after n tr with
          | Some (s -[ℓ]-> tr') =>
-             ∃ m, pred_at tr' m is_usr_step
+             ∃ m, pred_at (s -[ℓ]-> tr') m is_usr_step
          | _ => True
         end.
 
@@ -206,28 +207,111 @@ Section measure.
           ⟨ s ⟩
     end.
 
-  Definition match_trace (tr : jmtrace) :=
-    match tr with
-    | ⟨ s ⟩ => ⟨ s ⟩
-    | s -[ℓ]-> tr' => s -[ℓ]-> tr'
-    end.
+  Inductive trimmed_of_ind (trimmed_of: jmtrace → jmtrace → Prop) : jmtrace → jmtrace → Prop :=
+  | TrimmedEnd s : trimmed_of_ind trimmed_of ⟨s⟩ ⟨s⟩
+  | TrimmedKeep s ℓ tr1 tr2 :
+    trimmed_of tr1 tr2 →
+    (∃ m, pred_at (s -[ℓ]-> tr1) m is_usr_step) →
+    trimmed_of_ind trimmed_of (s -[ℓ]-> tr1) (s -[ℓ]-> tr2)
+  | TrimmedStop s ℓ tr1 tr2 :
+    trimmed_of tr1 tr2 →
+    (¬ ∃ m, pred_at (s -[ℓ]-> tr1) m is_usr_step) →
+    trimmed_of_ind trimmed_of (s -[ℓ]-> tr1) ⟨s⟩.
 
-  Lemma unfold_trace tr :
-    tr = match_trace tr.
-  Proof. by destruct tr. Qed.
+  Definition trimmed_of := paco2 trimmed_of_ind bot2.
+
+  Lemma trimmed_of_mono :
+    monotone2 (trimmed_of_ind).
+  Proof.
+    unfold monotone2. intros x0 x1 r r' IN LE.
+    induction IN; try (econstructor; eauto; done).
+  Qed.
+  Hint Resolve trimmed_of_mono : paco.
+
+  Lemma trim_trace_trimmed_of tr:
+    trimmed_of tr (trim_trace tr).
+  Proof.
+    revert tr. pcofix CH=> tr. pfold.
+    destruct tr as [s|s ℓ tr]; rewrite (trace_unfold_fold (trim_trace _)) /=.
+    { constructor. }
+    destruct (decide _).
+    - constructor 2=>//. by right.
+    - econstructor 3=>//. by right.
+  Qed.
+
+  Lemma trimmed_of_after m tr1 tr2 tr2':
+    trimmed_of tr1 tr2 →
+    after m tr2 = Some tr2' →
+    ∃ tr1', after m tr1 = Some tr1' ∧ trimmed_of tr1' tr2'.
+  Proof.
+    revert tr1 tr2 tr2'. induction m as [|m IH]; intros tr1 tr2 tr2' Hto.
+    - destruct tr1; simpl; intros ?; simplify_eq; naive_solver.
+    - destruct tr1=>//; punfold Hto.
+      + inversion Hto; simplify_eq; naive_solver.
+      + inversion Hto; simplify_eq; last naive_solver. simpl.
+        eintros ?%IH=>//. by pclearbot.
+  Qed.
+
+  Lemma trimmed_of_pred_at_usr m tr1 tr2:
+    trimmed_of tr1 tr2 →
+    pred_at tr1 m is_usr_step →
+    pred_at tr2 m is_usr_step.
+  Proof.
+    revert tr1 tr2. induction m as [|m IH]; intros tr1 tr2 Hto.
+    - destruct tr1=>//. punfold Hto. inversion Hto; simplify_eq; naive_solver.
+    - destruct tr1=>//. punfold Hto. inversion Hto; simplify_eq; last naive_solver.
+      rewrite !pred_at_S. intros ?. eapply IH=>//. by pclearbot.
+  Qed.
+
+  Lemma trimmed_of_pred_at_usr_ex tr1 tr2:
+    trimmed_of tr1 tr2 →
+    (∃ m, pred_at tr1 m is_usr_step) →
+    ∃ m, pred_at tr2 m is_usr_step.
+  Proof. have ?:= trimmed_of_pred_at_usr. naive_solver. Qed.
+
+  Lemma trimmed_of_is_trimmed tr1 tr2:
+    trimmed_of tr1 tr2 →
+    trace_is_trimmed tr2.
+  Proof.
+    intros Hto n. revert tr1 tr2 Hto. induction n as [|n IH]; intros tr1 tr2 Hto.
+    - destruct tr1 as [s1 | s1 ℓ1 tr1].
+      + punfold Hto. by inversion Hto; simplify_eq.
+      + punfold Hto. inversion Hto; simplify_eq; simpl=>//.
+        eapply trimmed_of_pred_at_usr_ex=>//. pfold. done.
+    - destruct tr1 as [s1 | s1 ℓ1 tr1].
+      + punfold Hto. by inversion Hto; simplify_eq.
+      + punfold Hto. inversion Hto; simplify_eq; simpl=>//.
+        eapply IH. pclearbot. done.
+  Qed.
 
   Lemma trim_trace_is_trimmed tr:
-    trace_is_trimmed tr.
+    trace_is_trimmed (trim_trace tr).
+  Proof. eapply trimmed_of_is_trimmed, trim_trace_trimmed_of. Qed.
+
+  Lemma trimmed_of_infinite tr1 tr2:
+    trimmed_of tr1 tr2 →
+    infinite_trace tr2 →
+    trace_equiv tr1 tr2.
   Proof.
-  (*
-    Maybe, define a coinductive predicate to say that
-     ttr is the trimmed version of tr
-    and then:
-    1. prove that trimed_of tr (trim_trace tr)
-    2. trimed_of tr ttr → trace_is_trimmed ttr
-    ???
-   *)
-  Admitted.
+    revert tr1 tr2. cofix CH; intros tr1 tr2 Hto Hinf.
+    destruct tr1 as [s|s ℓ tr1].
+    - punfold Hto. inversion Hto; simplify_eq. done.
+    - punfold Hto. inversion Hto; simplify_eq.
+      + constructor=>//. apply CH=>//.
+        * pclearbot. done.
+        * eapply infinite_cons. done.
+      + exfalso. clear CH. specialize (Hinf 1). simpl in Hinf.
+        inversion Hinf. naive_solver.
+  Qed.
+
+  Lemma trim_trace_infinite tr:
+    infinite_trace (trim_trace tr) →
+    trace_equiv tr (trim_trace tr).
+  Proof.
+    intros Hinf.
+    eapply trimmed_of_infinite=>//.
+    apply trim_trace_trimmed_of.
+  Qed.
 
   Lemma trace_no_roles_no_usr tr:
     jmtrace_valid tr →
@@ -255,6 +339,13 @@ Section measure.
       inversion Hval; simplify_eq. naive_solver.
   Qed.
 
+  Definition trace_is_trimmed_alt (tr: jmtrace) :=
+    ∀ n, match after n tr with
+         | Some (s -[ℓ]-> tr') =>
+             ∃ ρ, ρ ∈ live_roles _ s
+         | _ => True
+        end.
+
   Lemma trace_is_trimmed_equiv tr :
     jmtrace_valid tr →
     trace_is_trimmed tr →
@@ -264,12 +355,11 @@ Section measure.
     specialize (Htr n).
     destruct (after n tr) as [[|s ℓ tr']|] eqn:Heq=>//.
     apply NNP_P. intros Hc.
-    have Hemp: live_roles _ (trfirst tr') = ∅.
+    have Hemp: live_roles _ s = ∅.
     { set_solver. }
-    apply (trace_always_suffix_of _ _ tr') in Hval; last first.
-    { have ?: trace_suffix_of (s -[ℓ]-> tr') tr by eexists.
-      by eapply trace_suffix_of_cons_l. }
-    have ?:= trace_no_roles_no_usr tr' Hval Hemp.
+    apply (trace_always_suffix_of _ _ (s -[ℓ]-> tr')) in Hval; last first.
+    { by eexists. }
+    have ?:= trace_no_roles_no_usr (s -[ℓ]-> tr') Hval Hemp.
     naive_solver.
   Qed.
 
@@ -301,27 +391,33 @@ Section measure.
       by inversion Hval; simplify_eq. }
     rewrite /env_steps_count_total.
 
-    have Hlive1: ∃ ρ : fmrole JM, ρ ∈ live_roles JM (trfirst tr').
+    have Hlive1: ∃ ρ : fmrole JM, ρ ∈ live_roles JM s.
     { apply trace_is_trimmed_equiv in Htrim=>//.
       specialize (Htrim n). rewrite Heq // in Htrim. }
-    have Hlive2: ∃ ρ : fmrole JM, ρ ∈ live_roles JM s.
-    { apply (trace_always_suffix_of _ _ _ Hsuff1), trace_always_elim in Hval.
-      destruct s as [us ns]. unfold trans_valid in Hval. destruct (trfirst tr').
-      by inversion Hval; simplify_eq. }
-    destruct (decide _) as [Hin1|]; last naive_solver.
-    destruct (decide _) as [[Hval1 Hfair1]|]; last first.
-    { exfalso.
+
+    have ? : jmtrace_valid tr' ∧ fair_scheduling tr'.
+    { apply NNP_P. intros ?.
       have ?: jmtrace_valid tr' by apply (trace_always_suffix_of _ _ _ Hsuff2) in Hval.
       have ?: fair_scheduling tr'.
       { intros ρ. eapply (trace_always_suffix_of _ _ _ Hsuff2) in Hf. apply Hf. }
       naive_solver. }
-    destruct (decide _) as [Hin2|]; last naive_solver.
-    destruct (decide _) as [[Hval2 Hfair2]|]; last first.
-    { exfalso.
+
+    have ? : jmtrace_valid (s -[ inr f ]-> tr') ∧ fair_scheduling (s -[ inr f ]-> tr').
+    { apply NNP_P. intros ?.
       have ?: jmtrace_valid (s -[ inr f ]-> tr') by apply (trace_always_suffix_of _ _ _ Hsuff1) in Hval.
       have ?: fair_scheduling (s -[ inr f ]-> tr').
       { intros ρ. eapply (trace_always_suffix_of _ _ _ Hsuff1) in Hf. apply Hf. }
       naive_solver. }
+
+    destruct (decide _) as [Hin1|]; last first.
+    { destruct (decide _) as [|]; last done.
+      destruct (decide _) as [[??]|]; last done. lia. }
+
+    destruct (decide _) as [[Hval1 Hfair1]|]; last done.
+    destruct (decide _) as [Hin2|]; last done.
+    destruct (decide _) as [[Hval2 Hfair2]|]; last done.
+
+    rewrite -Nat.succ_lt_mono.
 
     generalize (choose_correct (λ ρ : fmrole JM, ρ ∈ live_roles JM (trfirst tr')) Hin1) as Hin1'.
     intros Hin1'.
@@ -337,6 +433,7 @@ Section measure.
 
     have [? _] := env_steps_count_good_correct _ _ Hval1 Hfair1 Hin1'.
     have [? _] := env_steps_count_good_correct _ _ Hval2 Hfair2 Hin2'.
+
 
     eapply env_steps_count_step_gt=>//.
   Qed.
