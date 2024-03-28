@@ -424,6 +424,13 @@ Section ltl_lemmas.
       by specialize (H _ Hsuff).
   Qed.
 
+  Lemma trace_always_eventually_always_until (P : trace S L → Prop) (tr : trace S L) :
+    (□ ◊P) tr → (□ trace_until (trace_not P) (P)) tr.
+  Proof.
+    rewrite !trace_alwaysI. intros He tr' Hsuff.
+    apply trace_eventually_until. apply He=>//.
+  Qed.
+
   Lemma trace_always_forall {A} (P : A → trace S L → Prop) tr :
     (∀ (x:A), (□ (P x)) tr) ↔ (□ (λ tr', ∀ x, P x tr')) tr.
   Proof.
