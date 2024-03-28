@@ -1,5 +1,5 @@
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From fairneris Require Export trace_utils fairness env_model fuel ltl_lite.
+From fairneris Require Export trace_utils fairness env_model fuel ltl_lite env_model_project.
 From fairneris.aneris_lang Require Import ast network lang aneris_lang.
 
 Definition net_state : Set :=
@@ -188,3 +188,41 @@ Section exec_fairness.
         apply cfg_labels_match_is_eq in Hlm. simplify_eq. done.
   Qed.
 End exec_fairness.
+
+Section fairness.
+  Context {M: UserModel aneris_lang}.
+
+  Notation jmlabel := ((usr_role M * option (action aneris_lang)) + config_label aneris_lang)%type.
+  Notation jmtrace := (trace (joint_model M net_model) jmlabel).
+
+  Notation ltl_equiv P := (ltl_tme (S1 := joint_model M net_model) (L1 := jmlabel)
+                             eq eq (λ _ _ _, True) (λ _ _ _, True) P P).
+
+  Lemma trim_preserves_network_fairness (tr: jmtrace):
+    network_fair_delivery tr →
+    network_fair_delivery (trim_trace tr).
+  Proof.
+    rewrite /network_fair_delivery /network_fair_delivery_of.
+    intros Hf msg. specialize (Hf msg).
+    apply trace_alwaysI. intros tr' Hsuff. rewrite trace_impliesI. intros Hae.
+    have Hinf: infinite_trace tr'.
+    { by eapply trace_always_eventually_label_infinite. }
+    have Hinf': infinite_trace (trim_trace tr).
+    { eapply trace_suffix_of_infinite=>//. }
+    apply trim_trace_infinite in Hinf'.
+    rewrite trace_alwaysI in Hf.
+    eapply traces_match_suffix_of in Hsuff as (tr''&Hsuff'&?)=>//.
+    specialize (Hf _ Hsuff').
+    rewrite trace_impliesI in Hf.
+
+    have Hleq: ltl_equiv (□ ◊ ℓ↓ send_filter msg).
+    { apply ltl_tme_always, ltl_tme_eventually, ltl_tme_now. naive_solver. }
+
+    ospecialize (Hf _); first by eapply Hleq=>//.
+
+    have {}Hleq: ltl_equiv (◊ ℓ↓ deliver_filter msg).
+    { apply ltl_tme_eventually, ltl_tme_now. naive_solver. }
+
+    eapply Hleq=>//.
+  Qed.
+End fairness.

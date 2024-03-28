@@ -170,6 +170,30 @@ Section traces.
     rewrite Hsuffix1. done.
   Qed.
 
+  Lemma trace_suffix_of_infinite (tr tr': trace St L) :
+    trace_suffix_of tr' tr →
+    infinite_trace tr' →
+    infinite_trace tr.
+  Proof.
+    intros [n Hafter] Hinf m.
+    destruct (decide (m < n)).
+    - have Heq: n = m + (n - m) by lia.
+      rewrite Heq in Hafter.
+      rewrite after_sum' in Hafter.
+      destruct (after _ _)=>//.
+    - have Heq: m = n + (m - n) by lia.
+      rewrite Heq after_sum' Hafter. apply Hinf.
+  Qed.
+
+  Lemma trace_suffix_of_infinite' (tr tr': trace St L) :
+    trace_suffix_of tr' tr →
+    infinite_trace tr →
+    infinite_trace tr'.
+  Proof.
+    intros [n Hafter] Hinf m.
+    specialize (Hinf (n+m)).
+    rewrite after_sum' Hafter // in Hinf.
+  Qed.
   End after.
 
 End traces.

@@ -438,3 +438,5 @@ Section measure.
     eapply env_steps_count_step_gt=>//.
   Qed.
 End measure.
+
+Arguments trim_trace {_ _ _ _ _ _ _ _}.
