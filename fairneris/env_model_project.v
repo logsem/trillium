@@ -1,7 +1,8 @@
 From stdpp Require Import option countable.
 From fairneris Require Export inftraces trace_utils fairness env_model ltl_lite.
-From trillium.prelude Require Import classical classical_instances.
+From trillium.prelude Require Import classical classical_instances finitary.
 From Paco Require Import paco2 pacotac.
+From Coq.Logic Require Import Classical.
 
 Section measure.
   Context {Λ: language}.
@@ -252,6 +253,18 @@ Section measure.
         eintros ?%IH=>//. by pclearbot.
   Qed.
 
+  Lemma trimmed_of_suffix_of tr1 tr2 tr2':
+    trimmed_of tr1 tr2 →
+    trace_suffix_of tr2' tr2 →
+    ∃ tr1', trace_suffix_of tr1' tr1 ∧ trimmed_of tr1' tr2'.
+  Proof.
+    intros ? [? Ha]. eapply trimmed_of_after in Ha as [tr1' ?]=>//.
+    exists tr1'. rewrite /trace_suffix_of. naive_solver.
+  Qed.
+
+  (* Lemma trimmed_of_finite_last *)
+
+
   Lemma trimmed_of_pred_at_usr m tr1 tr2:
     trimmed_of tr1 tr2 →
     pred_at tr1 m is_usr_step →
@@ -337,6 +350,72 @@ Section measure.
       by eapply (fm_live_spec _ _ _ α (trfirst tr)).
     - rewrite /trans_valid in Hval. destruct (trfirst tr).
       inversion Hval; simplify_eq. naive_solver.
+  Qed.
+
+  Lemma trace_no_usr_cst_live_roles n tr tr':
+    jmtrace_valid tr →
+    (∀ n, ¬ pred_at tr n is_usr_step) →
+    after n tr = Some tr' →
+    live_roles _ (trfirst tr) = live_roles _ (trfirst tr').
+  Proof.
+    revert tr tr'. induction n as [|n IH]; intros tr tr' Hval Hdead Hafter; first naive_solver.
+    destruct tr as [s|s ℓ tr]; first naive_solver.
+    rewrite /= in Hafter.
+    transitivity (live_roles _ (trfirst tr)).
+    - apply trace_always_elim in Hval.
+      destruct ℓ.
+      { exfalso. by apply (Hdead 0). }
+      unfold trans_valid in Hval.
+      destruct (trfirst tr) eqn:Heq; inversion Hval; simplify_eq=>//.
+    - apply IH=>//.
+      + eapply trace_always_suffix_of=>//. apply trace_suffix_of_cons_r, trace_suffix_of_refl.
+      + intros m. specialize (Hdead (1+m)). naive_solver.
+  Qed.
+
+  Lemma trace_no_roles_no_usr_inv tr:
+    jmtrace_valid tr →
+    fair_scheduling tr →
+    (∀ n, ¬ pred_at tr n is_usr_step) →
+    live_roles _ (trfirst tr) = ∅.
+  Proof.
+    intros Hval Hfair Hdead.
+    apply NNP_P. intros Hne.
+    apply finitary.set_choose_L' in Hne as [ρ Hin].
+    specialize (Hfair ρ). apply trace_always_elim in Hfair.
+    rewrite trace_impliesI in Hfair.
+    ospecialize (Hfair _).
+    { destruct tr=>//. }
+    rewrite trace_eventuallyI in Hfair.
+    destruct Hfair as (tr'&[n Hafter]&Hx).
+    have Hafter' := Hafter.
+    apply trace_no_usr_cst_live_roles in Hafter=>//.
+    destruct tr' eqn:Heq.
+    - destruct Hx as [Hx|Hx]. set_solver. naive_solver.
+    - destruct Hx as [Hx|[? Hx]]. set_solver.
+      apply (Hdead n). rewrite /pred_at Hafter'. naive_solver.
+  Qed.
+
+  Lemma trimmed_of_None_fair n (tr tr' : jmtrace) tr1:
+    jmtrace_valid tr →
+    fair_scheduling tr →
+    trimmed_of tr tr' →
+    after n tr = Some tr1 →
+    after n tr' = None →
+    ∃ s n', n' < n ∧ after n' tr' = Some ⟨s⟩ ∧ live_roles _ s = ∅.
+  Proof.
+    revert tr tr' tr1. induction n as [|n IH]; intros tr tr' tr1 Hval Hfair Htrim HafterS HafterN.
+    { punfold Htrim. inversion Htrim; simplify_eq. }
+    destruct tr as [s | s ℓ tr]; punfold Htrim; inversion Htrim; simplify_eq;
+      simpl in HafterS, HafterN.
+    - odestruct (IH _ _ _ _ _ _ HafterS HafterN) as (s'&n'&CC&DD&EE)=>//.
+      { eapply trace_always_suffix_of=>//. apply trace_suffix_of_cons_r, trace_suffix_of_refl. }
+      { intros ρ. specialize (Hfair ρ).
+        eapply trace_always_suffix_of=>//. apply trace_suffix_of_cons_r, trace_suffix_of_refl. }
+      { by pclearbot. }
+      exists s', (1 + n'). split; first lia. simpl. split=>//.
+    - exists s, 0. split; first lia. split=>//.
+      change s with (trfirst (s -[ ℓ ]-> tr)).
+      eapply trace_no_roles_no_usr_inv=>//. by apply not_ex_all_not.
   Qed.
 
   Definition trace_is_trimmed_alt (tr: jmtrace) :=
@@ -439,4 +518,74 @@ Section measure.
   Qed.
 End measure.
 
+Arguments fair_scheduling {_ _ _ _ _ _ _ _}.
+Arguments fair_scheduling_mtr {_ _ _ _ _ _ _ _}.
 Arguments trim_trace {_ _ _ _ _ _ _ _}.
+Arguments trimmed_of {_ _ _ _ _ _ _ _}.
+Arguments jmtrace_valid {_ _ _ _ _ _ _ _}.
+
+Section trim_scheduling_fairness.
+  Context `{GoodLang Λ}.
+  Context {M: UserModel Λ}.
+  Context {N: EnvModel Λ}.
+
+  Notation JM := (joint_model M N).
+  Notation jmlabel := (fmlabel JM).
+  Notation jmtrace := (trace JM jmlabel).
+
+  Notation ltl_equiv P := (ltl_tme (S1 := JM) (L1 := jmlabel)
+                             eq eq (λ _ _ _, True) (λ _ _ _, True) P P).
+
+  Lemma trimming_preserves_fair_scheduling (tr : jmtrace):
+    jmtrace_valid tr →
+    fair_scheduling tr →
+    fair_scheduling (trim_trace tr).
+  Proof.
+    have: trimmed_of tr (trim_trace tr).
+    { apply trim_trace_trimmed_of. }
+    generalize (trim_trace tr). intros ttr Htrim.
+
+    rewrite /fair_scheduling /fair_scheduling_mtr /trace_always_eventually_implies_now.
+    rewrite /trace_always_eventually_implies. intros Hval Hf ρ.
+    have Hfair := Hf.
+    specialize (Hf ρ).
+    rewrite trace_alwaysI. intros ttr' Hsuff. rewrite trace_impliesI. intros Hlive.
+
+    have {}Hlive: ρ ∈ live_roles _ (trfirst ttr').
+    { destruct ttr'=>//. }
+
+    destruct (trimmed_of_suffix_of _ _ _ _ _ Htrim Hsuff) as [tr' [Hsuff' Htrim']].
+
+    have Hfeq: trfirst tr' = trfirst ttr'.
+    { punfold Htrim'. inversion Htrim'=>//. apply trimmed_of_mono. }
+
+    rewrite trace_alwaysI in Hf. specialize (Hf _ Hsuff').
+    rewrite trace_impliesI in Hf. ospecialize (Hf _).
+    { rewrite /trace_now /pred_at. destruct tr'; simpl; naive_solver. }
+    rewrite trace_eventuallyI in Hf. destruct Hf as [tr'' [Hsuff'' Hf]].
+
+    destruct Hsuff'' as [n Hn].
+    destruct (after n ttr') as [ttr''|] eqn:Heq.
+    - rewrite trace_eventuallyI. exists ttr''. split; [by exists n|].
+      eapply trimmed_of_after in Heq as [tr''' [Hafter Htrim'']]=>//.
+      have ?: tr''' = tr'' by congruence. simplify_eq.
+      revert Hf. rewrite /trace_now /pred_at //=.
+      destruct tr'', ttr'';
+      (punfold Htrim''; last apply trimmed_of_mono); inversion Htrim''; simplify_eq=>//.
+      intros _. left.
+      have Hsuff0: trace_suffix_of (s0 -[ ℓ ]-> tr'') tr.
+      { eapply trace_suffix_of_trans=>//. by exists n. }
+      opose proof (trace_no_roles_no_usr_inv _ _ (s0 -[ ℓ ]-> tr'') _ _ _) as Hnr.
+      + eapply trace_always_suffix_of=>//.
+      + intros ρ0. specialize (Hfair ρ0).
+        eapply trace_always_suffix_of=>//.
+      + by apply not_ex_all_not.
+      + simpl in Hnr. rewrite Hnr. set_solver.
+    - unshelve eapply (trimmed_of_None_fair _ _ _ _ _ _ _ _ Htrim') in Heq=>//.
+      { eapply trace_always_suffix_of=>//. }
+      { intros ρ0. specialize (Hfair ρ0). eapply trace_always_suffix_of=>//. }
+      destruct Heq as (s&n'&Hleq&Hafter&Hnl).
+      rewrite trace_eventuallyI. exists ⟨s⟩. split; [by exists n'|].
+      rewrite /trace_now /pred_at //=. simpl in Hnl. rewrite Hnl. left. set_solver.
+  Qed.
+End trim_scheduling_fairness.
