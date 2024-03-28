@@ -95,11 +95,27 @@ Section fairness.
   Instance deliver_filter_decision msg l : Decision (deliver_filter msg l).
   Proof. apply make_decision. Qed.
 
+  Definition recv_filter msg : jmlabel → Prop :=
+    λ l, ∃ ρ, l = inl $ (ρ, Some $ Recv (m_destination msg) (Some msg)).
+  Instance recv_filter_decision msg l : Decision (deliver_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition any_recv_filter sa : jmlabel → Prop :=
+    λ l, ∃ ρ omsg, l = inl $ (ρ, Some $ Recv sa omsg).
+  Instance any_recv_filter_decision msg l : Decision (deliver_filter msg l).
+  Proof. apply make_decision. Qed.
+
   Definition network_fair_delivery_of msg : jmtrace → Prop :=
     □ (□◊ ℓ↓send_filter msg → ◊ ℓ↓ deliver_filter msg).
 
   Definition network_fair_delivery (mtr : jmtrace) : Prop :=
     ∀ msg, network_fair_delivery_of msg mtr.
+
+  Definition network_fair_send_receive_of msg : jmtrace → Prop :=
+    □ (□◊ℓ↓send_filter msg → □◊ℓ↓ any_recv_filter (m_destination msg) → ◊ℓ↓ recv_filter msg).
+
+  Definition network_fair_send_receive (mtr : jmtrace) : Prop :=
+    ∀ msg, network_fair_send_receive_of msg mtr.
 End fairness.
 
 Section fuel_fairness.
@@ -226,3 +242,64 @@ Section fairness.
     eapply Hleq=>//.
   Qed.
 End fairness.
+
+
+Section user_fairness.
+  Context {M: UserModel aneris_lang}.
+
+  Notation jmlabel := ((usr_role M * option (action aneris_lang)) + config_label aneris_lang)%type.
+  Notation jmtrace := (trace (joint_model M net_model) jmlabel).
+
+  Notation buffer_of sa ns := (ns.2.2 !! sa).
+
+  (* Proposition network_fairness_user_eventually_in_buffer msg (jmtr: jmtrace) : *)
+  (*   network_fair_delivery jmtr → *)
+  (*   (□◊ℓ↓send_filter msg) jmtr → *)
+  (*   (◊ℓ↓send_filter msg) jmtr → *)
+
+
+
+  (*   → □◊ℓ↓ any_recv_filter (m_destination msg) → ◊ℓ↓ recv_filter msg). *)
+  (* Proof. *)
+
+  Proposition network_fairness_user (jmtr: jmtrace) :
+    network_fair_delivery jmtr → network_fair_send_receive jmtr.
+  Proof.
+    intros Hf msg. apply trace_alwaysI. intros tr' Hsuff.
+    apply trace_impliesI. intros Hae.
+    specialize (Hf msg).
+    rewrite /network_fair_delivery_of trace_alwaysI in Hf. specialize (Hf _ Hsuff).
+    rewrite trace_impliesI in Hf. specialize (Hf Hae). clear Hae.
+    rewrite trace_impliesI. intros Hae.
+
+    rewrite trace_eventuallyI in Hf. destruct Hf as (tr1&Hsuff1&Hdel).
+    destruct tr1 as [|s1 ℓ1 tr1].
+    { rewrite /trace_label /pred_at //= in Hdel. }
+    pose sa := m_destination msg.
+    assert (∃ rest, (buffer_of sa (trfirst tr1) = Some (msg::rest))) as [rest Hbuf1].
+    { admit. }
+
+    assert (∃ pre tr2, trace_suffix_of tr2 tr1 ∧ buffer_of sa (trfirst tr2) = Some (pre ++ [msg])).
+    { have: (□ trace_until
+               (trace_not (ℓ↓ any_recv_filter (m_destination msg)))
+               (ℓ↓ any_recv_filter (m_destination msg))) tr1.
+      { admit. }
+      clear Hdel Hsuff1.
+      have {Hbuf1}: ∃ pre, buffer_of sa (trfirst tr1) = Some (pre ++ msg :: rest) by exists nil.
+      revert tr1. induction rest as [|msg' rest IH] using rev_ind.
+      { intros tr1 [pre Hbuf1] _. exists pre, tr1. list_simplifier. split=>//. apply trace_suffix_of_refl. }
+      intros tr1 Hbuf Hrecvs.
+      apply trace_always_elim in Hrecvs.
+      induction Hrecvs as [tr Hnow|s ℓ tr Hnot Huntil IHuntil].
+      - destruct tr as [s|s ℓ tr].
+        { rewrite /trace_label /pred_at //= in Hnow. }
+        rewrite /trace_label /pred_at /= in Hnow.
+        destruct ℓ as [ℓ|ℓ]; last first.
+        { rewrite /any_recv_filter in Hnow. naive_solver. }
+        rewrite /any_recv_filter in Hnow. destruct Hnow as (ρ&omsg&Heq). simplify_eq.
+        (* use that jmtr is a valid trace, etc *)
+        admit.
+      - (* look at the first label, and then use IHuntil... *)
+        admit.
+  Admitted.
+End user_fairness.
