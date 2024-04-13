@@ -43,10 +43,10 @@ Proof. solve_inG. Qed.
 }.
 
 (** Override the notations so that scopes and coercions work out *)
-Notation "l ↦{ q } v" := (mapsto (L:=loc) (V:=val) l (DfracOwn q) v%V)
+Notation "l ↦{ q } v" := (pointsto (L:=loc) (V:=val) l (DfracOwn q) v%V)
   (at level 20, q at level 50, format "l  ↦{ q }  v") : bi_scope.
 Notation "l ↦ v" :=
-  (mapsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
+  (pointsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
 Notation "l ↦{ q } -" := (∃ v, l ↦{q} v)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -") : bi_scope.
 Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : bi_scope.

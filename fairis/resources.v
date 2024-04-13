@@ -242,7 +242,7 @@ End model_state_interp.
 Lemma own_proper `{inG Σ X} γ (x y: X):
   x ≡ y ->
   own γ x -∗ own γ y.
-Proof. by intros ->. Qed.
+Proof. intros ->; auto. Qed.
 
 Section model_state_lemmas.
   Context `{Countable (locale Λ)}.
@@ -377,23 +377,12 @@ Section model_state_lemmas.
     iDestruct (own_valid_2 with "Hauth Hfrag") as %Hvalid.
     iPureIntro.
     apply auth_both_valid_discrete in Hvalid as [Hincl Hvalid].
-    rewrite fmap_insert fmap_empty in Hincl.
-    rewrite lookup_included in Hincl.
-    specialize (Hincl ζ).
-    rewrite lookup_insert in Hincl.
-    apply option_included in Hincl.
-    destruct Hincl as [|Hincl]; [done|].
-    destruct Hincl as (a&b&Ha&Hb&Hincl).
-    simplify_eq.
-    rewrite lookup_fmap_Some in Hb.
-    destruct Hb as (b'&Heq&HSome).
-    simplify_eq.
-    rewrite HSome. f_equiv.
-    destruct Hincl as [Hincl|Hincl].
-    - naive_solver.
-    - apply Some_included_2 in Hincl.
-      rewrite Excl_included in Hincl.
-      naive_solver.
+    rewrite map_fmap_singleton in Hincl.
+    apply singleton_included_exclusive_l in Hincl;
+      [|apply _|done].
+    rewrite lookup_fmap in Hincl.
+    apply leibniz_equiv in Hincl.
+    destruct (m !! ζ); simplify_eq/=; done.
   Qed.
 
   Lemma has_fuels_update fm ζ fs fs' :
@@ -759,7 +748,7 @@ Section model_state_lemmas.
       apply elem_of_union. left.
       apply elem_of_dom.
       apply elem_of_dom in Hdom as [f Heq]. exists f.
-      by apply map_filter_lookup_Some_2.
+      by apply map_lookup_filter_Some_2.
     - eexists ζ', fs. by rewrite lookup_alter_ne.
   Qed.
 
@@ -883,8 +872,8 @@ Section model_state_lemmas.
       intros k v1 Hv2.
       rewrite /model_update_locale_role_map lookup_fmap in Hv2.
       apply fmap_Some in Hv2 as [? [Hv2 ->]].
-      pose proof Hv2 as Hv2'%map_filter_lookup_Some_1_2.
-      apply map_filter_lookup_Some_1_1 in Hv2.
+      pose proof Hv2 as Hv2'%map_lookup_filter_Some_1_2.
+      apply map_lookup_filter_Some_1_1 in Hv2.
       assert (k ∈ dom fs) as Hv2''.
       { destruct Hv2' as [Hv2'|Hv2']; [|done].
         rewrite -(dom_fmap_L S fs).
@@ -937,11 +926,13 @@ Section model_state_lemmas.
     assert ((S <$> fs) !! ρ = Some (S f1)) as Hρ'; [by rewrite lookup_fmap Hρ|].
     specialize (Hρs ρ (S f1) Hρ') as [v2 [Hv2 Hle]].
     destruct v2; [lia|]. exists v2. split; [|lia].
-    rewrite !lookup_fmap map_filter_lookup Hv2=> /=.
-    destruct (decide (ρ ∈ live_roles M δ ∨ ρ ∈ dom fs)) as [Hin|Hnin].
-    + rewrite option_guard_True; [|done]. simpl. f_equiv. lia.
-    + apply Decidable.not_or in Hnin. destruct Hnin as [Hnin1 Hnin2].
-      apply not_elem_of_dom in Hnin2. set_solver.
+    rewrite !lookup_fmap.
+    erewrite map_lookup_filter_Some_2; [|done|]; first by simpl; f_equal; lia.
+    simpl.
+    destruct (decide (ρ ∈ live_roles M δ ∨ ρ ∈ dom fs))
+      as [Hin|Hnin]; first done.
+    apply Decidable.not_or in Hnin. destruct Hnin as [Hnin1 Hnin2].
+    apply not_elem_of_dom in Hnin2. set_solver.
   Qed.
 
   Lemma fuel_map_preserve_dead_fuel_step fm ζ fs (δ:LM) :
@@ -1123,7 +1114,7 @@ Section model_state_lemmas.
       as "[Hfm Hf]".
     iDestruct (model_agree with "Hm Hs") as %<-.
     iMod (model_update _ _ s2 with "Hm Hs") as "[Hm Hs]".
-    iModIntro. iFrame. iExists _. iFrame.
+    iModIntro. iFrame.
     rewrite Hδ2. iFrame.
     iPureIntro.
     split; [|split].
@@ -1277,10 +1268,10 @@ Section model_state_lemmas.
       done.
     - rewrite Hδ2. simpl. rewrite lookup_alter. rewrite lookup_fmap.
       apply elem_of_dom in Hρ' as [f' Heq].
-      rewrite map_filter_lookup.
-      rewrite Heq. simpl.
-      rewrite option_guard_True; [done|].
-      set_solver.
+      apply fmap_Some; eexists; split; last done.
+      apply fmap_Some; eexists; split; last done.
+      apply map_lookup_filter_Some_2; first done.
+      right; set_solver.
     - rewrite map_included_spec.
       intros ρ' f' HSome.
       assert (ρ ≠ ρ').
@@ -1292,7 +1283,7 @@ Section model_state_lemmas.
       simpl in *.
       rewrite lookup_alter_ne in HSome; [|done].
       rewrite lookup_fmap in HSome.
-      rewrite map_filter_lookup in HSome. simpl in *.
+      rewrite map_lookup_filter in HSome. simpl in *.
       destruct (fs' !! ρ') eqn:Heqn; [|done].
       simpl in *.
       destruct (decide (ρ' ∈ live_roles M δ ∨ ρ' ∈ {[ρ]} ∪ dom fs)) as [Hin|Hnin].
@@ -1507,14 +1498,14 @@ Section model_state_lemmas.
           split; [done|].
           apply elem_of_dom. rewrite /is_Some.
           apply elem_of_dom in Hin' as [??].
-          eexists _. by apply map_filter_lookup_Some_2.
+          eexists _. by apply map_lookup_filter_Some_2.
         - exists ζ, (filter (λ ρf : fmrole M * nat, ρf.1 ∉ ρs) fs).
           rewrite lookup_insert_ne; [|done].
           rewrite lookup_alter. rewrite HSome. simpl.
           split; [done|].
           apply elem_of_dom. rewrite /is_Some.
           apply elem_of_dom in Hin' as [??].
-          eexists _. by apply map_filter_lookup_Some_2. }
+          eexists _. by apply map_lookup_filter_Some_2. }
       exists ζ', fs. split; [|done].
       simpl. rewrite !lookup_insert_ne; [|done].
       rewrite lookup_alter_ne; [|done].
@@ -1616,7 +1607,7 @@ Section model_state_lemmas.
     iMod (has_fuels_split _ _ (locale_of tp1 efork) with "Hfm Hf")
       as "[Hfm [Hf1 Hf2]]"; [|done|].
     { set_solver. }
-    iModIntro. iFrame. iExists _. iFrame. rewrite Hδ2. iFrame.
+    iModIntro. iFrame. rewrite Hδ2. iFrame.
     iPureIntro.
     split; [|split].
     - split; last first.

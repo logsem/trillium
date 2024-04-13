@@ -145,13 +145,13 @@ Proof.
   rewrite !map_included_spec.
   intros HP Hle k v1 HSome1.
   pose proof HSome1 as HP'.
-  apply map_filter_lookup_Some_1_1 in HSome1.
-  apply map_filter_lookup_Some_1_2 in HP'.
+  apply map_lookup_filter_Some_1_1 in HSome1.
+  apply map_lookup_filter_Some_1_2 in HP'.
   pose proof HSome1 as HSome2.
   apply Hle in HSome2 as [v2 [HSome2 HR]].
   specialize (HP k v1 v2 HSome1 HSome2 HP').
   exists v2. split; [|done].
-  by apply map_filter_lookup_Some_2.
+  by apply map_lookup_filter_Some_2.
 Qed.
 
 Lemma map_included_subseteq_r `{∀ A, Lookup K A (MAP A)} {A}

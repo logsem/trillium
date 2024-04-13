@@ -260,7 +260,7 @@ Proof.
 Qed.
 Lemma wp_value_inv' s E ζ Φ v :
   WP of_val v @ s; ζ; E {{ Φ }} -∗ |~{E}~| Φ v.
-Proof. by rewrite wp_unfold /wp_pre to_of_val pre_step_unseal. Qed.
+Proof. rewrite wp_unfold /wp_pre to_of_val pre_step_unseal; auto. Qed.
 
 Lemma wp_strong_mono s1 s2 E1 E2 ζ e Φ Ψ :
   s1 ⊑ s2 → E1 ⊆ E2 →

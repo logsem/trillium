@@ -31,7 +31,7 @@ Lemma tac_wp_pure_helper `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} tid E K e1
 Proof.
   intros Hne HPE Hφ. specialize (HPE Hφ).
   revert e1 e2 fs Hne HPE. induction n; intros e1 e2 fs Hne HPE.
-  { inversion HPE. rewrite has_fuel_fuels_plus_0. by simplify_eq. }
+  { inversion HPE. rewrite has_fuel_fuels_plus_0. iIntros "?"; done. }
 
   inversion HPE; simplify_eq.
 
@@ -48,7 +48,7 @@ Qed.
 Lemma equiv_wand {Σ} (P Q: iProp Σ):
   P ≡ Q ->
   P -∗ Q.
-Proof. by intros ->. Qed.
+Proof. intros ->; auto. Qed.
 
 Lemma maps_gt_n {Mdl} (fs: gmap (fmrole Mdl) _) n:
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->

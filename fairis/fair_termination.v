@@ -17,7 +17,7 @@ Definition extrace_fairly_terminating {Λ} `{Countable (locale Λ)}
 Class FairTerminatingModel (Mdl: FairModel) := {
   ftm_leq: relation Mdl;
   ftm_order: PreOrder ftm_leq;
-  ftm_wf: wf (strict ftm_leq);
+  ftm_wf: well_founded (strict ftm_leq);
 
   ftm_decreasing_role: Mdl -> fmrole Mdl;
   ftm_decr:

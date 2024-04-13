@@ -20,7 +20,8 @@ Lemma posts_of_empty_mapping `{heapGS Σ M} (e1 e: expr) v (tid : nat) (tp : lis
   tid ↦M ∅.
 Proof.
   intros Hsome Hval. simpl.
-  rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (λ _: val, tid ↦M ∅)%I) _) //.
+  rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (λ _: val, tid ↦M ∅)%I) _);
+    first by auto.
   apply elem_of_list_omap.
   exists (e, (λ _: val, tid ↦M ∅)%I); split; last first.
   - simpl. apply fmap_Some. exists v. split; done.
@@ -115,7 +116,7 @@ Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
   (∀ `{Hinv : !heapGS Σ LM},
     ⊢ |={⊤}=>
        (* state_interp (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)) ∗ *)
-       ([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) -∗
+       ([∗ map] l ↦ v ∈ heap σ1, pointsto l (DfracOwn 1) v) -∗
        frag_model_is s1 -∗
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1)) ={⊤}=∗

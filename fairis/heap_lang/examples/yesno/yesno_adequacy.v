@@ -131,7 +131,7 @@ Proof.
   intros [[?|?] [Hneq HnR]%Classical_Prop.not_or_and] =>//.
 Qed.
 
-Lemma wf_bool_le: wf (strict bool_le).
+Lemma wf_bool_le: well_founded (strict bool_le).
 Proof.
   intros b. destruct b; constructor; intros b' h; destruct b'; inversion h as [h1 h2];
               [done| | inversion h1| done]. clear h1 h2.
@@ -155,7 +155,7 @@ Qed.
   |}.
 Next Obligation.
   unfold the_order.
-  assert (H: wf (lexprod nat bool (strict Nat.le) (strict bool_le))).
+  assert (H: well_founded (lexprod nat bool (strict Nat.le) (strict bool_le))).
   + apply wf_lexprod; last apply wf_bool_le.
     eapply (wf_projected _ id); last apply Nat.lt_wf_0.
     intros ??[??]. simpl. lia.
