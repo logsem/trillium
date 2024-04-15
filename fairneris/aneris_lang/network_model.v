@@ -250,55 +250,64 @@ Section user_fairness.
   Notation jmlabel := ((usr_role M * option (action aneris_lang)) + config_label aneris_lang)%type.
   Notation jmtrace := (trace (joint_model M net_model) jmlabel).
 
-  Notation buffer_of sa ns := (ns.2.2 !! sa).
-
-  (* Proposition network_fairness_user_eventually_in_buffer msg (jmtr: jmtrace) : *)
-  (*   network_fair_delivery jmtr → *)
-  (*   (□◊ℓ↓send_filter msg) jmtr → *)
-  (*   (◊ℓ↓send_filter msg) jmtr → *)
-
-
-
-  (*   → □◊ℓ↓ any_recv_filter (m_destination msg) → ◊ℓ↓ recv_filter msg). *)
-  (* Proof. *)
+  Notation buffer_of sa ns := (ns.2.2 !!! sa).
 
   Proposition network_fairness_user (jmtr: jmtrace) :
-    network_fair_delivery jmtr → network_fair_send_receive jmtr.
+    jmtrace_valid jmtr →
+    network_fair_delivery jmtr →
+    network_fair_send_receive jmtr.
   Proof.
-    intros Hf msg. apply trace_alwaysI. intros tr' Hsuff.
+    intros Hv Hf msg. apply trace_alwaysI. intros tr' Hsuff.
     apply trace_impliesI. intros Hae.
     specialize (Hf msg).
     rewrite /network_fair_delivery_of trace_alwaysI in Hf. specialize (Hf _ Hsuff).
     rewrite trace_impliesI in Hf. specialize (Hf Hae). clear Hae.
     rewrite trace_impliesI. intros Hae.
+    apply trace_always_eventually_always_until in Hae.
 
     rewrite trace_eventuallyI in Hf. destruct Hf as (tr1&Hsuff1&Hdel).
     destruct tr1 as [|s1 ℓ1 tr1].
     { rewrite /trace_label /pred_at //= in Hdel. }
     pose sa := m_destination msg.
-    assert (∃ rest, (buffer_of sa (trfirst tr1) = Some (msg::rest))) as [rest Hbuf1].
+    assert (∃ rest, (buffer_of sa (trfirst tr1) = msg::rest)) as [rest Hbuf1].
     { admit. }
 
-    assert (∃ pre tr2, trace_suffix_of tr2 tr1 ∧ buffer_of sa (trfirst tr2) = Some (pre ++ [msg])).
-    { have: (□ trace_until
-               (trace_not (ℓ↓ any_recv_filter (m_destination msg)))
-               (ℓ↓ any_recv_filter (m_destination msg))) tr1.
-      { admit. }
+    assert (∃ pre tr2, trace_suffix_of tr2 tr1 ∧ buffer_of sa (trfirst tr2) = pre ++ [msg]).
+    { have {Hv}: jmtrace_valid tr1.
+      { eapply trace_always_suffix_of =>//. eapply trace_suffix_of_trans;
+          [eapply trace_suffix_of_cons_l=>// | done]. }
+      have {Hbuf1}: ∃ pre, buffer_of sa (trfirst tr1) = pre ++ msg :: rest by exists nil.
+      have {Hae}: (□ trace_until (trace_not (ℓ↓ any_recv_filter (m_destination msg))) (ℓ↓ any_recv_filter (m_destination msg))) tr1.
+      { eapply trace_always_suffix_of =>//. eapply trace_suffix_of_cons_l=>//. }
       clear Hdel Hsuff1.
-      have {Hbuf1}: ∃ pre, buffer_of sa (trfirst tr1) = Some (pre ++ msg :: rest) by exists nil.
       revert tr1. induction rest as [|msg' rest IH] using rev_ind.
-      { intros tr1 [pre Hbuf1] _. exists pre, tr1. list_simplifier. split=>//. apply trace_suffix_of_refl. }
-      intros tr1 Hbuf Hrecvs.
+      { intros tr1 Hae [pre Hbuf1] Hv. exists pre, tr1. list_simplifier. split=>//. apply trace_suffix_of_refl. }
+      intros tr1 Hae Hbuf Hv.
+      have Hrecvs := Hae.
       apply trace_always_elim in Hrecvs.
       induction Hrecvs as [tr Hnow|s ℓ tr Hnot Huntil IHuntil].
-      - destruct tr as [s|s ℓ tr].
+      - destruct tr as [s|s2 ℓ2 tr2] eqn:Htr.
         { rewrite /trace_label /pred_at //= in Hnow. }
         rewrite /trace_label /pred_at /= in Hnow.
-        destruct ℓ as [ℓ|ℓ]; last first.
+        destruct ℓ2 as [ℓ2|ℓ2]; last first.
         { rewrite /any_recv_filter in Hnow. naive_solver. }
+        have Hv' := Hv.
         rewrite /any_recv_filter in Hnow. destruct Hnow as (ρ&omsg&Heq). simplify_eq.
-        (* use that jmtr is a valid trace, etc *)
-        admit.
+        apply trace_always_elim in Hv. simpl in Hv.
+        destruct (trfirst tr2) eqn:Heq. rewrite Heq in Hv.
+        destruct Hbuf as (pre&Hbuf1). simpl in Hbuf1.
+        inversion Hv; simplify_eq.
+        simpl in Hbuf1.
+        inversion H5; simplify_eq.
+        + simpl in Hbuf1. rewrite /sa in Hbuf1. exfalso. rewrite Hbuf1 in H4. destruct pre=>//.
+        + rewrite Hbuf1 in H4. list_simplifier.
+          odestruct (IH tr2 _ _ _) as (pre3&tr3&?&Heq3).
+          { eapply trace_always_suffix_of in Hae =>//.
+            eapply trace_suffix_of_cons_r, trace_suffix_of_refl. }.
+          { exists pre. rewrite Heq /= lookup_total_insert //. }
+          { eapply trace_always_suffix_of=>//. apply trace_suffix_of_cons_r, trace_suffix_of_refl. }
+          exists pre3, tr3. split=>//.
+          apply (trace_suffix_of_trans _ tr2)=>//. apply trace_suffix_of_cons_r, trace_suffix_of_refl.
       - (* look at the first label, and then use IHuntil... *)
         admit.
   Admitted.
