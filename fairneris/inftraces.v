@@ -162,6 +162,10 @@ Section traces.
     trace_suffix_of tr tr' → trace_suffix_of tr (s -[l]-> tr').
   Proof. intros [n Hafter]. by exists (Datatypes.S n). Qed.
 
+  Lemma trace_suffix_of_cons_r' s l (tr : trace St L) :
+    trace_suffix_of tr (s -[l]-> tr).
+  Proof. by exists (Datatypes.S 0). Qed.
+
   Lemma trace_suffix_of_trans (tr tr' tr'' : trace St L) :
     trace_suffix_of tr'' tr' → trace_suffix_of tr' tr → trace_suffix_of tr'' tr.
   Proof.
