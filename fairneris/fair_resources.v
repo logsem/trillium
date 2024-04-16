@@ -351,6 +351,18 @@ Section adequacy.
     gmap (locale Λ) (exclR $ gmap (usr_role M) nat) :=
     {[ ζ0 := Excl (gset_to_gmap (usr_fl s0) (usr_live_roles s0)) ]}.
 
+  Lemma model_fuel_mapping_init_gen (fss: gmap (locale Λ) (gmap M.(usr_role) nat)) :
+    let fss' := fmap Excl fss: ucmra_car (gmapUR _ (exclR $ gmapUR (RoleO M) natO)) in
+    ⊢ |==> ∃ γ, own γ (● fss') ∗ own γ (◯ fss').
+  Proof.
+    intros fss'.
+    iMod (own_alloc (● fss' ⋅ ◯ fss')) as (γ) "[Hfl Hfr]".
+    { apply auth_both_valid_2; eauto.
+      intros i. rewrite /fss'. rewrite lookup_fmap.
+      destruct (fss !! i) as [fs|] eqn:Heq; rewrite Heq //. }
+    iExists _. by iSplitL "Hfl".
+  Qed.
+
   Lemma model_fuel_mapping_init (s0: M) (ζ0: locale Λ) :
     ⊢ |==> ∃ γ,
       own γ (● (init_fuel_map s0 ζ0)) ∗
