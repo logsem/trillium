@@ -12,7 +12,10 @@ Class irisG (Λ : language) (M : Model) (Σ : gFunctors) := IrisG {
   the remaining observations, and [nat] is the number of forked-off threads
   (not the total number of threads, which is one higher because there is always
   a main thread). *)
+  (* TODO: Consider redefining as [option (locale Λ → option (action Λ))] arg *)
   state_interp : execution_trace Λ → auxiliary_trace M → iProp Σ;
+  state_interp' : execution_trace Λ → auxiliary_trace M →
+                  locale Λ → option (action Λ) → iProp Σ;
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -920,3 +923,76 @@ Section proofmode_classes.
   Qed.
 
 End proofmode_classes.
+
+Definition sswp `{!irisG Λ M Σ} (s : stuckness)
+           E ζ e1 (Φ : expr Λ → option (action Λ) → iProp Σ) : iProp Σ :=
+  ⌜TCEq (to_val e1) None⌝ ∧
+  ∀ (extr : execution_trace Λ) (atr : auxiliary_trace M) K tp1 tp2 σ1,
+  ⌜valid_exec extr⌝ -∗
+  ⌜locale_of tp1 (ectx_fill K e1) = ζ⌝ -∗
+  ⌜trace_ends_in extr (tp1 ++ ectx_fill K e1 :: tp2, σ1)⌝ -∗
+  state_interp extr atr ={E,∅}=∗
+  ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
+  ∀ α e2 σ2 efs,
+  ⌜prim_step e1 σ1 α e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
+  state_interp'
+    (trace_extend extr (inl (ζ,α)) (tp1 ++ ectx_fill K e2 :: tp2, σ2))
+    atr ζ α ∗ Φ e2 α ∗ ⌜efs = []⌝.
+
+Definition MU `{!irisG Λ M Σ} E ζ α (P : iProp Σ) : iProp Σ :=
+  ∀ (extr : execution_trace Λ) (atr : auxiliary_trace M),
+  state_interp' extr atr ζ α ={E}=∗
+  ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) ∗ P.
+
+Lemma sswp_MU_wp_fupd `{!irisG Λ M Σ} s E E' ζ e Φ :
+  (|={E,E'}=> sswp s E' ζ e (λ e' α, MU E' ζ α ((|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))))%I -∗
+  WP e @ s; ζ; E {{ Φ }}.
+Proof.
+  rewrite wp_unfold /wp_pre.
+  iIntros "Hsswp".
+  destruct (to_val e) eqn:Heqn.
+  { iMod "Hsswp" as (Hval) "_". inversion Hval. by simplify_eq. }
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+  iMod "Hsswp" as "[_ Hsswp]".
+  iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp".
+  iModIntro. iSplit; [done|].
+  iIntros (α e2 σ2 efs Hstep).
+  iDestruct ("Hsswp" with "[//]") as "Hsswp".
+  iApply (step_fupdN_wand with "Hsswp"). iIntros ">(Hσ & HMU & ->)".
+  iMod ("HMU" with "Hσ") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
+  iExists _, _. rewrite right_id_L. by iFrame.
+Qed.
+
+
+Lemma sswp_wand `{!irisG Λ M Σ} s E ζ e
+      (Φ Ψ : expr Λ → option (action Λ) → iProp Σ) :
+  (∀ e α, Φ e α -∗ Ψ e α) -∗ sswp s E ζ e Φ -∗ sswp s E ζ e Ψ.
+Proof.
+  rewrite /sswp. iIntros "HΦΨ [%Hval Hsswp]".
+  iSplit; [done|].
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+  iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp".
+  iModIntro. iSplit; [done|].
+  iIntros (α e2 σ2 efs Hstep).
+  iDestruct ("Hsswp" with "[//]") as "Hsswp".
+  iApply (step_fupdN_wand with "Hsswp"). iIntros ">(Hσ & HMU & ->)".
+  iFrame. iModIntro. iSplit; [|done]. by iApply "HΦΨ".
+Qed.
+
+Lemma MU_wand `{!irisG Λ M Σ} E ζ α (P Q : iProp Σ) :
+  (P -∗ Q) -∗ MU E ζ α P -∗ MU E ζ α Q.
+Proof.
+  rewrite /MU. iIntros "HPQ HMU".
+  iIntros (extr atr) "Hσ".
+  iMod ("HMU" with "Hσ") as (??) "[Hσ HP]". iModIntro.
+  iExists _, _. iFrame. by iApply "HPQ".
+Qed.
+
+Lemma sswp_MU_wp `{!irisG Λ m Σ} s E ζ e (Φ : val Λ → iProp Σ) :
+  sswp s E ζ e (λ e' α, MU E ζ α (WP e' @ s; ζ;  E {{ Φ }})) -∗
+  WP e @ s; ζ; E {{ Φ }}.
+Proof.
+  iIntros "Hsswp". iApply sswp_MU_wp_fupd. iModIntro.
+  iApply (sswp_wand with "[] Hsswp").
+  iIntros (??) "HMU". iApply (MU_wand with "[] HMU"). by iIntros "$ !>".
+Qed.
