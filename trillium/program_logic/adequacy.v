@@ -1047,13 +1047,14 @@ Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
   length es ≥ 1 →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
+       stateI None (trace_singleton (es, σ)) (trace_singleton δ) ∗
        wptp s es Φs ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
          ⌜valid_system_trace ex atr⌝ -∗
@@ -1064,13 +1065,13 @@ Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
                            trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
          ⌜locales_equiv es (take (length es) c.1)⌝ -∗
-         stateI ex atr -∗
+         stateI None ex atr -∗
          posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
                               (prefixes_from es (drop (length es) c.1)))) -∗
-         □ (stateI ex atr ∗
+         □ (stateI None ex atr ∗
             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ →
                               ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
+            ={⊤}=∗ stateI None ex atr ∗ trace_inv ex atr) ∗
          ((∀ ex' atr' oζ ℓ,
              ⌜trace_contract ex oζ ex'⌝ →
              ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
@@ -1095,7 +1096,7 @@ Proof.
               ⌜(es, σ) = c1⌝ ∗
               ⌜δ = δ1⌝ ∗
               ⌜length c1.1 ≥ 1⌝ ∗
-              stateI ex atr ∗
+              stateI None ex atr ∗
               (∀ ex' atr' oζ ℓ,
                   ⌜trace_contract ex oζ ex'⌝ →
                   ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr') ∗
@@ -1150,11 +1151,11 @@ Proof.
     iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
     iApply fupd_plain_mask.
     iMod ("Hξ" with "HTI") as "%"; auto. }
-  iAssert (□ (stateI ex atr -∗
+  iAssert (□ (stateI None ex atr -∗
              (∀ ex' atr' oζ ℓ,
                  ⌜trace_contract ex oζ ex'⌝ →
                  ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-                 ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I as "#HTIextend".
+                 ={⊤}=∗ stateI None ex atr ∗ trace_inv ex atr))%I as "#HTIextend".
   { iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[#Hext _]";
       auto.
     iModIntro.
@@ -1214,7 +1215,7 @@ Proof.
   iMod "Hstp" as "(% & H)".
   iDestruct "H" as (δ'' ℓ) "(HSI & Hpost & Hback)"; simpl in *.
   iSpecialize ("Hback" with "Hpost").
-  replace stateI with state_interp by done.
+  replace (stateI None) with (state_interp) by done.
   iPoseProof (wptp_of_val_post with "Hback") as "Hback".
   iMod (pre_step_elim with "HSI Hback") as "[HSI Hback]".
   (* iDestruct ("H" with "Hpost") as "[? Hξ]". *)
@@ -1296,13 +1297,14 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
         e1 σ1 δ:
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φ : val Λ → iProp Σ)
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI (trace_singleton ([e1], σ1)) (trace_singleton δ) ∗
+       stateI None (trace_singleton ([e1], σ1)) (trace_singleton δ) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
          ⌜valid_system_trace ex atr⌝ -∗
@@ -1312,11 +1314,11 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
          ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
          ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
-         stateI ex atr -∗
+         stateI None ex atr -∗
          posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
-         □ (stateI ex atr ∗
+         □ (stateI None ex atr ∗
              (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
+            ={⊤}=∗ stateI None ex atr ∗ trace_inv ex atr) ∗
          ((∀ ex' atr' oζ ℓ,
               ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
           ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
@@ -1463,13 +1465,14 @@ Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
   rel_finitary ξ →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
+       stateI None (trace_singleton (es, σ)) (trace_singleton δ) ∗
        wptp s es Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ) δ) →
   continued_simulation ξ (trace_singleton (es, σ)) (trace_singleton δ).
@@ -1485,13 +1488,14 @@ Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
   rel_finitary ξ →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φ : val Λ → iProp Σ)
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
+       stateI None (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
        rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1], σ1) δ1) →
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
@@ -1508,12 +1512,13 @@ Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
   rel_finitary ξ →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
+       stateI None (trace_singleton (es, σ)) (trace_singleton δ) ∗
        wptp s es Φs ∗
        rel_always_holds s Φs ξ (es, σ) δ) →
   continued_simulation ξ (trace_singleton (es, σ)) (trace_singleton δ).
@@ -1537,12 +1542,13 @@ Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
   rel_finitary ξ →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φ : val Λ → iProp Σ)
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
-       stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
+       stateI None (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
        rel_always_holds s [Φ] ξ ([e1], σ1) δ1) →
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
@@ -1663,7 +1669,8 @@ Corollary adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), 
   rel_finitary ξ →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ),
@@ -1671,7 +1678,7 @@ Corollary adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), 
        ⌜length φs = length Φs⌝ ∗
        config_wp ∗
        ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
-       stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
+       stateI None (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
        wptp s es Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ1) δ1) →
   adequate_multiple s es σ1 ((λ φ v _, φ v) <$> φs).
@@ -1722,14 +1729,15 @@ Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecisio
   rel_finitary ξ →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φ : val Λ → iProp Σ)
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        (∀ v, Φ v -∗ ⌜φ v⌝) ∗
-       stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
+       stateI None (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
        rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1],σ1) δ1) →
   adequate s e1 σ1 (λ v _, φ v).
@@ -1757,7 +1765,8 @@ Corollary sim_and_adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mla
   rel_finitary ξ →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ),
@@ -1765,7 +1774,7 @@ Corollary sim_and_adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mla
        ⌜length φs = length Φs⌝ ∗
        config_wp ∗
        ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
-       stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
+       stateI None (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
        wptp s es Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ1) δ1) →
   (continued_simulation ξ (trace_singleton (es, σ1)) (trace_singleton δ1) ∧
@@ -1785,14 +1794,15 @@ Corollary sim_and_adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), E
   rel_finitary ξ →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
+         (stateI : option (locale Λ * option (action Λ))
+  → execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φ : val Λ → iProp Σ)
          (fork_post : locale Λ → val Λ → iProp Σ),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        (∀ v, Φ v -∗ ⌜φ v⌝) ∗
-       stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
+       stateI None (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
        rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1],σ1) δ1) →
   (continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∧
@@ -1807,10 +1817,10 @@ Qed.
 (* Corollary wp_adequacy Λ M Σ `{!invGpreS Σ} s e σ δ φ : *)
 (*   (∀ `{Hinv : !invGS_gen HasNoLc Σ}, *)
 (*      ⊢ |={⊤}=> ∃ *)
-(*          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
+(*          (stateI None : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
 (*          (fork_post : locale Λ -> val Λ → iProp Σ), *)
-(*        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in *)
-(*        config_wp ∗ stateI (trace_singleton ([e], σ)) (trace_singleton δ) ∗ *)
+(*        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI None fork_post in *)
+(*        config_wp ∗ stateI None (trace_singleton ([e], σ)) (trace_singleton δ) ∗ *)
 (*        WP e @ s; locale_of [] e; ⊤ {{ v, ⌜φ v⌝ }}) → *)
 (*   adequate s e σ (λ v _, φ v). *)
 (* Proof. *)
@@ -1820,7 +1830,7 @@ Qed.
 (*   apply (wp_strong_adequacy Λ M Σ s). *)
 (*   { admit. } *)
 (*   iIntros (?) "". *)
-(*   iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp)". *)
+(*   iMod Hwp as (stateI None fork_post) "(config_wp & HSI & Hwp)". *)
 (*   iModIntro; iExists _, _, _; iFrame. *)
 (*   iIntros (ex atr c Hvlt Hexs Hatrs Hexe Hψ Hnst) "HSI Hposts". *)
 (*   iApply fupd_mask_intro_discard; first done. *)
@@ -1862,17 +1872,17 @@ Qed.
 (*   rel_finitary (wp_invariance_relation Λ M e1 σ1 t2 σ2 φ) → *)
 (*   (∀ `{Hinv : !invGS_gen HasNoLc Σ}, *)
 (*      ⊢ |={⊤}=> ∃ *)
-(*          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
+(*          (stateI None : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
 (*          (fork_post : locale Λ -> val Λ → iProp Σ), *)
-(*        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in *)
-(*        config_wp ∗ stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗ *)
+(*        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI None fork_post in *)
+(*        config_wp ∗ stateI None (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗ *)
 (*        WP e1 @ s; locale_of [] e1; ⊤ {{ _, True }} ∗ *)
 (*        (∀ ex atr, *)
 (*            ⌜valid_system_trace ex atr⌝ → *)
 (*            ⌜trace_starts_in ex ([e1], σ1)⌝ → *)
 (*            ⌜trace_starts_in atr δ1⌝ → *)
 (*            ⌜trace_ends_in ex (t2, σ2)⌝ → *)
-(*            stateI ex atr -∗ ∃ E, |={⊤,E}=> ⌜φ⌝)) → *)
+(*            stateI None ex atr -∗ ∃ E, |={⊤,E}=> ⌜φ⌝)) → *)
 (*   ∀ ex, *)
 (*     valid_exec ex → *)
 (*     trace_starts_in ex ([e1], σ1) → *)
@@ -1883,7 +1893,7 @@ Qed.
 (*   apply (wp_invariance_relation_invariance _ _ δ1). *)
 (*   apply (wp_strong_adequacy Λ M Σ s); first done. *)
 (*   iIntros (?) "". *)
-(*   iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp & Hφ)". *)
+(*   iMod Hwp as (stateI None fork_post) "(config_wp & HSI & Hwp & Hφ)". *)
 (*   iModIntro; iExists _, _, _; iFrame. *)
 (*   iIntros (ex atr c Hvlt Hexs Hatrs Hexe Hψ Hnst) "HSI Hposts". *)
 (*   rewrite /wp_invariance_relation. *)
