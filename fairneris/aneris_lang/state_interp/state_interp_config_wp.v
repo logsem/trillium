@@ -186,7 +186,8 @@ Section state_interpretation.
             [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       + iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
-        iExists _. iFrame. iPureIntro. unshelve by eapply env_apply_trans_spec_both.
+        iExists _. simpl. iFrame. rewrite Hex. iFrame. iPureIntro.
+        unshelve eapply env_apply_trans_spec_both in Hem; [..|done|done|by rewrite Hex].
         exact inhabitant.
     - destruct H as (Hsteps & Hmatch & Htids).
       iSplitR.
@@ -205,7 +206,8 @@ Section state_interpretation.
       iFrame "Hauth". simpl.
       iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first.
       { iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
-        iExists _. iFrame. iPureIntro. unshelve by eapply env_apply_trans_spec_both.
+        iExists _. simpl. iFrame. rewrite Hex. iFrame. iPureIntro.
+        unshelve eapply env_apply_trans_spec_both in Hem; [..|done|done|by rewrite Hex].
         exact inhabitant. }
       iExists γm, mh. iFrame.
       iSplit.
@@ -232,7 +234,8 @@ Section state_interpretation.
       iFrame "Hauth". simpl.
       iModIntro. iSplitL "Hnauth Hsi Hlcoh Hfreeips Hmctx Hmres"; last first.
       { iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
-        iExists _. iFrame. iPureIntro. unshelve by eapply env_apply_trans_spec_both.
+        iExists _. simpl. iFrame. rewrite Hex. iFrame. iPureIntro.
+        unshelve eapply env_apply_trans_spec_both in Hem; [..|done|done|by rewrite Hex].
         exact inhabitant. }
       iExists γm, mh. iFrame.
       iSplit.

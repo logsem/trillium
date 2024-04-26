@@ -13,9 +13,7 @@ Class irisG (Λ : language) (M : Model) (Σ : gFunctors) := IrisG {
   (not the total number of threads, which is one higher because there is always
   a main thread). *)
   (* TODO: Consider redefining as [option (locale Λ → option (action Λ))] arg *)
-  state_interp : execution_trace Λ → auxiliary_trace M → iProp Σ;
-  state_interp' : execution_trace Λ → auxiliary_trace M →
-                  locale Λ → option (action Λ) → iProp Σ;
+  state_interp_opt : (option (locale Λ * option (action Λ))) → execution_trace Λ → auxiliary_trace M → iProp Σ;
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -23,6 +21,8 @@ Class irisG (Λ : language) (M : Model) (Σ : gFunctors) := IrisG {
   fork_post : locale Λ → val Λ → iProp Σ;
 }.
 Global Opaque iris_invGS.
+
+Notation state_interp := (state_interp_opt None).
 
 (* TODO: Move this *)
 Definition pre_step_def `{!irisG Λ M Σ} E1 E2 (P:iProp Σ) : iProp Σ :=
@@ -924,6 +924,8 @@ Section proofmode_classes.
 
 End proofmode_classes.
 
+Notation state_interp_oos ζ α := (state_interp_opt (Some (ζ,α))).
+
 Definition sswp `{!irisG Λ M Σ} (s : stuckness)
            E ζ e1 (Φ : expr Λ → option (action Λ) → iProp Σ) : iProp Σ :=
   ⌜TCEq (to_val e1) None⌝ ∧
@@ -935,13 +937,13 @@ Definition sswp `{!irisG Λ M Σ} (s : stuckness)
   ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
   ∀ α e2 σ2 efs,
   ⌜prim_step e1 σ1 α e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
-  state_interp'
+  state_interp_oos ζ α
     (trace_extend extr (inl (ζ,α)) (tp1 ++ ectx_fill K e2 :: tp2, σ2))
-    atr ζ α ∗ Φ e2 α ∗ ⌜efs = []⌝.
+    atr ∗ Φ e2 α ∗ ⌜efs = []⌝.
 
 Definition MU `{!irisG Λ M Σ} E ζ α (P : iProp Σ) : iProp Σ :=
   ∀ (extr : execution_trace Λ) (atr : auxiliary_trace M),
-  state_interp' extr atr ζ α ={E}=∗
+  state_interp_oos  ζ α extr atr ={E}=∗
   ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) ∗ P.
 
 Lemma sswp_MU_wp_fupd `{!irisG Λ M Σ} s E E' ζ e Φ :
@@ -962,7 +964,6 @@ Proof.
   iMod ("HMU" with "Hσ") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
   iExists _, _. rewrite right_id_L. by iFrame.
 Qed.
-
 
 Lemma sswp_wand `{!irisG Λ M Σ} s E ζ e
       (Φ Ψ : expr Λ → option (action Λ) → iProp Σ) :
