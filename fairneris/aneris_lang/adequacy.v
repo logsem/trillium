@@ -1,6 +1,7 @@
 From Paco Require Import pacotac.
 From stdpp Require Import finite.
 From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import excl.
 From trillium Require Import adequacy.
 From fairneris Require Import fairness retransmit_model fair_resources.
 From fairneris.aneris_lang Require Import aneris_lang resources network_model.
@@ -153,8 +154,6 @@ Definition wp_proto_multiple_strong `(M: UserModel aneris_lang) `{@anerisPreG M 
 (*                     (prefixes es)) *)
 (*      (* OBS: Can add [always_holds ξ] here *)). *)
 
-Definition net_state_initial : net_model := (∅, ∅).
-
 Definition good_fuel_alloc
   `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
   (es : list aneris_expr) (st : lts_state M) (fss : list $ gset (usr_role M)) :=
@@ -197,24 +196,24 @@ Proof. intros ?%initial_fuel_map_inv'. naive_solver. Qed.
 Program Definition lm_init
   `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
   (es : list aneris_expr)
-  (st : lts_state M) fss
+  (st : lts_state M) fss net_init
   (Hfss: good_fuel_alloc es st fss)
   : mstate LM :=
 {|
   ls_data := {|
-              ls_under := (st, net_state_initial);
+              ls_under := (st, net_init);
               ls_map := initial_fuel_map M es fss st;
   |}
 |}.
 Next Obligation.
-  simpl. intros M LM Σ Haneris Hlmeq es st fss [Hlen [Hgood _]] ζ1 ζ2 fs1 fs2 Hneq.
+  simpl. intros M LM Σ Haneris Hlmeq es st fss ? [Hlen [Hgood _]] ζ1 ζ2 fs1 fs2 Hneq.
   intros (n1&?&?&?&?)%initial_fuel_map_inv.
   intros (n2&?&?&?&?)%initial_fuel_map_inv.
   apply map_disjoint_dom_2. eapply Hgood; try eassumption.
   intros Heq. simplify_eq.
 Qed.
 Next Obligation.
-  simpl. intros M LM Σ Haneris Hlmeq es st fss [Hlen [_ Hgood]] ρ Hin.
+  simpl. intros M LM Σ Haneris Hlmeq es st fss ? [Hlen [_ Hgood]] ρ Hin.
   rewrite /initial_fuel_map. destruct (Hgood _ Hin) as (n&fs&HSome&Hinfs).
   destruct (es !! n) as [e|] eqn:Heq; last first.
   { apply lookup_ge_None_1 in Heq. apply lookup_lt_Some in HSome. lia. }
@@ -255,11 +254,12 @@ Qed.
 
 Theorem simulation_adequacy_multiple_strong
         `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
-        A s (es : list aneris_expr) σ st fss FR
+        A s (es : list aneris_expr) σ st fss FR net_init
         (Hfss: good_fuel_alloc es st fss) :
   length es >= 1 →
   (* aneris_model_rel_finitary Mdl → *)
   dom (state_heaps σ) = dom (state_sockets σ) →
+  config_net_match (es, σ) net_init →
   (* TODO1: something to relate the socket state and the model one. *)
   (* TODO2: we need to get a proper LiveModel state that is related to the initial fuel map...
      but that requires property on fss, i.e. disjointness. *)
@@ -276,9 +276,9 @@ Theorem simulation_adequacy_multiple_strong
   (* Message soup is initially empty *)
   state_ms σ = ∅ →
   wp_proto_multiple_strong M A σ s es FR st fss →
-  continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) (lm_init es st fss Hfss).
+  continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) (lm_init es st fss net_init Hfss).
 Proof.
-  intros Hlen Hdom Hport_coh Hbuf_coh Hsh_coh Hsa_coh Hms Hwp.
+  intros Hlen Hdom Hnetinit Hport_coh Hbuf_coh Hsh_coh Hsa_coh Hms Hwp.
   apply (wp_strong_adequacy_multiple aneris_lang
                                      (live_model_to_model LM) Σ s);
     [done| |].
@@ -355,21 +355,40 @@ Proof.
     simpl. iSplit; [|done].
     iExists _, _. iFrame.
     iPureIntro. set_solver. }
-  { admit. }
+  { rewrite /has_fuels /frag_fuel_mapping_is. simpl.
+    rewrite -big_opM_own_1.
+    rewrite -big_opM_auth_frag.
+    iApply (fair_resources.own_proper with "Hmapf").
+    f_equiv.
+    (* rewrite leibniz_equiv_iff. *)
+    transitivity (([^ op map] k↦x ∈ Excl <$> initial_fuel_map M es fss st,
+                     {[k := x]} : gmap.gmapUR _ (exclR (gmap.gmapUR _ natO)))); last first.
+    { rewrite (big_opM_fmap). f_equiv. intros ??. rewrite map_fmap_singleton //. }
+    rewrite gmap.big_opM_singletons //. }
   iDestruct ("Hwp") as ">[Hσ $]".
   simpl. rewrite Hms=> /=. rewrite dom_empty_L.
   iFrame.
   iModIntro.
   iSplitL "Hmapa"; first iSplit.
   { iPureIntro. rewrite /fuel.valid_state_evolution_fairness /=. split; [constructor|split=>//].
-    intros ζ Hin. admit. }
+    intros ζ Hin. rewrite /lm_init /= in Hin.
+    apply elem_of_dom in Hin as [fs Hfs].
+    apply initial_fuel_map_inv in Hfs as (n&e&?&Hlk&->).
+    exists e. apply from_locale_from_Some. apply prefixes_from_spec. list_simplifier.
+    apply take_drop_middle in Hlk. naive_solver. }
   { rewrite /model_state_interp. iExists _.
     rewrite /usr_state. iFrame.
-    (iSplit; [|iSplit;[|iSplit]]); iPureIntro; simpl.
-    - rewrite /fuel_map_le /fuel_map_le_inner. split; reflexivity.
-    - intros ρ Hlive. admit.
-    - intros ζ Hnotin. admit.
-    - admit. (* TODO: for this, add a new hypothesis! *) }
+    (iSplit; [|iSplit;[|iSplit]]); iPureIntro; simpl=>//.
+    - intros ρ Hlive.
+      change (initial_fuel_map M es fss st) with (ls_map (lm_init es st fss net_init Hfss)).
+      by apply (ls_map_live (lm_init es st fss net_init Hfss)) in Hlive.
+    - intros ζ Hnotin. destruct (initial_fuel_map M es fss st !! ζ) as [fs|] eqn:Heq=>//;
+        last rewrite Heq //. exfalso.
+      apply initial_fuel_map_inv in Heq as (n&e&?&Hlk&->).
+      apply Hnotin.
+      apply locales_of_list_from_locale_from.
+      exists e. apply from_locale_from_Some. apply prefixes_from_spec. list_simplifier.
+      apply take_drop_middle in Hlk. naive_solver. }
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Htake)
           "Hsi Hposts".
   iDestruct "Hsi" as "(%Hvalid&_&Hlive&_)".
@@ -459,7 +478,7 @@ Proof.
    opose proof (ls_map_agree Hfs1 Hfs2 Hinfs1 _).
    { apply map_included_utils.map_included_subseteq_inv in Hincl2. set_solver. }
    naive_solver.
-Admitted.
+Qed.
 
 Definition auxtrace (M : Model) := trace (M.(mstate)) (M.(mlabel)).
 
