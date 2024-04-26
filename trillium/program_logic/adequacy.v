@@ -71,7 +71,7 @@ Definition Gsim_pre Σ {Λ} (M : Model) (s : stuckness)
 Proof.
   rewrite /Gsim_pre=> n wp wp' HGsm ex sm.
   repeat (f_contractive || f_equiv).
-  repeat (eapply dist_lt; try apply HGsm). auto. 
+  repeat (eapply dist_lt; try apply HGsm). auto.
 Qed.
 
 Definition Gsim Σ {Λ} (M : Model) (s : stuckness)
@@ -370,6 +370,46 @@ Section from_locale.
     fold (prefixes_from (A := expr Λ)) in Hin.
     by eapply locale_injective.
   Qed.
+
+
+  Lemma from_locale_from_elem_of es tp ζ (e : expr Λ):
+    from_locale_from es tp ζ = Some e → ∃ i, tp !! i = Some e.
+  Proof.
+    revert es.
+    induction tp as [|e' tp IHtp]; [done|].
+    intros es Hlocale.
+    rewrite /from_locale in Hlocale.
+    simpl in *.
+    case_decide.
+    - simplify_eq. exists 0%nat. rewrite lookup_cons. done.
+    - specialize (IHtp (es ++ [e']) Hlocale) as [i Hi].
+      exists (S i). done.
+  Qed.
+
+  Lemma from_locale_elem_of tp ζ e :
+    from_locale tp ζ = Some e → ∃ i, tp !! i = Some e.
+  Proof. apply from_locale_from_elem_of. Qed.
+
+  Lemma from_locale_from_elem_of' es tp ζ e :
+    from_locale_from es tp ζ = Some e →
+    ∃ i, tp !! i = Some e ∧ locale_of (es ++ take i tp) e = ζ.
+  Proof.
+    revert es.
+    induction tp as [|e' tp IHtp]; [done|].
+    intros es Hlocale.
+    rewrite /from_locale in Hlocale.
+    simpl in *.
+    case_decide.
+    - simplify_eq. exists 0%nat. rewrite lookup_cons.
+      rewrite right_id. done.
+    - specialize (IHtp (es ++ [e']) Hlocale) as [i [Hlookup Hi]].
+      exists (S i). simpl. split; [done|].
+      rewrite cons_middle assoc. done.
+  Qed.
+
+  Lemma from_locale_elem_of' tp ζ e :
+    from_locale tp ζ = Some e → ∃ i, tp !! i = Some e ∧ locale_of (take i tp) e = ζ.
+  Proof. apply from_locale_from_elem_of'. Qed.
 
 End from_locale.
 

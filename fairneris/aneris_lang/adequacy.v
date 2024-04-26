@@ -1,9 +1,10 @@
 From Paco Require Import pacotac.
 From stdpp Require Import finite.
 From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import excl.
 From trillium Require Import adequacy.
 From fairneris Require Import fairness retransmit_model fair_resources.
-From fairneris.aneris_lang Require Import aneris_lang resources.
+From fairneris.aneris_lang Require Import aneris_lang resources network_model.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.
 From fairneris.aneris_lang.state_interp Require Import state_interp.
@@ -68,6 +69,31 @@ Proof. Admitted.
 (*   by apply derive_live_tid_inl. *)
 (* Qed. *)
 
+(* Lemma posts_of_empty_mapping `(M: UserModel aneris_lang) `{@anerisG M net_model LM Σ} *)
+(*   (e1 e: aneris_expr) v (tid : locale aneris_lang) (tp : list aneris_expr): *)
+(*   from_locale tp tid = Some e -> *)
+(*   to_val e = Some v -> *)
+(*   posts_of tp *)
+(*     ((λ (_ : aneris_val), (locale_of [] e) ↦M ∅) :: (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) tp)))) -∗ *)
+(*   tid ↦M (∅ : gmap (usr_role M) nat). *)
+(* Proof. *)
+(*   intros Hsome Hval. simpl. *)
+(*   rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (λ _: val, tid ↦M ∅)%I) _) //. *)
+(*   apply elem_of_list_omap. *)
+(*   exists (e, (λ _: val, tid ↦M ∅)%I); split; last first. *)
+(*   - simpl. apply fmap_Some. exists v. split; done. *)
+(*   - destruct tp as [|e1' tp]; first set_solver. simpl. *)
+(*     apply elem_of_cons. *)
+(*     destruct tid as [|tid]; [left|right]; first by simpl in Hsome; simplify_eq. *)
+(*     apply elem_of_lookup_zip_with. eexists tid, e, _. do 2 split =>//. *)
+(*     rewrite /locale_of /=. *)
+(*     rewrite list_lookup_fmap fmap_Some. simpl in Hsome. *)
+(*     exists (e1 :: take tid tp, e). rewrite drop_0. split. *)
+(*     + erewrite prefixes_from_lookup =>//. *)
+(*     + rewrite /locale_of /= take_length_le //. *)
+(*       assert (tid < length tp)%nat; last lia. by eapply lookup_lt_Some. *)
+(* Qed. *)
+
 Definition continued_simulation_init {Λ M}
            (ξ : execution_trace Λ → auxiliary_trace M → Prop)
            (c : cfg Λ) (s : mstate M) :=
@@ -85,8 +111,18 @@ Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :
                              | None => ∅
                              end ∪ A) ∅ skts ∪ A) ∅ skts.
 
-Definition wp_proto_multiple_strong `(LM: LiveModel aneris_lang M) `{anerisPreG _ LM Σ} A
-           σ (s:stuckness) (es : list aneris_expr) st :=
+Definition initial_fuel_map_from `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ}
+  (tp0 : list aneris_expr)
+  (es: list aneris_expr) (fss: list (gset M.(usr_role))) (st : M) : gmap aneris_locale (gmap _ _) :=
+  let esfss := zip (prefixes_from tp0 es) fss in
+  foldr (λ '((tp, e), fs) fss, <[ locale_of tp e := gset_to_gmap (usr_fl st) fs]> fss) ∅ esfss.
+
+Definition initial_fuel_map `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ} :=
+  initial_fuel_map_from M nil.
+
+Definition wp_proto_multiple_strong `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ}
+  (A: gset socket_address) (σ: aneris_lang.state) (s:stuckness) (es : list aneris_expr) (FR: gset _)
+  (st: M) (fss: list (gset M.(usr_role))) :=
   (∀ (aG : anerisG LM Σ), ⊢ |={⊤}=>
      unallocated A -∗
      ([∗ set] sa ∈ A, sa ⤳ (∅, ∅)) -∗
@@ -97,35 +133,136 @@ Definition wp_proto_multiple_strong `(LM: LiveModel aneris_lang M) `{anerisPreG 
                               (A ∖ (ports_in_use $ state_sockets σ))),
         free_ports ip ports)%I -∗
      frag_model_is st -∗
-     (* initial allocation of roles to threads... see my notebook... *)
+     frag_free_roles_are (FR ∖ usr_live_roles st) -∗
+     ([∗ map] ζ ↦ fs ∈ (initial_fuel_map M es fss st), ζ ↦M fs) -∗
      ([∗ set] ip ∈ dom (state_heaps σ), is_node ip) -∗
      aneris_state_interp σ (∅, ∅) ={⊤}=∗
-     □ config_update_state ∗
      aneris_state_interp σ (∅, ∅) ∗
-     wptp s es (map (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v)
+     wptp s es (fmap (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v)
                     (prefixes es))).
 
-Definition wp_proto `{anerisPreG retransmit_fair_model Σ} IPs A
-           s es ip st :=
-  (∀ (aG : anerisG retransmit_fair_model Σ), ⊢ |={⊤}=>
-     unallocated A -∗
-     ([∗ set] a ∈ A, a ⤳ (∅, ∅)) -∗
-     live_roles_frag_own (retransmit_live_roles st : gset $ fmrole retransmit_fair_model) -∗
-     dead_roles_frag_own ((all_roles ∖ retransmit_live_roles st) : gset $ fmrole retransmit_fair_model) -∗
-     ([∗ set] i ∈ IPs, free_ip i) -∗
-     is_node ip ={⊤}=∗
-     wptp s es (map (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v)
-                    (prefixes es))
-     (* OBS: Can add [always_holds ξ] here *)).
+(* Definition wp_proto `{anerisPreG retransmit_fair_model Σ} IPs A *)
+(*            s es ip st := *)
+(*   (∀ (aG : anerisG retransmit_fair_model Σ), ⊢ |={⊤}=> *)
+(*      unallocated A -∗ *)
+(*      ([∗ set] a ∈ A, a ⤳ (∅, ∅)) -∗ *)
+(*      live_roles_frag_own (retransmit_live_roles st : gset $ fmrole retransmit_fair_model) -∗ *)
+(*      dead_roles_frag_own ((all_roles ∖ retransmit_live_roles st) : gset $ fmrole retransmit_fair_model) -∗ *)
+(*      ([∗ set] i ∈ IPs, free_ip i) -∗ *)
+(*      is_node ip ={⊤}=∗ *)
+(*      wptp s es (map (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v) *)
+(*                     (prefixes es)) *)
+(*      (* OBS: Can add [always_holds ξ] here *)). *)
+
+Definition good_fuel_alloc
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+  (es : list aneris_expr) (st : lts_state M) (fss : list $ gset (usr_role M)) :=
+    (length es = length fss) ∧
+    (∀ (n1 n2 : nat) fs1 fs2, n1 ≠ n2 → fss !! n1 = Some fs1 → fss !! n2 = Some fs2 → fs1 ## fs2) ∧
+    (∀ ρ, ρ ∈ usr_live_roles st → ∃ n fs, fss !! n = Some fs ∧ ρ ∈ fs).
+
+Lemma initial_fuel_map_inv'
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+  (tp0 es : list aneris_expr)
+  (st : lts_state M) fss ζ (fs : gmap _ _):
+  initial_fuel_map_from M tp0 es fss st !! ζ = Some fs →
+    ∃ n e, fss !! n = Some (dom fs) ∧
+           es !! n = Some e ∧
+           ζ = locale_of (tp0 ++ take n es) e.
+Proof.
+  revert tp0 fs fss. induction es as [|e es IH]; first naive_solver.
+  intros tp0 fs fss. rewrite /initial_fuel_map /initial_fuel_map_from /=.
+  destruct fss as [|fs' fss]; first naive_solver. simpl.
+  destruct (decide (ζ = locale_of tp0 e)) as [->|Hneq].
+  { rewrite lookup_insert. intros; simplify_eq. exists 0, e.
+    rewrite dom_gset_to_gmap /=. list_simplifier. naive_solver. }
+  rewrite lookup_insert_ne //.
+  intros Hlk.
+  destruct (IH _ _ _ Hlk) as (n&fs''&?&?&?).
+  eexists (1+n), fs''. simpl. list_simplifier. naive_solver.
+Qed.
+
+Lemma initial_fuel_map_inv
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+  (es : list aneris_expr)
+  (st : lts_state M) fss ζ (fs : gmap _ _):
+  initial_fuel_map M es fss st !! ζ = Some fs →
+    ∃ n e, fss !! n = Some (dom fs) ∧
+           es !! n = Some e ∧
+           ζ = locale_of (take n es) e.
+Proof. intros ?%initial_fuel_map_inv'. naive_solver. Qed.
+
+
+Program Definition lm_init
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+  (es : list aneris_expr)
+  (st : lts_state M) fss net_init
+  (Hfss: good_fuel_alloc es st fss)
+  : mstate LM :=
+{|
+  ls_data := {|
+              ls_under := (st, net_init);
+              ls_map := initial_fuel_map M es fss st;
+  |}
+|}.
+Next Obligation.
+  simpl. intros M LM Σ Haneris Hlmeq es st fss ? [Hlen [Hgood _]] ζ1 ζ2 fs1 fs2 Hneq.
+  intros (n1&?&?&?&?)%initial_fuel_map_inv.
+  intros (n2&?&?&?&?)%initial_fuel_map_inv.
+  apply map_disjoint_dom_2. eapply Hgood; try eassumption.
+  intros Heq. simplify_eq.
+Qed.
+Next Obligation.
+  simpl. intros M LM Σ Haneris Hlmeq es st fss ? [Hlen [_ Hgood]] ρ Hin.
+  rewrite /initial_fuel_map. destruct (Hgood _ Hin) as (n&fs&HSome&Hinfs).
+  destruct (es !! n) as [e|] eqn:Heq; last first.
+  { apply lookup_ge_None_1 in Heq. apply lookup_lt_Some in HSome. lia. }
+  exists (locale_of (take n es) e). exists (gset_to_gmap (usr_fl st) fs).
+  split; last by rewrite dom_gset_to_gmap //.
+  pose ctx := @nil aneris_expr.
+
+  have // : foldr
+    (λ '(tp, e0, fs0) (fss0 : gmap aneris_locale (gmap (usr_role M) nat)),
+       <[locale_of tp e0:=gset_to_gmap (usr_fl st) fs0]> fss0) ∅ (zip (prefixes_from ctx es) fss)
+  !! locale_of (ctx ++ take n es) e = Some (gset_to_gmap (usr_fl st) fs).
+
+  generalize ctx. clear ctx.
+  clear ρ Hinfs Hin Hgood.
+  revert n e fss Hlen fs Heq HSome.
+
+  induction es as [|e' es IH].
+  { move=> [] //. }
+  intros n e fss Hlen fs Heq HSome ctx. destruct fss as [|fs' fss] =>//.
+  simpl.
+  destruct n as [|n].
+  { simpl in *. list_simplifier. rewrite lookup_insert //. }
+  rewrite /=.
+
+  rewrite lookup_insert_ne; last first.
+  { eapply (locale_injective _ _ (take n es ++ [e])).
+    rewrite prefixes_from_app. apply elem_of_app; right.
+    simpl. list_simplifier. by apply elem_of_list_singleton. }
+
+  replace (ctx ++ e' :: take n es) with ((ctx ++ [e'] ++ take n es)); last by list_simplifier.
+
+  list_simplifier.
+  ospecialize (IH n e fss Hlen _ Heq HSome (ctx ++ [e'])).
+  list_simplifier.
+  rewrite IH //.
+Qed.
+
 
 Theorem simulation_adequacy_multiple_strong
-        `{anerisPreG retransmit_fair_model Σ}
-        A s (es : list aneris_expr) σ st :
-  role_enabled_locale_exists (es, σ) st →
-  config_state_valid (es, σ) st →
+        `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+        A s (es : list aneris_expr) σ st fss FR net_init
+        (Hfss: good_fuel_alloc es st fss) :
   length es >= 1 →
   (* aneris_model_rel_finitary Mdl → *)
   dom (state_heaps σ) = dom (state_sockets σ) →
+  config_net_match (es, σ) net_init →
+  (* TODO1: something to relate the socket state and the model one. *)
+  (* TODO2: we need to get a proper LiveModel state that is related to the initial fuel map...
+     but that requires property on fss, i.e. disjointness. *)
   (* Port coherence *)
   ((∀ ip ps, (GSet <$> (addrs_to_ip_ports_map
                               (A ∖ (ports_in_use $ state_sockets σ))))
@@ -138,12 +275,12 @@ Theorem simulation_adequacy_multiple_strong
   map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
   (* Message soup is initially empty *)
   state_ms σ = ∅ →
-  wp_proto_multiple_strong A σ s es st →
-  continued_simulation_init valid_state_evolution_fairness (es, σ) st.
+  wp_proto_multiple_strong M A σ s es FR st fss →
+  continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) (lm_init es st fss net_init Hfss).
 Proof.
-  intros Hexists Hconfig Hlen Hdom Hport_coh Hbuf_coh Hsh_coh Hsa_coh Hms Hwp.
+  intros Hlen Hdom Hnetinit Hport_coh Hbuf_coh Hsh_coh Hsa_coh Hms Hwp.
   apply (wp_strong_adequacy_multiple aneris_lang
-                                     (fair_model_to_model retransmit_fair_model) Σ s);
+                                     (live_model_to_model LM) Σ s);
     [done| |].
   { apply rel_finitary_valid_state_evolution_fairness. }
   iIntros (?) "".
@@ -166,15 +303,14 @@ Proof.
   iDestruct (socket_address_group_own_big_sepS with "HownA") as "#HownAS".
   iMod (messages_ctx_init (to_singletons A) _ _ _ _ with "HownAS Hobserved_send Hobserved_receive" ) as (γms) "[Hms HB]".
   iMod (steps_init 1) as (γsteps) "[Hsteps _]".
-  iMod (roles_init ((retransmit_live_roles st) : gset $ fmrole retransmit_fair_model)) as (γlive) "[Hlivefull Hlivefrag]".
-  iMod (roles_init ((all_roles ∖ retransmit_live_roles st) : gset $ fmrole retransmit_fair_model))
-    as (γdead) "[Hdeadfull Hdeadfrag]".
   iMod (alloc_evs_init ∅) as (γalevs) "[Halobctx Halobs]".
   iMod (sendreceive_evs_init (to_singletons A)) as
       (γsendevs) "[Hsendevsctx Hsendevs]".
   iMod (sendreceive_evs_init (to_singletons A)) as
     (γreceiveevs) "[Hreceiveevsctx Hreceiveevs]".
-  iMod (model_init (st:(fair_model_to_model retransmit_fair_model).(mstate))) as (γm) "[Hmfull Hmfrag]".
+  iMod (model_state_init st) as (γmod) "[Hmoda Hmodf]".
+  iMod (model_fuel_mapping_init_gen (initial_fuel_map M es fss st)) as (γmap) "[Hmapa Hmapf]".
+  iMod (model_free_roles_init st (FR ∖ usr_live_roles st)) as (γfr) "[HFR Hfr]".
   set (dg :=
          {|
            aneris_node_gnames_name := γmp;
@@ -184,28 +320,23 @@ Proof.
            aneris_freeips_name := γips;
            aneris_freeports_name := γpiu;
            aneris_messages_name := γms;
-           aneris_model_name := γm;
-           aneris_live_roles_name := γlive;
-           aneris_dead_roles_name := γdead;
            aneris_steps_name := γsteps;
            aneris_allocEVS_name := γalevs;
            aneris_sendonEVS_name := γsendevs;
            aneris_receiveonEVS_name := γreceiveevs;
            aneris_observed_send_name := γobserved_send;
            aneris_observed_recv_name := γobserved_receive;
+           aneris_fairnessG := {|
+                              fairness_model_name := γmod;
+                              fairness_model_fuel_mapping_name := γmap;
+                              fairness_model_free_roles_name := γfr;
+                              |}
          |}).
   iMod (Hwp dg) as "Hwp".
   iMod (is_node_alloc_multiple σ with "[Hmp]")
     as (γs Hheaps_dom' Hsockets_dom') "[Hγs [#Hn [Hσctx Hσ]]]"; [set_solver|done|].
-  iExists
-    (λ ex atr,
-      (⌜simple_valid_state_evolution ex atr⌝ ∗
-      aneris_state_interp
-        (trace_last ex).2
-        (trace_messages_history ex) ∗
-      thread_live_roles_interp (trace_last atr) ∗
-      steps_auth (trace_length ex)))%I.
-  iExists (map (λ '(tnew,e) v, fork_post (locale_of tnew e) v) (prefixes es))%I,
+  iExists (@state_interp aneris_lang LM Σ (@anerisG_irisG M net_model LM Σ dg)).
+  iExists (fmap (λ '(tnew,e) v, fork_post (locale_of tnew e) v) (prefixes es))%I,
             (fork_post)%I.
   iSplitR; [iApply config_wp_correct|].
   iMod (socket_address_group_own_alloc_subseteq_pre _
@@ -217,49 +348,136 @@ Proof.
                Hunallocated_auth Hsi HIPsCtx HPiu") as "Hinterp";
     [set_solver|set_solver|set_solver|done|done|done|done|done|done|done| |..].
   { iPureIntro. apply to_singletons_is_ne. }
-  iDestruct ("Hwp" with "Hunallocated [HB] Hlivefrag Hdeadfrag Hσ HPs Hmfrag Hn Hinterp")
-    as ">[Hσ $]".
+  iSpecialize ("Hwp" with "Hunallocated [HB] Hσ HPs Hmodf Hfr [Hmapf] Hn Hinterp").
   { iApply (big_sepS_to_singletons with "[] HB").
     iIntros "!>" (sa).
     iDestruct 1 as (As' Ar') "(?&?&[%HAs' %HAr']&$&$)".
     simpl. iSplit; [|done].
     iExists _, _. iFrame.
     iPureIntro. set_solver. }
+  { rewrite /has_fuels /frag_fuel_mapping_is. simpl.
+    rewrite -big_opM_own_1.
+    rewrite -big_opM_auth_frag.
+    iApply (fair_resources.own_proper with "Hmapf").
+    f_equiv.
+    (* rewrite leibniz_equiv_iff. *)
+    transitivity (([^ op map] k↦x ∈ Excl <$> initial_fuel_map M es fss st,
+                     {[k := x]} : gmap.gmapUR _ (exclR (gmap.gmapUR _ natO)))); last first.
+    { rewrite (big_opM_fmap). f_equiv. intros ??. rewrite map_fmap_singleton //. }
+    rewrite gmap.big_opM_singletons //. }
+  iDestruct ("Hwp") as ">[Hσ $]".
   simpl. rewrite Hms=> /=. rewrite dom_empty_L.
   iFrame.
   iModIntro.
-  iSplit.
-  { iPureIntro. split; [by constructor|done]. }
+  iSplitL "Hmapa"; first iSplit.
+  { iPureIntro. rewrite /fuel.valid_state_evolution_fairness /=. split; [constructor|split=>//].
+    intros ζ Hin. rewrite /lm_init /= in Hin.
+    apply elem_of_dom in Hin as [fs Hfs].
+    apply initial_fuel_map_inv in Hfs as (n&e&?&Hlk&->).
+    exists e. apply from_locale_from_Some. apply prefixes_from_spec. list_simplifier.
+    apply take_drop_middle in Hlk. naive_solver. }
+  { rewrite /model_state_interp. iExists _.
+    rewrite /usr_state. iFrame.
+    (iSplit; [|iSplit;[|iSplit]]); iPureIntro; simpl=>//.
+    - intros ρ Hlive.
+      change (initial_fuel_map M es fss st) with (ls_map (lm_init es st fss net_init Hfss)).
+      by apply (ls_map_live (lm_init es st fss net_init Hfss)) in Hlive.
+    - intros ζ Hnotin. destruct (initial_fuel_map M es fss st !! ζ) as [fs|] eqn:Heq=>//;
+        last rewrite Heq //. exfalso.
+      apply initial_fuel_map_inv in Heq as (n&e&?&Hlk&->).
+      apply Hnotin.
+      apply locales_of_list_from_locale_from.
+      exists e. apply from_locale_from_Some. apply prefixes_from_spec. list_simplifier.
+      apply take_drop_middle in Hlk. naive_solver. }
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Htake)
           "Hsi Hposts".
   iDestruct "Hsi" as "(%Hvalid&_&Hlive&_)".
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_".
-  iAssert (⌜locale_dead_role_disabled c (trace_last atr)⌝)%I as "%Hrole".
-  { iIntros (ℓ ζ Hmatch e Hlocale Hval).
-    iAssert (dead_role_frag_own ℓ)%I with "[Hposts]" as "H".
-    { rewrite -map_app -prefixes_from_app.
-      iDestruct (posts_of_length_drop with "Hposts") as "Hposts"; [done|].
-      destruct Hval as [v Hv].
-      iDestruct (posts_of_idx with "Hposts") as (ℓ' Hmatch') "H"; [done|done|].
-      rewrite /roles_match in Hmatch.
-      rewrite /roles_match in Hmatch'.
-      rewrite -Hmatch in Hmatch'. simplify_eq. done. }
-    simpl in *.
-    iDestruct "Hlive" as "(_&Hdead)".
-    iDestruct (dead_role_auth_elem_of with "Hdead H") as %Hin.
-    iPureIntro.
-    intros Hneq.
-    rewrite /role_enabled_model in Hneq.
-    set_solver. }
-  iPureIntro.
   pose proof Hvalid as Hvalid'.
-  destruct Hvalid as (Htrace&Hlabels&Hstate&Hconfig').
-  split; [done|].
-  split; [done|].
-  split; [|done].
-  apply valid_state_live_tids; [done|].
-  by rewrite Hendex.
+  rewrite /fuel.valid_state_evolution_fairness in Hvalid.
+  destruct Hvalid as (Hsteps&Hlabs&Htids).
+  iSplit; [done|].
+  iSplit; [done|].
+  iSplit.
+  { iPureIntro. rewrite /tids_smaller in Htids.
+    intros ρ ζ Hlk. apply ls_mapping_data_inv in Hlk as [?[??]]. apply Htids=>//.
+    by eapply elem_of_dom_2. }
+  iIntros (ζ' e' Hsome Hnoval ρ HSome). simpl.
+  iAssert (ζ' ↦M ∅)%I with "[Hposts]" as "H".
+  { destruct (to_val e') as [?|] eqn:Heq; last done.
+
+  rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (λ _, ζ' ↦M ∅)%I) _) //.
+  have Hceq: c = trace_last ex.
+  { symmetry. eapply last_eq_trace_ends_in. done. }
+  apply elem_of_list_omap.
+  exists (e', (λ _: aneris_val, ζ' ↦M ∅)%I); split; last first.
+  - simpl. apply fmap_Some. exists v. split; done.
+  - destruct (trace_last ex).1 as [|e1' tp] eqn:Htpeq; first set_solver. simpl.
+    destruct (from_locale_from_elem_of' _ _ ζ' e' Hsome) as [i [Htplk Hloc]].
+    apply elem_of_lookup_zip_with. eexists i, _, _. do 2 split =>//.
+    { rewrite -Htplk Hceq Htpeq //. }
+    rewrite lookup_app. rewrite list_lookup_fmap.
+    list_simplifier.
+
+    destruct (prefixes es !! i) as [] eqn:Hlk.
+    + have Hleni: i < length es.
+      { rewrite -(prefixes_from_length []). by eapply lookup_lt_Some. }
+      simpl. f_equiv. destruct p as [tnew e]. simpl.
+      have -> //: locale_of (take i (e1' :: tp)) e' = aneris_lang.locale_of tnew e.
+      rewrite Htpeq in Htake.
+      rewrite Forall2_lookup in Htake. specialize (Htake i).
+      rewrite Hlk in Htake.
+
+      rewrite prefixes_from_take in Htake.
+      rewrite lookup_take // in Htake.
+      apply (prefixes_from_lookup []) in Htplk.
+      rewrite Htplk /= in Htake.
+      inversion Htake. done.
+    + simpl. rewrite list_lookup_fmap.
+      rewrite Htpeq fmap_length prefixes_from_length.
+
+      have Hleni: i >= length es.
+      { rewrite -(prefixes_from_length []). by eapply lookup_ge_None. }
+
+
+      have Hlk': (drop (length es) (e1' :: tp)) !! (i - length es) = Some e'.
+      { rewrite lookup_drop. rewrite -Htplk. f_equal. lia. }
+
+      apply (prefixes_from_lookup es) in Hlk'.
+      rewrite Hlk' /=. f_equal.
+      rewrite -skipn_firstn_comm.
+
+      have Hequiv: locales_equiv (es ++ drop (length es) (take i (e1' :: tp))) (take i (e1' :: tp)).
+      { rewrite Htpeq in Htake.
+        eapply (locales_equiv_transitive _
+           ((take (length es) (e1' :: tp)) ++ drop (length es) (take i (e1' :: tp))) (take i (e1' :: tp))).
+        - eapply locales_equiv_from_app. apply Htake.
+          list_simplifier. apply locales_equiv_from_refl. done.
+        - have ->: take (length es) (e1' :: tp) = take (length es) (take i $ e1' :: tp).
+          { rewrite take_take. f_equal. lia. }
+          rewrite take_drop. apply locales_equiv_refl. }
+      rewrite (locale_equiv _ _ _ Hequiv) //. }
+   (* Now conclude using fuel_map_le somehow *)
+   unfold model_state_interp.
+   iDestruct "Hlive" as (fm) "(%Hle & %Hdead & ? & ? & Hfm & ?)".
+   iDestruct (has_fuels_agree with "Hfm H") as %Hfm.
+   rewrite /fuel_map_preserve_dead in Hdead.
+   iPureIntro. intros Ha. destruct (Hdead _ Ha) as (ζ'' & fs' & Hfm' & Hin).
+
+   have Hccl: ζ'' = ζ'; last first.
+   { rewrite -Hccl in Hfm. set_solver. }
+
+   apply ls_mapping_data_inv in HSome as [fs1 [Hfs1 Hinfs1]].
+
+
+   rewrite /fuel_map_le /fuel_map_le_inner in Hle.
+   rewrite map_included_utils.map_included_spec in Hle. destruct Hle as [Hle Hdoms].
+   destruct (Hle _ _ Hfm') as [fs2 [Hfs2 Hincl2]].
+
+   opose proof (ls_map_agree Hfs1 Hfs2 Hinfs1 _).
+   { apply map_included_utils.map_included_subseteq_inv in Hincl2. set_solver. }
+   naive_solver.
 Qed.
 
 Definition auxtrace (M : Model) := trace (M.(mstate)) (M.(mlabel)).
