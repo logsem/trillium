@@ -3,7 +3,7 @@ From fairneris Require Export inftraces trace_utils fairness.
 
 Class GoodLang (Λ : language)
   `{Countable (config_label Λ), Inhabited (config_label Λ)}
-  `{Countable (action Λ), Inhabited (action Λ)}
+  `{Countable (action Λ)}
   `{Countable (locale Λ)}
   := {}.
 
