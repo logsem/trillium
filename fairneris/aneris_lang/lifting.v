@@ -2,7 +2,8 @@ From RecordUpdate Require Import RecordSet.
 From stdpp Require Import binders.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Import weakestpre lifting ectx_lifting atomic.
-From fairneris.aneris_lang Require Import aneris_lang base_lang.
+From fairneris Require Import fuel fair_resources.
+From fairneris.aneris_lang Require Import aneris_lang base_lang resources.
 From fairneris.aneris_lang.state_interp Require Import
      state_interp state_interp_events.
 Set Default Proof Using "Type".
@@ -252,6 +253,88 @@ Proof. solve_pure_exec. Qed.
 
 Opaque aneris_state_interp.
 
+Notation state_interp_oos ζ α := (aneris_state_interp_opt (Some (ζ,α))).
+
+Definition sswp `{LM:LiveModel aneris_lang (joint_model M Net)}
+           `{!anerisG LM Σ} (s : stuckness)
+           E ζ (e1:aneris_expr) (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) : iProp Σ :=
+  ⌜TCEq (aneris_to_val e1) None⌝ ∧
+  ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace LM) K
+    (tp1 tp2:list aneris_expr) σ1,
+  ⌜valid_exec extr⌝ -∗
+  ⌜locale_of tp1 (ectx_fill K e1) = ζ⌝ -∗
+  ⌜trace_ends_in extr (tp1 ++ ectx_fill K e1 :: tp2, σ1)⌝ -∗
+  state_interp extr atr ={E,∅}=∗
+  ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
+  ∀ α e2 σ2 efs,
+  ⌜prim_step e1 σ1 α e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
+  state_interp_oos ζ α
+    (trace_extend extr (inl (ζ,α)) (tp1 ++ ectx_fill K e2 :: tp2, σ2))
+    atr ∗ Φ e2 α ∗ ⌜efs = []⌝.
+
+Definition MU `{LM:LiveModel aneris_lang (joint_model M Net)}
+           `{!anerisG LM Σ} E ζ α (P : iProp Σ) : iProp Σ :=
+  ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace LM),
+  state_interp_oos ζ α extr atr ={E}=∗
+  ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) ∗ P.
+
+Lemma sswp_MU_wp_fupd `{LM:LiveModel aneris_lang (joint_model M Net)}
+           `{!anerisG LM Σ} s E E' ζ e Φ :
+  (|={E,E'}=> sswp s E' ζ e (λ e' α, MU E' ζ α ((|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))))%I -∗
+  WP e @ s; ζ; E {{ Φ }}.
+Proof.
+  rewrite wp_unfold /wp_pre.
+  iIntros "Hsswp".
+  replace (language.to_val e) with (aneris_to_val e) by eauto.
+  destruct (aneris_to_val e) eqn:Heqn.
+  { iMod "Hsswp" as (Hval) "_". inversion Hval as [Heq]. by simplify_eq. }
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+  iMod "Hsswp" as "[_ Hsswp]".
+  iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp".
+  iModIntro. iSplit; [done|].
+  iIntros (α e2 σ2 efs Hstep).
+  iDestruct ("Hsswp" with "[//]") as "Hsswp".
+  iApply (step_fupdN_wand with "Hsswp"). iIntros ">(Hσ & HMU & ->)".
+  iMod ("HMU" with "Hσ") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
+  iExists _, _. rewrite right_id_L. by iFrame.
+Qed.
+
+Lemma sswp_wand `{LM:LiveModel aneris_lang (joint_model M Net)}
+           `{!anerisG LM Σ} s E ζ e
+      (Φ Ψ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+  (∀ e α, Φ e α -∗ Ψ e α) -∗ sswp s E ζ e Φ -∗ sswp s E ζ e Ψ.
+Proof.
+  rewrite /sswp. iIntros "HΦΨ [%Hval Hsswp]".
+  iSplit; [done|].
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+  iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp".
+  iModIntro. iSplit; [done|].
+  iIntros (α e2 σ2 efs Hstep).
+  iDestruct ("Hsswp" with "[//]") as "Hsswp".
+  iApply (step_fupdN_wand with "Hsswp"). iIntros ">(Hσ & HMU & ->)".
+  iFrame. iModIntro. iSplit; [|done]. by iApply "HΦΨ".
+Qed.
+
+Lemma MU_wand `{LM:LiveModel aneris_lang (joint_model M Net)}
+           `{!anerisG LM Σ} E ζ α (P Q : iProp Σ) :
+  (P -∗ Q) -∗ MU E ζ α P -∗ MU E ζ α Q.
+Proof.
+  rewrite /MU. iIntros "HPQ HMU".
+  iIntros (extr atr) "Hσ".
+  iMod ("HMU" with "Hσ") as (??) "[Hσ HP]". iModIntro.
+  iExists _, _. iFrame. by iApply "HPQ".
+Qed.
+
+Lemma sswp_MU_wp `{LM:LiveModel aneris_lang (joint_model M Net)}
+           `{!anerisG LM Σ} s E ζ e (Φ : aneris_val → iProp Σ) :
+  sswp s E ζ e (λ e' α, MU E ζ α (WP e' @ s; ζ;  E {{ Φ }})) -∗
+  WP e @ s; ζ; E {{ Φ }}.
+Proof.
+  iIntros "Hsswp". iApply sswp_MU_wp_fupd. iModIntro.
+  iApply (sswp_wand with "[] Hsswp").
+  iIntros (??) "HMU". iApply (MU_wand with "[] HMU"). by iIntros "$ !>".
+Qed.
+
 Section primitive_laws.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
   Context `{!LiveModelEq LM}.
@@ -270,6 +353,605 @@ Section primitive_laws.
   Implicit Types sh : socket_handle.
   Implicit Types skt : socket.
   Implicit Types mh : messages_history.
+
+  Lemma mu_step_fuel ζ E fs P :
+    fs ≠ ∅ → ▷ ζ ↦M++ fs -∗
+    (ζ ↦M fs -∗ P) -∗
+    MU E ζ None P.
+  Proof.
+    iIntros (?) ">HfuelS HP".
+    iIntros (ex atr) "[Hσ Hm]".
+    iDestruct "Hm" as (ex' Hex' Hvalid Hstep) "Hmi".
+    iMod (update_fuel_step with "HfuelS [//] Hmi") as (δ2) "(%Hvse & Hfuel & Hmod)" =>//.
+    iIntros "!>".
+    iExists _, (Silent_step ζ None). iFrame.
+    iSplit; [by destruct Hex' as [ex'' ->]|].
+    by iApply "HP".
+  Qed.
+
+  Lemma mu_step_model ζ ρ α (f1 : nat) fs fr s1 s2 E P :
+    lts_trans Mod s1 (ρ, α) s2 →
+    Mod.(usr_live_roles) s2 ⊆ Mod.(usr_live_roles) s1 →
+    ρ ∉ dom fs →
+    ▷ frag_model_is s1 -∗
+    ▷ ζ ↦M ({[ρ:=f1]} ∪ fmap S fs) -∗
+    ▷ frag_free_roles_are fr -∗
+    (frag_model_is s2 -∗
+     ζ ↦M ({[ρ:=(Mod.(usr_fl) s2)]} ∪ fs) -∗
+     frag_free_roles_are fr -∗ P) -∗
+    MU E ζ α P.
+  Proof.
+    iIntros (Htrans Hlive Hdom) ">Hst >Hfuel1 >Hfr HP".
+    iIntros (ex atr) "[Hσ Hm]".
+    iDestruct "Hm" as (ex' Hex' Hvalid Hstep) "Hmi".
+    (* iMod (update_model_step with "Hfuel1 Hst Hmi") as *)
+    (*   (δ2 Hvse) "(Hfuel & Hst & Hmod)"; eauto. *)
+  Admitted.
+
+  Lemma has_fuels_decr E tid fs :
+    tid ↦M++ fs -∗ |~{E}~| tid ↦M fs.
+  Proof.
+    iIntros "Hf". rewrite weakestpre.pre_step_unseal.
+    iIntros (extr atr) "[Hσ [% Hm]]"=> /=.
+    iMod (model_state_interp_has_fuels_decr with "Hm Hf") as "[$ $]". by iFrame.
+  Qed.
+
+  Lemma has_fuels_dealloc E tid fs ρ (δ:joint_model Mod Net) :
+    ρ ∉ live_roles _ δ → frag_model_is δ.1 -∗ tid ↦M fs -∗
+    |~{E}~| frag_model_is δ.1 ∗ tid ↦M (delete ρ fs).
+  Proof.
+    iIntros (Hnin) "Hst Hf". rewrite weakestpre.pre_step_unseal.
+    iIntros (extr atr) "[Hσ [% Hm]]".
+    iMod (model_state_interp_has_fuels_dealloc with "Hm Hst Hf") as "[Hm Hf]";
+      [done|by iFrame].
+  Qed.
+
+  Lemma message_history_evolution_id x y mh :
+    mh = message_history_evolution x x y y mh.
+  Proof.
+    rewrite /message_history_evolution !gmultiset_difference_diag.
+    destruct mh. f_equal; set_solver.
+  Qed.
+
+  (* OBS: Pure needs either a special case for one step (that exposes action,
+          or to default action to None *)
+  (* Lemma sswp_pure_step s E ζ (e1 e2 : aneris_expr) (Φ : Prop) (Ψ : aneris_expr → iProp Σ) : *)
+  (*   PureExec Φ 1 e1 e2 → Φ → ▷ (Ψ e2) -∗ *)
+  (*   sswp s E ζ e1 (λ (e2:aneris_expr) α, (Ψ e2))%I. *)
+  (* Proof. *)
+  (*   iIntros (Hpe HΦ) "HΨ". *)
+  (*   assert (pure_step e1 e2) as Hps. *)
+  (*   { specialize (Hpe HΦ). by apply nsteps_once_inv in Hpe. } *)
+  (*   rewrite /sswp /=. *)
+  (*   assert (aneris_to_val e1 = None) as ->. *)
+  (*   { destruct Hps as [Hred _]. *)
+  (*     specialize (Hred (mkState ∅ ∅ ∅)). *)
+  (*     by eapply reducible_not_val. } *)
+  (*   iSplit; [done|]. *)
+  (*   iIntros (extr atr K tp1 tp2 σ1 Hvalid Htp1 Hex) "Hσ". *)
+  (*   iMod fupd_mask_subseteq as "Hclose"; last iModIntro; [by set_solver|]. *)
+  (*   iSplit. *)
+  (*   { destruct s; [|done]. by destruct Hps as [Hred _]. } *)
+  (*   iIntros (α e2' σ2 efs Hstep) "!>!>!>". *)
+  (*   iApply step_fupdN_intro; [done|]. iIntros "!>". *)
+  (*   iMod "Hclose". iModIntro. destruct Hps as [_ Hstep']. *)
+  (*   apply Hstep' in Hstep as [-> [-> ->]]. iFrame. *)
+
+  (* Qed. *)
+
+  (* Lemma sswp_pure_step s E ζ (e1 e2 : aneris_expr) (Φ : Prop) (Ψ : aneris_expr → iProp Σ) : *)
+  (*   PureExec Φ 1 e1 e2 → Φ → ▷ (MU E ζ None (Ψ e2)) -∗ *)
+  (*   sswp s E ζ e1 (λ (e2:aneris_expr) α, MU E ζ α (Ψ e2))%I. *)
+  (* Proof. *)
+  (*   iIntros (Hpe HΦ) "HΨ". *)
+  (*   assert (pure_step e1 e2) as Hps. *)
+  (*   { specialize (Hpe HΦ). by apply nsteps_once_inv in Hpe. } *)
+  (*   rewrite /sswp /=. *)
+  (*   assert (aneris_to_val e1 = None) as ->. *)
+  (*   { destruct Hps as [Hred _]. *)
+  (*     specialize (Hred (mkState ∅ ∅ ∅)). *)
+  (*     by eapply reducible_not_val. } *)
+  (*   iSplit; [done|]. *)
+  (*   iIntros (extr atr K tp1 tp2 σ1 Hvalid Htp1 Hex) "Hσ". *)
+  (*   iMod fupd_mask_subseteq as "Hclose"; last iModIntro; [by set_solver|]. *)
+  (*   iSplit. *)
+  (*   { destruct s; [|done]. by destruct Hps as [Hred _]. } *)
+  (*   iIntros (α e2' σ2 efs Hstep) "!>!>!>". *)
+  (*   iApply step_fupdN_intro; [done|]. iIntros "!>". *)
+  (*   iMod "HΨ" with "Hσ". *)
+  (*   iMod "Hclose". iModIntro. destruct Hps as [_ Hstep']. *)
+  (*   apply Hstep' in Hstep as [-> [-> ->]]. iFrame. *)
+  (* Qed. *)
+
+  Lemma wp_alloc n s E ζ v (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+    ▷ is_node n -∗
+    (∀ (l:loc), l ↦[n] v -∗ Φ (mkExpr n (Val $ LitV $ LitLoc l)) None) -∗
+    sswp s E ζ (mkExpr n (Alloc None (Val v))) Φ.
+  Proof.
+    iIntros "Hn HΦ".
+    rewrite /sswp.
+    iSplit; [done|].
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
+    iMod "Hn".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iDestruct (is_node_heap_valid with "Hσ Hn") as (h) "%Hσ".
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplitR; [iPureIntro; eauto|].
+    { destruct s; [|done]. do 4 eexists. eapply head_prim_step.
+      eapply LocalStepS; eauto.  }
+    iIntros (α v2 σ2 efs Hstep).
+    apply head_reducible_prim_step in Hstep; last first.
+    { do 4 eexists. eapply LocalStepS; eauto. }
+    pose proof (conj Hstep I) as Hstep'.
+    inv_head_step.
+    destruct Hstep' as [Hstep' _].
+    iApply step_fupdN_intro; [done|].
+    iIntros "!>!>".
+    iMod (aneris_state_interp_alloc_heap _ _ _ l with "Hn Hσ")
+      as "[Hσ Hl]"; [done..|].
+    iModIntro. iIntros "!>".
+    iMod (steps_auth_update _ (S (trace_length ex)) with "Hauth")
+      as "[Hauth _]"; [by eauto|].
+    iMod "Hclose" as "_".
+    iModIntro. iFrame. simpl.
+    rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+    rewrite -message_history_evolution_id; iFrame.
+    iSplitL "Hm".
+    { iExists ex.
+      iSplit.
+      { iPureIntro. simpl. by eexists _. }
+      rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+      iSplit; [|done].
+      iPureIntro.
+      eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+      { by rewrite right_id_L. }
+      apply fill_step.
+      eapply head_prim_step. simpl. done. }
+    iSplit; [|done]. by iApply "HΦ".
+  Qed.
+
+  Lemma wp_load n s E ζ l q v (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+    ▷ l ↦[n]{q} v -∗
+    ▷ (l ↦[n]{q} v -∗ Φ (mkExpr n v) None) -∗
+    sswp s E ζ (mkExpr n (Load (Val $ LitV $ LitLoc l))) Φ.
+  Proof.
+    iIntros "Hl HΦ".
+    rewrite /sswp.
+    iSplit; [done|].
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h') "#>[%Hσ %Hl]".
+    simpl in *.
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplitR; [iPureIntro; eauto|].
+    { destruct s; [|done]. do 4 eexists. eapply head_prim_step.
+      eapply LocalStepS; eauto. by constructor. }
+    iIntros (α v2 σ2 efs Hstep).
+    apply head_reducible_prim_step in Hstep; last first.
+    { do 4 eexists. eapply LocalStepS; eauto. by constructor. }
+    pose proof (conj Hstep I) as Hstep'.
+    inv_head_step.
+    destruct Hstep' as [Hstep' _].
+    iApply step_fupdN_intro; [done|].
+    iIntros "!>!>".
+    iModIntro. iIntros "!>".
+    iMod (steps_auth_update _ (S (trace_length ex)) with "Hauth")
+      as "[Hauth _]"; [by eauto|].
+    iMod "Hclose" as "_".
+    iModIntro. iFrame. simpl.
+    rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+    rewrite -message_history_evolution_id; iFrame.
+    rewrite insert_id //; iFrame.
+    rewrite insert_id in Hstep'=> //.
+    iSplitL "Hm".
+    { iExists ex.
+      iSplit.
+      { iPureIntro. simpl. by eexists _. }
+      rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+      iSplit; [|done].
+      iPureIntro.
+      eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+      { by rewrite right_id_L. }
+      apply fill_step.
+      eapply head_prim_step. simpl. done. }
+    iSplit; [|done]. by iApply "HΦ".
+  Qed.
+
+  Lemma wp_store n s E ζ l v1 v2 (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+    ▷ l ↦[n] v1 -∗
+    ▷ (l ↦[n] v2 -∗ Φ (mkExpr n #()) None) -∗
+    sswp s E ζ (mkExpr n (Store #l (Val v2))) Φ.
+  Proof.
+    iIntros "Hl HΦ".
+    rewrite /sswp.
+    iSplit; [done|].
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h') "#>[%Hσ %Hl]".
+    simpl in *.
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplitR; [iPureIntro; eauto|].
+    { destruct s; [|done]. do 4 eexists. eapply head_prim_step.
+      eapply LocalStepS; eauto. by constructor. }
+    iIntros (α w σ2 efs Hstep).
+    apply head_reducible_prim_step in Hstep; last first.
+    { do 4 eexists. eapply LocalStepS; eauto. by constructor. }
+    pose proof (conj Hstep I) as Hstep'.
+    inv_head_step.
+    destruct Hstep' as [Hstep' _].
+    iApply step_fupdN_intro; [done|].
+    iIntros "!>!>".
+    iModIntro. iIntros "!>".
+    iMod (aneris_state_interp_heap_update with "[$Hσ $Hl]") as "[Hσ Hl]";
+      [done|].
+    iMod (steps_auth_update _ (S (trace_length ex)) with "Hauth")
+      as "[Hauth _]"; [by eauto|].
+    iMod "Hclose" as "_".
+    iModIntro. iFrame. simpl.
+    rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+    rewrite -message_history_evolution_id; iFrame.
+    iSplitL "Hm".
+    { iExists ex.
+      iSplit.
+      { iPureIntro. simpl. by eexists _. }
+      rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+      iSplit; [|done].
+      iPureIntro.
+      eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+      { by rewrite right_id_L. }
+      apply fill_step.
+      eapply head_prim_step. simpl. done. }
+    iSplit; [|done]. by iApply "HΦ".
+  Qed.
+
+  Lemma wp_send φ mbody (is_dup : bool) sh skt a to k E
+        ζ R T
+        (Φ : (aneris_expr → option (action aneris_lang) → iProp Σ)) :
+    let msg := mkMessage a to mbody in
+    saddress skt = Some a →
+    ▷ sh ↪[ip_of_address a] skt -∗
+    ▷ a ⤳ (R, T) -∗
+    ▷ to ⤇ φ -∗
+    (if is_dup then ⌜msg ∈ T⌝ else ▷ φ msg) -∗
+    (sh ↪[ip_of_address a] skt -∗ a ⤳ (R, {[ msg ]} ∪ T) -∗
+     Φ (mkVal (ip_of_address a) #(String.length mbody)) (Some (Send msg))) -∗
+    sswp k E ζ
+         (mkExpr (ip_of_address a)
+                 (SendTo (Val $ LitV $ LitSocket sh) #mbody #to)) Φ.
+  Proof.
+    iIntros (msg Hskt) "Hsh Hrt Hφ Hmsg HΦ".
+    iAssert (▷ socket_address_group_own {[a]})%I as "#Ha".
+    { iDestruct "Hrt" as "[(%send & %recv & _ & _ & _ & $ & _) _]". }
+    iAssert (▷ socket_address_group_own {[to]})%I as "#Hto".
+    { iNext. by iDestruct "Hφ" as (γ) "[H _]". }
+    iDestruct "Hrt" as "[Hrt Hown]".
+    rewrite /sswp.
+    iSplit; [done|].
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "[[Hσ Hauth] [%Hvalid Hm]]".
+    iMod (steps_auth_update_S with "Hauth") as "Hauth".
+    iMod "Hsh". iMod "Hrt".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iDestruct (aneris_state_interp_network_sockets_coh_valid with "Hσ") as %Hcoh.
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iApply fupd_mask_intro; [set_solver|].
+    iIntros "Hclose".
+    iSplitR.
+    { destruct k; [|done].
+      iPureIntro; do 4 eexists. eapply head_prim_step. eapply SocketStepS; eauto.
+        by econstructor; naive_solver. }
+    iIntros (α e2 σ2 efs Hstep).
+    apply head_reducible_prim_step in Hstep; last first.
+    { do 4 eexists. eapply SocketStepS; eauto. by econstructor. }
+    pose proof (conj Hstep I) as Hstep'.
+    inv_head_step.
+    destruct Hstep' as [Hstep' _].
+    iApply step_fupdN_intro; [done|].
+    destruct is_dup; last first.
+    - iIntros "!>!>".
+      iModIntro.
+      iIntros "!>".
+      iMod (aneris_state_interp_send sh a {[a]} to {[to]} _ _ skt
+             with "[] [] [$Hsh] [$Hrt] [Hφ] [Hmsg] [$Hσ]")
+        as "(%Hmhe & Hσ & Hsh & Hrt)"; try done.
+      { apply message_group_equiv_refl; try set_solver. }
+      { iSplit; [|done]. iPureIntro. set_solver. }
+      { iSplit; [|done]. iPureIntro. set_solver. }
+      { iSplit; [|done]. done. }
+      iMod "Hclose". iModIntro.
+      iSplitL "Hσ Hauth Hm".
+      { iFrame.
+        iSplitL "Hσ".
+        - simpl.
+          rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+          rewrite Hmhe.
+          simpl.
+          rewrite insert_id; [|done].
+          rewrite - /msg.
+          simpl.
+          iFrame.
+        - simpl.
+          iExists ex.
+          iSplit.
+          { iPureIntro. simpl. by eexists _. }
+          rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+          iSplit; [|done].
+          iPureIntro.
+          eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+          { by rewrite right_id_L. }
+          apply fill_step.
+          eapply head_prim_step. simpl. done. }
+      iSplit; [|done].
+      iApply ("HΦ" with "Hsh [$Hrt $Hown]").
+    - iIntros "!>!>".
+      iModIntro.
+      iIntros "!>".
+      iDestruct "Hmsg" as "%Hmsg".
+      iMod (aneris_state_interp_send_duplicate sh a {[a]} to {[to]} _ _ skt
+             with "[] [] [$Hsh] [$Hrt] [$Hσ]")
+        as "(%Hmhe & Hσ & Hsh & Hrt)"; try done.
+      { eexists _. split; [done|].
+        apply message_group_equiv_refl; try set_solver. }
+      { iSplit; [|done]. iPureIntro. set_solver. }
+      { iSplit; [|done]. iPureIntro. set_solver. }
+      iMod "Hclose". iModIntro.
+      iSplitL "Hσ Hauth Hm".
+      { iFrame.
+        iSplitL "Hσ".
+        - simpl.
+          rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+          rewrite Hmhe.
+          simpl.
+          rewrite insert_id; [|done].
+          rewrite - /msg.
+          simpl.
+          iFrame.
+        - simpl.
+          iExists ex.
+          iSplit.
+          { iPureIntro. simpl. by eexists _. }
+          rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+          iSplit; [|done].
+          iPureIntro.
+          eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+          { by rewrite right_id_L. }
+          apply fill_step.
+          eapply head_prim_step. simpl. done. }
+      iSplit; [|done].
+      iApply ("HΦ" with "Hsh [$Hrt $Hown]").
+  Qed.
+
+
+  Lemma wp_recv
+        (φ : socket_interp Σ) k saR E sh skt ζ R T
+        (Φ : (aneris_expr → option (action aneris_lang) → iProp Σ)) :
+    saddress skt = Some saR →
+    sblock skt = false →
+    ▷ sh ↪[ip_of_address saR] skt -∗
+    ▷ saR ⤳ (R, T) -∗
+    saR ⤇ φ -∗
+    (∀ om r,
+       ((⌜r = NONEV⌝ ∗ ⌜om = Recv saR None⌝ ∗
+        sh ↪[ip_of_address saR] skt ∗ saR ⤳ (R, T)) ∨
+       (∃ msg,
+           ⌜r = SOMEV (PairV (LitV $ LitString (m_body msg))
+                             (LitV $ LitSocketAddress (m_sender msg)))⌝ ∗
+           ⌜om = Recv saR (Some msg)⌝ ∗
+           ⌜m_destination msg = saR⌝ ∗
+           sh ↪[ip_of_address saR] skt ∗
+           saR ⤳ ({[msg]} ∪ R, T) ∗
+           (⌜msg ∉ R⌝ -∗ φ msg))) -∗
+       Φ (mkVal (ip_of_address saR) r) (Some om)) -∗
+    sswp k E ζ
+         (mkExpr (ip_of_address saR)
+                 (ReceiveFrom (Val $ LitV $ LitSocket sh))) Φ.
+  Proof.
+    iIntros (Hskt Hblock) "Hsh Hrt #Hφ HΦ".
+    iAssert (▷ socket_address_group_own {[saR]})%I as "#HsaR".
+    { iDestruct "Hrt" as "[(%send & %recv & _ & _ & _ & $ & _) _]". }
+    iDestruct "Hrt" as "[Hrt Hown]".
+    rewrite /sswp.
+    iSplit; [done|].
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "[[Hσ Hauth] [%Hvalid Hm]]".
+    iMod (steps_auth_update_S with "Hauth") as "Hauth".
+    iMod "Hsh". iMod "Hrt".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iDestruct (aneris_state_interp_network_sockets_coh_valid with "Hσ") as %Hcoh.
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    destruct (decide (r = [])) as [-> | Hneq].
+    - iApply fupd_mask_intro; [set_solver|].
+      iIntros "Hclose".
+      iSplitR.
+      { destruct k; [|done].
+        iPureIntro; do 4 eexists. eapply head_prim_step.
+        eapply SocketStepS; eauto.
+        by eapply ReceiveFromNoneS. }
+      iIntros (α e2 σ2 efs Hstep).
+      apply head_reducible_prim_step in Hstep; last first.
+      { do 4 eexists. eapply SocketStepS; eauto. by econstructor. }
+      pose proof (conj Hstep I) as Hstep'.
+      inv_head_step.
+      { assert (length (r ++ [m]) = length ([] : list message)) as Hdone; first by f_equal.
+        rewrite app_length /= in Hdone. lia. }
+      2: { assert (false = true) by by rewrite -Hblock. done. }
+      iIntros "!>!>".
+      iModIntro.
+      iApply step_fupdN_intro; [done|].
+      destruct Hstep' as [Hstep' _].
+      iIntros "!>".
+      iMod "Hclose". iModIntro.
+      simpl.
+      iSplitL "Hσ Hauth Hm".
+      { iFrame.
+        iSplitL "Hσ".
+        - simpl.
+          rewrite insert_id; [|done].
+          rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+          rewrite -message_history_evolution_id.
+          iFrame.
+        - simpl.
+          iExists ex.
+          iSplit.
+          { iPureIntro. simpl. by eexists _. }
+          rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+          iSplit; [|done].
+          iPureIntro.
+          eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+          { by rewrite right_id_L. }
+          apply fill_step.
+          eapply head_prim_step. simpl. done. }
+      iSplit; [|done].
+      iApply ("HΦ" with "[Hsh Hrt Hown]").
+      iLeft. by iFrame.
+    - iApply fupd_mask_intro; [set_solver|].
+      iIntros "Hclose".
+      apply last_is_Some in Hneq as [m Hneq].
+      apply last_Some in Hneq as [? ->].
+      iSplitR.
+      { destruct k; [|done].
+        iPureIntro; do 4 eexists. eapply head_prim_step.
+        eapply SocketStepS; eauto.
+        by eapply ReceiveFromSomeS. }
+      iIntros (α e2 σ2 efs Hstep).
+      apply head_reducible_prim_step in Hstep; last first.
+      { do 4 eexists. eapply SocketStepS; eauto.
+        by eapply ReceiveFromSomeS. }
+      pose proof (conj Hstep I) as Hstep'.
+      inv_head_step.
+      2: { assert (length (x ++ [m]) = length ([] : list message)) as Hdone; first by f_equal.
+        rewrite app_length /= in Hdone. lia. }
+      2: { assert (false = true) by by rewrite -Hblock. done. }
+      iDestruct (messages_mapsto_observed with "Hrt")
+        as "[Hrt (%As & %Ar & _ & _ & #Hvalid & _)]".
+      simpl.
+      iMod "Hown".
+      iMod "HsaR".
+      iDestruct (aneris_state_interp_receive_some saR {[saR]} _ _ _ _ (Some (from_singleton φ))
+                   with "[] [] [$Hσ] [$Hsh] [$Hrt]") as (R' sagT) "(% & [%Hhst #Hin] & %Hhist & %HR & Hrt & Hrest)"; [try set_solver..|].
+      { iFrame "HsaR". iPureIntro. set_solver. }
+      iMod "Hrest" as "(Hσ & Hsh & Ha)".
+      iModIntro.
+      simpl.
+      assert (m0 = m) as ->.
+      { by eapply app_inj_tail_iff. }
+      assert (r = x) as ->.
+      { by eapply app_inv_tail. }
+      destruct (decide (m ∈ R)) as [Hin|Hnin].
+      + iDestruct "Hrt" as "[Hrt|Hrt]".
+        { iDestruct "Hrt" as "(%Hm & Hrt)".
+          specialize (Hm m Hin).
+          assert (false).
+          { apply Hm. apply message_group_equiv_refl. set_solver. set_solver. }
+          done. }
+        iIntros "!>!>".
+        iApply step_fupdN_intro; [done|].
+        destruct Hstep' as [Hstep' _].
+        iIntros "!>".
+        iMod "Hclose". iModIntro.
+        simpl.
+        iSplitL "Hσ Hauth Hm".
+        { iFrame.
+          iSplitL "Hσ".
+          - simpl.
+            simpl in *.
+            rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+            rewrite Hhist. iFrame.
+          - simpl.
+            iExists ex.
+            iSplit.
+            { iPureIntro. simpl. by eexists _. }
+            rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+            iSplit; [|done].
+            iPureIntro.
+            eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+            { by rewrite right_id_L. }
+            apply fill_step.
+            eapply head_prim_step. simpl. done. }
+        iSplit; [|done].
+        iApply ("HΦ").
+        iRight.
+        iExists m.
+        iSplit; [done|].
+        iSplit; [done|].
+        iFrame.
+        rewrite HR. iFrame.
+        simpl. replace ({[m]} ∪ R) with R by set_solver.
+        iFrame. iSplit; [done|].
+        iIntros (Hnin). set_solver.
+      + iDestruct "Hrt" as "[Hrt|Hrt]"; last first.
+        { iDestruct "Hrt" as %Hm.
+          destruct Hm as [m' [Hmin Hmeq]].
+          iAssert (⌜sagT = {[m_sender m']}⌝)%I as %->.
+          {
+            iDestruct (big_sepS_elem_of with "Hown") as "Hown_m"; [done|].
+            destruct Hmeq as (Hm11 & Hm12 & _).
+            iApply (socket_address_group_own_agree with "Hin Hown_m");
+              set_solver.
+          }
+          assert (m = m').
+          { destruct m, m'. rewrite /message_group_equiv in Hmeq.
+            simpl in *.
+            destruct Hmeq as (Hm11 & Hm12 & Hm21 & Hm22 & <-).
+            (* destruct Hmeq as (<- & <- & <- & Hm1 & Hm2). *)
+            assert (m_sender = m_sender0) as <- by set_solver.
+            assert (m_destination = m_destination0) as <- by set_solver.
+            done. }
+          set_solver.
+        }
+        iDestruct "Hrt" as (Hall m' Hmeq) "Hrt".
+        iAssert (▷ socket_address_group_own {[m_sender m']})%I as "#>Hown'".
+        { iNext. iDestruct "Hrt" as "[$ Hrt]". }
+        iAssert (⌜m_sender m = m_sender m'⌝)%I as %Hsender.
+        {
+          destruct Hmeq as (Hm11 & Hm12 & _).
+          iDestruct (socket_address_group_own_agree with "Hin Hown'")
+            as %->; [set_solver.. |].
+          iPureIntro. set_solver. }
+        assert (m = m') as <-.
+        {
+          destruct m. destruct m'. simpl in *.
+          destruct Hmeq as (Hm11 & Hm12 & Hm21 & Hm22 & Hprot).
+          repeat f_equiv; eauto. set_solver. }
+        iApply step_fupdN_intro; [done|].
+        destruct Hstep' as [Hstep' _].
+        iIntros "!>!>!>".
+        iMod "Hclose". iIntros "!>".
+        simpl.
+        iSplitL "Hσ Hauth Hm".
+        { iFrame.
+          iSplitL "Hσ".
+          - simpl.
+            simpl in *.
+            rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+            rewrite Hhist. iFrame.
+          - simpl.
+            iExists ex.
+            iSplit.
+            { iPureIntro. simpl. by eexists _. }
+            rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+            iSplit; [|done].
+            iPureIntro.
+            eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+            { by rewrite right_id_L. }
+            apply fill_step.
+            eapply head_prim_step. simpl. done. }
+        iSplit; [|done].
+        iApply ("HΦ").
+        iRight.
+        iExists m.
+        iSplit; [done|].
+        iSplit; [done|].
+        iFrame.
+        rewrite HR. iFrame.
+        simpl.
+        iSplit; [done|].
+        iSplitL "Hown".
+        { iApply big_sepS_union; [set_solver|].
+          iFrame. iApply big_sepS_singleton. eauto. }
+        iIntros "Hnin'".
+        iDestruct "Hrt" as "[??]". iFrame.
+  Qed.
 
   (* #[global] Instance aneris_lang_allows_stuttering : *)
   (*   AllowsStuttering (aneris_to_trace_model Mdl) Σ. *)

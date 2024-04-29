@@ -252,17 +252,49 @@ Section Aneris_AS.
 
   Definition mAB := mkMessage saA saB "Hello".
 
+  Definition map_oζα
+             (f : execution_trace aneris_lang → auxiliary_trace LM → iProp Σ)
+             oζα : execution_trace aneris_lang → auxiliary_trace LM → iProp Σ :=
+    (match oζα with
+    | None => f
+    | Some (ζ,α) => λ ex atr, ∃ ex', ⌜trace_contract ex (inl (ζ,α)) ex'⌝ ∗
+                                     ⌜language.locale_step (trace_last ex') (inl (ζ, α)) (trace_last ex)⌝ ∗
+                                     f ex' atr
+    end)%I.
+
+  Definition aneris_state_interp_σ (ex : execution_trace aneris_lang) :=
+    (aneris_state_interp (trace_last ex).2 (trace_messages_history ex) ∗
+    steps_auth (trace_length ex))%I.
+
+  Definition aneris_state_interp_δ
+             (ex : execution_trace aneris_lang) (atr : auxiliary_trace LM) :=
+    (⌜valid_state_evolution_fairness ex atr⌝ ∗
+    model_state_interp (trace_last ex) (trace_last atr))%I.
+
+  Definition aneris_state_interp_opt oζα ex atr :=
+    (aneris_state_interp_σ ex ∗
+    map_oζα aneris_state_interp_δ oζα ex atr)%I.
+
   Global Instance anerisG_irisG :
     irisG aneris_lang (live_model_to_model LM) Σ := {
     iris_invGS := _;
     state_interp ex atr :=
-      (⌜valid_state_evolution_fairness ex atr⌝ ∗
-       aneris_state_interp
-         (trace_last ex).2
-         (trace_messages_history ex) ∗
-       model_state_interp (trace_last ex) (trace_last atr) ∗
-       steps_auth (trace_length ex))%I;
+      aneris_state_interp_opt None ex atr;
     fork_post ζ _ := (ζ ↦M ∅)%I }.
+
+  (* Global Instance anerisG_irisG : *)
+  (*   irisG aneris_lang (live_model_to_model LM) Σ := { *)
+  (*   iris_invGS := _; *)
+  (*   state_interp_opt oζα ex atr := *)
+  (*     (map_oζα (λ ex atr, ⌜valid_state_evolution_fairness ex atr⌝) oζα ex atr ∗ *)
+  (*      aneris_state_interp *)
+  (*        (trace_last ex).2 *)
+  (*        (trace_messages_history ex) ∗ *)
+  (*      (map_oζα (λ ex atr, model_state_interp (trace_last ex) (trace_last atr)) *)
+  (*       oζα ex atr)∗ *)
+  (*      steps_auth (trace_length ex))%I; *)
+  (*   fork_post ζ _ := (ζ ↦M ∅)%I }. *)
+
 End Aneris_AS.
 
 Global Opaque iris_invGS.

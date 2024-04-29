@@ -519,7 +519,7 @@ Definition option_nat_to_val (v : option nat) :=
   end.
 
 Inductive head_step
-  : expr → state → option Empty_set → expr → state → list expr → Prop :=
+  : expr → state → option unit → expr → state → list expr → Prop :=
   | RecS f x e σ :
      head_step (Rec f x e) σ None (Val $ RecV f x e) σ []
   | PairS v1 v2 σ :

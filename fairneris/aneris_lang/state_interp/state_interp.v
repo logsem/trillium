@@ -1025,7 +1025,7 @@ Section state_interpretation.
   Proof.
     iIntros "Hlt Hsi".
     rewrite /state_interp /= /aneris_state_interp /messages_sent_from.
-    iDestruct "Hsi" as "(% & Hsi & Hauth)".
+    iDestruct "Hsi" as "[[Hsi Hauth] [% Hlive]]".
     iDestruct "Hsi" as (γm mh Hmh Hgnms Hnetsock Hhistcoh) "(?&?&?&?& Hctx &?)".
     rewrite -Hmh /=.
     iDestruct (messages_mapsto_ctx_valid with "Hlt Hctx") as %Hma.
