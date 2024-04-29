@@ -123,12 +123,12 @@ Definition messages_addresses_coh mhm :=
 Definition messages_received_from_sent_coh mhm :=
   messages_received mhm ⊆ messages_sent mhm.
 
-Definition messages_received_from_sent_coh_aux mhm :=
+Definition messages_received_from_sent_coh_aux mhm : Prop :=
   ∀ rt sag m,
   m_destination m ∈ sag →
   mhm !! sag = Some rt →
   m ∈ rt.1 →
-  ∃ rt' sag', m_sender m ∈ sag' →
+  ∃ rt' sag', m_sender m ∈ sag' ->
               mhm !! sag' = Some rt' ∧ m ∈ rt'.2.
 
 Lemma messages_received_from_sent_corrolary_coh mhm :

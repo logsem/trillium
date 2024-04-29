@@ -20,6 +20,7 @@ Import RecordSetNotations.
 
 Section state_interpretation.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   (* socket_interp_coh *)

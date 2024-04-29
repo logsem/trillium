@@ -17,9 +17,10 @@ Import RecordSetNotations.
 
 Section state_interpretation.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
-  Definition ip_is_free (ip : ip_address) (σ : state) : Prop :=
+  Definition ip_is_free (ip : ip_address) (σ : state aneris_lang) : Prop :=
     state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None.
 
   (** free_ips_coh *)
