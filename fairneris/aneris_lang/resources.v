@@ -135,7 +135,7 @@ Class anerisG `(LM : LiveModel aneris_lang (joint_model M Net)) `{!LiveModelEq L
       aneris_observed_recv_name : gname;
     }.
 
-Class anerisPreG `(LM : LiveModel aneris_lang (joint_model M Net)) Σ :=
+Class anerisPreG `(LM : LiveModel aneris_lang (joint_model M Net)) `{!LiveModelEq LM} Σ :=
   AnerisPreG {
       anerisPre_invGS :> invGpreS Σ;
       anerisPre_fairnessGS :> fairnessGpreS LM Σ;
@@ -178,7 +178,7 @@ Definition anerisΣ `(LM : LiveModel aneris_lang (joint_model M Net)) : gFunctor
     GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)))
    ].
 
-#[global] Instance subG_anerisPreG {Σ: gFunctors} `(LM : LiveModel aneris_lang (joint_model M Net)) :
+#[global] Instance subG_anerisPreG {Σ: gFunctors} `(LM : LiveModel aneris_lang (joint_model M Net)) `{!LiveModelEq LM}  :
   subG (anerisΣ LM) Σ → anerisPreG LM Σ.
 Proof. solve_inG. Qed.
 

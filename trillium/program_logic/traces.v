@@ -270,6 +270,24 @@ Lemma valid_inf_system_trace_inv {Λ M}
   Ψ ex atr.
 Proof. by inversion 1. Qed.
 
+Lemma valid_inf_system_trace_mono {Λ M}
+      (Φ Ψ : execution_trace Λ → auxiliary_trace M → Prop) ex atr iex itr :
+  (∀ ex atr, Φ ex atr → Ψ ex atr) →
+  valid_inf_system_trace Φ ex atr iex itr →
+  valid_inf_system_trace Ψ ex atr iex itr.
+Proof.
+  intros Himpl. revert ex atr iex itr. cofix CH. intros ex atr iex itr.
+  destruct iex as [|[??]], itr as [|[??]].
+  - intros Hval. clear CH. constructor. inversion Hval. naive_solver.
+  - clear CH. intros Hval. inversion Hval.
+  - clear CH. intros Hval. inversion Hval.
+  - intros Hval.
+    econstructor=>//.
+    + apply Himpl. by inversion Hval; simplify_eq.
+    + inversion Hval; simplify_eq. unfold trace_ends_in in *. naive_solver.
+    + inversion Hval; simplify_eq. by apply CH.
+Qed.
+
 Section simulation.
   Context {Λ : language} {M : Model}
           (φ : execution_trace Λ → auxiliary_trace M → Prop).
