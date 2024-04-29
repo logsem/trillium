@@ -158,7 +158,7 @@ Proof.
           end.
 Qed.
 
-Class AsRecV (v : val) (f x : binder) (erec : expr) :=
+Class AsRecV (v : val _) (f x : binder) (erec : expr _) :=
   as_recv : v = RecV f x erec.
 Global Hint Mode AsRecV ! - - - : typeclass_instances.
 Definition AsRecV_recv f x e : AsRecV (RecV f x e) f x e := eq_refl.
@@ -254,12 +254,13 @@ Opaque aneris_state_interp.
 
 Section primitive_laws.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : aneris_val → iProp Σ.
-  Implicit Types v : val.
-  Implicit Types e : expr.
+  Implicit Types v : val aneris_lang.
+  Implicit Types e : expr aneris_lang.
   Implicit Types σ : base_lang.state.
   Implicit Types M R T : message_soup.
   Implicit Types m : message.

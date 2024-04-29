@@ -23,9 +23,10 @@ Import RecordSetNotations.
 
 Section definitions.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
-  Implicit Types σ : state.
+  Implicit Types σ : state aneris_lang.
   Implicit Types h : heap.
   Implicit Types H : gmap ip_address heap.
   Implicit Types S : gmap ip_address sockets.
@@ -234,6 +235,7 @@ End definitions.
 
 Section Aneris_AS.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   Definition ipA := "0.0.0.0".

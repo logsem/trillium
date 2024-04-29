@@ -6,23 +6,23 @@ From fairneris.lib Require Import singletons.
 From fairneris.aneris_lang Require Export resources network base_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def state_interp.
 (* Maybe move the TC stuff out of lifting *)
-From fairneris.aneris_lang Require Export lifting.
+From fairneris.aneris_lang Require Export lifting ast.
 
 Set Default Proof Using "Type".
 
-Definition aneris_wp_def `{LM: LiveModel aneris_lang (joint_model Mod Net)} `{aG : !anerisG LM Σ}
+Definition aneris_wp_def `{LM: LiveModel aneris_lang (joint_model Mod Net)} `{!LiveModelEq LM} `{aG : !anerisG LM Σ}
   (ip : ip_address) (E : coPset)
-  (e : expr) (Φ : val → iProp Σ) : iProp Σ :=
+  (e : ast.expr) (Φ : ast.val → iProp Σ) : iProp Σ :=
   (∀ tid, is_node ip -∗
    wp NotStuck E (ip, tid) (mkExpr ip e) (λ v, ∃ w, ⌜v = mkVal ip w⌝ ∗ Φ w))%I.
 
-Definition aneris_wp_aux `{LM: LiveModel aneris_lang (joint_model Mod Net)} `{aG : !anerisG LM Σ}
-  : seal (@aneris_wp_def _ _ _ Σ _).
+Definition aneris_wp_aux `{LM: LiveModel aneris_lang (joint_model Mod Net)} `{!LiveModelEq LM} `{aG : !anerisG LM Σ}
+  : seal (@aneris_wp_def _ _ _ _ Σ _).
 Proof. by eexists. Qed.
-Definition aneris_wp `{LM: LiveModel aneris_lang (joint_model Mod Net)}
+Definition aneris_wp `{LM: LiveModel aneris_lang (joint_model Mod Net)} `{!LiveModelEq LM}
   `{aG : !anerisG LM Σ} := aneris_wp_aux.(unseal).
-Definition aneris_wp_eq `{LM: LiveModel aneris_lang (joint_model Mod Net)}
-`{aG : !anerisG LM Σ} : aneris_wp = @aneris_wp_def _ _ _ Σ _ :=
+Definition aneris_wp_eq `{LM: LiveModel aneris_lang (joint_model Mod Net)} `{!LiveModelEq LM}
+`{aG : !anerisG LM Σ} : aneris_wp = @aneris_wp_def _ _ _ _ Σ _ :=
   aneris_wp_aux.(seal_eq).
 
 Notation "'WP' e '@[' ip ] E {{ Φ } }" := (aneris_wp ip E e%E Φ)
@@ -80,6 +80,7 @@ Notation "'{{{' P } } } e '@[' ip ] {{{ 'RET' pat ; Q } } }" :=
 
 Section aneris_wp.
 Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+Context `{!LiveModelEq LM}.
 Context `{aG : !anerisG LM Σ}.
 Implicit Types ip : ip_address.
 Implicit Types P : iProp Σ.
@@ -508,7 +509,7 @@ Proof.
   iIntros "Hwp".
   iLöb as "IH" forall (E ip e Ψ).
   rewrite !wp_unfold /wp_pre /= /aneris_to_val /=.
-  destruct (to_val e); simpl.
+  destruct (base_lang.to_val e); simpl.
   { iMod "Hwp". iModIntro. eauto. }
   iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "Hsi".
   iMod ("Hwp" with "[//] [//] [//] Hsi") as "[% Hstp]".
@@ -626,6 +627,7 @@ End aneris_wp.
 (** Proofmode class instances *)
 Section proofmode_classes.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   Implicit Types P Q : iProp Σ.

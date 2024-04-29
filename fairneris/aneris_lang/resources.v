@@ -5,7 +5,7 @@ From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import saved_prop invariants mono_nat.
 From iris.proofmode Require Import tactics.
 From fairneris.lib Require Import gen_heap_light.
-From fairneris.aneris_lang Require Export aneris_lang network.
+From fairneris.aneris_lang Require Export aneris_lang network network_model.
 From fairneris.algebra Require Import disj_gsets.
 From trillium.events Require Import event.
 From fairneris.aneris_lang Require Import events.
@@ -84,13 +84,10 @@ Definition aneris_localeO := leibnizO aneris_locale.
 Definition live_roleUR (FM : FairModel) :=
   authUR (gset_disjUR $ FM.(fmrole)).
 
-Instance aneris_good: GoodLang aneris_lang.
-Proof. Qed.
-
 (* Instance aneris_inh: Inhabited (action aneris_lang). *)
 
 (** The system CMRA *)
-Class anerisG `(LM : LiveModel aneris_lang (joint_model M Net)) Σ :=
+Class anerisG `(LM : LiveModel aneris_lang (joint_model M Net)) `{!LiveModelEq LM} Σ :=
   AnerisG {
       aneris_invG :> invGS_gen HasNoLc Σ;
       aneris_fairnessG :> fairnessGS LM Σ;
@@ -187,6 +184,7 @@ Proof. solve_inG. Qed.
 
 Section definitions.
   Context `{LM: LiveModel aneris_lang (joint_model M Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   (** Authoritative view of the system ghost names *)
@@ -480,6 +478,7 @@ Notation "sa ⤇1 Φ" := ({[sa]} ⤇* Φ) (at level 20).
 
 Section singleton_to_singleton_connectives.
   Context `{LM: LiveModel aneris_lang (joint_model M Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   Definition message_history_singleton (sag : socket_address_group) q
@@ -890,6 +889,7 @@ Qed.
 
 Section resource_lemmas.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   #[global] Instance mapsto_node_persistent ip γn : Persistent (mapsto_node ip γn).

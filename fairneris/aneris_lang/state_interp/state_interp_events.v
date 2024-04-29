@@ -12,6 +12,7 @@ Set Default Proof Using "Type".
 
 Section state_interpretation.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   Lemma aneris_events_state_interp_same_tp ex c oζ c':

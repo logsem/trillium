@@ -31,6 +31,7 @@ Import RecordSetNotations.
 
 Section aneris_state_interpretation.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   (** aneris_state_interp *)
@@ -178,7 +179,9 @@ Section aneris_state_interpretation.
     (* free_ips_coh *)
     { iApply (free_ips_coh_init_strong with "[$]"); [set_solver|done..]. }
     (* messages_resource_coh *)
-    iApply messages_resource_coh_init.
+    unfold socket_address_groups_own.
+    Set Printing All.
+    iPoseProof (messages_resource_coh_init with "Hsags'") as "S".
     iFrame "#".
   Qed.
 
@@ -988,6 +991,7 @@ End aneris_state_interpretation.
 
 Section state_interpretation.
   Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   (* Lemma aneris_state_interp_model_agree m ex atr : *)
