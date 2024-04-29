@@ -1,5 +1,5 @@
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From fairneris Require Export trace_utils fairness env_model fuel ltl_lite env_model_project.
+From fairneris Require Export trace_utils fairness env_model fuel ltl_lite env_model_project fair_resources.
 From fairneris.aneris_lang Require Import ast network lang aneris_lang.
 
 Definition net_state : Set :=
@@ -73,12 +73,6 @@ Next Obligation.
   (* Unlabeled steps don't change the network state *)
 Admitted.
 
-Class LiveModelEq `(LM: LiveModel aneris_lang (joint_model Mod net_model)) := {
-    cfg_labels_match_is_eq: ∀ x y, lm_cfg_labels_match LM x y ↔ x = y;
-    actions_match_is_eq: ∀ x y, lm_actions_match LM x y ↔ Some x = y;
-}.
-Arguments LiveModelEq {_}.
-
 Section fairness.
   Context {M: UserModel aneris_lang}.
 
@@ -118,8 +112,12 @@ Section fairness.
     ∀ msg, network_fair_send_receive_of msg mtr.
 End fairness.
 
+Instance aneris_good_lang : GoodLang aneris_lang.
+Proof. Qed.
+
 Section fuel_fairness.
-  Context `{@LiveModelEq M LM}.
+  Context `{LM: LiveModel aneris_lang (joint_model M net_model)}.
+  Context `{!LiveModelEq LM}.
 
   Notation jmlabel := ((usr_role M * option (action aneris_lang)) + config_label aneris_lang)%type.
   Notation jmtrace := (trace (joint_model M net_model) jmlabel).
@@ -174,7 +172,8 @@ Definition ex_fair_network (extr : extrace aneris_lang) : Prop :=
   ∀ msg, ex_fair_network_of msg extr.
 
 Section exec_fairness.
-  Context `{@LiveModelEq M LM}.
+  Context `{LM: LiveModel aneris_lang (joint_model M net_model)}.
+  Context `{!LiveModelEq LM}.
 
   Lemma exec_fuel_fairness:
     exaux_tme (LM := LM) ex_fair_network fuel_network_fair_delivery.
@@ -188,7 +187,7 @@ Section exec_fairness.
         destruct Hlm as (?&?&Hlm). apply actions_match_is_eq in Hlm. simplify_eq.
         rewrite /fuel_send_filter. naive_solver.
       + rewrite /fuel_send_filter /ex_send_filter.
-        destruct l1 as [[? [|]]|], l2 =>//=; try naive_solver.
+        destruct l1 as [[? ?]|], l2 =>//=; try naive_solver.
         intros ?. simplify_eq.
         destruct Hlm as (?&?&Hlm). apply actions_match_is_eq in Hlm. simplify_eq.
         rewrite /fuel_send_filter. naive_solver.
@@ -263,7 +262,7 @@ Section user_fairness.
     apply trace_always_elim in Hv. simpl in Hv.
     destruct (trfirst tr) eqn:Heq. rewrite Heq in Hv.
     destruct Hbuf1 as (pre&Hbuf1). simpl in Hbuf1.
-    inversion Hv as [| AA BB CC DD Hnet FF|AA BB CC DD EE FF GG Hnet]; simplify_eq.
+    inversion Hv as [| AA BB CC DD Hnet FF|??????? Hnet]; simplify_eq.
     - by exists pre.
     - inversion Hnet; simplify_eq; try (by exists pre).
       match goal with

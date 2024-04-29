@@ -565,7 +565,7 @@ Section fairness.
       lm_lbl := FairLabel M;
       lm_ls_trans (δ: LiveState) (ℓ: FairLabel M) := ls_trans fm_fl δ ℓ;
       lm_cfg_labels_match : config_label Λ → fmconfig M → Prop;
-      lm_actions_match : action Λ → fmaction M → Prop;
+      lm_actions_match : option (action Λ) → fmaction M → Prop;
     }.
 
   Definition live_model_model `(LM : LiveModel) : Model := {|
@@ -597,10 +597,9 @@ Section fairness.
     match pl, ℓ with
     | inr cfg, Config_step fmcfg cfg' => cfg = cfg' ∧ lm_cfg_labels_match LM cfg fmcfg
     | inl (ζ, act), Silent_step ζ' act' => ζ = ζ' ∧ act = act' ∧ act = None
-    | inl (ζ, Some act), Take_step ρ fmact ζ' act' => ζ = ζ' ∧ Some act = act' ∧ lm_actions_match LM act fmact
+    | inl (ζ, act), Take_step ρ fmact ζ' act' => ζ = ζ' ∧ act = act' ∧ lm_actions_match LM act fmact
     | _, _ => False
     end.
-
 End fairness.
 
 Arguments LiveState _ _ {_ _}.
@@ -869,7 +868,7 @@ Section fairness_preserved.
         + have [f' [Hfuel' Hff']] : exists f', ls_fuel (trfirst auxtr') !! ρ = Some f' ∧ f' ≤ f.
           { inversion Htm as [|s1 ℓ1 r1 s2 ℓ2 r2 Hl Hs Hts Hls Hmatchrest]; simplify_eq.
             simpl in *. destruct ℓ as [ρ0 ζ0| ζ0|].
-            + destruct Hls as (?&?&?&Hnoninc&?); destruct act;
+            + destruct Hls as (?&?&?&Hnoninc&?);
               destruct Hl; simplify_eq.
               unfold fuel_must_not_incr in Hnoninc.
               have Hneq: Some ρ ≠ Some ρ0 by congruence.
@@ -907,7 +906,7 @@ Section fairness_preserved.
         + have [f' [Hfuel' Hff']] : exists f', ls_fuel (trfirst auxtr') !! ρ = Some f' ∧ f' < f.
           { inversion Htm as [|s1 ℓ1 r1 s2 ℓ2 r2 Hl Hs Hts Hls Hmatchrest]; simplify_eq.
               simpl in *. destruct ℓ as [ρ0 ? ζ0 ?| ζ0|].
-              + destruct Hls as (?&?&Hdec&?&?); destruct act;
+              + destruct Hls as (?&?&Hdec&?&?);
                 unfold fuel_decr in Hdec; destruct Hl; simplify_eq.
                 have Hmd: must_decrease ρ (Some ρ0) δ (trfirst auxtr') (Some ζ0).
                 { econstructor 2. congruence. rewrite Hζ''; eauto. }

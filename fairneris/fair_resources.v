@@ -2,6 +2,13 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
 From fairneris Require Import fairness fuel map_included_utils env_model.
 
+Class LiveModelEq `{GoodLang Λ} `{N: EnvModel Λ}
+  `(LM: !LiveModel Λ (joint_model Mod N)) := {
+    cfg_labels_match_is_eq: ∀ x y, lm_cfg_labels_match LM x y ↔ x = y;
+    actions_match_is_eq: ∀ x y, lm_actions_match LM x y ↔ x = y;
+}.
+Arguments LiveModelEq {_ _ _ _ _ _ _ _ _ _ _} _.
+
 Canonical Structure ModelO `{GoodLang Λ} (Mdl : UserModel Λ) := leibnizO Mdl.
 Canonical Structure RoleO `{GoodLang Λ} (Mdl : UserModel Λ) := leibnizO (Mdl.(usr_role)).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
@@ -24,10 +31,10 @@ Class fairnessGS `{GoodLang Λ} `(LM : LiveModel Λ (joint_model M Net)) Σ := F
   fairness_model_free_roles_name : gname;
 }.
 
-Global Arguments fairnessGS {_ _ _ _ _ _ _ _ _ _ _ _} LM Σ.
-Global Arguments fairness_model_name {_ _ _ _ _ _ _ _ _ _ _ _ LM Σ} _.
-Global Arguments fairness_model_fuel_mapping_name {Λ _ _ _ _ _ _ _ _ _ M Net LM Σ} _ : assert.
-Global Arguments fairness_model_free_roles_name {Λ _ _ _ _ _ _ _ _ _ M Net LM Σ} _ : assert.
+Global Arguments fairnessGS {_ _ _ _ _ _ _ _ _ _ _} LM Σ.
+Global Arguments fairness_model_name {_ _ _ _ _ _ _ _ _ _ _ LM Σ} _.
+Global Arguments fairness_model_fuel_mapping_name {Λ _ _ _ _ _ _ _ _ M Net LM Σ} _ : assert.
+Global Arguments fairness_model_free_roles_name {Λ _ _ _ _ _ _ _ _ M Net LM Σ} _ : assert.
 
 Definition fairnessΣ Λ `{GoodLang Λ} M : gFunctors := #[
    GFunctor (authUR (optionUR (exclR (ModelO M))));
@@ -387,6 +394,7 @@ End adequacy.
 Section model_state_lemmas.
   Context `{GoodLang Λ}.
   Context `{LM: LiveModel Λ (joint_model M Net)}.
+  Context `{!LiveModelEq LM}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
   Context `{!invGS_gen HasNoLc Σ}.
@@ -453,7 +461,9 @@ Section model_state_lemmas.
     apply auth_update.
     rewrite !fmap_insert.
     rewrite !fmap_empty.
-    rewrite -(insert_insert ∅ ζ (Excl fs') (Excl fs)).
+    rewrite <-(insert_insert ∅ ζ (Excl fs') (Excl fs)).
+    (* BUG in ssrelfect rewrite here? *)
+    (* rewrite -(insert_insert ∅ ζ (Excl fs') (Excl fs)). *)
     eapply insert_local_update; [| |].
     - rewrite lookup_fmap. rewrite Hagree. simpl. done.
     - simpl. rewrite lookup_insert. done.
@@ -1405,60 +1415,61 @@ Section model_state_lemmas.
   Qed.
 
   Lemma model_update_locale_spec_model_step extr
-        (auxtr : auxiliary_trace LM) ζ c2 ρs (ρ : fmrole (joint_model M Net)) δ2 s2 fmact act :
+        (auxtr : auxiliary_trace LM) ζ c2 ρs (ρ : fmrole (joint_model M Net)) δ2 s2 act :
     (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ ρs) ρ s2
                                            (trace_last auxtr) →
-    model_can_model_step (trace_last auxtr) ζ ρ δ2 fmact →
+    model_can_model_step (trace_last auxtr) ζ ρ δ2 act →
     valid_state_evolution_fairness extr auxtr →
     tids_smaller c2.1 δ2 →
-    lm_actions_match LM act fmact →
     valid_state_evolution_fairness
-      (extr :tr[inl (ζ, Some act)]: c2)
-      (auxtr :tr[Take_step ρ fmact ζ (Some act)]: δ2).
+      (extr :tr[inl (ζ, act)]: c2)
+      (auxtr :tr[Take_step ρ act ζ act]: δ2).
   Proof.
     intros Hstep Htids Hvse ?. destruct c2.
     destruct Hvse as (?&?&?).
     split; [| split]=>//.
     econstructor=>//; first by apply model_can_model_step_trans.
+    rewrite /trace_labels_match /labels_match.
+    do 2 split=>//. by apply actions_match_is_eq.
   Qed.
 
-  (* Lemma update_model_step *)
-  (*       (extr : execution_trace Λ) *)
-  (*       (auxtr: auxiliary_trace LM) c2 (s1 s2 : joint_model M Net) fs ρ (δ1 : LM) ζ f fmact act : *)
-  (*   usr_live_roles s2.1 ⊆ usr_live_roles s1.1 → *)
-  (*   ρ ∉ dom fs → *)
-  (*   trace_last auxtr = δ1 → *)
-  (*   locale_step (trace_last extr) (inl (ζ, act)) c2 → *)
-  (*   env_states_match c2  → *)
-  (*   fmtrans _ s1 (inl (ρ, fmact)) s2 → *)
-  (*   env_state δ1 = s1.2 → *)
-  (*   has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗ frag_model_is s1.1 -∗ *)
-  (*   ⌜valid_state_evolution_fairness extr auxtr⌝ -∗ *)
-  (*   model_state_interp (trace_last extr) δ1 ==∗ *)
-  (*   ∃ (δ2: LM), *)
-  (*     ⌜valid_state_evolution_fairness *)
-  (*       (extr :tr[inl (ζ, act)]: c2) (auxtr :tr[Take_step ρ fmact ζ act]: δ2)⌝ ∗ *)
-  (*     has_fuels ζ ({[ρ := fm_fl s2]} ∪ fs) ∗ *)
-  (*     frag_model_is s2.1 ∗ model_state_interp c2 δ2. *)
-  (* Proof. *)
-  (*   iIntros (Hlive Hdom Hlast Hstep Htrans Henv) "Hfuel Hfrag %Hvse Hm". *)
-  (*   iDestruct (model_agree' with "Hm Hfrag") as %Heq. *)
-  (*   pose proof (model_update_model_step_valid *)
-  (*                 ζ ({[ρ]} ∪ dom fs) ρ s2 δ1) as [δ2 Hδ2]. *)
-  (*   { rewrite /usr_state Heq //. } *)
-  (*   iExists δ2. *)
-  (*   iDestruct (model_state_interp_can_model_step with "Hm Hfuel Hfrag") *)
-  (*     as %Hcan_step; [try done..|]. *)
-  (*   destruct (trace_last extr), c2. *)
-  (*   iMod (model_state_interp_model_step_update with "Hm Hfuel Hfrag") *)
-  (*     as "(Hm&Hf&Hfrag)"; [try done..|]. *)
-  (*   { rewrite Hδ2 //=. } *)
-  (*   iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids. *)
-  (*   iModIntro. *)
-  (*   iFrame "Hm Hf Hfrag". *)
-  (*   iPureIntro. subst. *)
-  (*   by eapply model_update_locale_spec_model_step. *)
-  (* Qed. *)
+  Lemma update_model_step
+        (extr : execution_trace Λ)
+        (auxtr: auxiliary_trace LM) c2 (s1 s2 : joint_model M Net) fs ρ (δ1 : LM) ζ f act :
+    usr_live_roles s2.1 ⊆ usr_live_roles s1.1 →
+    ρ ∉ dom fs →
+    trace_last auxtr = δ1 →
+    locale_step (trace_last extr) (inl (ζ, act)) c2 →
+    env_states_match c2 s2.2  →
+    fmtrans _ s1 (inl (ρ, act)) s2 →
+    env_state δ1 = s1.2 →
+    has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗ frag_model_is s1.1 -∗
+    ⌜valid_state_evolution_fairness extr auxtr⌝ -∗
+    model_state_interp (trace_last extr) δ1 ==∗
+    ∃ (δ2: LM),
+      ⌜valid_state_evolution_fairness
+        (extr :tr[inl (ζ, act)]: c2) (auxtr :tr[Take_step ρ act ζ act]: δ2)⌝ ∗
+      has_fuels ζ ({[ρ := fm_fl s2]} ∪ fs) ∗
+      frag_model_is s2.1 ∗ model_state_interp c2 δ2.
+  Proof.
+    iIntros (Hlive Hdom Hlast Hstep Hcfg Htrans Henv) "Hfuel Hfrag %Hvse Hm".
+    iDestruct (model_agree' with "Hm Hfrag") as %Heq.
+    pose proof (model_update_model_step_valid
+                  ζ ({[ρ]} ∪ dom fs) ρ s2 δ1) as [δ2 Hδ2].
+    { rewrite /usr_state Heq //. }
+    iExists δ2.
+    iDestruct (model_state_interp_can_model_step with "Hm Hfuel Hfrag")
+      as %Hcan_step; [try done..|].
+    destruct (trace_last extr), c2.
+    iMod (model_state_interp_model_step_update with "Hm Hfuel Hfrag")
+      as "(Hm&Hf&Hfrag)"; [try done..|].
+    { rewrite Hδ2 //=. }
+    iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
+    iModIntro.
+    iFrame "Hm Hf Hfrag".
+    iPureIntro. subst.
+    eapply model_update_locale_spec_model_step=>//.
+  Qed.
 
   (** Fork step *)
 
@@ -2111,44 +2122,44 @@ Section model_state_lemmas.
     iPureIntro. by eexists _.
   Qed.
 
-  (* Lemma update_fork_step fs1 fs2 tp1 tp2 (extr : execution_trace Λ) *)
-  (*       (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 : *)
-  (*   fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 → *)
-  (*   trace_last extr = (tp1, σ1) → *)
-  (*   locale_step (tp1, σ1) (inl (ζ, None)) (tp2, σ2) → *)
-  (*   valid_state_evolution_fairness extr auxtr → *)
-  (*   has_forked tp1 tp2 efork → *)
-  (*   has_fuels_S ζ (fs1 ∪ fs2) -∗ *)
-  (*   model_state_interp (tp1, σ1) (trace_last auxtr) ==∗ *)
-  (*   ∃ δ2, *)
-  (*     ⌜valid_state_evolution_fairness *)
-  (*       (extr :tr[inl (ζ, None)]: (tp2, σ2)) (auxtr :tr[Silent_step ζ None]: δ2)⌝ ∗ *)
-  (*     has_fuels ζ fs1 ∗ has_fuels (locale_of tp1 efork) fs2 ∗ *)
-  (*     model_state_interp tp2 δ2. *)
-  (* Proof. *)
-  (*   iIntros (Hdom Hdisj Hlast Hstep Hvse Hforked) "Hfuel Hm". *)
-  (*   iDestruct (model_state_interp_has_fuels_agree with "Hm Hfuel") *)
-  (*     as %(fs'&HSome&Hfs'). *)
-  (*   iAssert (⌜(locale_of tp1 efork) ∉ dom (ls_map (trace_last auxtr))⌝)%I as %Hnin. *)
-  (*   { destruct Hforked as (?&?&?). *)
-  (*     iDestruct "Hm" as "(%fm&[%Hfmle %Hdom']&%Hfmdead&%Htp&Hm&Hfm)". *)
-  (*     rewrite -Hdom'. *)
-  (*     iPureIntro. apply not_elem_of_dom. apply Htp. *)
-  (*     apply locale_step_equiv in Hstep. simpl in *. *)
-  (*     apply not_elem_of_locale_of_from_list. } *)
-  (*   opose proof (model_update_fork_valid _ _ _ _ _) as [δ2 Hδ]; *)
-  (*     [by apply elem_of_dom|done|]. *)
-  (*   iDestruct (model_state_interp_can_fork_step with "Hm Hfuel") as %Hcan_step; *)
-  (*     [done..|]. *)
-  (*   iMod (model_state_interp_fork_update with "Hm Hfuel") as "(Hm&Hf1&Hf2)"; *)
-  (*     [done..|]. *)
-  (*   iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids. *)
-  (*   iModIntro. *)
-  (*   iExists δ2. *)
-  (*   iFrame "Hm Hf1 Hf2". *)
-  (*   iPureIntro. *)
-  (*   by eapply model_update_locale_spec_fork. *)
-  (* Qed. *)
+  Lemma update_fork_step fs1 fs2 tp1 tp2 (extr : execution_trace Λ)
+        (auxtr: auxiliary_trace LM) ζ efork σ1 σ2 :
+    fs1 ∪ fs2 ≠ ∅ → fs1 ##ₘ fs2 →
+    trace_last extr = (tp1, σ1) →
+    locale_step (tp1, σ1) (inl (ζ, None)) (tp2, σ2) →
+    valid_state_evolution_fairness extr auxtr →
+    has_forked tp1 tp2 efork →
+    has_fuels_S ζ (fs1 ∪ fs2) -∗
+    model_state_interp (tp1, σ1) (trace_last auxtr) ==∗
+    ∃ δ2,
+      ⌜valid_state_evolution_fairness
+        (extr :tr[inl (ζ, None)]: (tp2, σ2)) (auxtr :tr[Silent_step ζ None]: δ2)⌝ ∗
+      has_fuels ζ fs1 ∗ has_fuels (locale_of tp1 efork) fs2 ∗
+      model_state_interp (tp2, σ2) δ2.
+  Proof.
+    iIntros (Hdom Hdisj Hlast Hstep Hvse Hforked) "Hfuel Hm".
+    iDestruct (model_state_interp_has_fuels_agree with "Hm Hfuel")
+      as %(fs'&HSome&Hfs').
+    iAssert (⌜(locale_of tp1 efork) ∉ dom (ls_map (trace_last auxtr))⌝)%I as %Hnin.
+    { destruct Hforked as (?&?&?).
+      iDestruct "Hm" as "(%fm&[%Hfmle %Hdom']&%Hfmdead&%Htp&Hm&Hfm)".
+      rewrite -Hdom'.
+      iPureIntro. apply not_elem_of_dom. apply Htp.
+      apply locale_step_equiv in Hstep. simpl in *.
+      apply not_elem_of_locale_of_from_list. }
+    opose proof (model_update_fork_valid _ _ _ _ _) as [δ2 Hδ];
+      [by apply elem_of_dom|done|].
+    iDestruct (model_state_interp_can_fork_step with "Hm Hfuel") as %Hcan_step;
+      [done..|].
+    iMod (model_state_interp_fork_update with "Hm Hfuel") as "(Hm&Hf1&Hf2)";
+      [done..|].
+    iDestruct (model_state_interp_tids_smaller with "Hm") as %Htids.
+    iModIntro.
+    iExists δ2.
+    iFrame "Hm Hf1 Hf2".
+    iPureIntro.
+    by eapply model_update_locale_spec_fork.
+  Qed.
 
   Lemma free_roles_inclusion FR fr:
     auth_free_roles_are FR -∗
