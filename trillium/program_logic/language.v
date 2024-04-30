@@ -413,7 +413,7 @@ Section language.
   Record pure_step (e1 e2 : expr Λ) := {
     pure_step_safe σ1 : reducible e1 σ1;
     pure_step_det σ1 α e2' σ2 efs :
-      prim_step e1 σ1 α e2' σ2 efs → σ2 = σ1 ∧ e2' = e2 ∧ efs = []
+      prim_step e1 σ1 α e2' σ2 efs → σ2 = σ1 ∧ α = None ∧ e2' = e2 ∧ efs = []
   }.
 
   Notation pure_steps_tp := (Forall2 (rtc pure_step)).
@@ -434,7 +434,7 @@ Section language.
       destruct (fill_step_inv K e1 σ1 α e2' σ2 efs)
         as (e2'' & -> & ?); [|exact Hpstep|].
       + destruct (Hred σ1) as (? & ? & ? & ? & ?); eauto using val_stuck.
-      + edestruct (Hstep σ1 α e2'' σ2 efs) as (-> & -> & ->); auto.
+      + edestruct (Hstep σ1 α e2'' σ2 efs) as (-> & -> & -> & ->); auto.
   Qed.
 
   Lemma pure_step_nsteps_ctx K n e1 e2 :
@@ -482,15 +482,16 @@ Section language.
     destruct (Hstep inhabitant) as (?&?&?&?&Hval%val_stuck).
     by rewrite to_of_val in Hval.
   Qed.
+
   (* FIXME: add a new case *)
-  (** Let thread pools [t1] and [t3] be such that each thread in [t1] makes
-   (zero or more) pure steps to the corresponding thread in [t3]. Furthermore,
-   let [t2] be a thread pool such that [t1] under state [σ1] makes a (single)
-   step to thread pool [t2] and state [σ2]. In this situation, either the step
-   from [t1] to [t2] corresponds to one of the pure steps between [t1] and [t3],
-   or, there is an [i] such that [i]th thread does not participate in the
-   pure steps between [t1] and [t3] and [t2] corresponds to taking a step in
-   the [i]th thread starting from [t1]. *)
+  (** Let thread pools [t1] and [t3] be such that each thread in [t1] makes *)
+  (*  (zero or more) pure steps to the corresponding thread in [t3]. Furthermore, *)
+  (*  let [t2] be a thread pool such that [t1] under state [σ1] makes a (single) *)
+  (*  step to thread pool [t2] and state [σ2]. In this situation, either the step *)
+  (*  from [t1] to [t2] corresponds to one of the pure steps between [t1] and [t3], *)
+  (*  or, there is an [i] such that [i]th thread does not participate in the *)
+  (*  pure steps between [t1] and [t3] and [t2] corresponds to taking a step in *)
+  (*  the [i]th thread starting from [t1]. *)
   Lemma step_pure_step_tp t1 σ1 t2 σ2 t3 :
     step (t1, σ1) (t2, σ2) →
     pure_steps_tp t1 t3 →
@@ -511,7 +512,7 @@ Section language.
          * apply Forall2_length in Hpsteps.
              by rewrite lookup_app_r Hpsteps // Nat.sub_diag.
          * by rewrite insert_app_r_alt // Nat.sub_diag /= -assoc_L.
-       + edestruct Hprs as (?&?&?); first done; simplify_eq.
+       + edestruct Hprs as (?&?&?&?); first done; simplify_eq.
          left; split; first done.
          rewrite right_id_L.
          eauto using Forall2_app.

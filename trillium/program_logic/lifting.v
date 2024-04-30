@@ -106,8 +106,8 @@ Qed.
 Lemma wp_lift_pure_step_no_fork
       `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} s E E' Φ e1 ζ:
   (∀ σ1, if s is NotStuck then reducible e1 σ1 else to_val e1 = None) →
-  (∀ σ1 α e2 σ2 efs, prim_step e1 σ1 α e2 σ2 efs → σ2 = σ1 ∧ efs = []) →
-  (|={E}[E']▷=> ∀ α e2 efs σ, ⌜prim_step e1 σ α e2 σ efs⌝ → WP e2 @ s; ζ; E {{ Φ }})
+  (∀ σ1 α e2 σ2 efs, prim_step e1 σ1 α e2 σ2 efs → σ2 = σ1 ∧ α = None ∧ efs = []) →
+  (|={E}[E']▷=> ∀ e2 efs σ, ⌜prim_step e1 σ None e2 σ efs⌝ → WP e2 @ s; ζ; E {{ Φ }})
   ⊢ WP e1 @ s; ζ; E {{ Φ }}.
 Proof.
   iIntros (Hsafe Hstep) "H". iApply wp_lift_step.
@@ -117,7 +117,7 @@ Proof.
   iSplit.
   { iPureIntro. destruct s; done. }
   iNext. iIntros (α e2 σ2 efs ?).
-  destruct (Hstep σ1 α e2 σ2 efs) as (<- & ->); auto.
+  destruct (Hstep σ1 α e2 σ2 efs) as (<- & -> & ->); auto.
   iMod "Hclose" as "_". iMod "H".
   iMod (allows_pure_step with "Hsi") as "Hsi"; [done|done|done| |].
   { econstructor 1; [done| |by apply fill_step]; by rewrite app_nil_r. }
@@ -203,13 +203,13 @@ Lemma wp_lift_pure_det_step_no_fork
       `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} {s E E' Φ} e1 e2 ζ:
   (∀ σ1, if s is NotStuck then reducible e1 σ1 else to_val e1 = None) →
   (∀ σ1 α e2' σ2 efs', prim_step e1 σ1 α e2' σ2 efs' →
-    σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
+    σ2 = σ1 ∧ α = None ∧ e2' = e2 ∧ efs' = []) →
   (|={E}[E']▷=> WP e2 @ s; ζ; E {{ Φ }}) ⊢ WP e1 @ s; ζ; E {{ Φ }}.
 Proof.
   iIntros (? Hpuredet) "H". iApply (wp_lift_pure_step_no_fork s E E'); try done.
   { naive_solver. }
   iApply (step_fupd_wand with "H"); iIntros "H".
-  iIntros (α e' efs' σ (?&->&?)%Hpuredet); auto.
+  iIntros (e' efs' σ (?&Hα&->&?)%Hpuredet); auto.
 Qed.
 
 Lemma wp_pure_step_fupd
@@ -222,7 +222,7 @@ Proof.
   iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?]] "IH"; simpl; first done.
   iApply wp_lift_pure_det_step_no_fork.
   - intros σ. specialize (Hsafe σ). destruct s; eauto using reducible_not_val.
-  - done.
+  - intros. apply pure_step_det. done.
   - by iApply (step_fupd_wand with "Hwp").
 Qed.
 
