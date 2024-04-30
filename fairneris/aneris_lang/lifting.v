@@ -256,6 +256,7 @@ Opaque aneris_state_interp.
 Notation state_interp_oos ζ α := (aneris_state_interp_opt (Some (ζ,α))).
 
 Definition sswp `{LM:LiveModel aneris_lang (joint_model M Net)}
+           `{!LiveModelEq LM}
            `{!anerisG LM Σ} (s : stuckness)
            E ζ (e1:aneris_expr) (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) : iProp Σ :=
   ⌜TCEq (aneris_to_val e1) None⌝ ∧
@@ -273,13 +274,15 @@ Definition sswp `{LM:LiveModel aneris_lang (joint_model M Net)}
     atr ∗ Φ e2 α ∗ ⌜efs = []⌝.
 
 Definition MU `{LM:LiveModel aneris_lang (joint_model M Net)}
+           `{!LiveModelEq LM}
            `{!anerisG LM Σ} E ζ α (P : iProp Σ) : iProp Σ :=
   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace LM),
   state_interp_oos ζ α extr atr ={E}=∗
   ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) ∗ P.
 
 Lemma sswp_MU_wp_fupd `{LM:LiveModel aneris_lang (joint_model M Net)}
-           `{!anerisG LM Σ} s E E' ζ e Φ :
+      `{!LiveModelEq LM}
+      `{!anerisG LM Σ} s E E' ζ e Φ :
   (|={E,E'}=> sswp s E' ζ e (λ e' α, MU E' ζ α ((|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))))%I -∗
   WP e @ s; ζ; E {{ Φ }}.
 Proof.
@@ -300,7 +303,8 @@ Proof.
 Qed.
 
 Lemma sswp_wand `{LM:LiveModel aneris_lang (joint_model M Net)}
-           `{!anerisG LM Σ} s E ζ e
+      `{!LiveModelEq LM}
+      `{!anerisG LM Σ} s E ζ e
       (Φ Ψ : aneris_expr → option (action aneris_lang) → iProp Σ) :
   (∀ e α, Φ e α -∗ Ψ e α) -∗ sswp s E ζ e Φ -∗ sswp s E ζ e Ψ.
 Proof.
@@ -316,7 +320,8 @@ Proof.
 Qed.
 
 Lemma MU_wand `{LM:LiveModel aneris_lang (joint_model M Net)}
-           `{!anerisG LM Σ} E ζ α (P Q : iProp Σ) :
+      `{!LiveModelEq LM}
+      `{!anerisG LM Σ} E ζ α (P Q : iProp Σ) :
   (P -∗ Q) -∗ MU E ζ α P -∗ MU E ζ α Q.
 Proof.
   rewrite /MU. iIntros "HPQ HMU".
@@ -326,7 +331,8 @@ Proof.
 Qed.
 
 Lemma sswp_MU_wp `{LM:LiveModel aneris_lang (joint_model M Net)}
-           `{!anerisG LM Σ} s E ζ e (Φ : aneris_val → iProp Σ) :
+      `{!LiveModelEq LM}
+      `{!anerisG LM Σ} s E ζ e (Φ : aneris_val → iProp Σ) :
   sswp s E ζ e (λ e' α, MU E ζ α (WP e' @ s; ζ;  E {{ Φ }})) -∗
   WP e @ s; ζ; E {{ Φ }}.
 Proof.
@@ -337,11 +343,11 @@ Qed.
 
 Section primitive_laws.
   Context `{LM: LiveModel aneris_lang (joint_model Mod net_model)}.
+  Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : aneris_val → iProp Σ.
-  Implicit Types v : val aneris_lang.
   Implicit Types e : expr aneris_lang.
   Implicit Types σ : base_lang.state.
   Implicit Types M R T : message_soup.
