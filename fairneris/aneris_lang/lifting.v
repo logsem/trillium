@@ -640,121 +640,237 @@ Section primitive_laws.
     iSplit; [|done]. by iApply "HΦ".
   Qed.
 
-  Lemma wp_send φ mbody (is_dup : bool) sh skt a to k E
-        ζ R T
-        (Φ : (aneris_expr → option (action aneris_lang) → iProp Σ)) :
-    let msg := mkMessage a to mbody in
-    saddress skt = Some a →
-    ▷ sh ↪[ip_of_address a] skt -∗
-    ▷ a ⤳ (R, T) -∗
-    ▷ to ⤇ φ -∗
-    (if is_dup then ⌜msg ∈ T⌝ else ▷ φ msg) -∗
-    (sh ↪[ip_of_address a] skt -∗ a ⤳ (R, {[ msg ]} ∪ T) -∗
-     Φ (mkVal (ip_of_address a) #(String.length mbody)) (Some (Send msg))) -∗
-    sswp k E ζ
-         (mkExpr (ip_of_address a)
-                 (SendTo (Val $ LitV $ LitSocket sh) #mbody #to)) Φ.
+  Lemma wp_new_socket ip s E ζ (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+    ▷ is_node ip -∗
+    (∀ sh, sh ↪[ip] (mkSocket None true) -∗ Φ (mkVal ip (LitV (LitSocket sh))) None) -∗
+    sswp s E ζ (mkExpr ip (NewSocket #())) Φ.
   Proof.
-    iIntros (msg Hskt) "Hsh Hrt Hφ Hmsg HΦ".
-    iAssert (▷ socket_address_group_own {[a]})%I as "#Ha".
-    { iDestruct "Hrt" as "[(%send & %recv & _ & _ & _ & $ & _) _]". }
-    iAssert (▷ socket_address_group_own {[to]})%I as "#Hto".
-    { iNext. by iDestruct "Hφ" as (γ) "[H _]". }
-    iDestruct "Hrt" as "[Hrt Hown]".
+    iIntros "Hn HΦ".
     rewrite /sswp.
     iSplit; [done|].
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "[[Hσ Hauth] [%Hvalid Hm]]".
-    iMod (steps_auth_update_S with "Hauth") as "Hauth".
-    iMod "Hsh". iMod "Hrt".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
+    iMod "Hn".
     rewrite (last_eq_trace_ends_in _ _ Hex).
-    iDestruct (aneris_state_interp_network_sockets_coh_valid with "Hσ") as %Hcoh.
-    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
-      as (Sn r) "[%HSn (%Hr & %Hreset)]".
-    iApply fupd_mask_intro; [set_solver|].
-    iIntros "Hclose".
-    iSplitR.
-    { destruct k; [|done].
-      iPureIntro; do 4 eexists. eapply head_prim_step. eapply SocketStepS; eauto.
-        by econstructor; naive_solver. }
-    iIntros (α e2 σ2 efs Hstep).
+    iDestruct (is_node_valid_sockets with "Hσ Hn") as (?) "%".
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplitR; [iPureIntro; eauto|].
+    { destruct s; [|done]. do 4 eexists. eapply head_prim_step.
+      eapply SocketStepS; eauto.
+      apply newsocket_fresh. }
+    iIntros (α v2 σ2 efs Hstep).
     apply head_reducible_prim_step in Hstep; last first.
-    { do 4 eexists. eapply SocketStepS; eauto. by econstructor. }
+    { do 4 eexists. eapply SocketStepS; eauto.
+      apply newsocket_fresh. }
     pose proof (conj Hstep I) as Hstep'.
     inv_head_step.
     destruct Hstep' as [Hstep' _].
     iApply step_fupdN_intro; [done|].
-    destruct is_dup; last first.
-    - iIntros "!>!>".
-      iModIntro.
-      iIntros "!>".
-      iMod (aneris_state_interp_send sh a {[a]} to {[to]} _ _ skt
-             with "[] [] [$Hsh] [$Hrt] [Hφ] [Hmsg] [$Hσ]")
-        as "(%Hmhe & Hσ & Hsh & Hrt)"; try done.
-      { apply message_group_equiv_refl; try set_solver. }
-      { iSplit; [|done]. iPureIntro. set_solver. }
-      { iSplit; [|done]. iPureIntro. set_solver. }
-      { iSplit; [|done]. done. }
-      iMod "Hclose". iModIntro.
-      iSplitL "Hσ Hauth Hm".
-      { iFrame.
-        iSplitL "Hσ".
-        - simpl.
-          rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
-          rewrite Hmhe.
-          simpl.
-          rewrite insert_id; [|done].
-          rewrite - /msg.
-          simpl.
-          iFrame.
-        - simpl.
-          iExists ex.
-          iSplit.
-          { iPureIntro. simpl. by eexists _. }
-          rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
-          iSplit; [|done].
-          iPureIntro.
-          eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
-          { by rewrite right_id_L. }
-          apply fill_step.
-          eapply head_prim_step. simpl. done. }
+    iIntros "!>!>".
+    set (sock := {| saddress := None;
+                    sblock := true |}).
+    iMod (aneris_state_interp_alloc_socket sock with "Hn Hσ")
+      as "[Hσ Hsh]"; try done.
+    iModIntro. iIntros "!>".
+    iMod (steps_auth_update _ (S (trace_length ex)) with "Hauth")
+      as "[Hauth _]"; [by eauto|].
+    iMod "Hclose" as "_".
+    iModIntro. iFrame. simpl.
+    rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+    rewrite -message_history_evolution_new_socket; [|done|done].
+    iFrame.
+    iSplitL "Hm".
+    { iExists ex.
+      iSplit.
+      { iPureIntro. simpl. by eexists _. }
+      rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
       iSplit; [|done].
-      iApply ("HΦ" with "Hsh [$Hrt $Hown]").
-    - iIntros "!>!>".
-      iModIntro.
-      iIntros "!>".
-      iDestruct "Hmsg" as "%Hmsg".
-      iMod (aneris_state_interp_send_duplicate sh a {[a]} to {[to]} _ _ skt
-             with "[] [] [$Hsh] [$Hrt] [$Hσ]")
-        as "(%Hmhe & Hσ & Hsh & Hrt)"; try done.
-      { eexists _. split; [done|].
-        apply message_group_equiv_refl; try set_solver. }
-      { iSplit; [|done]. iPureIntro. set_solver. }
-      { iSplit; [|done]. iPureIntro. set_solver. }
-      iMod "Hclose". iModIntro.
-      iSplitL "Hσ Hauth Hm".
-      { iFrame.
-        iSplitL "Hσ".
-        - simpl.
-          rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
-          rewrite Hmhe.
-          simpl.
-          rewrite insert_id; [|done].
-          rewrite - /msg.
-          simpl.
-          iFrame.
-        - simpl.
-          iExists ex.
-          iSplit.
-          { iPureIntro. simpl. by eexists _. }
-          rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
-          iSplit; [|done].
-          iPureIntro.
-          eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
-          { by rewrite right_id_L. }
-          apply fill_step.
-          eapply head_prim_step. simpl. done. }
+      iPureIntro.
+      eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+      { by rewrite right_id_L. }
+      apply fill_step.
+      eapply head_prim_step. simpl. done. }
+    iSplit; [|done]. by iApply "HΦ".
+  Qed.
+
+  (* Lemma wp_socketbind A E ζ sh skt k a : *)
+  (*   saddress skt = None → *)
+  (*   {{{ ▷ free_ports (ip_of_address a) {[port_of_address a]} ∗ *)
+  (*       ▷ sh ↪[ip_of_address a] skt }}} *)
+  (*     (mkExpr (ip_of_address a) *)
+  (*             (SocketBind (Val $ LitV $ LitSocket sh) *)
+  (*                         (Val $ LitV $ LitSocketAddress a))) @ k; ζ; E *)
+  (*  {{{ RET (mkVal (ip_of_address a) #0); *)
+  (*      sh ↪[ip_of_address a] (skt<| saddress := Some a |>) }}}. *)
+
+  Lemma wp_socketbind s E ζ sh skt a (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+    saddress skt = None →
+    ▷ free_ports (ip_of_address a) {[port_of_address a]} -∗    
+    ▷ sh ↪[ip_of_address a] skt -∗
+    (sh ↪[ip_of_address a] (skt<| saddress := Some a |>) -∗ Φ (mkVal (ip_of_address a) #0) None) -∗
+    sswp s E ζ (mkExpr (ip_of_address a)
+              (SocketBind (Val $ LitV $ LitSocket sh)
+                          (Val $ LitV $ LitSocketAddress a))) Φ.
+  Proof.
+    iIntros (?) "Hp Hsh HΦ".
+    rewrite /sswp.
+    iSplit; [done|].
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
+    iMod "Hp".
+    iMod "Hsh".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as "%HP".
+    { apply HSn. }   
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplitR; [iPureIntro; eauto|].
+    { destruct s; [|done]. do 4 eexists. eapply head_prim_step.
+      eapply SocketStepS; eauto.
+      econstructor; naive_solver. }
+    iIntros (α v2 σ2 efs Hstep).
+    apply head_reducible_prim_step in Hstep; last first.
+    { do 4 eexists. eapply SocketStepS; eauto.
+      econstructor; naive_solver. }
+    pose proof (conj Hstep I) as Hstep'.
+    inv_head_step.
+    destruct Hstep' as [Hstep' _].
+    iApply step_fupdN_intro; [done|].
+    iIntros "!>!>".
+    iMod (aneris_state_interp_socketbind with "Hσ Hsh Hp")
+      as "(Hσ & Hsh)"; [set_solver..|].
+    iModIntro. iIntros "!>".
+    iMod (steps_auth_update _ (S (trace_length ex)) with "Hauth")
+      as "[Hauth _]"; [by eauto|].
+    iMod "Hclose" as "_".
+    iModIntro. iFrame. simpl.
+    rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+    rewrite -message_history_evolution_socketbind; [|done|done].
+    iFrame.
+    iSplitL "Hm".
+    { iExists ex.
+      iSplit.
+      { iPureIntro. simpl. by eexists _. }
+      rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
       iSplit; [|done].
-      iApply ("HΦ" with "Hsh [$Hrt $Hown]").
+      iPureIntro.
+      eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+      { by rewrite right_id_L. }
+      apply fill_step.
+      eapply head_prim_step. simpl. done. }
+    iSplit; [|done]. by iApply "HΦ".
+  Qed.
+  
+  Lemma wp_rcvtimeo_block s E ζ sh skt a
+        (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+    let ip := ip_of_address a in
+    saddress skt = Some a →
+    ▷ sh ↪[ip] skt -∗
+    (sh ↪[ip] skt<|sblock := true|> -∗ Φ (mkVal ip #()) None) -∗
+    sswp s E ζ (mkExpr ip (SetReceiveTimeout
+                  (Val $ LitV $ LitSocket sh)
+                  (Val $ LitV $ LitInt 0)
+                  (Val $ LitV $ LitInt 0))) Φ.
+  Proof.
+    iIntros (??) "Hsh HΦ".
+    rewrite /sswp.
+    iSplit; [done|].
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
+    iMod "Hsh".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplitR; [iPureIntro; eauto|].
+    { destruct s; [|done]. do 4 eexists. eapply head_prim_step.
+      eapply SocketStepS; eauto.
+      econstructor; naive_solver. }
+    iIntros (α v2 σ2 efs Hstep).
+    apply head_reducible_prim_step in Hstep; last first.
+    { do 4 eexists. eapply SocketStepS; eauto.
+      econstructor; naive_solver. }
+    pose proof (conj Hstep I) as Hstep'.
+    inv_head_step; first by lia.
+    destruct Hstep' as [Hstep' _].
+    iApply step_fupdN_intro; [done|].
+    iIntros "!>!>".
+    iMod (aneris_state_interp_sblock_update with "Hσ Hsh") as "(Hσ&Hsh)"; eauto.
+    iModIntro. iIntros "!>".
+    iMod (steps_auth_update _ (S (trace_length ex)) with "Hauth")
+      as "[Hauth _]"; [by eauto|].
+    iMod "Hclose" as "_".
+    iModIntro. iFrame. simpl.
+    rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+    rewrite -message_history_evolution_update_sblock; [|done|done].
+    iFrame.
+    iSplitL "Hm".
+    { iExists ex.
+      iSplit.
+      { iPureIntro. simpl. by eexists _. }
+      rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+      iSplit; [|done].
+      iPureIntro.
+      eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+      { by rewrite right_id_L. }
+      apply fill_step.
+      eapply head_prim_step. simpl. done. }
+    iSplit; [|done]. by iApply "HΦ".
+  Qed.
+    
+  Lemma wp_rcvtimeo_ublock s E ζ sh skt a n1 n2
+        (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+    let ip := ip_of_address a in
+    saddress skt = Some a →
+    (0 ≤ n1 ∧ 0 <= n2 ∧ 0 < n1 + n2)%Z →
+    ▷ sh ↪[ip] skt -∗
+    (sh ↪[ip] skt<|sblock := false|> -∗ Φ (mkVal ip #()) None) -∗
+    sswp s E ζ (mkExpr ip (SetReceiveTimeout
+                  (Val $ LitV $ LitSocket sh)
+                  (Val $ LitV $ LitInt n1)
+                  (Val $ LitV $ LitInt n2))) Φ.
+  Proof.
+    iIntros (???) "Hsh HΦ".
+    rewrite /sswp.
+    iSplit; [done|].
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
+    iMod "Hsh".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
+      as (Sn r) "[%HSn (%Hr & %Hreset)]".
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplitR; [iPureIntro; eauto|].
+    { destruct s; [|done]. do 4 eexists. eapply head_prim_step.
+      eapply SocketStepS; eauto.
+      econstructor; naive_solver. }
+    iIntros (α v2 σ2 efs Hstep).
+    apply head_reducible_prim_step in Hstep; last first.
+    { do 4 eexists. eapply SocketStepS; eauto.
+      econstructor; naive_solver. }
+    pose proof (conj Hstep I) as Hstep'.
+    inv_head_step; last by lia.
+    destruct Hstep' as [Hstep' _].
+    iApply step_fupdN_intro; [done|].
+    iIntros "!>!>".
+    iMod (aneris_state_interp_sblock_update with "Hσ Hsh") as "(Hσ&Hsh)"; eauto.
+    iModIntro. iIntros "!>".
+    iMod (steps_auth_update _ (S (trace_length ex)) with "Hauth")
+      as "[Hauth _]"; [by eauto|].
+    iMod "Hclose" as "_".
+    iModIntro. iFrame. simpl.
+    rewrite (last_eq_trace_ends_in _ _ Hex). simpl.
+    rewrite -message_history_evolution_update_sblock; [|done|done].
+    iFrame.
+    iSplitL "Hm".
+    { iExists ex.
+      iSplit.
+      { iPureIntro. simpl. by eexists _. }
+      rewrite /aneris_state_interp_δ. rewrite Hex. iFrame.
+      iSplit; [|done].
+      iPureIntro.
+      eapply (locale_step_atomic _ _ _ _ _ _ _ []); try done.
+      { by rewrite right_id_L. }
+      apply fill_step.
+      eapply head_prim_step. simpl. done. }
+    iSplit; [|done]. by iApply "HΦ".
   Qed.
 
   Lemma wp_recv
