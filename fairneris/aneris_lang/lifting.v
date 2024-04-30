@@ -3,7 +3,7 @@ From stdpp Require Import binders.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Import weakestpre lifting ectx_lifting atomic.
 From fairneris Require Import fuel fair_resources.
-From fairneris.aneris_lang Require Import aneris_lang base_lang resources.
+From fairneris.aneris_lang Require Import network_model aneris_lang base_lang resources.
 From fairneris.aneris_lang.state_interp Require Import
      state_interp state_interp_events.
 Set Default Proof Using "Type".
@@ -336,8 +336,7 @@ Proof.
 Qed.
 
 Section primitive_laws.
-  Context `{LM: LiveModel aneris_lang (joint_model Mod Net)}.
-  Context `{!LiveModelEq LM}.
+  Context `{LM: LiveModel aneris_lang (joint_model Mod net_model)}.
   Context `{aG : !anerisG LM Σ}.
 
   Implicit Types P Q : iProp Σ.
@@ -353,7 +352,7 @@ Section primitive_laws.
   Implicit Types sh : socket_handle.
   Implicit Types skt : socket.
   Implicit Types mh : messages_history.
-
+  
   Lemma mu_step_fuel ζ E fs P :
     fs ≠ ∅ → ▷ ζ ↦M++ fs -∗
     (ζ ↦M fs -∗ P) -∗
@@ -369,7 +368,7 @@ Section primitive_laws.
     by iApply "HP".
   Qed.
 
-  Lemma mu_step_model ζ ρ α (f1 : nat) fs fr s1 s2 E P :
+  Lemma mu_step_model `{!LiveModelEq LM} ζ ρ α (f1 : nat) fs fr s1 s2 E P :
     lts_trans Mod s1 (ρ, α) s2 →
     Mod.(usr_live_roles) s2 ⊆ Mod.(usr_live_roles) s1 →
     ρ ∉ dom fs →
@@ -383,9 +382,42 @@ Section primitive_laws.
   Proof.
     iIntros (Htrans Hlive Hdom) ">Hst >Hfuel1 >Hfr HP".
     iIntros (ex atr) "[Hσ Hm]".
-    iDestruct "Hm" as (ex' Hex' Hvalid Hstep) "Hmi".
-    (* iMod (update_model_step with "Hfuel1 Hst Hmi") as *)
-    (*   (δ2 Hvse) "(Hfuel & Hst & Hmod)"; eauto. *)
+    iDestruct "Hm" as (ex' Hex' Hstep Hvalid) "Hmi".
+    iAssert (⌜(trace_last atr).(ls_data).(ls_under).1 = s1⌝)%I
+      with "[Hst Hmi]" as %Heq.
+    { iDestruct "Hmi" as (fm Hfmle Hfmdead Hfmtp) "[Hauth Hmi]".
+      by iDestruct (model_agree with "Hauth Hst") as %Heq. }
+    destruct α; last first.
+    {
+      iAssert (⌜config_net_match (trace_last ex) (trace_last atr).(ls_data).(ls_under).2⌝)%I as %Hmatch.
+      { iDestruct "Hmi" as (fm Hfmle Hfmdead Hfmtp) "[Hauth [Hmi %Hmatch]]".
+        destruct Hmatch. simpl in *. iPureIntro.
+        simpl. 
+        inversion Hstep. subst.
+        inversion H7. subst.
+        inv_head_step.
+        rewrite H3 in H. simpl in *. rewrite H5.
+        admit. }
+      (* set (δ2 := (s2, trace_last atr).2). *)
+      iMod (update_model_step _ _ _
+                              ((trace_last atr).(ls_data).(ls_under).1, (trace_last atr).(ls_data).(ls_under).2) ((s2, (trace_last atr).(ls_data).(ls_under).2)) _ _ _ _ _ None
+             with "[$Hfuel1] [Hst] [//] [$Hmi]") as
+        (δ2 Hvse) "(Hfuel & Hst & Hmod)"; [|done|done|done|..].
+      { simpl. rewrite Heq. apply Hlive. }
+      { simpl. done. }
+      { simpl. econstructor. rewrite Heq. done. }
+      { done. }
+      { simpl. rewrite Heq. done. }
+      iModIntro.
+      iExists δ2.
+      iExists (Take_step (ρ:fmrole (joint_model Mod _)) None ζ None).
+      iFrame.
+      destruct Hex' as [ex'' ->].
+      simpl in *. iSplit; [done|].
+      iApply ("HP" with "Hst Hfuel Hfr"). }
+    destruct a.
+    - admit.                    (* Send case: Construct new model state, where a message has been added, and prove config_net_match *)
+    - admit.                    (* Recv case: Construct new model state, depending on whether a message was received or not, and prove config_net_match *)
   Admitted.
 
   Lemma has_fuels_decr E tid fs :
@@ -396,7 +428,7 @@ Section primitive_laws.
     iMod (model_state_interp_has_fuels_decr with "Hm Hf") as "[$ $]". by iFrame.
   Qed.
 
-  Lemma has_fuels_dealloc E tid fs ρ (δ:joint_model Mod Net) :
+  Lemma has_fuels_dealloc E tid fs ρ (δ:joint_model Mod net_model) :
     ρ ∉ live_roles _ δ → frag_model_is δ.1 -∗ tid ↦M fs -∗
     |~{E}~| frag_model_is δ.1 ∗ tid ↦M (delete ρ fs).
   Proof.
@@ -720,7 +752,6 @@ Section primitive_laws.
       iSplit; [|done].
       iApply ("HΦ" with "Hsh [$Hrt $Hown]").
   Qed.
-
 
   Lemma wp_recv
         (φ : socket_interp Σ) k saR E sh skt ζ R T
