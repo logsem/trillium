@@ -201,7 +201,7 @@ Lemma wp_lift_pure_det_head_step_no_fork
   to_val e1 = None →
   (∀ σ1, head_reducible e1 σ1) →
   (∀ α σ1 e2' σ2 efs',
-    head_step e1 σ1 α e2' σ2 efs' → σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
+    head_step e1 σ1 α e2' σ2 efs' → σ2 = σ1 ∧ α = None ∧ e2' = e2 ∧ efs' = []) →
   (|={E}[E']▷=> WP e2 @ s; ζ; E {{ Φ }}) ⊢ WP e1 @ s; ζ; E {{ Φ }}.
 Proof using Hinh.
   intros. rewrite -(wp_lift_pure_det_step_no_fork e1 e2); eauto.
@@ -213,7 +213,7 @@ Lemma wp_lift_pure_det_head_step_no_fork'
   to_val e1 = None →
   (∀ σ1, head_reducible e1 σ1) →
   (∀ α σ1 e2' σ2 efs',
-    head_step e1 σ1 α e2' σ2 efs' → σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
+    head_step e1 σ1 α e2' σ2 efs' → σ2 = σ1 ∧ α = None ∧ e2' = e2 ∧ efs' = []) →
   ▷ WP e2 @ s; ζ; E {{ Φ }} ⊢ WP e1 @ s; ζ; E {{ Φ }}.
 Proof using Hinh.
   intros. rewrite -[(WP e1 @ s; _; _ {{ _ }})%I]wp_lift_pure_det_head_step_no_fork //.
