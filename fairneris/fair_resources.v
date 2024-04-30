@@ -394,7 +394,6 @@ End adequacy.
 Section model_state_lemmas.
   Context `{GoodLang Λ}.
   Context `{LM: LiveModel Λ (joint_model M Net)}.
-  Context `{!LiveModelEq LM}.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
   Context `{!invGS_gen HasNoLc Σ}.
@@ -1414,7 +1413,8 @@ Section model_state_lemmas.
         set_solver.
   Qed.
 
-  Lemma model_update_locale_spec_model_step extr
+  Lemma model_update_locale_spec_model_step `{!LiveModelEq LM}
+        extr
         (auxtr : auxiliary_trace LM) ζ c2 ρs (ρ : fmrole (joint_model M Net)) δ2 s2 act :
     (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ ρs) ρ s2
                                            (trace_last auxtr) →
@@ -1433,7 +1433,7 @@ Section model_state_lemmas.
     do 2 split=>//. by apply actions_match_is_eq.
   Qed.
 
-  Lemma update_model_step
+  Lemma update_model_step `{!LiveModelEq LM}
         (extr : execution_trace Λ)
         (auxtr: auxiliary_trace LM) c2 (s1 s2 : joint_model M Net) fs ρ (δ1 : LM) ζ f act :
     usr_live_roles s2.1 ⊆ usr_live_roles s1.1 →
