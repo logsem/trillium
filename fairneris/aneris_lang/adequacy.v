@@ -542,9 +542,8 @@ Lemma continued_simulation_infinite_model_trace
     iatr.
 Proof. intros Hcs. eexists. (unshelve apply produced_inf_aux_trace_valid_inf)=>//. constructor. Qed.
 
-Theorem simulation_adequacy_traces Σ
+Lemma simulation_adequacy_traces Σ
   `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
-  (s: stuckness)
         es σ m0
         (extr : aneris_trace)
         (Hvex : extrace_valid extr)
@@ -573,6 +572,78 @@ Proof.
   - change m0 with (trace_last (L := mlabel LM) (trace_singleton m0)). apply to_trace_spec.
   - eapply valid_inf_system_trace_mono; last eassumption. by intros ??[??]%continued_simulation_unfold.
 Qed.
+
+Definition ex_fair_scheduling (tr: aneris_trace) := ∀ ζ, fair_scheduling_ex ζ tr.
+
+Definition ex_fair (tr: aneris_trace) :=
+  ex_fair_network tr ∧ ex_fair_scheduling tr.
+
+Section lm_network.
+  Context {M: UserModel aneris_lang}.
+  Context `{@anerisPreG M net_model LM LMeq Σ}.
+
+  Definition lm_send_filter msg : mlabel LM → Prop :=
+    λ l, ∃ ρ ζ, l = Take_step ρ (Some $ Send msg : fmaction (joint_model M net_model)) ζ (Some $ Send msg).
+  Instance lm_send_filter_decision msg l : Decision (lm_send_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition lm_deliver_filter msg : mlabel LM → Prop :=
+    λ l, l = Config_step (Deliver msg : fmconfig (joint_model M net_model)) (Deliver msg).
+  Instance lm_deliver_filter_decision msg l : Decision (lm_deliver_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition lm_network_fair_delivery_of msg : auxtrace LM → Prop :=
+    □ (□◊ ℓ↓lm_send_filter msg → ◊ ℓ↓ lm_deliver_filter msg).
+
+  Definition lm_network_fair_delivery (mtr : auxtrace LM) : Prop :=
+    ∀ msg, lm_network_fair_delivery_of msg mtr.
+
+  Definition lm_fair_scheduling (tr: auxtrace LM) :=
+    ∀ ρ, fair_aux (LM := LM) ρ tr.
+
+  Definition lm_fair (tr: auxtrace LM) :=
+    lm_network_fair_delivery tr ∧ lm_fair_scheduling tr.
+
+  Notation ff :=
+    (ltl_tme labels_match live_tids locale_step (lm_ls_trans LM)).
+
+  Lemma simulation_adequacy_traces_fairness
+          es σ m0
+          (extr : aneris_trace)
+          (Hvex : extrace_valid extr)
+          (Hexfirst : (trfirst extr) = (es, σ))
+    :
+    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+    ex_fair extr →
+    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr.
+  Proof.
+    intros Hcs [Hfn Hfs].
+    destruct (simulation_adequacy_traces _ _ _ _ _ extr Hvex Hexfirst Hcs) as [atr Hatr].
+    eexists _; split=>//. split.
+    - rewrite /lm_network_fair_delivery /ex_fair_network in Hfn *.
+      rewrite /lm_network_fair_delivery_of /ex_fair_network_of in Hfn *.
+      intros msg. specialize (Hfn msg).
+
+      unshelve eapply (ltl_tme_use _ _ _ _ _ Hatr Hfn).
+      apply ltl_tme_always, ltl_tme_impl.
+      + apply ltl_tme_always, ltl_tme_eventually, ltl_tme_now.
+        rewrite /labels_match.
+        rewrite /ex_send_filter /lm_send_filter /=.
+        intros [[]|] [] Hlm=>//.
+        * destruct Hlm as (?&?&Ham). simplify_eq. split; last naive_solver.
+          intros ?. simplify_eq.
+          apply actions_match_is_eq in Ham. naive_solver.
+        * destruct Hlm as (?&?&Ham). simplify_eq. simpl. split; naive_solver.
+        * destruct Hlm as (?&Ham). simplify_eq. simpl. split; naive_solver.
+      + apply ltl_tme_eventually, ltl_tme_now.
+        rewrite /labels_match.
+        rewrite /ex_deliver_filter /lm_deliver_filter /=.
+        intros [[]|] [] Hlm=>//.
+        destruct Hlm as (?&Ham). simplify_eq. simpl. split; last naive_solver.
+        apply cfg_labels_match_is_eq in Ham. naive_solver.
+    - rewrite /lm_fair_scheduling /ex_fair_scheduling in Hfn *. eapply fairness_preserved=>//.
+  Qed.
+End lm_network.
 
 (* OBS: This is not needed. *)
 Lemma valid_inf_system_trace_implies_traces_match

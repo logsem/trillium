@@ -757,6 +757,13 @@ Section traces_match.
   Definition ltl_tme (P: ltl_pred S1 L1) (Q: ltl_pred S2 L2) :=
     ∀ tr tr', tm tr tr' → (P tr ↔ Q tr').
 
+  Lemma ltl_tme_use {P Q tr1 tr2}:
+    ltl_tme P Q →
+    tm tr1 tr2 →
+    P tr1 →
+    Q tr2.
+  Proof. intros Htme Htm. rewrite Htme //. Qed.
+
   Lemma ltl_tme_now P P':
     (∀ l1 l2, Rl l1 l2 → (P l1 ↔ P' l2)) →
     ltl_tme (ℓ↓ P) (ℓ↓ P').
