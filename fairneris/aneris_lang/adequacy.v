@@ -3,13 +3,14 @@ From stdpp Require Import finite.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl.
 From trillium Require Import adequacy.
+From trillium.prelude Require Import relations.
 From fairneris Require Import fairness retransmit_model fair_resources.
 From fairneris.aneris_lang Require Import aneris_lang resources network_model.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.
 From fairneris.aneris_lang.state_interp Require Import state_interp.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
-From fairneris Require Import from_locale_utils trace_utils ltl_lite.
+From fairneris Require Import from_locale_utils trace_utils ltl_lite fuel_jm_scheduling_fairness.
 
 (* TODO: Move to stdpp *)
 Lemma gset_union_difference_intersection_L `{Countable A} (X Y : gset A) :
@@ -111,19 +112,22 @@ Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :
                              | None => ∅
                              end ∪ A) ∅ skts ∪ A) ∅ skts.
 
-Definition initial_fuel_map_from `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ}
+Definition initial_fuel_map_from `(M: UserModel aneris_lang) `{LMeq: !LiveModelEq LM} `{@anerisPreG M net_model LM LMeq Σ}
   (tp0 : list aneris_expr)
   (es: list aneris_expr) (fss: list (gset M.(usr_role))) (st : M) : gmap aneris_locale (gmap _ _) :=
   let esfss := zip (prefixes_from tp0 es) fss in
   foldr (λ '((tp, e), fs) fss, <[ locale_of tp e := gset_to_gmap (usr_fl st) fs]> fss) ∅ esfss.
 
-Definition initial_fuel_map `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ} :=
+Definition initial_fuel_map `(M: UserModel aneris_lang) `{LMeq: !LiveModelEq LM} `{@anerisPreG M net_model LM LMeq Σ} :=
   initial_fuel_map_from M nil.
 
-Definition wp_proto_multiple_strong `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ}
-  (A: gset socket_address) (σ: aneris_lang.state) (s:stuckness) (es : list aneris_expr) (FR: gset _)
-  (st: M) (fss: list (gset M.(usr_role))) :=
-  (∀ (aG : anerisG LM Σ), ⊢ |={⊤}=>
+Definition wp_proto_multiple_strong
+  `(M: UserModel aneris_lang)
+  `{LM: LiveModel aneris_lang (joint_model M net_model)}
+  `{LMeq: !LiveModelEq LM} `{@anerisPreG M net_model LM LMeq Σ}
+  (A: gset socket_address) (σ: aneris_lang.state) (s:stuckness) (es : list aneris_expr) (FR: gset (usr_role M))
+  (st: M) (fss: list (gset M.(usr_role))):=
+  (∀ (aG : anerisG LM Σ),  ⊢ |={⊤}=>
      unallocated A -∗
      ([∗ set] sa ∈ A, sa ⤳ (∅, ∅)) -∗
      ([∗ set] ip ∈ dom (state_heaps σ),
@@ -137,7 +141,7 @@ Definition wp_proto_multiple_strong `(M: UserModel aneris_lang) `{@anerisPreG M 
      ([∗ map] ζ ↦ fs ∈ (initial_fuel_map M es fss st), ζ ↦M fs) -∗
      ([∗ set] ip ∈ dom (state_heaps σ), is_node ip) -∗
      aneris_state_interp σ (∅, ∅) ={⊤}=∗
-     aneris_state_interp σ (∅, ∅) ∗
+     ((aneris_state_interp σ (∅, ∅)) : iProp Σ) ∗
      wptp s es (fmap (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v)
                     (prefixes es))).
 
@@ -155,14 +159,14 @@ Definition wp_proto_multiple_strong `(M: UserModel aneris_lang) `{@anerisPreG M 
 (*      (* OBS: Can add [always_holds ξ] here *)). *)
 
 Definition good_fuel_alloc
-  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM LMeq Σ} {HLMEq: LiveModelEq LM}
   (es : list aneris_expr) (st : lts_state M) (fss : list $ gset (usr_role M)) :=
     (length es = length fss) ∧
     (∀ (n1 n2 : nat) fs1 fs2, n1 ≠ n2 → fss !! n1 = Some fs1 → fss !! n2 = Some fs2 → fs1 ## fs2) ∧
     (∀ ρ, ρ ∈ usr_live_roles st → ∃ n fs, fss !! n = Some fs ∧ ρ ∈ fs).
 
 Lemma initial_fuel_map_inv'
-  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM LMeq Σ} {HLMEq: LiveModelEq LM}
   (tp0 es : list aneris_expr)
   (st : lts_state M) fss ζ (fs : gmap _ _):
   initial_fuel_map_from M tp0 es fss st !! ζ = Some fs →
@@ -183,7 +187,7 @@ Proof.
 Qed.
 
 Lemma initial_fuel_map_inv
-  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM LMeq Σ} {HLMEq: LiveModelEq LM}
   (es : list aneris_expr)
   (st : lts_state M) fss ζ (fs : gmap _ _):
   initial_fuel_map M es fss st !! ζ = Some fs →
@@ -194,7 +198,7 @@ Proof. intros ?%initial_fuel_map_inv'. naive_solver. Qed.
 
 
 Program Definition lm_init
-  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM LMeq Σ} {HLMEq: LiveModelEq LM}
   (es : list aneris_expr)
   (st : lts_state M) fss net_init
   (Hfss: good_fuel_alloc es st fss)
@@ -206,14 +210,14 @@ Program Definition lm_init
   |}
 |}.
 Next Obligation.
-  simpl. intros M LM Σ Haneris Hlmeq es st fss ? [Hlen [Hgood _]] ζ1 ζ2 fs1 fs2 Hneq.
+  simpl. intros M LM LMeq Σ Haneris Hlmeq es st fss ? [Hlen [Hgood _]] ζ1 ζ2 fs1 fs2 Hneq.
   intros (n1&?&?&?&?)%initial_fuel_map_inv.
   intros (n2&?&?&?&?)%initial_fuel_map_inv.
   apply map_disjoint_dom_2. eapply Hgood; try eassumption.
   intros Heq. simplify_eq.
 Qed.
 Next Obligation.
-  simpl. intros M LM Σ Haneris Hlmeq es st fss ? [Hlen [_ Hgood]] ρ Hin.
+  simpl. intros M LM LMeq Σ Haneris Hlmeq es st fss ? [Hlen [_ Hgood]] ρ Hin.
   rewrite /initial_fuel_map. destruct (Hgood _ Hin) as (n&fs&HSome&Hinfs).
   destruct (es !! n) as [e|] eqn:Heq; last first.
   { apply lookup_ge_None_1 in Heq. apply lookup_lt_Some in HSome. lia. }
@@ -253,7 +257,7 @@ Qed.
 
 
 Theorem simulation_adequacy_multiple_strong
-        `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM Σ} {HLMEq: LiveModelEq LM}
+        `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
         A s (es : list aneris_expr) σ st fss FR net_init
         (Hfss: good_fuel_alloc es st fss) :
   length es >= 1 →
@@ -335,7 +339,7 @@ Proof.
   iMod (Hwp dg) as "Hwp".
   iMod (is_node_alloc_multiple σ with "[Hmp]")
     as (γs Hheaps_dom' Hsockets_dom') "[Hγs [#Hn [Hσctx Hσ]]]"; [set_solver|done|].
-  iExists (@state_interp aneris_lang LM Σ (@anerisG_irisG M net_model LM Σ dg)).
+  iExists (@state_interp aneris_lang LM Σ (@anerisG_irisG M net_model LM LMeq Σ dg)).
   iExists (fmap (λ '(tnew,e) v, fork_post (locale_of tnew e) v) (prefixes es))%I,
             (fork_post)%I.
   iSplitR; [iApply config_wp_correct|].
@@ -480,6 +484,7 @@ Proof.
    naive_solver.
 Qed.
 
+Definition aneris_trace := extrace aneris_lang.
 Definition auxtrace (M : Model) := trace (M.(mstate)) (M.(mlabel)).
 
 Lemma valid_inf_system_trace_implies_traces_match_strong {Λ} {Mdl:Model}
@@ -521,6 +526,226 @@ Proof.
       end; by eapply (Hφ3 (ex :tr[ oζ ]: (l, σ')) (atr :tr[ ℓ ]: δ')).
     + eapply IH; eauto.
 Qed.
+
+
+Lemma continued_simulation_infinite_model_trace
+  `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
+  es σ m0 iex:
+  continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+  valid_inf_exec {tr[ (es, σ) ]} iex →
+  exists iatr,
+  @valid_inf_system_trace _ LM
+    (continued_simulation
+       (valid_state_evolution_fairness LM))
+    (trace_singleton (es, σ))
+    (trace_singleton m0)
+    iex
+    iatr.
+Proof. intros Hcs. eexists. (unshelve apply produced_inf_aux_trace_valid_inf)=>//. constructor. Qed.
+
+Lemma simulation_adequacy_traces Σ
+  `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
+        es σ m0
+        (extr : aneris_trace)
+        (Hvex : extrace_valid extr)
+        (Hexfirst : (trfirst extr) = (es, σ))
+  :
+  continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+  ∃ (auxtr : auxtrace LM), exaux_traces_match (LM := LM) extr auxtr.
+Proof.
+  intros Hcci.
+  opose proof (from_trace_preserves_validity _ (trace_singleton (es, σ)) Hvex _ _) as Hval.
+  { constructor. }
+  { rewrite Hexfirst //. }
+  eapply continued_simulation_infinite_model_trace in Hcci=>//.
+  destruct Hcci as [atr Hatr].
+  exists (to_trace m0 atr).
+  eapply (valid_inf_system_trace_implies_traces_match_strong (valid_state_evolution_fairness LM)
+            _ _ _ (trace_singleton m0) (from_trace extr) atr
+         ).
+  - intros ex atr' Hvse. unfold valid_state_evolution_fairness in Hvse. naive_solver.
+  - intros ex auxtr (?&Hlm&?) ζ ℓ Hlab Hlab'.
+    rewrite /trace_labels_match in Hlm.
+    destruct ex as [|?? [??]]=>//. destruct auxtr=>//. naive_solver.
+  - intros ex autr (Hsteps&?&?). destruct ex=>//. destruct autr=>//.
+    inversion Hsteps; simplify_eq. simpl. unfold trace_ends_in in *. naive_solver.
+  - apply (from_trace_spec (trace_singleton (es, σ))). rewrite Hexfirst //.
+  - change m0 with (trace_last (L := mlabel LM) (trace_singleton m0)). apply to_trace_spec.
+  - eapply valid_inf_system_trace_mono; last eassumption. by intros ??[??]%continued_simulation_unfold.
+Qed.
+
+Definition ex_fair_scheduling (tr: aneris_trace) := ∀ ζ, fair_scheduling_ex ζ tr.
+
+Definition ex_fair (tr: aneris_trace) :=
+  ex_fair_network tr ∧ ex_fair_scheduling tr.
+
+Section lm_network.
+  Context {M: UserModel aneris_lang}.
+  Context `{@anerisPreG M net_model LM LMeq Σ}.
+
+  Definition lm_send_filter msg : mlabel LM → Prop :=
+    λ l, ∃ ρ ζ, l = Take_step ρ (Some $ Send msg : fmaction (joint_model M net_model)) ζ (Some $ Send msg).
+  Instance lm_send_filter_decision msg l : Decision (lm_send_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition lm_deliver_filter msg : mlabel LM → Prop :=
+    λ l, l = Config_step (Deliver msg : fmconfig (joint_model M net_model)) (Deliver msg).
+  Instance lm_deliver_filter_decision msg l : Decision (lm_deliver_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition lm_network_fair_delivery_of msg : auxtrace LM → Prop :=
+    □ (□◊ ℓ↓lm_send_filter msg → ◊ ℓ↓ lm_deliver_filter msg).
+
+  Definition lm_network_fair_delivery (mtr : auxtrace LM) : Prop :=
+    ∀ msg, lm_network_fair_delivery_of msg mtr.
+
+  Definition lm_fair_scheduling (tr: auxtrace LM) :=
+    ∀ ρ, fair_aux (LM := LM) ρ tr.
+
+  Definition lm_fair (tr: auxtrace LM) :=
+    fuel_network_fair_delivery tr ∧ lm_fair_scheduling tr.
+
+  Notation ff :=
+    (ltl_tme labels_match live_tids locale_step (lm_ls_trans LM)).
+
+  Lemma simulation_adequacy_traces_fairness
+          es σ m0
+          (extr : aneris_trace)
+          (Hvex : extrace_valid extr)
+          (Hexfirst : (trfirst extr) = (es, σ))
+    :
+    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+    ex_fair extr →
+    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr.
+  Proof.
+    intros Hcs [Hfn Hfs].
+    destruct (simulation_adequacy_traces _ _ _ _ _ extr Hvex Hexfirst Hcs) as [atr Hatr].
+    eexists _; split=>//. split.
+    - rewrite /lm_network_fair_delivery /ex_fair_network in Hfn *.
+      rewrite /lm_network_fair_delivery_of /ex_fair_network_of in Hfn *.
+      intros msg. specialize (Hfn msg).
+
+      unshelve eapply (ltl_tme_use _ _ _ _ _ Hatr Hfn).
+      apply ltl_tme_always, ltl_tme_impl.
+      + apply ltl_tme_always, ltl_tme_eventually, ltl_tme_now.
+        rewrite /labels_match.
+        rewrite /ex_send_filter /fuel_send_filter /=.
+        intros [[]|] [] Hlm=>//.
+        * destruct Hlm as (?&?&Ham). simplify_eq. rewrite actions_match_is_eq in Ham. naive_solver.
+        * destruct Hlm as (?&?&Ham). simplify_eq. simpl. split; naive_solver.
+        * destruct Hlm as (?&Ham). simplify_eq. simpl. split; naive_solver.
+      + apply ltl_tme_eventually, ltl_tme_now.
+        rewrite /labels_match.
+        rewrite /ex_deliver_filter /fuel_deliver_filter /=.
+        intros [[]|] [] Hlm=>//; [naive_solver| naive_solver |].
+        destruct Hlm as (?&Ham). simplify_eq. simpl. rewrite cfg_labels_match_is_eq in Ham; naive_solver.
+    - rewrite /lm_fair_scheduling /ex_fair_scheduling in Hfn *. eapply fairness_preserved=>//.
+  Qed.
+
+  Notation jmtrace := (trace (joint_model M net_model) (fmlabel (joint_model M net_model))).
+  Definition jm_fair (tr: jmtrace) :=
+    jm_network_fair_delivery tr ∧ jm_fair_scheduling tr.
+
+  Definition usr_fair (tr: lts_trace M) :=
+    usr_network_fair_send_receive tr ∧ usr_fair_scheduling tr.
+
+  Lemma simulation_adequacy_trace_remove_fuel
+          (auxtr : auxtrace LM) :
+    lm_fair auxtr →
+    auxtrace_valid (LM := LM) auxtr →
+    ∃ jmtr, jm_fair jmtr ∧ jmtrace_valid jmtr ∧ upto_stutter_aux auxtr jmtr.
+  Proof.
+    intros [Hnf Hsf] Hval. have Hval' := Hval.
+    apply can_destutter_auxtr in Hval as [jmtr Hupto].
+    exists jmtr; split; [|split]=>//.
+    - split.
+      + eapply fuel_network_fairness_destutter=>//.
+      + apply (upto_stutter_fairness_ltl _ _) in Hupto=>//.
+    - eapply (upto_stutter_preserves_validity (Λ := aneris_lang)) =>//.
+  Qed.
+
+  Lemma simulation_adequacy_trace_trimed
+          (jmtr : jmtrace) :
+    jm_fair jmtr →
+    jmtrace_valid jmtr →
+    ∃ ttr, jm_fair ttr ∧ jmtrace_valid ttr ∧ trimmed_of jmtr ttr.
+  Proof.
+    intros [Ha Hb] Hval. exists (trim_trace jmtr). split; [|split]; last first.
+    { apply trim_trace_trimmed_of. }
+    - rewrite /jmtrace_valid in Hval *. by apply trim_trace_valid.
+    - split.
+      + eapply trim_preserves_network_fairness =>//.
+      + eapply trimming_preserves_fair_scheduling=>//.
+  Qed.
+
+  Lemma simulation_adequacy_trace_trimmed_user
+          (ttr : jmtrace) :
+    jm_fair ttr →
+    jmtrace_valid ttr →
+    trace_is_trimmed ttr →
+    ∃ utr, usr_fair utr ∧ usr_trace_valid utr ∧ upto_stutter_env ttr utr.
+  Proof.
+    intros [Hnf Hsf] Hval Htrim.
+    have [utr ?] : ∃ utr, upto_stutter_env ttr utr.
+    { eapply can_destutter. apply env_steps_dec_unless=>//. }
+    exists utr. split; [split|split] =>//.
+    - eapply network_fairness_project_usr=>//.
+    - eapply usr_project_scheduler_fair=>//.
+    - eapply usr_project_valid=>//.
+  Qed.
+
+  Definition model_refinement : rel (auxtrace LM) (lts_trace M) :=
+    upto_stutter_aux
+    >> trimmed_of
+    >> upto_stutter_env.
+
+  Definition program_model_refinement : rel (extrace aneris_lang) (lts_trace M) :=
+    exaux_traces_match (LM := LM) >> model_refinement.
+
+  Lemma model_refinement_preserves_upward auxtr :
+    lm_fair auxtr →
+    auxtrace_valid (LM := LM) auxtr →
+    ∃ utr, model_refinement auxtr utr ∧ usr_fair utr ∧ usr_trace_valid utr.
+  Proof.
+    intros Hf Hval.
+    apply simulation_adequacy_trace_remove_fuel in Hval as (?&?&Hval&?) =>//.
+    apply simulation_adequacy_trace_trimed in Hval as (?&?&Hval&?) =>//.
+    apply simulation_adequacy_trace_trimmed_user in Hval as (utr&?&Hval&?) =>//;
+      last by eapply trimmed_of_is_trimmed.
+    rewrite /model_refinement /rel_compose. naive_solver.
+  Qed.
+
+  Proposition program_model_refinement_preserves_upward extr m0 es σ :
+    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+    extrace_valid extr →
+    ex_fair extr →
+    (trfirst extr) = (es, σ) →
+    ∃ utr, program_model_refinement extr utr ∧ usr_fair utr ∧ usr_trace_valid utr.
+  Proof.
+    intros Hf Hval ??.
+    eapply simulation_adequacy_traces_fairness in Hval as (?&?&Hmatch) =>//.
+    have Hmatch' := Hmatch.
+    apply exaux_preserves_validity in Hmatch.
+    apply model_refinement_preserves_upward in Hmatch as (utr&?&?&?) =>//.
+    rewrite /program_model_refinement /rel_compose. naive_solver.
+  Qed.
+
+  Proposition program_model_refinement_downward_eventually extr utr P :
+    program_model_refinement extr utr →
+    (◊ ℓ↓ (λ '(_, α), P α)) utr →
+    (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, ℓ') ∧ P ℓ')) extr.
+  Proof. Admitted.
+Lemma simulation_adequacy_traces_fairness
+          es σ m0
+          (extr : aneris_trace)
+          (Hvex : extrace_valid extr)
+          (Hexfirst : (trfirst extr) = (es, σ))
+    :
+    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+    ex_fair extr →
+    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr.
+
+End lm_network.
 
 (* OBS: This is not needed. *)
 Lemma valid_inf_system_trace_implies_traces_match

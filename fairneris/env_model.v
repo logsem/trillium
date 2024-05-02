@@ -1,5 +1,5 @@
 From stdpp Require Import option countable.
-From fairneris Require Export inftraces trace_utils fairness.
+From fairneris Require Export inftraces fairness ltl_lite.
 
 Class GoodLang (Λ : language)
   `{Countable (config_label Λ), Inhabited (config_label Λ)}
@@ -17,12 +17,16 @@ Record Lts lab `{Countable lab, Inhabited lab}: Type := {
   lts_trans: lts_state → lab → lts_state → Prop;
 }.
 
+
 Arguments lts_state {_ _ _ _}.
 Arguments lts_trans {_ _ _ _}.
 
+Definition lts_trace {L} `{Countable L, Inhabited L} (LTS: Lts L) := trace LTS.(lts_state) L.
+Definition lts_label {L} `{Countable L, Inhabited L} (LTS: Lts L) := L.
+
 Section models.
-  Context (Λ: language).
-  Context `{GoodLang Λ}.
+Context (Λ: language).
+Context `{GoodLang Λ}.
 
 Record EnvModel := {
     env_lts :> Lts (action Λ + config_label Λ);
@@ -62,6 +66,27 @@ Record UserModel := {
 
 Arguments usr_live_roles {_}.
 
+Section user_fairness.
+  Context `{M: UserModel}.
+
+  Definition usr_trans_valid (mtr : lts_trace M) :=
+     match mtr with
+     | ⟨s⟩ => True
+     | (s -[l]-> tr) => lts_trans _ s l (trfirst tr)
+     end.
+
+  Definition usr_trace_valid (mtr : lts_trace M) :=
+    trace_always usr_trans_valid mtr.
+
+  Definition usr_fair_scheduling_mtr (ρ : M.(usr_role)) : lts_trace M → Prop :=
+    trace_always_eventually_implies_now
+      (λ (δ: M) _, ρ ∈ usr_live_roles δ)
+      (λ δ (ℓ : option (usr_role M * option (action Λ))), ρ ∉ usr_live_roles δ ∨ ∃ α, ℓ = Some (ρ, α)).
+
+  Definition usr_fair_scheduling (mtr : lts_trace M) : Prop :=
+    ∀ ρ, usr_fair_scheduling_mtr ρ mtr.
+End user_fairness.
+
 Inductive joint_trans {M: UserModel} {N: EnvModel} :
   (M * N) → ((usr_role M * option (action Λ)) + config_label Λ) → (M * N) → Prop :=
 | UsrTrans n u1 u2 ρ : lts_trans M u1 (ρ, None) u2 → joint_trans (u1, n) (inl (ρ, None)) (u2, n)
@@ -100,3 +125,6 @@ Arguments env_lts {_ _ _}.
 Arguments env_states_match {_ _ _ _ _ _ _}.
 Arguments joint_model {_ _ _ _ _ _}.
 Arguments joint_trans {_ _ _ _ _ _}.
+Arguments usr_trace_valid {_ _ _ _} _.
+Arguments usr_fair_scheduling {_ _ _ _} _.
+Arguments usr_fair_scheduling_mtr {_ _ _ _} _ _.

@@ -14,22 +14,22 @@ Section measure.
 
   Notation jmtrace := (trace JM (fmlabel JM)).
 
-  Definition trans_valid (mtr : jmtrace) :=
+  Definition jm_trans_valid (mtr : jmtrace) :=
      match mtr with
      | ⟨s⟩ => True
      | (s -[l]-> tr) => fmtrans _ s l (trfirst tr)
      end.
 
   Definition jmtrace_valid (mtr : jmtrace) :=
-    trace_always trans_valid mtr.
+    trace_always jm_trans_valid mtr.
 
-  Definition fair_scheduling_mtr (ρ : M.(usr_role)) : jmtrace → Prop :=
+  Definition jm_fair_scheduling_mtr (ρ : M.(usr_role)) : jmtrace → Prop :=
     trace_always_eventually_implies_now
       (λ (δ: JM) _, ρ ∈ live_roles _ δ)
       (λ δ (ℓ: option $ fmlabel JM), ρ ∉ live_roles _ δ ∨ ∃ α, ℓ = Some (inl (ρ, α))).
 
-  Definition fair_scheduling (mtr : jmtrace) : Prop :=
-    ∀ ρ, fair_scheduling_mtr ρ mtr.
+  Definition jm_fair_scheduling (mtr : jmtrace) : Prop :=
+    ∀ ρ, jm_fair_scheduling_mtr ρ mtr.
 
   Fixpoint env_steps_count (tr: jmtrace) (bound: nat) : option nat :=
     match bound with
@@ -115,11 +115,11 @@ Section measure.
   Qed.
 
   Lemma env_steps_bound_exists ρ tr :
-    fair_scheduling tr →
+    jm_fair_scheduling tr →
     ρ ∈ live_roles _ (trfirst tr) →
     exists n, pred_at tr n (is_usr_step_or_disabled ρ).
   Proof.
-    unfold fair_scheduling, fair_scheduling_mtr, trace_always_eventually_implies_now,
+    unfold jm_fair_scheduling, jm_fair_scheduling_mtr, trace_always_eventually_implies_now,
       trace_always_eventually_implies.
     intros Hf Hl. specialize (Hf ρ).
     apply trace_always_elim in Hf.
@@ -134,19 +134,19 @@ Section measure.
   Qed.
 
   Definition env_steps_bound_get_bound ρ tr
-    (Hf: fair_scheduling tr)
+    (Hf: jm_fair_scheduling tr)
     (Hlive: ρ ∈ live_roles _ (trfirst tr)):
     nat := epsilon (env_steps_bound_exists _ _ Hf Hlive).
 
   Lemma env_steps_bound_get_bound_correct ρ tr
-    (Hf: fair_scheduling tr)
+    (Hf: jm_fair_scheduling tr)
     (Hlive: ρ ∈ live_roles _ (trfirst tr)):
     pred_at tr (env_steps_bound_get_bound _ _ Hf Hlive) (is_usr_step_or_disabled ρ).
   Proof. rewrite /env_steps_bound_get_bound. apply epsilon_correct. Qed.
 
   Lemma env_steps_count_is_Some tr ρ
     (Hval: jmtrace_valid tr)
-    (Hf: fair_scheduling tr)
+    (Hf: jm_fair_scheduling tr)
     (Hlive: ρ ∈ live_roles _ (trfirst tr)):
     ∃ m, env_steps_count tr (S $ env_steps_bound_get_bound _ _ Hf Hlive) = Some m ∧ pred_at tr m is_usr_step.
   Proof.
@@ -156,14 +156,14 @@ Section measure.
 
   Definition env_steps_count_good tr ρ
     (Hval: jmtrace_valid tr)
-    (Hf: fair_scheduling tr)
+    (Hf: jm_fair_scheduling tr)
     (Hlive: ρ ∈ live_roles _ (trfirst tr)):
     nat
     := epsilon (env_steps_count_is_Some _ _ Hval Hf Hlive).
 
   Lemma env_steps_count_good_correct tr ρ
     (Hval: jmtrace_valid tr)
-    (Hf: fair_scheduling tr)
+    (Hf: jm_fair_scheduling tr)
     (Hlive: ρ ∈ live_roles _ (trfirst tr)):
     env_steps_count tr (S $ env_steps_bound_get_bound _ _ Hf Hlive) = Some (env_steps_count_good _ _ Hval Hf Hlive)
       ∧ pred_at tr (env_steps_count_good _ _ Hval Hf Hlive) is_usr_step.
@@ -171,14 +171,14 @@ Section measure.
 
   #[local] Instance live_dec (tr : jmtrace): Decision (∃ ρ : fmrole JM, ρ ∈ live_roles JM (trfirst tr)).
   Proof. apply make_decision. Qed.
-  #[local] Instance valid_dec (tr: jmtrace) : Decision (jmtrace_valid tr ∧ fair_scheduling tr).
+  #[local] Instance valid_dec (tr: jmtrace) : Decision (jmtrace_valid tr ∧ jm_fair_scheduling tr).
   Proof. apply make_decision. Qed.
 
   Definition env_steps_count_total tr : nat :=
     match decide (∃ ρ, ρ ∈ live_roles _ (trfirst tr)) with
     | left Hin =>
         let ρ := choose _ Hin in
-        match decide (jmtrace_valid tr ∧ fair_scheduling tr) with
+        match decide (jmtrace_valid tr ∧ jm_fair_scheduling tr) with
         | left (conj Hval Hf) =>
             S $ env_steps_count_good tr ρ Hval Hf (choose_correct (λ ρ, ρ ∈ live_roles _ (trfirst tr)) _)
         | right _ => 0
@@ -262,8 +262,18 @@ Section measure.
     exists tr1'. rewrite /trace_suffix_of. naive_solver.
   Qed.
 
-  (* Lemma trimmed_of_finite_last *)
 
+  Lemma trimmed_of_valid tr1 tr2 :
+    trimmed_of tr1 tr2 →
+    jmtrace_valid tr1 →
+    jmtrace_valid  tr2.
+  Proof.
+    rewrite /jmtrace_valid !trace_alwaysI.
+    intros Hto Ha tr2' Hsuff.
+    destruct (trimmed_of_suffix_of _ _ _ Hto Hsuff) as (tr1'&Hsuff'&Hto').
+    specialize (Ha _ Hsuff'). punfold Hto'. inversion Hto' as [| ???? IH |]; simplify_eq=>//.
+    rewrite /jm_trans_valid in Ha *. pclearbot. punfold IH. inversion IH; simplify_eq=>//.
+  Qed.
 
   Lemma trimmed_of_pred_at_usr m tr1 tr2:
     trimmed_of tr1 tr2 →
@@ -300,6 +310,13 @@ Section measure.
   Lemma trim_trace_is_trimmed tr:
     trace_is_trimmed (trim_trace tr).
   Proof. eapply trimmed_of_is_trimmed, trim_trace_trimmed_of. Qed.
+
+  Lemma trim_trace_valid tr :
+    jmtrace_valid tr →
+    jmtrace_valid (trim_trace tr).
+  Proof.
+    intros Hval. by eapply trimmed_of_valid in Hval; last eapply trim_trace_trimmed_of.
+  Qed.
 
   Lemma trimmed_of_infinite tr1 tr2:
     trimmed_of tr1 tr2 →
@@ -348,7 +365,7 @@ Section measure.
     - destruct ℓ as [ρ α].
       have : ρ ∈ live_roles _ s; last set_solver.
       by eapply (fm_live_spec _ _ _ α (trfirst tr)).
-    - rewrite /trans_valid in Hval. destruct (trfirst tr).
+    - rewrite /jm_trans_valid in Hval. destruct (trfirst tr).
       inversion Hval; simplify_eq. naive_solver.
   Qed.
 
@@ -365,7 +382,7 @@ Section measure.
     - apply trace_always_elim in Hval.
       destruct ℓ.
       { exfalso. by apply (Hdead 0). }
-      unfold trans_valid in Hval.
+      unfold jm_trans_valid in Hval.
       destruct (trfirst tr) eqn:Heq; inversion Hval; simplify_eq=>//.
     - apply IH=>//.
       + eapply trace_always_suffix_of=>//. apply trace_suffix_of_cons_r, trace_suffix_of_refl.
@@ -374,7 +391,7 @@ Section measure.
 
   Lemma trace_no_roles_no_usr_inv tr:
     jmtrace_valid tr →
-    fair_scheduling tr →
+    jm_fair_scheduling tr →
     (∀ n, ¬ pred_at tr n is_usr_step) →
     live_roles _ (trfirst tr) = ∅.
   Proof.
@@ -397,7 +414,7 @@ Section measure.
 
   Lemma trimmed_of_None_fair n (tr tr' : jmtrace) tr1:
     jmtrace_valid tr →
-    fair_scheduling tr →
+    jm_fair_scheduling tr →
     trimmed_of tr tr' →
     after n tr = Some tr1 →
     after n tr' = None →
@@ -453,7 +470,7 @@ Section measure.
 
   Lemma env_steps_dec_unless tr
     (Hval: jmtrace_valid tr)
-    (Hf: fair_scheduling tr)
+    (Hf: jm_fair_scheduling tr)
     (Htrim: trace_is_trimmed tr):
     env_dec_unless tr.
   Proof.
@@ -466,7 +483,7 @@ Section measure.
     { by eapply trace_suffix_of_cons_l. }
     right. split; last first.
     { apply (trace_always_suffix_of _ _ _ Hsuff1), trace_always_elim in Hval.
-      destruct s as [us ns]. unfold trans_valid in Hval. destruct (trfirst tr').
+      destruct s as [us ns]. unfold jm_trans_valid in Hval. destruct (trfirst tr').
       by inversion Hval; simplify_eq. }
     rewrite /env_steps_count_total.
 
@@ -474,17 +491,17 @@ Section measure.
     { apply trace_is_trimmed_equiv in Htrim=>//.
       specialize (Htrim n). rewrite Heq // in Htrim. }
 
-    have ? : jmtrace_valid tr' ∧ fair_scheduling tr'.
+    have ? : jmtrace_valid tr' ∧ jm_fair_scheduling tr'.
     { apply NNP_P. intros ?.
       have ?: jmtrace_valid tr' by apply (trace_always_suffix_of _ _ _ Hsuff2) in Hval.
-      have ?: fair_scheduling tr'.
+      have ?: jm_fair_scheduling tr'.
       { intros ρ. eapply (trace_always_suffix_of _ _ _ Hsuff2) in Hf. apply Hf. }
       naive_solver. }
 
-    have ? : jmtrace_valid (s -[ inr f ]-> tr') ∧ fair_scheduling (s -[ inr f ]-> tr').
+    have ? : jmtrace_valid (s -[ inr f ]-> tr') ∧ jm_fair_scheduling (s -[ inr f ]-> tr').
     { apply NNP_P. intros ?.
       have ?: jmtrace_valid (s -[ inr f ]-> tr') by apply (trace_always_suffix_of _ _ _ Hsuff1) in Hval.
-      have ?: fair_scheduling (s -[ inr f ]-> tr').
+      have ?: jm_fair_scheduling (s -[ inr f ]-> tr').
       { intros ρ. eapply (trace_always_suffix_of _ _ _ Hsuff1) in Hf. apply Hf. }
       naive_solver. }
 
@@ -513,16 +530,122 @@ Section measure.
     have [? _] := env_steps_count_good_correct _ _ Hval1 Hfair1 Hin1'.
     have [? _] := env_steps_count_good_correct _ _ Hval2 Hfair2 Hin2'.
 
-
     eapply env_steps_count_step_gt=>//.
+  Qed.
+
+  Definition upto_stutter_env := upto_stutter env_proj_st env_proj_lab.
+  Definition ltl_se_env := ltl_se env_proj_st env_proj_lab.
+
+  Definition jm_usr_trans_valid (mtr : jmtrace) :=
+     match mtr with
+     | ⟨s⟩ => True
+     | (s -[inr _]-> tr) => False
+     | (s -[inl l]-> tr) => lts_trans _ s.1 l (trfirst tr).1
+     end.
+
+  Definition jmtrace_usr_valid (mtr : jmtrace) :=
+    trace_always (trace_until (trace_silent env_proj_lab) jm_usr_trans_valid) mtr.
+
+  Proposition jm_valid_jm_usr_valid (jmtr: jmtrace) :
+    jm_fair_scheduling jmtr →
+    jmtrace_valid jmtr →
+    trace_is_trimmed jmtr →
+    jmtrace_usr_valid jmtr.
+  Proof.
+    rewrite /jmtrace_valid /jmtrace_usr_valid !trace_alwaysI.
+
+    intros Hfair Hval. have Hval' := Hval. revert Hfair Hval.
+
+    intros Hfair Hval Htrim jmtr' Hsuff.
+
+    specialize (Hval _ Hsuff).
+    revert Hsuff Hval Htrim.
+
+    have [n Hn] : ∃ n, n = env_steps_count_total jmtr' by naive_solver.
+    revert jmtr' Hn.
+
+    induction (Nat.lt_wf_0_projected id n) as [n ? IH].
+    intros jmtr' Hn Hsuff Hval Htrim.
+    opose proof (env_steps_dec_unless jmtr' _ _ _ 0) as Hdec.
+    { apply trace_alwaysI. intros ??. apply Hval'. eapply trace_suffix_of_trans=>//. }
+    { intros ?. eapply trace_always_suffix_of=>//. apply Hfair. }
+    { intros m. destruct Hsuff as [m' Hm']. specialize (Htrim (m' + m)).
+      rewrite after_sum' Hm' // in Htrim. }
+    rewrite /= in Hdec.
+    rewrite /jm_trans_valid in Hval.
+    destruct jmtr' as [js|[js1 js2] [jl|jl] jmtr'].
+    - constructor 1. done.
+    - constructor 1. simpl. destruct (trfirst jmtr') eqn:Heq. rewrite Heq.
+      inversion Hval; simplify_eq=>//.
+    - rewrite /= in Hdec. destruct Hdec as [|[Hdec Hst]]; first naive_solver.
+      constructor 2=>//.
+      apply trace_suffix_of_cons_l in Hsuff.
+      eapply IH=>//=.
+      + rewrite Hn //.
+      + by apply Hval'.
+  Qed.
+
+  Lemma usr_project_valid (jmtr: jmtrace) (utr: lts_trace M) :
+    trace_is_trimmed jmtr →
+    jm_fair_scheduling jmtr →
+    jmtrace_valid jmtr →
+    upto_stutter_env jmtr utr →
+    usr_trace_valid utr.
+  Proof.
+    intros Htrim Hsched Hval%jm_valid_jm_usr_valid Hupto =>//.
+    rewrite /jmtrace_usr_valid /usr_trace_valid in Hval *.
+    rewrite !trace_alwaysI in Hval *. intros utr' Hsuff.
+    destruct (upto_stutter_suffix_of _ _ _ _ _ Hupto Hsuff) as (jmtr'&Hsuff'&Hupto').
+    specialize (Hval _ Hsuff'). clear Htrim Hsched.
+    clear jmtr utr Hupto Hsuff Hsuff'. revert utr' Hupto'.
+    induction Hval as [jmtr Hnow|[js1 js2] jl jmtr Hlater Huntil IH]; intros utr Hupto.
+    - rewrite /jm_usr_trans_valid /usr_trans_valid in Hnow *.
+      punfold Hupto; last by apply upto_stutter_mono.
+      destruct jmtr as [js|[??] jl jmtr]; destruct utr as [us|us ul utr]=>//.
+      + inversion Hupto; simplify_eq=>//.
+      + destruct jl.
+        * inversion Hupto as [| |???????? Hupto']; simpl in *; simplify_eq=>//.
+          destruct (trfirst jmtr) as [js1 ?] eqn:Heq.
+          have ->//: trfirst utr = js1.
+          pclearbot. punfold Hupto'; last by apply upto_stutter_mono.
+          inversion Hupto'; simpl in *; simplify_eq; simpl in *; simplify_eq=>//=.
+        * inversion Hupto as [| |]; simpl in *; simplify_eq=>//.
+    - apply IH. destruct jl as [jl|jl]=>//.
+      punfold Hupto; last by apply upto_stutter_mono.
+      inversion Hupto; simplify_eq. by pfold.
+  Qed.
+
+  Lemma usr_project_scheduler_fair (jmtr: jmtrace) (utr: lts_trace M) :
+    jm_fair_scheduling jmtr →
+    upto_stutter_env jmtr utr →
+    usr_fair_scheduling utr.
+  Proof.
+    intros Hf Hupto ρ. specialize (Hf ρ).
+    have Hse //: ltl_se_env (jm_fair_scheduling_mtr ρ) (usr_fair_scheduling_mtr ρ); last by eapply Hse.
+    apply ltl_se_always, ltl_se_impl.
+    - clear jmtr Hf utr Hupto. intros jtr utr Hupto. punfold Hupto; last apply upto_stutter_mono.
+      rewrite /trace_now /pred_at /=. destruct (trfirst jtr) eqn:Heq.
+      inversion Hupto; simplify_eq; simpl in *; simplify_eq=>//.
+      destruct utr; simpl in *; simplify_eq=>//.
+    - eapply (ltl_se_eventually_now_or _ _ _ _ (λ s, ρ ∉ live_roles JM s) (λ s, ρ ∉ usr_live_roles s)
+                                       (λ s l, ∃ (α : fmaction JM), l = Some $ inl (ρ, α))
+                                       (λ s l, ∃ (α : option (action Λ)), l = Some $ (ρ, α))
+             )=>//.
+      + intros _ [?|?] ? =>//= ?. simplify_eq. naive_solver.
+      + naive_solver.
+      + naive_solver.
+      + naive_solver.
   Qed.
 End measure.
 
-Arguments fair_scheduling {_ _ _ _ _ _ _ _}.
-Arguments fair_scheduling_mtr {_ _ _ _ _ _ _ _}.
+Arguments jm_fair_scheduling {_ _ _ _ _ _ _ _}.
+Arguments jm_fair_scheduling_mtr {_ _ _ _ _ _ _ _}.
 Arguments trim_trace {_ _ _ _ _ _ _ _}.
 Arguments trimmed_of {_ _ _ _ _ _ _ _}.
+Arguments trace_is_trimmed {_ _ _ _ _ _ _ _} _.
 Arguments jmtrace_valid {_ _ _ _ _ _ _ _}.
+Arguments upto_stutter_env {_ _ _ _ _ _ _ _} _ _.
+Arguments ltl_se_env {_ _ _ _ _ _ _ _} _ _.
 
 Section trim_scheduling_fairness.
   Context `{GoodLang Λ}.
@@ -538,14 +661,14 @@ Section trim_scheduling_fairness.
 
   Lemma trimming_preserves_fair_scheduling (tr : jmtrace):
     jmtrace_valid tr →
-    fair_scheduling tr →
-    fair_scheduling (trim_trace tr).
+    jm_fair_scheduling tr →
+    jm_fair_scheduling (trim_trace tr).
   Proof.
     have: trimmed_of tr (trim_trace tr).
     { apply trim_trace_trimmed_of. }
     generalize (trim_trace tr). intros ttr Htrim.
 
-    rewrite /fair_scheduling /fair_scheduling_mtr /trace_always_eventually_implies_now.
+    rewrite /jm_fair_scheduling /jm_fair_scheduling_mtr /trace_always_eventually_implies_now.
     rewrite /trace_always_eventually_implies. intros Hval Hf ρ.
     have Hfair := Hf.
     specialize (Hf ρ).
