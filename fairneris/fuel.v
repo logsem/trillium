@@ -753,7 +753,6 @@ Section fairness_preserved.
   Local Hint Resolve pred_first_trace: core.
 
   Definition fairness_induction_stmt ρ fm f m ζ extr (auxtr : auxtrace LM) δ c :=
-      infinite_trace extr ->
        (forall ζ, fair_scheduling_ex ζ extr) ->
        fm = (f, m) ->
        exaux_traces_match extr auxtr ->
@@ -770,14 +769,13 @@ Section fairness_preserved.
              (δ : LiveState Λ M) (c : cfg Λ), fairness_induction_stmt ρ m0 f m ζ extr auxtr δ c) ->
     (ρ ∈ dom (ls_fuel (trfirst auxtr')) → oless (ls_fuel (trfirst auxtr') !! ρ) (ls_fuel δ !! ρ)) ->
     exaux_traces_match extr' auxtr' ->
-    infinite_trace extr' ->
     ls_fuel δ !! ρ = Some f ->
     (∀ ζ, fair_scheduling_ex ζ extr') ->
     ∃ M0 : nat,
       pred_at (δ -[ ℓ ]-> auxtr') M0
               (λ δ0 ℓ, ¬ role_enabled ρ δ0 ∨ ∃ ζ0 fmact act, ℓ = Some (Take_step ρ fmact ζ0 act)).
     Proof.
-      intros IH Hdec Hmatch Hinf Hsome Hfair.
+      intros IH Hdec Hmatch Hsome Hfair.
       unfold oless in Hdec.
       simpl in *.
       rewrite -> Hsome in *.
@@ -807,9 +805,13 @@ Section fairness_preserved.
         fairness_induction_stmt ρ fm f m ζ extr auxtr δ c.
     Proof.
       induction fm as [fm IH] using lex_ind.
-      intros f m ζ extr auxtr δ c Hexinfin Hfair -> Htm -> -> Hfuel Hmapping Hexen.
+      intros f m ζ extr auxtr δ c Hfair -> Htm -> -> Hfuel Hmapping Hexen.
       destruct extr as [|c ζ' extr'] eqn:Heq.
-      { have [??] := Hexinfin 1. done. }
+      { destruct m=>//. rewrite /pred_at /= in Hexen. exists 0. rewrite /pred_at /=.
+        inversion Htm; simplify_eq. left. destruct Hexen as [Hnen|[]]=>//.
+        destruct H1 as [Hloc Hl].
+        destruct (Hloc ρ ζ Hmapping) as [e He]. eapply Hl=>//.
+        intros Hc. apply Hnen. exists e=>//. }
       have Hfair': (forall ζ, fair_scheduling_ex ζ extr').
       { intros. by eapply fair_scheduling_ex_cons. }
       destruct auxtr as [|δ ℓ auxtr']; first by inversion Htm.
@@ -828,8 +830,7 @@ Section fairness_preserved.
         ospecialize (IH (f, m) _).
         { rewrite /strict /lt_lex. lia. }
         rewrite /fairness_induction_stmt in IH.
-        odestruct (IH f m ζ extr' _ _ _ _ _ _ _ _ _ _ _ Hexen) as [M' HM']; try done.
-        { by eapply infinite_cons. }
+        odestruct (IH f m ζ extr' _ _ _ _ _ _ _ _ _ _ Hexen) as [M' HM']; try done.
         { rewrite /ls_fuel -Hmap //. }
         { rewrite /ls_mapping -Hmap //. }
         exists (S M'). by apply pred_at_S. }
@@ -843,8 +844,7 @@ Section fairness_preserved.
           have Hmustdec: must_decrease ρ None δ (trfirst auxtr') (Some ζ').
           { constructor; eauto. }
           eapply case1 =>//.
-          * move=> Hinfuel; apply Hlsdec => //; first set_solver.
-          * eapply infinite_cons =>//.
+          move=> Hinfuel; apply Hlsdec => //; first set_solver.
         + (* Three cases: *)
 (*              (1) ρ' = ρ and we are done *)
 (*              (2) ρ' ≠ ρ but they share the same ρ -> ρ decreases *)
@@ -858,7 +858,7 @@ Section fairness_preserved.
           have Hmustdec: must_decrease ρ (Some ρ') δ (trfirst auxtr') (Some ζ').
           { constructor; eauto; congruence. }
           (* Copy and paste begins here *)
-          eapply case1 =>//; last by eauto using infinite_cons.
+          eapply case1 =>//.
           intros Hinfuels. apply Hdec =>//. SS.
       - (* Another thread is taking a step. *)
         destruct (decide (ρ ∈ live_roles M (trfirst auxtr'))) as [Hρlive'|]; last first.
@@ -898,7 +898,7 @@ Section fairness_preserved.
 
           have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ δ0 ℓ, ¬ role_enabled ρ δ0 ∨
                             ∃ ζ0 fmact act, ℓ = Some $ Take_step ρ fmact ζ0 act).
-          { eapply (IH _ _ _ m' _ extr'); eauto. by eapply infinite_cons. by inversion Htm.
+          { eapply (IH _ _ _ m' _ extr'); eauto. by inversion Htm.
             Unshelve.
             - done.
             - unfold strict, lt_lex. lia. }
@@ -930,17 +930,16 @@ Section fairness_preserved.
           have [p Hp] := (Hfair' ζ'' 0 Hζ'en).
           have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ δ0 ℓ, ¬ role_enabled ρ δ0 ∨
                                           ∃ ζ0 fmact act, ℓ = Some (Take_step ρ fmact ζ0 act)).
-          { eapply (IH _ _ _ p _ extr'); eauto. by eapply infinite_cons. by inversion Htm.
+          { eapply (IH _ _ _ p _ extr'); eauto. by inversion Htm.
             Unshelve. unfold strict, lt_lex. lia. }
           exists (1+P). rewrite !pred_at_sum. simpl. done.
   Qed.
 
   Theorem fairness_preserved (extr: extrace Λ) (auxtr: auxtrace LM):
-    infinite_trace extr ->
     exaux_traces_match extr auxtr ->
     (forall ζ, fair_scheduling_ex ζ extr) -> (forall ρ, fair_aux ρ auxtr).
   Proof.
-    intros Hinfin Hmatch Hex ρ n Hn.
+    intros Hmatch Hex ρ n Hn.
     unfold pred_at in Hn.
     destruct (after n auxtr) as [tr|] eqn:Heq =>//.
     setoid_rewrite pred_at_sum. rewrite Heq.
@@ -960,9 +959,7 @@ Section fairness_preserved.
     have Hpa: pred_at extr n (λ c _, locale_enabled ζ c).
     { unfold pred_at. rewrite Heq'. destruct tr1'; eauto. }
     destruct (Hex' Hpa) as [m Hm].
-    have ?: infinite_trace tr1'.
-    { have Hinf := infinite_trace_after n extr Hinfin. by rewrite Heq' in Hinf. }
-    eapply (fairness_preserved_ind ρ _ f m ζ _ tr); eauto.
+    eapply (fairness_preserved_ind ρ _ f m ζ tr1' tr); eauto.
     intros ?. by eapply fair_scheduling_ex_after.
   Qed.
 
