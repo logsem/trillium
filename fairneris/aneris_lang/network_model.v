@@ -91,25 +91,47 @@ Section fairness.
 
   Definition recv_filter msg : jmlabel → Prop :=
     λ l, ∃ ρ, l = inl $ (ρ, Some $ Recv (m_destination msg) (Some msg)).
-  Instance recv_filter_decision msg l : Decision (deliver_filter msg l).
+  Instance recv_filter_decision msg l : Decision (recv_filter msg l).
   Proof. apply make_decision. Qed.
 
   Definition any_recv_filter sa : jmlabel → Prop :=
     λ l, ∃ ρ omsg, l = inl $ (ρ, Some $ Recv sa omsg).
-  Instance any_recv_filter_decision msg l : Decision (deliver_filter msg l).
+  Instance any_recv_filter_decision msg l : Decision (any_recv_filter msg l).
   Proof. apply make_decision. Qed.
 
-  Definition network_fair_delivery_of msg : jmtrace → Prop :=
+  Definition jm_network_fair_delivery_of msg : jmtrace → Prop :=
     □ (□◊ ℓ↓send_filter msg → ◊ ℓ↓ deliver_filter msg).
 
-  Definition network_fair_delivery (mtr : jmtrace) : Prop :=
-    ∀ msg, network_fair_delivery_of msg mtr.
+  Definition jm_network_fair_delivery (mtr : jmtrace) : Prop :=
+    ∀ msg, jm_network_fair_delivery_of msg mtr.
 
-  Definition network_fair_send_receive_of msg : jmtrace → Prop :=
+  Definition jm_network_fair_send_receive_of msg : jmtrace → Prop :=
     □ (□◊ℓ↓send_filter msg → □◊ℓ↓ any_recv_filter (m_destination msg) → ◊ℓ↓ recv_filter msg).
 
-  Definition network_fair_send_receive (mtr : jmtrace) : Prop :=
-    ∀ msg, network_fair_send_receive_of msg mtr.
+  Definition jm_network_fair_send_receive (mtr : jmtrace) : Prop :=
+    ∀ msg, jm_network_fair_send_receive_of msg mtr.
+
+
+  Definition usr_send_filter msg : lts_label M → Prop :=
+    λ l, ∃ ρ, l = (ρ, Some $ Send msg).
+  Instance usr_send_filter_decision msg l : Decision (usr_send_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition usr_recv_filter msg : lts_label M → Prop :=
+    λ l, ∃ ρ, l = (ρ, Some $ Recv (m_destination msg) (Some msg)).
+  Instance usr_recv_filter_decision msg l : Decision (usr_recv_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition usr_any_recv_filter sa : lts_label M → Prop :=
+    λ l, ∃ ρ omsg, l = (ρ, Some $ Recv sa omsg).
+  Instance usr_any_recv_filter_decision msg l : Decision (usr_any_recv_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition usr_network_fair_send_receive_of msg : lts_trace M → Prop :=
+    □ (□◊ℓ↓ usr_send_filter msg → □◊ℓ↓ usr_any_recv_filter (m_destination msg) → ◊ℓ↓ usr_recv_filter msg).
+
+  Definition usr_network_fair_send_receive (utr : lts_trace M) : Prop :=
+    ∀ msg, usr_network_fair_send_receive_of msg utr.
 End fairness.
 
 Instance aneris_good_lang : GoodLang aneris_lang.
@@ -141,7 +163,7 @@ Section fuel_fairness.
     ∀ msg, fuel_network_fair_delivery_of msg mtr.
 
   Lemma fuel_network_fairness_destutter :
-    fuel_se fuel_network_fair_delivery network_fair_delivery.
+    fuel_se fuel_network_fair_delivery jm_network_fair_delivery.
   Proof.
     apply ltl_se_forall=> msg.
     apply ltl_se_always, ltl_se_impl.
@@ -214,10 +236,10 @@ Section fairness.
                              eq eq (λ _ _ _, True) (λ _ _ _, True) P P).
 
   Lemma trim_preserves_network_fairness (tr: jmtrace):
-    network_fair_delivery tr →
-    network_fair_delivery (trim_trace tr).
+    jm_network_fair_delivery tr →
+    jm_network_fair_delivery (trim_trace tr).
   Proof.
-    rewrite /network_fair_delivery /network_fair_delivery_of.
+    rewrite /jm_network_fair_delivery /jm_network_fair_delivery_of.
     intros Hf msg. specialize (Hf msg).
     apply trace_alwaysI. intros tr' Hsuff. rewrite trace_impliesI. intros Hae.
     have Hinf: infinite_trace tr'.
@@ -283,13 +305,13 @@ Section user_fairness.
 
   Proposition network_fairness_user (jmtr: jmtrace) :
     jmtrace_valid jmtr →
-    network_fair_delivery jmtr →
-    network_fair_send_receive jmtr.
+    jm_network_fair_delivery jmtr →
+    jm_network_fair_send_receive jmtr.
   Proof.
     intros Hv Hf msg. apply trace_alwaysI. intros tr' Hsuff.
     apply trace_impliesI. intros Hae.
     specialize (Hf msg).
-    rewrite /network_fair_delivery_of trace_alwaysI in Hf. specialize (Hf _ Hsuff).
+    rewrite /jm_network_fair_delivery_of trace_alwaysI in Hf. specialize (Hf _ Hsuff).
     rewrite trace_impliesI in Hf. specialize (Hf Hae). clear Hae.
     rewrite trace_impliesI. intros Hae.
     apply trace_always_eventually_always_until in Hae.
@@ -382,4 +404,15 @@ Section user_fairness.
         by eapply trace_suffix_of_cons_l. }
       apply IH=>//. by eapply trace_suffix_of_cons_l.
   Qed.
+
+
+
+
+    jm_network_fair_delivery jmtr →
+    jm_network_fair_send_receive jmtr.
+
+  Proposition network_fairness_user (jmtr: jmtrace) :
+    jmtrace_valid jmtr →
+    jm_network_fair_delivery jmtr →
+    jm_network_fair_send_receive jmtr.
 End user_fairness.

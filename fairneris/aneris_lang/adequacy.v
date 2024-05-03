@@ -643,7 +643,9 @@ Section lm_network.
 
   Notation jmtrace := (trace (joint_model M net_model) (fmlabel (joint_model M net_model))).
   Definition jm_fair (tr: jmtrace) :=
-    network_fair_delivery tr ∧ fair_scheduling tr.
+    jm_network_fair_delivery tr ∧ jm_fair_scheduling tr.
+  Definition usr_fair (tr: lts_trace M) :=
+    (* usr_network_fair_send_receive tr ∧ *) usr_fair_scheduling tr.
 
   Lemma simulation_adequacy_trace_remove_fuel
           (auxtr : auxtrace LM) :
