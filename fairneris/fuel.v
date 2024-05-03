@@ -1172,10 +1172,10 @@ Section upto_preserves.
   Qed.
   Hint Resolve upto_stutter_mono' : paco.
 
-  Lemma upto_preserves_validity (auxtr : auxtrace LM) mtr:
+  Lemma upto_stutter_preserves_validity_coind (auxtr : auxtrace LM) mtr:
     upto_stutter_auxtr auxtr mtr ->
     auxtrace_valid auxtr ->
-    mtrace_valid mtr.
+    mtrace_valid_coind mtr.
   Proof.
     revert auxtr mtr. pcofix CH. intros auxtr mtr Hupto Hval.
     punfold Hupto.
@@ -1198,13 +1198,19 @@ Section upto_preserves.
         { destruct IH =>//. }
         subst. by inversion Hval.
   Qed.
+
+  Lemma upto_stutter_preserves_validity (auxtr : auxtrace LM) mtr:
+    upto_stutter_auxtr auxtr mtr ->
+    auxtrace_valid auxtr ->
+    mtrace_valid mtr.
+  Proof. intros ??. by eapply mtrace_valid_coind_ltl, upto_stutter_preserves_validity_coind. Qed.
 End upto_preserves.
 
 Section upto_stutter_preserves_fairness_and_termination.
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
 
-  Notation upto_stutter_aux := (upto_stutter (λ x, ls_under (Λ := Λ) (ls_data x)) (Ul (Λ := Λ) (LM := LM))).
+  Definition upto_stutter_aux := (upto_stutter (λ x, ls_under (M := M) (Λ := Λ) (ls_data x)) (Ul (Λ := Λ) (LM := LM))).
 
   Lemma upto_stutter_mono'' : (* TODO fix this proliferation *)
     monotone2 (upto_stutter_ind (λ x, ls_under (Λ:=Λ) (M:=M) (ls_data x)) (Ul (LM:=LM))).

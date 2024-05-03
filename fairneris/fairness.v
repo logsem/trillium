@@ -1,6 +1,6 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From fairneris Require Export inftraces trace_utils.
+From fairneris Require Export inftraces ltl_lite trace_utils .
 
 Record FairModel : Type := {
   fmstate:> Type;
@@ -83,6 +83,14 @@ Section model_traces.
   Definition fair_scheduling mtr := ∀ ρ, fair_scheduling_mtr ρ mtr.
   Definition mtrace_fair mtr := fair_scheduling mtr ∧ M.(fmfairness) mtr.
 
+  Definition mtrace_trans_valid (mtr : mtrace M) :=
+     match mtr with
+     | ⟨s⟩ => True
+     | (s -[l]-> tr) => fmtrans _ s l (trfirst tr)
+     end.
+
+  Definition mtrace_valid := □ mtrace_trans_valid.
+
   Inductive mtrace_valid_ind (mtrace_valid_coind: mtrace M → Prop) :
     mtrace M → Prop :=
   | mtrace_valid_singleton δ: mtrace_valid_ind _ ⟨δ⟩
@@ -90,7 +98,7 @@ Section model_traces.
       fmtrans _ δ ℓ (trfirst tr) →
       mtrace_valid_coind tr →
       mtrace_valid_ind _ (δ -[ℓ]-> tr).
-  Definition mtrace_valid := paco1 mtrace_valid_ind bot1.
+  Definition mtrace_valid_coind := paco1 mtrace_valid_ind bot1.
 
   Lemma mtrace_valid_mono :
     monotone1 mtrace_valid_ind.
@@ -100,6 +108,16 @@ Section model_traces.
   Qed.
   Hint Resolve mtrace_valid_mono : paco.
 
+  Lemma mtrace_valid_coind_ltl mtr :
+    mtrace_valid_coind mtr → mtrace_valid mtr.
+  Proof.
+    rewrite /mtrace_valid trace_alwaysI /trace_suffix_of.
+    intros Hval mtr' [n Hsome]. revert mtr Hval mtr' Hsome.
+    induction n as [|n IH]; intros mtr Hval mtr' Hsome.
+    { rewrite /= in Hsome. simplify_eq. punfold Hval. inversion Hval=>//. }
+    destruct mtr as [|?? mtr]=>//. simpl in Hsome.
+    eapply (IH mtr)=>//. punfold Hval. inversion Hval; simplify_eq. by pclearbot.
+  Qed.
 End model_traces.
 
 Global Hint Resolve mtrace_valid_mono : paco.

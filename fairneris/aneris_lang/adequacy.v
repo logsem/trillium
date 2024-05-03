@@ -9,7 +9,7 @@ From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.
 From fairneris.aneris_lang.state_interp Require Import state_interp.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
-From fairneris Require Import from_locale_utils trace_utils ltl_lite.
+From fairneris Require Import from_locale_utils trace_utils ltl_lite fuel_jm_scheduling_fairness.
 
 (* TODO: Move to stdpp *)
 Lemma gset_union_difference_intersection_L `{Countable A} (X Y : gset A) :
@@ -602,7 +602,7 @@ Section lm_network.
     ∀ ρ, fair_aux (LM := LM) ρ tr.
 
   Definition lm_fair (tr: auxtrace LM) :=
-    lm_network_fair_delivery tr ∧ lm_fair_scheduling tr.
+    fuel_network_fair_delivery tr ∧ lm_fair_scheduling tr.
 
   Notation ff :=
     (ltl_tme labels_match live_tids locale_step (lm_ls_trans LM)).
@@ -628,21 +628,72 @@ Section lm_network.
       apply ltl_tme_always, ltl_tme_impl.
       + apply ltl_tme_always, ltl_tme_eventually, ltl_tme_now.
         rewrite /labels_match.
-        rewrite /ex_send_filter /lm_send_filter /=.
+        rewrite /ex_send_filter /fuel_send_filter /=.
         intros [[]|] [] Hlm=>//.
-        * destruct Hlm as (?&?&Ham). simplify_eq. split; last naive_solver.
-          intros ?. simplify_eq.
-          apply actions_match_is_eq in Ham. naive_solver.
+        * destruct Hlm as (?&?&Ham). simplify_eq. rewrite actions_match_is_eq in Ham. naive_solver.
         * destruct Hlm as (?&?&Ham). simplify_eq. simpl. split; naive_solver.
         * destruct Hlm as (?&Ham). simplify_eq. simpl. split; naive_solver.
       + apply ltl_tme_eventually, ltl_tme_now.
         rewrite /labels_match.
-        rewrite /ex_deliver_filter /lm_deliver_filter /=.
-        intros [[]|] [] Hlm=>//.
-        destruct Hlm as (?&Ham). simplify_eq. simpl. split; last naive_solver.
-        apply cfg_labels_match_is_eq in Ham. naive_solver.
+        rewrite /ex_deliver_filter /fuel_deliver_filter /=.
+        intros [[]|] [] Hlm=>//; [naive_solver| naive_solver |].
+        destruct Hlm as (?&Ham). simplify_eq. simpl. rewrite cfg_labels_match_is_eq in Ham; naive_solver.
     - rewrite /lm_fair_scheduling /ex_fair_scheduling in Hfn *. eapply fairness_preserved=>//.
   Qed.
+
+  Notation jmtrace := (trace (joint_model M net_model) (fmlabel (joint_model M net_model))).
+  Definition jm_fair (tr: jmtrace) :=
+    network_fair_delivery tr ∧ fair_scheduling tr.
+
+  Lemma simulation_adequacy_trace_remove_fuel
+          (auxtr : auxtrace LM) :
+    lm_fair auxtr →
+    auxtrace_valid (LM := LM) auxtr →
+    ∃ jmtr, jm_fair jmtr ∧ jmtrace_valid jmtr ∧ upto_stutter_aux auxtr jmtr.
+  Proof.
+    intros [Hnf Hsf] Hval. have Hval' := Hval.
+    apply can_destutter_auxtr in Hval as [jmtr Hupto].
+    exists jmtr; split; [|split]=>//.
+    - split.
+      + eapply fuel_network_fairness_destutter=>//.
+      + apply (upto_stutter_fairness_ltl _ _) in Hupto=>//.
+    - eapply (upto_stutter_preserves_validity (Λ := aneris_lang)) =>//.
+  Qed.
+
+  Lemma simulation_adequacy_trace_trimed
+          (jmtr : jmtrace) :
+    jm_fair jmtr →
+    jmtrace_valid jmtr →
+    ∃ ttr, jm_fair ttr ∧ jmtrace_valid ttr ∧ trimmed_of jmtr ttr.
+  Proof.
+    intros [Ha Hb] Hval. exists (trim_trace jmtr). split; [|split]; last first.
+    { apply trim_trace_trimmed_of. }
+    - rewrite /jmtrace_valid in Hval *. by apply trim_trace_valid.
+    - split.
+      + eapply trim_preserves_network_fairness =>//.
+      + eapply trimming_preserves_fair_scheduling=>//.
+  Qed.
+
+  Lemma simulation_adequacy_trace_trimmed_user
+          (ttr : jmtrace) :
+    jm_fair ttr →
+    jmtrace_valid ttr →
+    ∃ utr, usr_fair utr ∧ usr_valid utr ∧ up_to_stutter_usr utr ttr.
+
+    destruct (can_destutter _ _ _ auxtr (env_steps_dec_unless)).
+
+
+  Lemma env_steps_dec_unless tr
+    (Hval: jmtrace_valid tr)
+    (Hf: fair_scheduling tr)
+    (Htrim: trace_is_trimmed tr):
+    env_dec_unless tr.
+can_destutter:
+  ∀ {St S' L L' : Type} (Us : St → S') (Ul : L → option L') (Ψ : trace St L → nat) (btr : trace St L),
+    dec_unless Us Ul Ψ btr → ∃ str : trace S' L', upto_stutter Us Ul btr str
+
+
+(* destutter... *).
 End lm_network.
 
 (* OBS: This is not needed. *)

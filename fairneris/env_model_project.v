@@ -262,8 +262,18 @@ Section measure.
     exists tr1'. rewrite /trace_suffix_of. naive_solver.
   Qed.
 
-  (* Lemma trimmed_of_finite_last *)
 
+  Lemma trimmed_of_valid tr1 tr2 :
+    trimmed_of tr1 tr2 →
+    jmtrace_valid tr1 →
+    jmtrace_valid  tr2.
+  Proof.
+    rewrite /jmtrace_valid !trace_alwaysI.
+    intros Hto Ha tr2' Hsuff.
+    destruct (trimmed_of_suffix_of _ _ _ Hto Hsuff) as (tr1'&Hsuff'&Hto').
+    specialize (Ha _ Hsuff'). punfold Hto'. inversion Hto' as [| ???? IH |]; simplify_eq=>//.
+    rewrite /trans_valid in Ha *. pclearbot. punfold IH. inversion IH; simplify_eq=>//.
+  Qed.
 
   Lemma trimmed_of_pred_at_usr m tr1 tr2:
     trimmed_of tr1 tr2 →
@@ -300,6 +310,13 @@ Section measure.
   Lemma trim_trace_is_trimmed tr:
     trace_is_trimmed (trim_trace tr).
   Proof. eapply trimmed_of_is_trimmed, trim_trace_trimmed_of. Qed.
+
+  Lemma trim_trace_valid tr :
+    jmtrace_valid tr →
+    jmtrace_valid (trim_trace tr).
+  Proof.
+    intros Hval. by eapply trimmed_of_valid in Hval; last eapply trim_trace_trimmed_of.
+  Qed.
 
   Lemma trimmed_of_infinite tr1 tr2:
     trimmed_of tr1 tr2 →
