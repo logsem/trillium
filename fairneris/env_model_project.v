@@ -585,7 +585,7 @@ Section measure.
       + by apply Hval'.
   Qed.
 
-  Proposition usr_network_fairness (jmtr: jmtrace) (utr: lts_trace M) :
+  Lemma usr_project_valid (jmtr: jmtrace) (utr: lts_trace M) :
     trace_is_trimmed jmtr →
     jm_fair_scheduling jmtr →
     jmtrace_valid jmtr →
@@ -613,6 +613,28 @@ Section measure.
     - apply IH. destruct jl as [jl|jl]=>//.
       punfold Hupto; last by apply upto_stutter_mono.
       inversion Hupto; simplify_eq. by pfold.
+  Qed.
+
+  Lemma usr_project_scheduler_fair (jmtr: jmtrace) (utr: lts_trace M) :
+    jm_fair_scheduling jmtr →
+    upto_stutter_env jmtr utr →
+    usr_fair_scheduling utr.
+  Proof.
+    intros Hf Hupto ρ. specialize (Hf ρ).
+    have Hse //: ltl_se_env (jm_fair_scheduling_mtr ρ) (usr_fair_scheduling_mtr ρ); last by eapply Hse.
+    apply ltl_se_always, ltl_se_impl.
+    - clear jmtr Hf utr Hupto. intros jtr utr Hupto. punfold Hupto; last apply upto_stutter_mono.
+      rewrite /trace_now /pred_at /=. destruct (trfirst jtr) eqn:Heq.
+      inversion Hupto; simplify_eq; simpl in *; simplify_eq=>//.
+      destruct utr; simpl in *; simplify_eq=>//.
+    - eapply (ltl_se_eventually_now_or _ _ _ _ (λ s, ρ ∉ live_roles JM s) (λ s, ρ ∉ usr_live_roles s)
+                                       (λ s l, ∃ (α : fmaction JM), l = Some $ inl (ρ, α))
+                                       (λ s l, ∃ (α : option (action Λ)), l = Some $ (ρ, α))
+             )=>//.
+      + intros _ [?|?] ? =>//= ?. simplify_eq. naive_solver.
+      + naive_solver.
+      + naive_solver.
+      + naive_solver.
   Qed.
 End measure.
 

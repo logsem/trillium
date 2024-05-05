@@ -405,14 +405,20 @@ Section user_fairness.
       apply IH=>//. by eapply trace_suffix_of_cons_l.
   Qed.
 
-
-
-
-    jm_network_fair_delivery jmtr →
-    jm_network_fair_send_receive jmtr.
-
-  Proposition network_fairness_user (jmtr: jmtrace) :
+  Proposition network_fairness_project_usr (jmtr: jmtrace) (utr: lts_trace M) :
     jmtrace_valid jmtr →
+    upto_stutter_env jmtr utr →
     jm_network_fair_delivery jmtr →
-    jm_network_fair_send_receive jmtr.
+    usr_network_fair_send_receive utr.
+  Proof.
+    move=> Hval ? /network_fairness_user Hf // msg. specialize (Hf Hval msg).
+    have Hse //: ltl_se_env (M := M) (jm_network_fair_send_receive_of msg) (usr_network_fair_send_receive_of msg);
+      last by eapply Hse.
+    apply ltl_se_always, ltl_se_impl; last apply ltl_se_impl.
+    - apply ltl_se_always, ltl_se_eventually_now. rewrite /send_filter /usr_send_filter.
+      intros [?|?]; naive_solver.
+    - apply ltl_se_always, ltl_se_eventually_now. rewrite /any_recv_filter /usr_any_recv_filter.
+      intros [?|?]; naive_solver.
+    - apply ltl_se_eventually_now. rewrite /recv_filter /usr_recv_filter. intros [?|?]; naive_solver.
+  Qed.
 End user_fairness.

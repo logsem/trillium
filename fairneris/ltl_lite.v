@@ -699,6 +699,59 @@ Section stutter.
         apply Hp. naive_solver.
   Qed.
 
+  Lemma ltl_se_now' P P':
+    (∀ s, P s None ↔ P' (Us s) None) →
+    (∀ s ℓ, Ul ℓ = None → (P s (Some ℓ) ↔ P' (Us s) None)) →
+    (∀ s l, P s (Some l) ↔ (∃ l', Ul l = Some l' ∧ P' (Us s) (Some l'))) →
+    ltl_se (trace_until trace_silent (↓ P)) (↓ P').
+  Proof.
+    intros Hp1 Hp2 Hp3 tr tr' Hupto; split.
+    - induction 1 as [tr Hnow| s ℓ tr Hsil Htu IH].
+      + destruct tr as [s|s ℓ tr], tr' as [s'|s' ℓ' tr'] =>//=.
+        * punfold Hupto. inversion Hupto; simplify_eq; naive_solver.
+        * punfold Hupto. inversion Hupto; simplify_eq; naive_solver.
+        * punfold Hupto. inversion Hupto; simplify_eq. naive_solver.
+        * punfold Hupto. inversion Hupto; simplify_eq;
+            rewrite /trace_now /pred_at /= in Hnow *; naive_solver.
+      + rewrite /trace_silent /trace_now /pred_at /= in Hsil.
+        punfold Hupto. inversion Hupto; simplify_eq.
+        apply IH. by pfold.
+    - punfold Hupto. induction Hupto as [s|tr tr' s ℓ Hsil Hs1 Hs2 IH|tr tr' s ℓ s' ℓ' Hs Hl].
+      + rewrite /trace_now /pred_at //=. intros HP. constructor 1. naive_solver.
+      + intros Hnow. constructor 2; naive_solver.
+      + rewrite {1}/trace_now /pred_at //=. intros Hnow. constructor 1.
+        apply Hp3. naive_solver.
+  Qed.
+
+  Lemma ltl_se_now_or Q Q' P1 P1' P2 P2':
+    (∀ s, P1 s ↔ P1' (Us s)) →
+    (∀ s l l', Ul l = Some l' → P2 s (Some l) ↔ (P2' (Us s) (Some l'))) →
+    (∀ s l, P2 s (Some l) → is_Some (Ul l)) →
+    (∀ s l, Q s l ↔ P1 s ∨ ∃ l', l = Some l' ∧ P2 s l) →
+    (∀ s l, Q' s l ↔ P1' s ∨ ∃ l', l = Some l' ∧ P2' s l) →
+    ltl_se (trace_until trace_silent (↓ Q)) (↓ Q').
+  Proof.
+    intros Hp1 Hp2 Hp3 Heq1 Heq2 tr tr' Hupto; split.
+    - induction 1 as [tr Hnow| s ℓ tr Hsil Htu IH].
+      + destruct tr as [s|s ℓ tr], tr' as [s'|s' ℓ' tr'] =>//=;
+        rewrite /trace_now /pred_at /= Heq1 Heq2 in Hnow *.
+        * punfold Hupto. inversion Hupto; simplify_eq; naive_solver.
+        * punfold Hupto. inversion Hupto; simplify_eq; naive_solver.
+        * punfold Hupto. inversion Hupto; simplify_eq. destruct Hnow as [|[?[? HP2]]]. naive_solver.
+          simplify_eq. exfalso. apply Hp3 in HP2. have [??] : is_Some (None : option L')=>//. congruence.
+        * punfold Hupto. inversion Hupto; simplify_eq; last naive_solver.
+          destruct Hnow as [|[?[? HP2]]]; [naive_solver|].
+          simplify_eq. exfalso. apply Hp3 in HP2. have [??] : is_Some (None : option L')=>//. congruence.
+      + rewrite /trace_silent /trace_now /pred_at /= in Hsil.
+        punfold Hupto. inversion Hupto; simplify_eq.
+        apply IH. by pfold.
+    - punfold Hupto. induction Hupto as [s|tr tr' s ℓ Hsil Hs1 Hs2 IH|tr tr' s ℓ s' ℓ' Hs Hl].
+      + rewrite /trace_now /pred_at //=. intros HP. constructor 1. naive_solver.
+      + intros Hnow. constructor 2; naive_solver.
+      + rewrite /trace_now /pred_at //= Heq2. intros Hnow. constructor 1. rewrite Heq1.
+        naive_solver.
+  Qed.
+
   Lemma ltl_se_always P P':
     ltl_se P P' →
     ltl_se (□ P) (□ P').
@@ -727,6 +780,32 @@ Section stutter.
   Proof.
     intros ?. have Hccl: ltl_se (◊ (trace_until trace_silent (ℓ↓ P))) (◊ (ℓ↓ P')).
     { by apply ltl_se_eventually, ltl_se_now. }
+    intros tr tr' ?. rewrite (trace_eventually_until_eventually trace_silent).
+    by apply Hccl.
+  Qed.
+
+  Lemma ltl_se_eventually_now' P P':
+    (∀ s, P s None ↔ P' (Us s) None) →
+    (∀ s ℓ, Ul ℓ = None → (P s (Some ℓ) ↔ P' (Us s) None)) →
+    (∀ s l, P s (Some l) ↔ (∃ l', Ul l = Some l' ∧ P' (Us s) (Some l'))) →
+    ltl_se (◊ ((↓ P))) (◊ (↓ P')).
+  Proof.
+    intros ???. have Hccl: ltl_se (◊ (trace_until trace_silent (↓ P))) (◊ (↓ P')).
+    { by apply ltl_se_eventually, ltl_se_now'. }
+    intros tr tr' ?. rewrite (trace_eventually_until_eventually trace_silent).
+    by apply Hccl.
+  Qed.
+
+  Lemma ltl_se_eventually_now_or Q Q' P1 P1' P2 P2':
+    (∀ s, P1 s ↔ P1' (Us s)) →
+    (∀ s l l', Ul l = Some l' → P2 s (Some l) ↔ (P2' (Us s) (Some l'))) →
+    (∀ s l, P2 s (Some l) → is_Some (Ul l)) →
+    (∀ s l, Q s l ↔ P1 s ∨ ∃ l', l = Some l' ∧ P2 s l) →
+    (∀ s l, Q' s l ↔ P1' s ∨ ∃ l', l = Some l' ∧ P2' s l) →
+    ltl_se (◊ ((↓ Q))) (◊ (↓ Q')).
+  Proof.
+    intros ?????. have Hccl: ltl_se (◊ (trace_until trace_silent (↓ Q))) (◊ (↓ Q')).
+    { by eapply ltl_se_eventually, ltl_se_now_or. }
     intros tr tr' ?. rewrite (trace_eventually_until_eventually trace_silent).
     by apply Hccl.
   Qed.
