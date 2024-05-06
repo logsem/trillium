@@ -262,7 +262,6 @@ Section measure.
     exists tr1'. rewrite /trace_suffix_of. naive_solver.
   Qed.
 
-
   Lemma trimmed_of_valid tr1 tr2 :
     trimmed_of tr1 tr2 →
     jmtrace_valid tr1 →
@@ -291,6 +290,16 @@ Section measure.
     (∃ m, pred_at tr1 m is_usr_step) →
     ∃ m, pred_at tr2 m is_usr_step.
   Proof. have ?:= trimmed_of_pred_at_usr. naive_solver. Qed.
+
+  Lemma trimmed_of_eventually_back tr1 tr2 P :
+    trimmed_of tr1 tr2 →
+    (◊ ℓ↓ P) tr2 →
+    (◊ ℓ↓ P) tr1.
+  Proof.
+    intros Htrim. rewrite !trace_eventuallyI. intros (tr2'&Hsuff&Hnow).
+    eapply trimmed_of_suffix_of in Hsuff as (tr1'&?&Htrim') =>//.
+    exists tr1'. split=>//. punfold Htrim'. inversion Htrim'; simplify_eq=>//.
+  Qed.
 
   Lemma trimmed_of_is_trimmed tr1 tr2:
     trimmed_of tr1 tr2 →

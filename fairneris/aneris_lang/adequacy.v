@@ -730,21 +730,41 @@ Section lm_network.
     rewrite /program_model_refinement /rel_compose. naive_solver.
   Qed.
 
-  Proposition program_model_refinement_downward_eventually extr utr P :
+  Proposition program_model_refinement_downward_eventually extr utr (P : action aneris_lang → Prop) :
     program_model_refinement extr utr →
-    (◊ ℓ↓ (λ '(_, α), P α)) utr →
-    (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, ℓ') ∧ P ℓ')) extr.
-  Proof. Admitted.
-Lemma simulation_adequacy_traces_fairness
-          es σ m0
-          (extr : aneris_trace)
-          (Hvex : extrace_valid extr)
-          (Hexfirst : (trfirst extr) = (es, σ))
-    :
-    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
-    ex_fair extr →
-    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr.
+    (◊ ℓ↓ (λ '(_, α), ∃ α', α = Some α' ∧ P α')) utr →
+    (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')) extr.
+  Proof.
+    rewrite /program_model_refinement /model_refinement /rel_compose.
+    intros (auxtr&?&jmtr&?&ttr&?&?) Hev.
 
+    have Heq: ltl_se_env (M := M) (N := net_model)
+      (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')) ((◊ ℓ↓ λ '(_, α), ∃ α', α = Some α' ∧ P α')) .
+    { apply ltl_se_eventually_now. intros [[??]|?]; naive_solver. }
+    rewrite -(Heq ttr) // in Hev. move=> {Heq}.
+
+    have {}Hev : (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')) jmtr.
+    { by eapply trimmed_of_eventually_back. }
+
+    have Heq: fuel_se
+      (◊ ℓ↓ (λ (ℓ : mlabel LM), ∃ ρ α1 (α α': fmaction (joint_model M net_model)) ζ,
+          α = Some α1 ∧ ℓ = Take_step ρ α ζ α' ∧ P α1))
+      (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')).
+    { apply ltl_se_eventually_now. intros [? α ??|?|?]; [|naive_solver|naive_solver]. split.
+      - intros (?&?&?&?&?). simplify_eq. naive_solver.
+      - intros (?&?&?&?&?&?). simpl in *. simplify_eq. naive_solver. }
+    rewrite -(Heq auxtr) // in Hev. move=> {Heq}.
+
+    have Heq: exaux_tme (LM := LM)
+      (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ'))
+      (◊ ℓ↓ (λ (ℓ : mlabel LM), ∃ ρ α1 (α α': fmaction (joint_model M net_model)) ζ,
+          α = Some α1 ∧ ℓ = Take_step ρ α ζ α' ∧ P α1)).
+    { apply ltl_tme_eventually, ltl_tme_now. rewrite /labels_match.
+      intros [[ζ oα]|?]; last naive_solver. intros [?|?|?]; last naive_solver.
+      - intros (?&?&?%actions_match_is_eq). naive_solver.
+      - intros (?&?&?). simplify_eq. naive_solver. }
+    rewrite -(Heq extr) // in Hev.
+  Qed.
 End lm_network.
 
 (* OBS: This is not needed. *)
