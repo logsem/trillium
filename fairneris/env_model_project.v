@@ -642,6 +642,7 @@ Arguments jm_fair_scheduling {_ _ _ _ _ _ _ _}.
 Arguments jm_fair_scheduling_mtr {_ _ _ _ _ _ _ _}.
 Arguments trim_trace {_ _ _ _ _ _ _ _}.
 Arguments trimmed_of {_ _ _ _ _ _ _ _}.
+Arguments trace_is_trimmed {_ _ _ _ _ _ _ _} _.
 Arguments jmtrace_valid {_ _ _ _ _ _ _ _}.
 Arguments upto_stutter_env {_ _ _ _ _ _ _ _} _ _.
 Arguments ltl_se_env {_ _ _ _ _ _ _ _} _ _.

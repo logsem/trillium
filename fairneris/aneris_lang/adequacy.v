@@ -3,6 +3,7 @@ From stdpp Require Import finite.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl.
 From trillium Require Import adequacy.
+From trillium.prelude Require Import relations.
 From fairneris Require Import fairness retransmit_model fair_resources.
 From fairneris.aneris_lang Require Import aneris_lang resources network_model.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
@@ -644,8 +645,9 @@ Section lm_network.
   Notation jmtrace := (trace (joint_model M net_model) (fmlabel (joint_model M net_model))).
   Definition jm_fair (tr: jmtrace) :=
     jm_network_fair_delivery tr ∧ jm_fair_scheduling tr.
+
   Definition usr_fair (tr: lts_trace M) :=
-    (* usr_network_fair_send_receive tr ∧ *) usr_fair_scheduling tr.
+    usr_network_fair_send_receive tr ∧ usr_fair_scheduling tr.
 
   Lemma simulation_adequacy_trace_remove_fuel
           (auxtr : auxtrace LM) :
@@ -680,22 +682,69 @@ Section lm_network.
           (ttr : jmtrace) :
     jm_fair ttr →
     jmtrace_valid ttr →
-    ∃ utr, usr_fair utr ∧ usr_valid utr ∧ up_to_stutter_usr utr ttr.
+    trace_is_trimmed ttr →
+    ∃ utr, usr_fair utr ∧ usr_trace_valid utr ∧ upto_stutter_env ttr utr.
+  Proof.
+    intros [Hnf Hsf] Hval Htrim.
+    have [utr ?] : ∃ utr, upto_stutter_env ttr utr.
+    { eapply can_destutter. apply env_steps_dec_unless=>//. }
+    exists utr. split; [split|split] =>//.
+    - eapply network_fairness_project_usr=>//.
+    - eapply usr_project_scheduler_fair=>//.
+    - eapply usr_project_valid=>//.
+  Qed.
 
-    destruct (can_destutter _ _ _ auxtr (env_steps_dec_unless)).
+  Definition model_refinement : rel (auxtrace LM) (lts_trace M) :=
+    upto_stutter_aux
+    >> trimmed_of
+    >> upto_stutter_env.
 
+  Definition program_model_refinement : rel (extrace aneris_lang) (lts_trace M) :=
+    exaux_traces_match (LM := LM) >> model_refinement.
 
-  Lemma env_steps_dec_unless tr
-    (Hval: jmtrace_valid tr)
-    (Hf: fair_scheduling tr)
-    (Htrim: trace_is_trimmed tr):
-    env_dec_unless tr.
-can_destutter:
-  ∀ {St S' L L' : Type} (Us : St → S') (Ul : L → option L') (Ψ : trace St L → nat) (btr : trace St L),
-    dec_unless Us Ul Ψ btr → ∃ str : trace S' L', upto_stutter Us Ul btr str
+  Lemma model_refinement_preserves_upward auxtr :
+    lm_fair auxtr →
+    auxtrace_valid (LM := LM) auxtr →
+    ∃ utr, model_refinement auxtr utr ∧ usr_fair utr ∧ usr_trace_valid utr.
+  Proof.
+    intros Hf Hval.
+    apply simulation_adequacy_trace_remove_fuel in Hval as (?&?&Hval&?) =>//.
+    apply simulation_adequacy_trace_trimed in Hval as (?&?&Hval&?) =>//.
+    apply simulation_adequacy_trace_trimmed_user in Hval as (utr&?&Hval&?) =>//;
+      last by eapply trimmed_of_is_trimmed.
+    rewrite /model_refinement /rel_compose. naive_solver.
+  Qed.
 
+  Proposition program_model_refinement_preserves_upward extr m0 es σ :
+    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+    extrace_valid extr →
+    ex_fair extr →
+    (trfirst extr) = (es, σ) →
+    ∃ utr, program_model_refinement extr utr ∧ usr_fair utr ∧ usr_trace_valid utr.
+  Proof.
+    intros Hf Hval ??.
+    eapply simulation_adequacy_traces_fairness in Hval as (?&?&Hmatch) =>//.
+    have Hmatch' := Hmatch.
+    apply exaux_preserves_validity in Hmatch.
+    apply model_refinement_preserves_upward in Hmatch as (utr&?&?&?) =>//.
+    rewrite /program_model_refinement /rel_compose. naive_solver.
+  Qed.
 
-(* destutter... *).
+  Proposition program_model_refinement_downward_eventually extr utr P :
+    program_model_refinement extr utr →
+    (◊ ℓ↓ (λ '(_, α), P α)) utr →
+    (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, ℓ') ∧ P ℓ')) extr.
+  Proof. Admitted.
+Lemma simulation_adequacy_traces_fairness
+          es σ m0
+          (extr : aneris_trace)
+          (Hvex : extrace_valid extr)
+          (Hexfirst : (trfirst extr) = (es, σ))
+    :
+    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+    ex_fair extr →
+    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr.
+
 End lm_network.
 
 (* OBS: This is not needed. *)
