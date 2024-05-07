@@ -251,7 +251,8 @@ Proof. solve_pure_exec. Qed.
            (mkExpr n (PairV #ip #(Zpos p))).
 Proof. solve_pure_exec. Qed.
 
-Opaque aneris_state_interp.
+(* Why??*)
+(* Opaque aneris_state_interp. *)
 
 Notation state_interp_oos ζ α := (aneris_state_interp_opt (Some (ζ,α))).
 
@@ -393,18 +394,131 @@ Section primitive_laws.
       with "[Hst Hmi]" as %Heq.
     { iDestruct "Hmi" as (fm Hfmle Hfmdead Hfmtp) "[Hauth Hmi]".
       by iDestruct (model_agree with "Hauth Hst") as %Heq. }
-    destruct α; last first.
+    destruct α as [a|]; last first.
     {
       iAssert (⌜config_net_match (trace_last ex) (trace_last atr).(ls_data).(ls_under).2⌝)%I as %Hmatch.
       { iDestruct "Hmi" as (fm Hfmle Hfmdead Hfmtp) "[Hauth [Hmi %Hmatch]]".
+        iDestruct "Hσ" as "[Hσ ?]".
+        iDestruct (aneris_state_interp_network_sockets_coh_valid with "Hσ") as %Hancoh.
+
         destruct Hmatch. simpl in *. iPureIntro.
         simpl.
         inversion Hstep. subst.
         inversion H7. subst.
+        rename H4 into Hcstep.
         inv_head_step.
         rewrite H3 in H. simpl in *. rewrite H5.
-        admit. }
-      (* set (δ2 := (s2, trace_last atr).2). *)
+        rewrite /config_net_match /=.
+        split; [|split].
+        - inversion Hcstep; simplify_eq; try naive_solver. simpl.
+          inversion SocketStep; simplify_eq; try naive_solver.
+        - rewrite /model_state_socket_incl. intros sa ms Hms.
+          destruct H0 as [Hincl Hcoh].
+          destruct (Hincl sa ms Hms) as (Sn&sh&skt&Hip&Hsh&Hsaddr).
+          rewrite H3 /= in Hip.
+          inversion Hcstep; simplify_eq; simpl in *; [naive_solver|naive_solver| |].
+          { destruct (decide (ip = ip_of_address sa)) as [->|];
+              [rewrite lookup_insert|rewrite lookup_insert_ne //]; naive_solver. }
+          destruct (decide (n = ip_of_address sa)) as [->|];
+            [rewrite lookup_insert|rewrite lookup_insert_ne //]; last naive_solver.
+          inversion SocketStep; simplify_eq.
+          + eexists _, _, _. split; [|split]=>//. rewrite lookup_insert_ne //. naive_solver.
+          + eexists _, _, _. split; [|split]=>//. rewrite lookup_insert_ne //. naive_solver.
+          + destruct (decide (a = sa)) as [->|].
+            * eexists _, sh, (skt0 <| sblock := false |>). split; [|split]=>//.
+              have Heq : sh = sh0; last (rewrite Heq lookup_insert; naive_solver).
+              rewrite /model_state_socket_coh in Hcoh.
+              ospecialize (Hancoh (ip_of_address sa) _ _).
+              { rewrite H5 /= lookup_insert. reflexivity. }
+              destruct Hancoh as (Hhcoh&?&?&?).
+
+              rewrite /socket_handlers_coh in Hhcoh.
+              destruct (decide (sh = sh0))=>//.
+              eapply (Hhcoh sh sh0 skt ({| saddress := saddress skt0; sblock := false |}))=>//.
+              rewrite lookup_insert_ne //.
+              rewrite lookup_insert //.
+              rewrite Hsaddr H4 //.
+            * have ?: sh ≠ sh0.
+              { intros ?; simplify_eq. }
+              eexists _, sh, skt.
+              split; [|split]=>//. rewrite lookup_insert_ne //.
+          + destruct (decide (a = sa)) as [->|].
+            * eexists _, sh, (skt0 <| sblock := true |>). split; [|split]=>//.
+              have Heq : sh = sh0; last (rewrite Heq lookup_insert; naive_solver).
+              rewrite /model_state_socket_coh in Hcoh.
+              ospecialize (Hancoh (ip_of_address sa) _ _).
+              { rewrite H5 /= lookup_insert. reflexivity. }
+              destruct Hancoh as (Hhcoh&?&?&?).
+
+              rewrite /socket_handlers_coh in Hhcoh.
+              destruct (decide (sh = sh0))=>//.
+              eapply (Hhcoh sh sh0 skt ({| saddress := saddress skt0; sblock := true |}))=>//.
+              rewrite lookup_insert_ne //.
+              rewrite lookup_insert //.
+              rewrite Hsaddr H2 //.
+            * have ?: sh ≠ sh0.
+              { intros ?; simplify_eq. }
+              eexists _, sh, skt.
+              split; [|split]=>//. rewrite lookup_insert_ne //.
+        - rewrite /model_state_socket_coh. intros ip Sn sh skt sa ms HSn Hskt Hsa.
+
+          destruct H0 as [Hincl Hcoh].
+          inversion Hcstep.
+          1-3: simplify_eq; specialize (Hcoh ip Sn sh skt sa ms); apply Hcoh=>//; rewrite H3=>//.
+          { rewrite /= in HSn *. destruct (decide (ip0 = ip)) as [->|];
+              [rewrite lookup_insert in HSn | rewrite lookup_insert_ne // in HSn ]; naive_solver. }
+          inversion SocketStep; simplify_eq; simpl in *.
+          + destruct (decide (n = ip)) as [->|];
+              [rewrite lookup_insert in HSn |
+                rewrite lookup_insert_ne // in HSn; simplify_eq;
+                specialize (Hcoh ip Sn sh skt sa ms); apply Hcoh=>//; rewrite H3=>// ].
+            simplify_eq.
+            destruct (decide (sh = sh0)) as [->|];
+            [rewrite lookup_insert in Hskt | rewrite lookup_insert_ne // in Hskt ]; simplify_eq.
+
+            simplify_eq; ospecialize (Hcoh ip Sn0 sh skt sa ms _ _ _)=>//=.
+            rewrite H3 //.
+          + destruct (decide (ip_of_address a = ip)) as [Heq|];
+              [rewrite Heq lookup_insert in HSn |
+                rewrite lookup_insert_ne // in HSn; simplify_eq;
+                specialize (Hcoh ip Sn sh skt sa ms); apply Hcoh=>//; rewrite H3=>// ].
+            simplify_eq.
+            destruct (decide (sh = sh0)) as [->|];
+            [rewrite lookup_insert in Hskt | rewrite lookup_insert_ne // in Hskt ]; simplify_eq.
+            * simpl in *. simplify_eq.
+              rewrite /lookup_total /map_lookup_total /default.
+              destruct ((trace_last atr).(ls_data).(ls_under).2.2 !! sa) eqn:Heq; last by rewrite Heq.
+              exfalso.
+
+              rewrite /model_state_socket_incl in Hincl.
+              destruct (Hincl _ _ Heq) as (Sn'&sh'&skt'&Hss&Hlk&Haddr).
+              rewrite /port_not_in_use in H12.
+              rewrite H3 H0 /= in Hss. simplify_eq.
+              eapply (H12 _ _ _ _ Hlk)=>//.
+            * simplify_eq; ospecialize (Hcoh (ip_of_address a) Sn0 sh skt sa ms _ _ _)=>//=.
+              rewrite H3 //.
+          + destruct (decide (ip_of_address a = ip)) as [Heq|];
+              [rewrite Heq lookup_insert in HSn |
+                rewrite lookup_insert_ne // in HSn; simplify_eq;
+                specialize (Hcoh ip Sn sh skt sa ms); apply Hcoh=>//; rewrite H3=>// ].
+            simplify_eq.
+            destruct (decide (sh = sh0)) as [->|];
+            [rewrite lookup_insert in Hskt | rewrite lookup_insert_ne // in Hskt ]; simplify_eq.
+            * simplify_eq; ospecialize (Hcoh (ip_of_address a) Sn0 sh0 skt0 sa ms _ _ _)=>//=.
+              rewrite H3 //.
+            * simplify_eq; ospecialize (Hcoh (ip_of_address a) Sn0 sh skt sa ms _ _ _)=>//=.
+              rewrite H3 //.
+          + destruct (decide (ip_of_address a = ip)) as [Heq|];
+              [rewrite Heq lookup_insert in HSn |
+                rewrite lookup_insert_ne // in HSn; simplify_eq;
+                specialize (Hcoh ip Sn sh skt sa ms); apply Hcoh=>//; rewrite H3=>// ].
+            simplify_eq.
+            destruct (decide (sh = sh0)) as [->|];
+            [rewrite lookup_insert in Hskt | rewrite lookup_insert_ne // in Hskt ]; simplify_eq.
+            * simplify_eq; ospecialize (Hcoh (ip_of_address a) Sn0 sh0 skt0 sa ms _ _ _)=>//=.
+              rewrite H3 //.
+            * simplify_eq; ospecialize (Hcoh (ip_of_address a) Sn0 sh skt sa ms _ _ _)=>//=.
+              rewrite H3 //. }
       iMod (update_model_step _ _ _
                               ((trace_last atr).(ls_data).(ls_under).1, (trace_last atr).(ls_data).(ls_under).2) ((s2, (trace_last atr).(ls_data).(ls_under).2)) _ _ _ _ _ None
              with "[$Hfuel1] [Hst] [//] [$Hmi]") as
@@ -418,13 +532,199 @@ Section primitive_laws.
       iExists δ2.
       iExists (Take_step (ρ:fmrole (joint_model Mod _)) None ζ None).
       iFrame.
-      destruct Hex' as [ex'' ->].
+      destruct Hex' as [c ->].
       simpl in *. iSplit; [done|].
       iApply ("HP" with "Hst Hfuel Hfr"). }
-    destruct a.
-    - admit.                    (* Send case: Construct new model state, where a message has been added, and prove config_net_match *)
-    - admit.                    (* Recv case: Construct new model state, depending on whether a message was received or not, and prove config_net_match *)
-  Admitted.
+    rewrite /state_interp /anerisG_irisG /aneris_state_interp_opt.
+    rewrite /aneris_state_interp_δ /=.
+
+    iDestruct "Hσ" as "[Hσ ?]".
+    iDestruct (aneris_state_interp_network_sockets_coh_valid with "Hσ") as %Hancoh.
+
+    iFrame.
+    destruct (trace_last atr).(ls_under) as [s1_copy [ms bs]] eqn:Heq'.
+    simplify_eq. rename s1_copy into s1.
+
+    inversion Hstep as [?? e1 σ1 ? e2 σ2 tpf tp tp' Htl' Htl Hpstep|]; simplify_eq.
+    destruct σ1 as [h1 bs1 ms1] eqn:Heqσ.
+
+    inversion Hpstep as [K he1 he2 ?? Hhstep]; simpl in *; simplify_eq. rewrite Htl.
+    inversion Hhstep as [| | | ip se1 XX se2 Sn0 Sn' ms' MM Hsstep Hlk]; simpl in *; simplify_eq.
+
+    iAssert (⌜ env_states_match (trace_last ex') (trace_last atr).(ls_under).2 ⌝)%I as %Hmatch.
+    { by iDestruct "Hmi" as (fm Hfmle Hfmdead Hfmtp) "[_ [_ %Hmatch]]". }
+
+    destruct a as [msg|recv_sa [msg|]].
+    - apply socket_step_send_inv in Hsstep as [??]. simplify_eq.
+
+      pose (ms ⊎ {[+ msg +]}, bs) as n2.
+
+      iAssert (⌜config_net_match (trace_last ex) n2⌝)%I as %Hnm.
+      { destruct Hmatch as (Hms&Hincl&Hcoh). simpl in *. iPureIntro.
+        rewrite /n2.
+        rewrite Heq' Htl' Htl //= in Hincl Hcoh Hms *. simplify_eq.
+        split; [|split]=> //=.
+        - intros sa_ ms_ Hlk_. destruct (Hincl sa_ ms_ Hlk_) as (?&?&?&?&?&?).
+          destruct (decide (ip = ip_of_address sa_)) as [->|];
+            [rewrite lookup_insert|rewrite lookup_insert_ne //]; naive_solver.
+        - intros ip_ Sn_ sh_ skt_ sa_ ms_ Hlk_ Hlk'_ Hsa_.
+          specialize (Hcoh ip_ Sn_ sh_ skt_ sa_ ms_).
+          destruct (decide (ip = ip_)) as [->|];
+            [rewrite lookup_insert in Hlk_|rewrite lookup_insert_ne // in Hlk_]; naive_solver. }
+
+      iPoseProof (update_model_step ex' atr (trace_last ex) (trace_last atr) (s2, n2) fs ρ (trace_last atr)
+                                    _ f1 (Some (Send msg))
+                 with "Hfuel1 [Hst] [//] Hmi"
+
+                 ) as "HH" =>//.
+      { rewrite Heq' //=. }
+      { rewrite Heq' //=. constructor=>//. rewrite /n2. constructor. }
+      { rewrite Heq' //. }
+      iMod "HH" as (δ2 Hvse) "(Hfuel & Hst & Hmod)".
+      iModIntro.
+      iExists δ2.
+      pose (locale_of tp (fill K {| expr_n := ip; expr_e := se1 |})) as ζ.
+      iExists (Take_step (ρ:fmrole (joint_model Mod _)) (Some (Send msg)) ζ (Some (Send msg))).
+      rewrite Htl. iFrame.
+      destruct Hex' as [ex'' ->].
+      simpl in *. iSplit; [done|].
+      iApply ("HP" with "Hst Hfuel Hfr").
+    - apply socket_step_recv_Some in Hsstep as (skt&r&sh&HSn0&Hsaddr&Hip&?&?). simplify_eq.
+
+      pose (bs !!! recv_sa) as bs_buf.
+      pose (ms, <[recv_sa := take (length bs_buf - 1) bs_buf]> bs) as n2.
+
+      iAssert (⌜config_net_match (trace_last ex) n2⌝)%I as %Hnm.
+      {
+
+        destruct Hmatch as (Hms&Hincl&Hcoh). simpl in *. iPureIntro.
+        rewrite /n2.
+        rewrite Heq' Htl' Htl //= in Hincl Hcoh Hms *. simplify_eq.
+
+        - split; [|split] =>//=.
+          + intros sa_ ms_ Hlk_. simpl in Hlk_. simpl.
+            destruct (decide (sa_ = recv_sa)) as [Heq|Hneq].
+            * rewrite Heq lookup_insert in Hlk_. simplify_eq.
+              rewrite lookup_insert. exists (<[sh:=(skt, r)]> Sn0), sh, skt.
+              rewrite lookup_insert.
+
+              rewrite /model_state_socket_incl in Hincl.
+              rewrite /model_state_socket_coh in Hcoh.
+              specialize (Hcoh _ _ _ _ _ _ Hlk HSn0 Hsaddr).
+              rewrite /bs_buf Hcoh app_length /=.
+              replace (length r + 1 - 1) with (length r); last lia.
+              rewrite take_app_length //.
+            * rewrite lookup_insert_ne // in Hlk_.
+              destruct (Hincl sa_ ms_ Hlk_) as (Sn'&sh'&skt'&?&Hlksock&?).
+              destruct (decide (ip_of_address recv_sa = ip_of_address sa_)) as [Heq|].
+              ** rewrite Heq lookup_insert. eexists _, sh', skt'. split; [|split]=>//.
+                 have HeqSn : Sn0 = Sn' by congruence.
+                 rewrite lookup_insert_ne //. rewrite -Hlksock HeqSn //.
+                 naive_solver.
+              ** rewrite lookup_insert_ne //. naive_solver.
+          + simpl. intros ip_ Sn_ sh_ skt_ sa_ ms_ HSn_ Hsh_ Haddr_.
+            destruct (decide (sa_ = recv_sa)) as [Heq|Hneq].
+            * rewrite Heq lookup_total_insert.
+              rewrite -Heq in HSn_.
+              have Hsameip: ip_of_address sa_ = ip_.
+              { rewrite Htl -Heq /= /network_sockets_coh in Hancoh. specialize (Hancoh ip_ Sn_ HSn_).
+                destruct Hancoh as (?&?&Hscoh&?). eapply Hscoh=>//. }
+              rewrite Hsameip lookup_insert in HSn_. simplify_eq.
+              rewrite /model_state_socket_coh in Hcoh.
+              ospecialize (Hcoh _ _ _ _ _ _ Hlk _ _)=>//.
+              rewrite /bs_buf Hcoh.
+              destruct (decide (sh = sh_)) as [Hsameh|Hshneq]; last first.
+              { exfalso. rewrite lookup_insert_ne // in Hsh_.
+                rewrite Htl /= /network_sockets_coh in Hancoh.
+
+                ospecialize (Hancoh (ip_of_address recv_sa) _ _).
+                { rewrite lookup_insert. done. }
+                destruct Hancoh as (Hhcoh&?&?&?).
+
+                rewrite /socket_handlers_coh in Hhcoh.
+                apply Hshneq. eapply (Hhcoh _ _ skt skt_)=>//.
+                rewrite lookup_insert //. rewrite lookup_insert_ne //. congruence. }
+              rewrite Hsameh lookup_insert in Hsh_. simplify_eq.
+              rewrite app_length /=.
+              replace (length ms_ + 1 - 1) with (length ms_); last lia.
+              rewrite take_app_length //.
+            * rewrite lookup_total_insert_ne //.
+              destruct (decide (ip_of_address recv_sa = ip_)) as [Heq|].
+              ** rewrite Heq lookup_insert in HSn_. simplify_eq.
+              destruct (decide (sh = sh_)) as [Hsameh|Hshneq].
+              { exfalso. rewrite Hsameh lookup_insert // in Hsh_. simplify_eq. }
+              rewrite lookup_insert_ne // in Hsh_. naive_solver.
+              ** rewrite lookup_insert_ne // in HSn_. eapply Hcoh=>//. }
+      iPoseProof (update_model_step ex' atr (trace_last ex) (trace_last atr) (s2, n2) fs ρ (trace_last atr)
+                                    _ f1 (Some (Recv recv_sa (Some msg)))
+                 with "Hfuel1 [Hst] [//] Hmi"
+
+                 ) as "HH" =>//.
+      { rewrite Heq' //=. }
+      { rewrite Heq' //=. constructor=>//. rewrite /n2. constructor=>//.
+
+        have Heq: bs !!! recv_sa = r ++ [msg].
+        { destruct Hmatch as (?&?&HH).
+          rewrite /model_state_socket_coh Heq' Htl' /= in HH. erewrite (HH _ _ sh)=>//. }
+        rewrite /bs_buf Heq app_length /=.
+        replace (length r + 1 - 1) with (length r); last lia.
+        rewrite take_app_length //. }
+      { rewrite Heq' //. }
+      iMod "HH" as (δ2 Hvse) "(Hfuel & Hst & Hmod)".
+      iModIntro.
+      iExists δ2.
+      pose (locale_of tp (fill K {| expr_n := ip_of_address recv_sa ; expr_e := se1 |})) as ζ.
+      iExists (Take_step (ρ:fmrole (joint_model Mod _))
+                 (Some (Recv recv_sa (Some msg))) ζ (Some (Recv recv_sa (Some msg)))).
+      rewrite Htl. iFrame.
+      destruct Hex' as [ex'' ->].
+      simpl in *. iSplit; [done|].
+      iApply ("HP" with "Hst Hfuel Hfr").
+    - apply socket_step_recv_None in Hsstep as (skt&sh&HSn0&Hsaddr&Hip&?&?). simplify_eq.
+
+      iAssert (⌜config_net_match (trace_last ex) (ms, bs)⌝)%I as %Hnm.
+      { destruct Hmatch as (Hms&Hincl&Hcoh). simpl in *. iPureIntro.
+        rewrite Heq' Htl' Htl //= in Hincl Hcoh Hms *. simplify_eq.
+
+        - split; [|split] =>//=.
+          + intros sa_ ms_ Hlk_.
+            destruct (decide (sa_ = recv_sa)) as [Heq|Hneq].
+            * rewrite Heq lookup_insert. simplify_eq.
+              exists Sn0, sh, skt. rewrite HSn0. split; [|split]=>//. do 2 f_equal.
+              rewrite /model_state_socket_coh in Hcoh.
+              specialize (Hcoh _ _ _ _ _ _ Hlk HSn0 Hsaddr).
+              apply lookup_total_correct in Hlk_. naive_solver.
+            * destruct (Hincl sa_ ms_ Hlk_) as (Sn'&sh'&skt'&?&Hlksock&?).
+              destruct (decide (ip_of_address recv_sa = ip_of_address sa_)) as [Heq|].
+              ** rewrite Heq lookup_insert. eexists _, sh', skt'. split; [|split]=>//.
+                 have HeqSn : Sn0 = Sn' by congruence. rewrite -Hlksock HeqSn //.
+              ** rewrite lookup_insert_ne //. naive_solver.
+          + intros ip_ Sn_ sh_ skt_ sa_ ms_ HSn_ Hsh_ Haddr_.
+            destruct (decide (ip_of_address recv_sa = ip_)) as [Heq|Hneq].
+            * rewrite Heq lookup_insert in HSn_. naive_solver.
+            * rewrite lookup_insert_ne // in HSn_. naive_solver. }
+
+      iPoseProof (update_model_step ex' atr (trace_last ex) (trace_last atr) (s2, (ms, bs)) fs ρ (trace_last atr)
+                                    _ f1 (Some (Recv recv_sa None))
+                 with "Hfuel1 [Hst] [//] Hmi"
+
+                 ) as "HH" =>//.
+      { rewrite Heq' //=. }
+      { rewrite Heq' //=. constructor=>//. constructor=>//.
+        destruct Hmatch as (?&?&HH).
+        rewrite /model_state_socket_coh Heq' Htl' /= in HH. erewrite (HH _ _ sh)=>//. }
+      { rewrite Heq' //. }
+      iMod "HH" as (δ2 Hvse) "(Hfuel & Hst & Hmod)".
+      iModIntro.
+      iExists δ2.
+      pose (locale_of tp (fill K {| expr_n := ip_of_address recv_sa ; expr_e := se1 |})) as ζ.
+      iExists (Take_step (ρ:fmrole (joint_model Mod _))
+                 (Some (Recv recv_sa None)) ζ (Some (Recv recv_sa None))).
+      rewrite Htl. iFrame.
+      destruct Hex' as [ex'' ->].
+      simpl in *. iSplit; [done|].
+      iApply ("HP" with "Hst Hfuel Hfr").
+  Qed.
 
   Lemma has_fuels_decr E tid fs :
     tid ↦M++ fs -∗ |~{E}~| tid ↦M fs.
@@ -704,7 +1004,7 @@ Section primitive_laws.
 
   Lemma wp_socketbind s E ζ sh skt a (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     saddress skt = None →
-    ▷ free_ports (ip_of_address a) {[port_of_address a]} -∗    
+    ▷ free_ports (ip_of_address a) {[port_of_address a]} -∗
     ▷ sh ↪[ip_of_address a] skt -∗
     (sh ↪[ip_of_address a] (skt<| saddress := Some a |>) -∗ Φ (mkVal (ip_of_address a) #0) None) -∗
     sswp s E ζ (mkExpr (ip_of_address a)
@@ -721,7 +1021,7 @@ Section primitive_laws.
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
     iDestruct (aneris_state_interp_free_ports_valid with "Hσ Hp") as "%HP".
-    { apply HSn. }   
+    { apply HSn. }
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iSplitR; [iPureIntro; eauto|].
     { destruct s; [|done]. do 4 eexists. eapply head_prim_step.
@@ -759,7 +1059,7 @@ Section primitive_laws.
       eapply head_prim_step. simpl. done. }
     iSplit; [|done]. by iApply "HΦ".
   Qed.
-  
+
   Lemma wp_rcvtimeo_block s E ζ sh skt a
         (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     let ip := ip_of_address a in
@@ -815,7 +1115,7 @@ Section primitive_laws.
       eapply head_prim_step. simpl. done. }
     iSplit; [|done]. by iApply "HΦ".
   Qed.
-    
+
   Lemma wp_rcvtimeo_ublock s E ζ sh skt a n1 n2
         (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     let ip := ip_of_address a in

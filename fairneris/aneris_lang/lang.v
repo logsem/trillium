@@ -888,6 +888,23 @@ Inductive socket_step ip :
       (Val $ (LitV LitUnit))
       (<[sh:=(skt<|sblock := true|>, R)]>Sn) M.
 
+Lemma socket_step_send_inv ip e1 ms msg e2 Sn Sn' ms':
+  socket_step ip e1 Sn ms (Some (Send msg)) e2 Sn' ms' →
+  Sn' = Sn ∧ ms' = (ms ⊎ {[+ msg +]}).
+Proof. inversion 1; simplify_eq; split; naive_solver multiset_solver. Qed.
+
+Lemma socket_step_recv_Some ip e1 ms sa msg e2 Sn Sn' ms':
+  socket_step ip e1 Sn ms (Some (Recv sa (Some msg))) e2 Sn' ms' →
+  ∃ skt r sh, Sn !! sh = Some (skt, r ++ [msg]) ∧ saddress skt = Some sa ∧
+                ip = ip_of_address sa ∧ Sn' = <[sh:=(skt, r)]> Sn ∧ ms' = ms.
+Proof. inversion 1; simplify_eq; naive_solver multiset_solver. Qed.
+
+Lemma socket_step_recv_None ip e1 ms sa e2 Sn Sn' ms':
+  socket_step ip e1 Sn ms (Some (Recv sa None)) e2 Sn' ms' →
+  ∃ skt sh, Sn !! sh = Some (skt, []) ∧ saddress skt = Some sa ∧
+                ip = ip_of_address sa ∧ Sn' = Sn ∧ ms' = ms.
+Proof. inversion 1; simplify_eq; naive_solver multiset_solver. Qed.
+
 Definition is_head_step_pure (e : expr) : bool :=
   match e with
   | Alloc _ _

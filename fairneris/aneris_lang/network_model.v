@@ -38,8 +38,15 @@ Definition model_state_socket_coh
   saddress skt = Some sa →
   bs !!! sa = ms.
 
+Definition model_state_socket_incl
+           (skts : gmap ip_address sockets)
+           (bs : gmap socket_address (list message)) :=
+  ∀ sa ms, bs !! sa = Some ms →
+           ∃ Sn sh skt, skts !! ip_of_address sa = Some Sn ∧ Sn !! sh = Some (skt, ms) ∧ saddress skt = Some sa.
+
 Definition config_net_match (c : cfg aneris_lang) (δ : net_state) :=
-  state_ms c.2 = δ.1 ∧ model_state_socket_coh (state_sockets c.2) δ.2.
+  state_ms c.2 = δ.1 ∧ model_state_socket_incl (state_sockets c.2) δ.2 ∧
+    model_state_socket_coh (state_sockets c.2) δ.2.
 
 Definition net_apply_trans (s: net_state) (l: action aneris_lang + config_label aneris_lang) : net_state :=
   let '(ms, bs) := s in
