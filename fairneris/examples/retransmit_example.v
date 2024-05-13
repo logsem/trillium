@@ -3,41 +3,25 @@ From iris.proofmode Require Import proofmode.
 From trillium.program_logic Require Import ectx_lifting.
 From fairneris Require Import fairness fair_resources fuel.
 From fairneris.examples Require Import retransmit_model.
-From fairneris.aneris_lang Require Import aneris_lang.
+From fairneris.aneris_lang Require Import proofmode.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 
-Definition Aprog shA : expr := SendToRepeat #(LitSocket shA) #"Hello" #saB.
+Definition Aprog (saA saB : socket_address) : expr :=
+  let: "shA" := NewSocket #() in
+  SocketBind "shA" #saA;;
+  rec: "go" <> := SendTo "shA" #"Hello" #saB;; "go" #().
+
 Definition Bprog shB : expr := ReceiveFrom #(LitSocket shB).
 
-Definition model_state_socket_coh
-           (skts : gmap ip_address sockets)
-           (bs : gmap socket_address (list message)) :=
-  ∀ ip Sn sh skt sa ms,
-  skts !! ip = Some Sn → Sn !! sh = Some (skt,ms) →
-  saddress skt = Some sa →
-  bs !!! sa = ms.
-
-Definition config_state_valid (c : cfg aneris_lang) (δ : retransmit_state) :=
-  state_ms c.2 = δ.1.2 ∧ model_state_socket_coh (state_sockets c.2) δ.2.
-
-Program Definition retransmit_live_model : LiveModel aneris_lang retransmit_fair_model :=
-  {|
-    lm_cfg_action m1 lab := (((), lab), m1);
-    lm_cfg_labels_match cl fl := cl = fl.2;
-  |}.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-Next Obligation. Admitted.
-
 Section with_Σ.
-  Context `{anerisG _ retransmit_live_model Σ}.
+  Context `{anerisG _ _ (live_model_of_user retransmit_model) Σ}.
 
   Notation loA := (ip_of_address saA,tidA).
 
   Lemma wp_A s E shA :
     {{{ shA ↪[ip_of_address saA] sA ∗ saA ⤳ (∅,∅) ∗ saB ⤇ (λ _, True) ∗ loA ↦M {[ Arole := 1%nat ]} }}}
-      (mkExpr (ip_of_address saA) (Aprog shA)) @ s; loA; E
+      (mkExpr (ip_of_address saA) (Aprog saA saB)) @ s; loA; E
     {{{ v, RET v; loA ↦M ∅ }}}.
   Proof.
     iIntros (Φ) "(Hsh & Hrt & #Hmsg & HA) HΦ".
@@ -45,6 +29,13 @@ Section with_Σ.
             [∗ set] m ∈ R, socket_address_group_own {[m_sender m]})%I
       with "[Hrt]" as (R T) "[HRT HR]"; [by eauto|].
     iLöb as "IH" forall (R T).
+
+    wp_bind (SendTo _).
+
+    iApply sswp_MU_wp. rewrite /Aprog.
+    iApply wp_send.
+
+
     iApply wp_lift_head_step_fupd; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
             "(%Hvalid & Hσ & [Hlive_auth Hlive_owns] & Hauth) /=".

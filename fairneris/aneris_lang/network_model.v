@@ -429,3 +429,12 @@ Section user_fairness.
     - apply ltl_se_eventually_now. rewrite /recv_filter /usr_recv_filter. intros [?|?]; naive_solver.
   Qed.
 End user_fairness.
+
+Definition live_model_of_user (M: UserModel aneris_lang) : LiveModel aneris_lang (joint_model M net_model) :=
+ {|
+    lm_cfg_labels_match (x : config_label aneris_lang) (y : fmconfig (joint_model M net_model)) := x = y;
+    lm_actions_match x y := x = y;
+ |}.
+
+Instance live_mdoel_of_user_eq (M: UserModel aneris_lang) : LiveModelEq (live_model_of_user M).
+Proof. constructor; naive_solver. Qed.

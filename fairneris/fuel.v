@@ -1297,5 +1297,4 @@ Section upto_stutter_preserves_fairness_and_termination.
     have [n' ?] := upto_stutter_after_None _ _ n Hupto Hfin.
     eexists; done.
   Qed.
-
 End upto_stutter_preserves_fairness_and_termination.

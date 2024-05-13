@@ -370,7 +370,7 @@ Proof.
     { rewrite (big_opM_fmap). f_equiv. intros ??. rewrite map_fmap_singleton //. }
     rewrite gmap.big_opM_singletons //. }
   iDestruct ("Hwp") as ">[Hσ $]".
-  simpl. rewrite Hms=> /=. rewrite dom_empty_L.
+  simpl. rewrite /aneris_state_interp_opt /aneris_state_interp_σ /aneris_state_interp_δ /= Hms /= dom_empty_L.
   iFrame.
   iModIntro.
   iSplitL "Hmapa"; first iSplit.
@@ -395,7 +395,7 @@ Proof.
       apply take_drop_middle in Hlk. naive_solver. }
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Htake)
           "Hsi Hposts".
-  iDestruct "Hsi" as "(%Hvalid&_&Hlive&_)".
+  iDestruct "Hsi" as "(Hasi&%Hvalid&Hmod)".
   iApply fupd_mask_intro; [set_solver|].
   iIntros "_".
   pose proof Hvalid as Hvalid'.
@@ -464,7 +464,7 @@ Proof.
       rewrite (locale_equiv _ _ _ Hequiv) //. }
    (* Now conclude using fuel_map_le somehow *)
    unfold model_state_interp.
-   iDestruct "Hlive" as (fm) "(%Hle & %Hdead & ? & ? & Hfm & ?)".
+   iDestruct "Hmod" as (fm) "(%Hle & %Hdead & ? & ? & Hfm & ?)".
    iDestruct (has_fuels_agree with "Hfm H") as %Hfm.
    rewrite /fuel_map_preserve_dead in Hdead.
    iPureIntro. intros Ha. destruct (Hdead _ Ha) as (ζ'' & fs' & Hfm' & Hin).
@@ -767,152 +767,152 @@ Section lm_network.
   Qed.
 End lm_network.
 
-(* OBS: This is not needed. *)
-Lemma valid_inf_system_trace_implies_traces_match
-      ex atr iex iatr progtr auxtr :
-  exec_trace_match ex iex progtr →
-  exec_trace_match atr iatr auxtr →
-  valid_inf_system_trace
-    (continued_simulation valid_state_evolution_fairness) ex atr iex iatr →
-  live_traces_match progtr auxtr.
-Proof.
-  intros.
-  eapply (valid_inf_system_trace_implies_traces_match_strong
-          (continued_simulation valid_state_evolution_fairness)); [| | |done..].
-  - by intros ?? (?&?&?&?)%continued_simulation_rel.
-  - intros [][] (?&?&?)%continued_simulation_rel; try done.
-    intros. simpl in *. by simplify_eq.
-  - intros [][] (Hvalid&?&?)%continued_simulation_rel; try done.
-    simpl in *. inversion Hvalid. simplify_eq. by rewrite H7.
-Qed.
+(* (* OBS: This is not needed. *) *)
+(* Lemma valid_inf_system_trace_implies_traces_match *)
+(*       ex atr iex iatr progtr auxtr : *)
+(*   exec_trace_match ex iex progtr → *)
+(*   exec_trace_match atr iatr auxtr → *)
+(*   valid_inf_system_trace *)
+(*     (continued_simulation valid_state_evolution_fairness) ex atr iex iatr → *)
+(*   live_traces_match progtr auxtr. *)
+(* Proof. *)
+(*   intros. *)
+(*   eapply (valid_inf_system_trace_implies_traces_match_strong *)
+(*           (continued_simulation valid_state_evolution_fairness)); [| | |done..]. *)
+(*   - by intros ?? (?&?&?&?)%continued_simulation_rel. *)
+(*   - intros [][] (?&?&?)%continued_simulation_rel; try done. *)
+(*     intros. simpl in *. by simplify_eq. *)
+(*   - intros [][] (Hvalid&?&?)%continued_simulation_rel; try done. *)
+(*     simpl in *. inversion Hvalid. simplify_eq. by rewrite H7. *)
+(* Qed. *)
 
-Definition extrace_matching_mtrace_exists
-           {Λ} {M} (Rs : cfg Λ → M.(mstate) → Prop) Rℓ st extr :=
-  ∃ mtr, trfirst mtr = st ∧
-         traces_match Rℓ Rs language.locale_step (M.(mtrans)) extr mtr.
+(* Definition extrace_matching_mtrace_exists *)
+(*            {Λ} {M} (Rs : cfg Λ → M.(mstate) → Prop) Rℓ st extr := *)
+(*   ∃ mtr, trfirst mtr = st ∧ *)
+(*          traces_match Rℓ Rs language.locale_step (M.(mtrans)) extr mtr. *)
 
-Lemma continued_simulation_traces_match {Λ} {M}
-      (ξ : _ → _ → Prop) (Rs : cfg Λ → M.(mstate) → Prop) (Rℓ : _ → _ → Prop)
-      extr st :
-  (∀ extr auxtr, continued_simulation ξ extr auxtr →
-                 Rs (trace_last extr) (trace_last auxtr)) →
-  (∀ extr auxtr, continued_simulation ξ extr auxtr →
-                 ∀ ζ ℓ, trace_last_label extr = Some ζ →
-                        trace_last_label auxtr = Some ℓ →
-                        Rℓ ζ ℓ) →
-  (∀ extr auxtr, continued_simulation ξ extr auxtr →
-                 match extr, auxtr with
-                 | _ :tr[_]: _, auxtr :tr[ℓ]: ρ =>
-                     mtrans (trace_last auxtr) ℓ ρ
-                 | _,_ => True
-                 end) →
-  extrace_valid extr →
-  continued_simulation_init ξ (trfirst extr) st →
-  extrace_matching_mtrace_exists Rs Rℓ st extr.
-Proof.
-  intros HRs HRℓ Htrans Hvalid Hsim.
-  assert (∃ iatr,
-             valid_inf_system_trace
-               (continued_simulation ξ)
-               (trace_singleton (trfirst extr))
-               (trace_singleton (st))
-               (from_trace extr)
-               iatr) as [iatr Hiatr].
-  { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
-    Unshelve.
-    - done.
-    - eapply from_trace_preserves_validity; eauto; first econstructor. }
-  eexists _.
-  split; last first.
-  { eapply (valid_inf_system_trace_implies_traces_match_strong); eauto.
-    - by apply from_trace_spec.
-    - by apply to_trace_spec. }
-  destruct iatr; [done|by destruct x].
-Qed.
+(* Lemma continued_simulation_traces_match {Λ} {M} *)
+(*       (ξ : _ → _ → Prop) (Rs : cfg Λ → M.(mstate) → Prop) (Rℓ : _ → _ → Prop) *)
+(*       extr st : *)
+(*   (∀ extr auxtr, continued_simulation ξ extr auxtr → *)
+(*                  Rs (trace_last extr) (trace_last auxtr)) → *)
+(*   (∀ extr auxtr, continued_simulation ξ extr auxtr → *)
+(*                  ∀ ζ ℓ, trace_last_label extr = Some ζ → *)
+(*                         trace_last_label auxtr = Some ℓ → *)
+(*                         Rℓ ζ ℓ) → *)
+(*   (∀ extr auxtr, continued_simulation ξ extr auxtr → *)
+(*                  match extr, auxtr with *)
+(*                  | _ :tr[_]: _, auxtr :tr[ℓ]: ρ => *)
+(*                      mtrans (trace_last auxtr) ℓ ρ *)
+(*                  | _,_ => True *)
+(*                  end) → *)
+(*   extrace_valid extr → *)
+(*   continued_simulation_init ξ (trfirst extr) st → *)
+(*   extrace_matching_mtrace_exists Rs Rℓ st extr. *)
+(* Proof. *)
+(*   intros HRs HRℓ Htrans Hvalid Hsim. *)
+(*   assert (∃ iatr, *)
+(*              valid_inf_system_trace *)
+(*                (continued_simulation ξ) *)
+(*                (trace_singleton (trfirst extr)) *)
+(*                (trace_singleton (st)) *)
+(*                (from_trace extr) *)
+(*                iatr) as [iatr Hiatr]. *)
+(*   { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor. *)
+(*     Unshelve. *)
+(*     - done. *)
+(*     - eapply from_trace_preserves_validity; eauto; first econstructor. } *)
+(*   eexists _. *)
+(*   split; last first. *)
+(*   { eapply (valid_inf_system_trace_implies_traces_match_strong); eauto. *)
+(*     - by apply from_trace_spec. *)
+(*     - by apply to_trace_spec. } *)
+(*   destruct iatr; [done|by destruct x]. *)
+(* Qed. *)
 
-Definition extrace_matching_mtrace_exists_live st extr :=
-  extrace_matching_mtrace_exists (live_tids : cfg aneris_lang → mstate (fair_model_to_model retransmit_fair_model) → Prop) labels_match st extr.
+(* Definition extrace_matching_mtrace_exists_live st extr := *)
+(*   extrace_matching_mtrace_exists (live_tids : cfg aneris_lang → mstate (fair_model_to_model retransmit_fair_model) → Prop) labels_match st extr. *)
 
-Lemma continued_simulation_traces_match_live extr st :
-  extrace_valid extr →
-  continued_simulation_init valid_state_evolution_fairness
-                       (trfirst extr) st →
-  extrace_matching_mtrace_exists_live st extr.
-Proof.
-  intros. eapply continued_simulation_traces_match; eauto.
-  - by intros ?? (?&?&?&?)%continued_simulation_rel.
-  - intros [][] (?&?&?)%continued_simulation_rel; try done.
-    intros. simpl in *. by simplify_eq.
-  - intros [][] (Hvalid&?&?)%continued_simulation_rel; try done.
-    simpl in *. inversion Hvalid. simplify_eq. by rewrite H6.
-Qed.
+(* Lemma continued_simulation_traces_match_live extr st : *)
+(*   extrace_valid extr → *)
+(*   continued_simulation_init valid_state_evolution_fairness *)
+(*                        (trfirst extr) st → *)
+(*   extrace_matching_mtrace_exists_live st extr. *)
+(* Proof. *)
+(*   intros. eapply continued_simulation_traces_match; eauto. *)
+(*   - by intros ?? (?&?&?&?)%continued_simulation_rel. *)
+(*   - intros [][] (?&?&?)%continued_simulation_rel; try done. *)
+(*     intros. simpl in *. by simplify_eq. *)
+(*   - intros [][] (Hvalid&?&?)%continued_simulation_rel; try done. *)
+(*     simpl in *. inversion Hvalid. simplify_eq. by rewrite H6. *)
+(* Qed. *)
 
-Definition matching_mtrace_exists c st :=
-  extrace_property c (extrace_matching_mtrace_exists_live st).
+(* Definition matching_mtrace_exists c st := *)
+(*   extrace_property c (extrace_matching_mtrace_exists_live st). *)
 
-(** A continued simulation exists between some initial configuration [c]
-    and the initial state [init_state] of a fair model. *)
-Definition live_simulation (c : cfg aneris_lang) (st : retransmit_state) :=
-  continued_simulation_init valid_state_evolution_fairness c st.
+(* (** A continued simulation exists between some initial configuration [c] *)
+(*     and the initial state [init_state] of a fair model. *) *)
+(* Definition live_simulation (c : cfg aneris_lang) (st : retransmit_state) := *)
+(*   continued_simulation_init valid_state_evolution_fairness c st. *)
 
-Lemma continued_simulation_traces_match_init c st :
-  live_simulation c st → matching_mtrace_exists c st.
-Proof.
-  intros Hsim extr <- Hvalid.
-  apply (continued_simulation_traces_match_live) in Hsim
-      as (mtr & Hmtr & Hmatch); [by eexists _|done].
-Qed.
+(* Lemma continued_simulation_traces_match_init c st : *)
+(*   live_simulation c st → matching_mtrace_exists c st. *)
+(* Proof. *)
+(*   intros Hsim extr <- Hvalid. *)
+(*   apply (continued_simulation_traces_match_live) in Hsim *)
+(*       as (mtr & Hmtr & Hmatch); [by eexists _|done]. *)
+(* Qed. *)
 
-Definition extrace_fairly_terminating_locale ζ (extr : extrace aneris_lang) :=
-  extrace_fair extr -> extrace_terminating_locale ζ extr.
+(* Definition extrace_fairly_terminating_locale ζ (extr : extrace aneris_lang) := *)
+(*   extrace_fair extr -> extrace_terminating_locale ζ extr. *)
 
-Definition fairly_terminating ζ (c : cfg aneris_lang) :=
-  extrace_property c (extrace_fairly_terminating_locale ζ).
+(* Definition fairly_terminating ζ (c : cfg aneris_lang) := *)
+(*   extrace_property c (extrace_fairly_terminating_locale ζ). *)
 
-Lemma traces_match_fair_termination_preserved_init c st :
-  matching_mtrace_exists c st → fairly_terminating localeB c.
-Proof.
-  intros Hmatches.
-  eapply extrace_property_impl; [done|].
-  intros extr Hstart Hvalid (mtr & Hstart' & Hmtr) Hfair.
-  eapply terminating_role_preserved;
-    [done|done|done|].
-  apply retransmit_fair_traces_terminate.
-  - by eapply traces_match_valid_preserved.
-  - by eapply traces_match_fairness_preserved.
-Qed.
+(* Lemma traces_match_fair_termination_preserved_init c st : *)
+(*   matching_mtrace_exists c st → fairly_terminating localeB c. *)
+(* Proof. *)
+(*   intros Hmatches. *)
+(*   eapply extrace_property_impl; [done|]. *)
+(*   intros extr Hstart Hvalid (mtr & Hstart' & Hmtr) Hfair. *)
+(*   eapply terminating_role_preserved; *)
+(*     [done|done|done|]. *)
+(*   apply retransmit_fair_traces_terminate. *)
+(*   - by eapply traces_match_valid_preserved. *)
+(*   - by eapply traces_match_fairness_preserved. *)
+(* Qed. *)
 
-Theorem continued_simulation_fair_termination c st :
-  live_simulation c st → fairly_terminating localeB c.
-Proof.
-  intros ?.
-  by eapply traces_match_fair_termination_preserved_init,
-    continued_simulation_traces_match_init.
-Qed.
+(* Theorem continued_simulation_fair_termination c st : *)
+(*   live_simulation c st → fairly_terminating localeB c. *)
+(* Proof. *)
+(*   intros ?. *)
+(*   by eapply traces_match_fair_termination_preserved_init, *)
+(*     continued_simulation_traces_match_init. *)
+(* Qed. *)
 
-Theorem simulation_adequacy_fair_termination_multiple
-        `{anerisPreG retransmit_fair_model Σ}
-        A s (es : list aneris_expr) σ st :
-  role_enabled_locale_exists (es, σ) st →
-  config_state_valid (es, σ) st →
-  length es >= 1 →
-  (* aneris_model_rel_finitary Mdl → *)
-  dom (state_heaps σ) = dom (state_sockets σ) →
-  (* Port coherence *)
-  ((∀ ip ps, (GSet <$> (addrs_to_ip_ports_map
-                              (A ∖ (ports_in_use $ state_sockets σ))))
-               !! ip = Some (GSet ps) →
-             ∀ Sn, (state_sockets σ) !! ip = Some Sn →
-                   ∀ p, p ∈ ps → port_not_in_use p Sn)) →
-  (* Socket buffers are initially empty *)
-  map_Forall (λ ip s, map_Forall (λ sh sb, sb.2 = []) s) (state_sockets σ) →
-  map_Forall (λ ip s, socket_handlers_coh s) (state_sockets σ) →
-  map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
-  (* Message soup is initially empty *)
-  state_ms σ = ∅ →
-  wp_proto_multiple_strong A σ s es st (* φs *) →
-  fairly_terminating localeB (es,σ).
-Proof.
-  intros. eapply continued_simulation_fair_termination,
-            simulation_adequacy_multiple_strong; try done.
-Qed.
+(* Theorem simulation_adequacy_fair_termination_multiple *)
+(*         `{anerisPreG retransmit_fair_model Σ} *)
+(*         A s (es : list aneris_expr) σ st : *)
+(*   role_enabled_locale_exists (es, σ) st → *)
+(*   config_state_valid (es, σ) st → *)
+(*   length es >= 1 → *)
+(*   (* aneris_model_rel_finitary Mdl → *) *)
+(*   dom (state_heaps σ) = dom (state_sockets σ) → *)
+(*   (* Port coherence *) *)
+(*   ((∀ ip ps, (GSet <$> (addrs_to_ip_ports_map *)
+(*                               (A ∖ (ports_in_use $ state_sockets σ)))) *)
+(*                !! ip = Some (GSet ps) → *)
+(*              ∀ Sn, (state_sockets σ) !! ip = Some Sn → *)
+(*                    ∀ p, p ∈ ps → port_not_in_use p Sn)) → *)
+(*   (* Socket buffers are initially empty *) *)
+(*   map_Forall (λ ip s, map_Forall (λ sh sb, sb.2 = []) s) (state_sockets σ) → *)
+(*   map_Forall (λ ip s, socket_handlers_coh s) (state_sockets σ) → *)
+(*   map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) → *)
+(*   (* Message soup is initially empty *) *)
+(*   state_ms σ = ∅ → *)
+(*   wp_proto_multiple_strong A σ s es st (* φs *) → *)
+(*   fairly_terminating localeB (es,σ). *)
+(* Proof. *)
+(*   intros. eapply continued_simulation_fair_termination, *)
+(*             simulation_adequacy_multiple_strong; try done. *)
+(* Qed. *)

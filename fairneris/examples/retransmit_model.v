@@ -304,14 +304,13 @@ Proof.
 Qed.
 
 
-Definition retransmit_lts : Lts (retransmit_role * option (action aneris_lang)).
-Proof.
-  refine({|
+Definition retransmit_lts : Lts (retransmit_role * option (action aneris_lang)) :=
+  {|
             lts_state := retransmit_state;
             lts_trans := retransmit_trans;
-          |}).
-Defined.
-Definition retransmit_fair_model : UserModel aneris_lang.
+  |}.
+
+Definition retransmit_model : UserModel aneris_lang.
 Proof.
   refine({|
             usr_role := retransmit_role;
