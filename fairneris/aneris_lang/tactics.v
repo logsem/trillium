@@ -11,6 +11,7 @@ evaluation context [K] and a subexpression [e']. It calls the tactic [tac K e']
 for each possible decomposition until [tac] succeeds. *)
 Ltac reshape_expr e tac :=
   let rec go K e :=
+    idtac e;
     match e with
     | _                                 => tac K e
     | App ?e1 (Val ?v)                  => add_item (AppLCtx v) K e1
@@ -56,4 +57,6 @@ Ltac reshape_expr e tac :=
     end
   with add_item Ki K e := go (Ki :: K) e
   in
-  go (@nil ectx_item) e.
+  match e with
+  | mkExpr ?ip ?ei => go (@nil ectx_item) ei
+  end.

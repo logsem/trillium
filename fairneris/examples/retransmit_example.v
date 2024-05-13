@@ -7,6 +7,10 @@ From fairneris.aneris_lang Require Import proofmode.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 
+(*Temporary*)
+From iris.proofmode Require Import coq_tactics reduction spec_patterns.
+From iris.proofmode Require Export tactics.
+
 Definition Aprog (saA saB : socket_address) : expr :=
   let: "shA" := NewSocket #() in
   SocketBind "shA" #saA;;
@@ -14,27 +18,89 @@ Definition Aprog (saA saB : socket_address) : expr :=
 
 Definition Bprog shB : expr := ReceiveFrom #(LitSocket shB).
 
+Tactic Notation "mu_fuel" :=
+  let solve_fuel _ :=
+    let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
+    iAssumptionCore || fail "wp_pure: cannot find" fs in
+  iStartProof;
+  lazymatch goal with
+  | |- envs_entails _ (MU ?E ?locale None ?P) =>
+      eapply (tac_mu_fuel _ locale E);
+      [let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
+       iAssumptionCore || fail "mu_fuel: cannot find" fs
+      | try apply map_non_empty_singleton; try apply insert_non_empty; try done
+      | try solve_fuel_positive
+      | pm_reduce; simpl_has_fuels; wp_finish
+      ]
+  | _ => fail "wp_pure: not a 'wp'"
+  end.
+
+Tactic Notation "wp_pure" open_constr(efoc) :=
+  iStartProof;
+  lazymatch goal with
+  | |- envs_entails _ (wp ?s ?E ?locale ?e ?Q) =>
+    let e := eval simpl in e in
+    reshape_expr e ltac:(fun K e' =>
+      idtac K;
+      unify e' efoc;
+      eapply (tac_wp_pure _ _ _ _ _ (@fill base_ectxi_lang K e')); idtac "Hi";
+      [ let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
+       iAssumptionCore || fail "wp_pure: cannot find" fs
+      | try solve_pure_exec
+      | try solve_fuel_positive
+      |
+      |
+      |
+      |
+      ])
+      (* [try tc_solve                       (* PureExec *) *)
+      (* |try solve_vals_compare_safe    (* The pure condition for PureExec *) *)
+      (* |try tc_solve                       (* IntoLaters *) *)
+      (* |try wp_finish                      (* new goal *) *)
+      (* ]) *)
+    || fail "wp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
+  end.
+
 Section with_Σ.
   Context `{anerisG _ _ (live_model_of_user retransmit_model) Σ}.
 
-  Notation loA := (ip_of_address saA,tidA).
+  Notation loA := (ip_of_address saA, tidA).
 
-  Lemma wp_A s E shA :
-    {{{ shA ↪[ip_of_address saA] sA ∗ saA ⤳ (∅,∅) ∗ saB ⤇ (λ _, True) ∗ loA ↦M {[ Arole := 1%nat ]} }}}
-      (mkExpr (ip_of_address saA) (Aprog saA saB)) @ s; loA; E
+  Lemma wp_A E :
+    {{{ is_node loA.1 ∗ saB ⤇ (λ _, True) ∗ loA ↦M {[ Arole := 10%nat ]} }}}
+      (mkExpr (ip_of_address saA) (Aprog saA saB)) @ loA; E
     {{{ v, RET v; loA ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(Hsh & Hrt & #Hmsg & HA) HΦ".
-    iAssert (∃ R T, saA ⤳ (R, T) ∗
-            [∗ set] m ∈ R, socket_address_group_own {[m_sender m]})%I
-      with "[Hrt]" as (R T) "[HRT HR]"; [by eauto|].
+    iIntros (Φ) "(#Hisn & #Hmsg & HA) HΦ".
+    (* iAssert (∃ R T, saA ⤳ (R, T) ∗ *)
+    (*         [∗ set] m ∈ R, socket_address_group_own {[m_sender m]})%I *)
+      (* with "[Hrt]" as (R T) "[HRT HR]"; [by eauto|]. *)
+
+    rewrite /Aprog.
+    wp_bind (NewSocket _).
+
+    iApply sswp_MU_wp. iApply wp_new_socket=>//.
+    iIntros (sh) "Hsh'".
+
+    mu_fuel.
+    iApply wp_value'.
+
+    idtac "ASDLKFJ".
+    wp_pure _.
+    - simpl. eapply pure_beta.
+
+      tc_solve.
+    eapply tac_wp_pure=>//.
+
+    wp_pure _.
+    iApply sswp_MU_wp.
+    iApply (sswp_pure_step _ _ _ _ _ True) =>//.
+
+    { (* How to solve it?? *) admit. }
+
+
+
     iLöb as "IH" forall (R T).
-
-    wp_bind (SendTo _).
-
-    iApply sswp_MU_wp. rewrite /Aprog.
-    iApply wp_send.
-
 
     iApply wp_lift_head_step_fupd; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)

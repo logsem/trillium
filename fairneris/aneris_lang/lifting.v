@@ -251,9 +251,6 @@ Proof. solve_pure_exec. Qed.
            (mkExpr n (PairV #ip #(Zpos p))).
 Proof. solve_pure_exec. Qed.
 
-(* Why??*)
-(* Opaque aneris_state_interp. *)
-
 Notation state_interp_oos ζ α := (aneris_state_interp_opt (Some (ζ,α))).
 
 Definition sswp `{LM:LiveModel aneris_lang (joint_model M Net)}
