@@ -999,16 +999,17 @@ Section primitive_laws.
   (*  {{{ RET (mkVal (ip_of_address a) #0); *)
   (*      sh ↪[ip_of_address a] (skt<| saddress := Some a |>) }}}. *)
 
-  Lemma wp_socketbind s E ζ sh skt a (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+  Lemma wp_socketbind s E ζ sh skt a ip (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+    ip = ip_of_address a →
     saddress skt = None →
     ▷ free_ports (ip_of_address a) {[port_of_address a]} -∗
     ▷ sh ↪[ip_of_address a] skt -∗
     (sh ↪[ip_of_address a] (skt<| saddress := Some a |>) -∗ Φ (mkVal (ip_of_address a) #0) None) -∗
-    sswp s E ζ (mkExpr (ip_of_address a)
+    sswp s E ζ (mkExpr ip
               (SocketBind (Val $ LitV $ LitSocket sh)
                           (Val $ LitV $ LitSocketAddress a))) Φ.
   Proof.
-    iIntros (?) "Hp Hsh HΦ".
+    iIntros (-> ?) "Hp Hsh HΦ".
     rewrite /sswp.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
@@ -1171,8 +1172,9 @@ Section primitive_laws.
   Qed.
 
   Lemma wp_recv
-        (φ : socket_interp Σ) k saR E sh skt ζ R T
+        (φ : socket_interp Σ) k saR E sh skt ζ R T ip
         (Φ : (aneris_expr → option (action aneris_lang) → iProp Σ)) :
+    ip = ip_of_address saR →
     saddress skt = Some saR →
     sblock skt = false →
     ▷ sh ↪[ip_of_address saR] skt -∗
@@ -1191,10 +1193,10 @@ Section primitive_laws.
            (⌜msg ∉ R⌝ -∗ φ msg))) -∗
        Φ (mkVal (ip_of_address saR) r) (Some om)) -∗
     sswp k E ζ
-         (mkExpr (ip_of_address saR)
+         (mkExpr ip
                  (ReceiveFrom (Val $ LitV $ LitSocket sh))) Φ.
   Proof.
-    iIntros (Hskt Hblock) "Hsh Hrt #Hφ HΦ".
+    iIntros (-> Hskt Hblock) "Hsh Hrt #Hφ HΦ".
     iAssert (▷ socket_address_group_own {[saR]})%I as "#HsaR".
     { iDestruct "Hrt" as "[(%send & %recv & _ & _ & _ & $ & _) _]". }
     iDestruct "Hrt" as "[Hrt Hown]".
@@ -1402,8 +1404,9 @@ Section primitive_laws.
   Qed.
 
   Lemma wp_send φ mbody (is_dup : bool) sh skt a to k E
-        ζ R T
+        ζ R T ip
         (Φ : (aneris_expr → option (action aneris_lang) → iProp Σ)) :
+    ip = ip_of_address a →
     let msg := mkMessage a to mbody in
     saddress skt = Some a →
     ▷ sh ↪[ip_of_address a] skt -∗
@@ -1413,10 +1416,10 @@ Section primitive_laws.
     (sh ↪[ip_of_address a] skt -∗ a ⤳ (R, {[ msg ]} ∪ T) -∗
      Φ (mkVal (ip_of_address a) #(String.length mbody)) (Some (Send msg))) -∗
     sswp k E ζ
-         (mkExpr (ip_of_address a)
+         (mkExpr ip
                  (SendTo (Val $ LitV $ LitSocket sh) #mbody #to)) Φ.
   Proof.
-    iIntros (msg Hskt) "Hsh Hrt Hφ Hmsg HΦ".
+    iIntros (-> msg Hskt) "Hsh Hrt Hφ Hmsg HΦ".
     iAssert (▷ socket_address_group_own {[a]})%I as "#Ha".
     { iDestruct "Hrt" as "[(%send & %recv & _ & _ & _ & $ & _) _]". }
     iAssert (▷ socket_address_group_own {[to]})%I as "#Hto".

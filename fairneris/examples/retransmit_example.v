@@ -14,7 +14,7 @@ From iris.proofmode Require Export tactics.
 Definition Aprog (saA saB : socket_address) : expr :=
   let: "shA" := NewSocket #() in
   SocketBind "shA" #saA;;
-  rec: "go" <> := SendTo "shA" #"Hello" #saB;; "go" #().
+  (rec: "go" <> := SendTo "shA" #"Hello" #saB;; "go" #()) #().
 
 Definition Bprog shB : expr := ReceiveFrom #(LitSocket shB).
 
@@ -43,15 +43,15 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
     reshape_expr e ltac:(fun K e' =>
       idtac K;
       unify e' efoc;
-      eapply (tac_wp_pure _ _ _ _ _ (@fill base_ectxi_lang K e')); idtac "Hi";
+      eapply (tac_wp_pure _ _ _ _ _ (@fill base_ectxi_lang K e') _ _ 1); idtac "Hi";
       [ let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
        iAssumptionCore || fail "wp_pure: cannot find" fs
-      | try solve_pure_exec
+      | tc_solve
       | try solve_fuel_positive
-      |
-      |
-      |
-      |
+      | try apply map_non_empty_singleton; try apply insert_non_empty; try done
+      | try naive_solver
+      | tc_solve
+      | pm_reduce; simpl_has_fuels; wp_finish
       ])
       (* [try tc_solve                       (* PureExec *) *)
       (* |try solve_vals_compare_safe    (* The pure condition for PureExec *) *)
@@ -67,14 +67,12 @@ Section with_Σ.
   Notation loA := (ip_of_address saA, tidA).
 
   Lemma wp_A E :
-    {{{ is_node loA.1 ∗ saB ⤇ (λ _, True) ∗ loA ↦M {[ Arole := 10%nat ]} }}}
+    {{{ is_node loA.1 ∗ saB ⤇ (λ _, True) ∗ loA ↦M {[ Arole := 10%nat ]} ∗
+          saA ⤳ (∅, ∅) ∗ free_ports (ip_of_address saA) {[port_of_address saA]} }}}
       (mkExpr (ip_of_address saA) (Aprog saA saB)) @ loA; E
     {{{ v, RET v; loA ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(#Hisn & #Hmsg & HA) HΦ".
-    (* iAssert (∃ R T, saA ⤳ (R, T) ∗ *)
-    (*         [∗ set] m ∈ R, socket_address_group_own {[m_sender m]})%I *)
-      (* with "[Hrt]" as (R T) "[HRT HR]"; [by eauto|]. *)
+    iIntros (Φ) "(#Hisn & #Hmsg & HA & Hrt & Hfp) HΦ".
 
     rewrite /Aprog.
     wp_bind (NewSocket _).
@@ -87,21 +85,47 @@ Section with_Σ.
 
     idtac "ASDLKFJ".
     wp_pure _.
-    - simpl. eapply pure_beta.
-
-      tc_solve.
-    eapply tac_wp_pure=>//.
-
     wp_pure _.
+
+    wp_bind (SocketBind _ _).
+    change "0.0.0.0" with (ip_of_address saA).
     iApply sswp_MU_wp.
-    iApply (sswp_pure_step _ _ _ _ _ True) =>//.
+    iApply (wp_socketbind with "[Hfp] [Hsh']")=>//=; first done.
+    iIntros "Hsh".
+    mu_fuel.
+    iApply wp_value'.
+    wp_pure _.
 
-    { (* How to solve it?? *) admit. }
-
-
+    iAssert (∃ R T, saA ⤳ (R, T) ∗
+            [∗ set] m ∈ R, socket_address_group_own {[m_sender m]})%I
+      with "[Hrt]" as (R T) "[HRT HR]"; [by eauto|].
+    wp_pure _.
 
     iLöb as "IH" forall (R T).
 
+    wp_pure _.
+    wp_pure _.
+
+    wp_bind (SendTo _ _ _).
+    iApply sswp_MU_wp.
+    iApply (wp_send _ _ false with "[Hsh] [HRT] [Hmsg]")=>//=>//=>//.
+    iIntros "Hsh HRT".
+
+    (* TODO: put the model state in an invariant, and add ghost state on the second note to control it? *)
+
+    iApply (mu_step_model _ _ _ _ ∅ ∅ with "Hmod [HA] []").
+
+  Lemma mu_step_model `{!LiveModelEq LM} ζ ρ α (f1 : nat) fs fr s1 s2 E P :
+    lts_trans Mod s1 (ρ, α) s2 →
+    Mod.(usr_live_roles) s2 ⊆ Mod.(usr_live_roles) s1 →
+    ρ ∉ dom fs →
+    ▷ frag_model_is s1 -∗
+    ▷ ζ ↦M ({[ρ:=f1]} ∪ fmap S fs) -∗
+    ▷ frag_free_roles_are fr -∗
+    (frag_model_is s2 -∗
+     ζ ↦M ({[ρ:=(Mod.(usr_fl) s2)]} ∪ fs) -∗
+     frag_free_roles_are fr -∗ P) -∗
+    MU E ζ α P.
     iApply wp_lift_head_step_fupd; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
             "(%Hvalid & Hσ & [Hlive_auth Hlive_owns] & Hauth) /=".
