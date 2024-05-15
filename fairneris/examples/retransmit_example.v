@@ -1,5 +1,6 @@
 From stdpp Require Import list fin_maps.
 From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import invariants.
 From trillium.program_logic Require Import ectx_lifting.
 From fairneris Require Import fairness fair_resources fuel.
 From fairneris.examples Require Import retransmit_model.
@@ -14,7 +15,8 @@ From iris.proofmode Require Export tactics.
 Definition Aprog (saA saB : socket_address) : expr :=
   let: "shA" := NewSocket #() in
   SocketBind "shA" #saA;;
-  (rec: "go" <> := SendTo "shA" #"Hello" #saB;; "go" #()) #().
+  let: "f" := (rec: "go" <> := SendTo "shA" #"Hello" #saB;; "go" #()) in
+  "f" #().
 
 Definition Bprog shB : expr := ReceiveFrom #(LitSocket shB).
 
@@ -63,16 +65,20 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
 
 Section with_Σ.
   Context `{anerisG _ _ (live_model_of_user retransmit_model) Σ}.
+  Let Ns := nroot .@ "retransmit".
 
   Notation loA := (ip_of_address saA, tidA).
 
-  Lemma wp_A E :
-    {{{ is_node loA.1 ∗ saB ⤇ (λ _, True) ∗ loA ↦M {[ Arole := 10%nat ]} ∗
-          saA ⤳ (∅, ∅) ∗ free_ports (ip_of_address saA) {[port_of_address saA]} }}}
-      (mkExpr (ip_of_address saA) (Aprog saA saB)) @ loA; E
+  Definition retinv : iProp Σ := ∃ st, frag_model_is st ∗ True.
+
+  Lemma wp_A f (Hf: f > 9) :
+    {{{ inv Ns retinv ∗ frag_free_roles_are ∅ ∗ is_node loA.1 ∗ saB ⤇ (λ _, True) ∗
+          loA ↦M {[ Arole := f ]} ∗ saA ⤳ (∅, ∅) ∗
+          free_ports (ip_of_address saA) {[port_of_address saA]} }}}
+      (mkExpr (ip_of_address saA) (Aprog saA saB)) @ loA; ⊤
     {{{ v, RET v; loA ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(#Hisn & #Hmsg & HA & Hrt & Hfp) HΦ".
+    iIntros (Φ) "(#Hinv & Hfr & #Hisn & #Hmsg & HA & Hrt & Hfp) HΦ".
 
     rewrite /Aprog.
     wp_bind (NewSocket _).
@@ -84,8 +90,7 @@ Section with_Σ.
     iApply wp_value'.
 
     idtac "ASDLKFJ".
-    wp_pure _.
-    wp_pure _.
+    do 2 wp_pure _.
 
     wp_bind (SocketBind _ _).
     change "0.0.0.0" with (ip_of_address saA).
@@ -94,85 +99,46 @@ Section with_Σ.
     iIntros "Hsh".
     mu_fuel.
     iApply wp_value'.
-    wp_pure _.
+    do 5 wp_pure _.
 
     iAssert (∃ R T, saA ⤳ (R, T) ∗
             [∗ set] m ∈ R, socket_address_group_own {[m_sender m]})%I
       with "[Hrt]" as (R T) "[HRT HR]"; [by eauto|].
-    wp_pure _.
+    iAssert (∃ f, ⌜ f > 0 ⌝ ∗ ("0.0.0.0", tidA) ↦M <[Arole:=f]> ∅)%I
+      with "[HA]" as (f') "[Hf HA]".
+    { iExists _. iSplit; last iFrame. iPureIntro. lia. }
 
-    iLöb as "IH" forall (R T).
-
-    wp_pure _.
+    clear Hf.
+    iLöb as "IH" forall (f' R T) "Hf".
+    iDestruct "Hf" as %Hf.
     wp_pure _.
 
     wp_bind (SendTo _ _ _).
-    iApply sswp_MU_wp.
+    iApply sswp_MU_wp_fupd.
+
+    iInv Ns as (st) "(Hst & Hrest)" "Hclose".
+    iModIntro.
+
     iApply (wp_send _ _ false with "[Hsh] [HRT] [Hmsg]")=>//=>//=>//.
     iIntros "Hsh HRT".
 
-    (* TODO: put the model state in an invariant, and add ghost state on the second note to control it? *)
+    iApply (mu_step_model _ _ _ _ ∅ ∅ _ st with "Hst [HA] [Hfr //]").
+    { constructor. }
+    { set_solver. }
+    { set_solver. }
+    { rewrite fmap_empty map_union_empty //. }
+    iIntros "Hst HA Hfr".
 
-    iApply (mu_step_model _ _ _ _ ∅ ∅ with "Hmod [HA] []").
+    iMod ("Hclose" with "[Hst]").
+    { iNext. iExists st. naive_solver. }
+    iModIntro.
+    simpl.
+    rewrite /= ?map_union_empty //.
 
-  Lemma mu_step_model `{!LiveModelEq LM} ζ ρ α (f1 : nat) fs fr s1 s2 E P :
-    lts_trans Mod s1 (ρ, α) s2 →
-    Mod.(usr_live_roles) s2 ⊆ Mod.(usr_live_roles) s1 →
-    ρ ∉ dom fs →
-    ▷ frag_model_is s1 -∗
-    ▷ ζ ↦M ({[ρ:=f1]} ∪ fmap S fs) -∗
-    ▷ frag_free_roles_are fr -∗
-    (frag_model_is s2 -∗
-     ζ ↦M ({[ρ:=(Mod.(usr_fl) s2)]} ∪ fs) -∗
-     frag_free_roles_are fr -∗ P) -∗
-    MU E ζ α P.
-    iApply wp_lift_head_step_fupd; [done|].
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
-            "(%Hvalid & Hσ & [Hlive_auth Hlive_owns] & Hauth) /=".
-    iMod (steps_auth_update_S with "Hauth") as "Hauth".
-    rewrite (last_eq_trace_ends_in _ _ Hex).
-    iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
-      as (Sn r) "[%HSn (%Hr & %Hreset)]".
-    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
-    iSplitR.
-    { iPureIntro; do 4 eexists. eapply SocketStepS; eauto. by econstructor. }
-    iIntros (α ? ? ? Hstep). simpl in *. iModIntro. inv_head_step; iNext.
-    rewrite (insert_id (state_sockets σ)); last done.
-    iAssert (socket_address_group_own {[saA]})%I as "#HsaA".
-    { iDestruct "HRT" as "[(%send & %recv & _ & _ & _ & $ & _) _]". }
-    iAssert (socket_address_group_own {[saB]})%I as "#HsaB".
-    { by iDestruct "Hmsg" as (γ) "[H _]". }
-    iMod (aneris_state_interp_send shA saA {[saA]} saB {[saB]} _ _ sA _ _ _ _ _
-                                   "Hello"
-           with "[$HsaA] [$HsaB] [$Hsh] [HRT] [$Hmsg] [] [$Hσ]")
-        as "(%Hmhe & Hσ & Hsh & HRT)";
-      [try set_solver..|].
-    { apply message_group_equiv_refl; set_solver. }
-    { iDestruct "HRT" as "[$ _]". }
-    { by rewrite /from_singleton; eauto. }
-    iDestruct (live_role_auth_elem_of with "Hlive_auth HA") as %Hrole.
-    destruct (trace_last atr) as [[st ms] bs] eqn:Heqn.
-    iExists (st,ms ⊎ {[ (mkMessage saA saB "Hello") ]},bs),
-              (inl (Arole,Some (mkMessage saA saB "Hello"))).
-    iMod "Hclose". rewrite -Hmhe. iFrame=> /=.
-    iSplitR; last first.
-    { iDestruct "HR" as "#HR".
-      iApply ("IH" with "Hsh HA HΦ [HRT]"); [by iSplitL|done]. }
-    iPureIntro.
-    rewrite /simple_valid_state_evolution in Hvalid.
-    rewrite /simple_valid_state_evolution=> /=.
-    destruct Hvalid as (Hsteps & Hmatch & Hlive & Hms & Hskt).
-    rewrite /trace_ends_in in Hex.
-    rewrite Hex in Hms. simpl in Hms. rewrite Hms.
-    split; [econstructor; [done|econstructor|done]|].
-    split; [done|].
-    split.
-    { intros ℓ ζ Hlabels Henabled=> /=. rewrite right_id_L.
-      rewrite Hex in Hlive. eapply Hlive; [done|by rewrite Heqn]. }
-    split; last first.
-    { simpl. rewrite Hex in Hskt. simpl in *. by rewrite Heqn in Hskt. }
-    simpl. rewrite Heqn in Hms. simpl in *.
-    rewrite Heqn. simpl. multiset_solver.
+    iApply wp_value'.
+    do 2 wp_pure _.
+    iApply ("IH" $! 8 with "[$] [$] [$] [$] [$] [$] []").
+    iPureIntro; lia.
   Qed.
 
   Lemma wp_B s E shB :
