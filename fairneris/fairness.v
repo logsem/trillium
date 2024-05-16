@@ -109,7 +109,7 @@ Section model_traces.
   Hint Resolve mtrace_valid_mono : paco.
 
   Lemma mtrace_valid_coind_ltl mtr :
-    mtrace_valid_coind mtr → mtrace_valid mtr.
+    (mtr ⊩ mtrace_valid_coind) → (mtr ⊩ mtrace_valid).
   Proof.
     rewrite /mtrace_valid trace_alwaysI /trace_suffix_of.
     intros Hval mtr' [n Hsome]. revert mtr Hval mtr' Hsome.

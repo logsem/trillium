@@ -103,16 +103,17 @@ Defined.
 Notation mtrace := (lts_trace retransmit_model).
 
 (* Put somewhere *)
-Lemma mtrace_fair_always (mtr : mtrace) :
-  usr_fair mtr ↔ (□ usr_fair) mtr.
+Lemma mtrace_fair_always :
+  (usr_fair (M := retransmit_model)) ⇔ (□ usr_fair).
 Proof.
+  rewrite /usr_fair. intros mtr.
   split; last by intros Hfair%trace_always_elim.
   rewrite /usr_fair /usr_network_fair_send_receive /usr_network_fair_send_receive_of
     /usr_fair_scheduling /usr_fair_scheduling_mtr.
   intros [Hmtr1 Hmtr2].
   apply trace_always_forall in Hmtr1.
   apply trace_always_forall in Hmtr2.
-  eassert ((□ trace_and _ _) mtr).
+  eassert (mtr ⊩ (□ trace_and _ _)).
   { apply trace_always_and. split; [apply Hmtr1|apply Hmtr2]. }
   apply trace_always_idemp in H.
   revert H. apply trace_always_mono.
@@ -123,10 +124,10 @@ Proof.
   split.
   + intros x. revert Htr1.
     apply trace_always_mono. intros tr'. apply trace_impliesI.
-    intros Htr'. done.
+    intros Htr'. naive_solver.
   + intros x. revert Htr2.
     apply trace_always_mono. intros tr'. apply trace_impliesI.
-    intros Htr'. done.
+    intros Htr'. naive_solver.
 Qed.
 
 Definition option_lift {S L} (P : S → L → Prop) : S → option L → Prop :=
@@ -137,7 +138,7 @@ Lemma option_lift_Some {S L} (P : S → L → Prop) s l :
 Proof. intros (l'&Hl'&HP). by simplify_eq. Qed.
 
 Lemma A_always_live (mtr : mtrace) :
-  (□ (trace_now (λ s _, retransmit_role_enabled_model Arole s))) mtr.
+  (mtr ⊩ □ (trace_now (λ s _, retransmit_role_enabled_model Arole s))).
 Proof. apply trace_always_universal.
   rewrite /pred_at /retransmit_role_enabled_model. intros mtr'.
   by destruct mtr'; set_solver.
@@ -157,10 +158,10 @@ Qed.
 (* Qed. *)
 
 Lemma B_always_live_always_eventually_receive (mtr : mtrace) :
-  usr_fair mtr →
-  usr_trace_valid mtr →
-  (□ (trace_now (λ s _, s = Start))) mtr →
-  (□◊ℓ↓ usr_any_recv_filter saB) mtr.
+  (mtr ⊩ usr_fair) →
+  (mtr ⊩ usr_trace_valid) →
+  (mtr ⊩ □ (trace_now (λ s _, s = Start))) →
+  (mtr ⊩ □◊ℓ↓ usr_any_recv_filter saB).
 Proof.
   intros Hf Hval Hae. apply trace_alwaysI. intros mtr' Hsuff.
   (* have Hfs': retransmit_fair_scheduling mtr'. *)
@@ -224,8 +225,8 @@ Admitted.
 (* Qed. *)
 
 Lemma retransmit_fair_traces_eventually_mAB (mtr : mtrace) :
-  usr_trace_valid mtr → usr_fair mtr →
-  (◊ ℓ↓ usr_send_filter mAB) mtr.
+  (mtr ⊩ usr_trace_valid) → (mtr ⊩ usr_fair) →
+  (mtr ⊩ ◊ ℓ↓ usr_send_filter mAB).
 Proof.
   intros Hvalid [Hfairn Hfairs].
   specialize (Hfairs Arole).
@@ -249,8 +250,8 @@ Proof.
 Qed.
 
 Lemma retransmit_fair_traces_always_eventually_mAB (mtr : mtrace) :
-  usr_trace_valid mtr → usr_fair mtr →
-  (□ ◊ ℓ↓ usr_send_filter mAB) mtr.
+  (mtr ⊩ usr_trace_valid) → (mtr ⊩ usr_fair) →
+  (mtr ⊩ □ ◊ ℓ↓ usr_send_filter mAB).
 Proof.
   intros Hvalid [Hfairn Hfairs]. eapply trace_always_implies_always_strong;
     [|apply trace_always_and; split; [apply Hvalid|apply Hfairn]].

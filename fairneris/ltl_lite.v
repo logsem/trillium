@@ -65,10 +65,25 @@ Notation "○ P" := (trace_next P) (at level 20, right associativity) : trace_sc
 Notation "□ P" := (trace_always P) (at level 20, right associativity) : trace_scope.
 Notation "◊ P" := (trace_eventually P) (at level 20, right associativity) : trace_scope.
 Notation "↓ P" := (trace_now P) (at level 20, right associativity) : trace_scope.
+Notation "⫬ P" := (trace_not P) (at level 20, right associativity) : trace_scope.
+Notation "P ⋒ Q" := (trace_and P Q) (at level 20, right associativity) : trace_scope.
+Notation "P ⋓ Q" := (trace_or P Q) (at level 20, right associativity) : trace_scope.
 Notation "ℓ↓ P" := (trace_label P) (at level 20, right associativity) : trace_scope.
 Notation "P → Q" := (trace_implies P Q)
                       (at level 99, Q at level 200,
                          format "'[' P  →  '/' '[' Q ']' ']'") : trace_scope.
+
+Definition ltl_sat {S L} (tr: trace S L) (P : trace S L → Prop) := P tr.
+#[global] Hint Unfold ltl_sat : core.
+
+Notation "tr ⊩ P" := (ltl_sat tr P) (at level 300).
+
+Lemma ltl_sat_def {S L} (tr : trace S L) P :
+  (tr ⊩ P) ↔ P tr.
+Proof. rewrite /ltl_sat //. Qed.
+
+Definition iff2 {S L} := (λ (P Q : trace S L → Prop), ∀ tr, (tr ⊩ P) ↔ (tr ⊩ Q)).
+Infix "⇔" := iff2 (at level 30).
 
 (* TODO: Replace existing library lemma with this *)
 Lemma not_exists_forall_not_alt {A} (P : A → Prop) x : ¬ (∃ x, P x) → ¬ P x.
@@ -124,35 +139,35 @@ Section ltl_lemmas.
   (** trace_not lemmas *)
 
   Lemma trace_notI (P : trace S L → Prop) tr :
-    trace_not P tr ↔ ¬ P tr.
+    (tr ⊩ ⫬ P) ↔ ¬ (tr ⊩ P).
   Proof. done. Qed.
 
-  Lemma trace_not_idemp (P : trace S L → Prop) (tr : trace S L) :
-    trace_not (trace_not P) tr ↔ P tr.
+  Lemma trace_not_idemp (P : trace S L → Prop) :
+     ⫬ ⫬ P ⇔ P.
   Proof. rewrite /trace_not. split; [apply NNP_P|apply P_NNP]. Qed.
 
   Lemma trace_not_mono (P Q : trace S L → Prop) tr :
-    (Q tr → P tr) → trace_not P tr → trace_not Q tr.
+    ((tr ⊩ Q) → (tr ⊩ P)) → (tr ⊩ ⫬ P) → (tr ⊩ ⫬ Q).
   Proof. intros HQP HP HQ. apply HP. by apply HQP. Qed.
 
   (** trace_next lemmas *)
 
   Lemma trace_next_intro (P : trace S L → Prop) s l (tr : trace S L) :
-    P tr → (○ P) (s -[l]-> tr).
+    (tr ⊩ P) → (s -[l]-> tr ⊩ (○ P)).
   Proof. intros ?. exists tr. simpl in *. by simplify_eq. Qed.
 
   Lemma trace_next_elim (P : trace S L → Prop) s l tr :
-    (○ P) (s -[l]-> tr) → P tr.
+    ((s -[l]-> tr) ⊩ (○ P)) → (tr ⊩ P).
   Proof. inversion 1. naive_solver. Qed.
 
   Lemma trace_next_elim_inv (P : trace S L → Prop) tr :
-    (○ P) tr → ∃ s l tr', tr = s -[l]-> tr' ∧ P tr'.
+    (tr ⊩ (○ P)) → ∃ s l tr', tr = s -[l]-> tr' ∧ (tr' ⊩ P).
   Proof. inversion 1. destruct tr; naive_solver. Qed.
 
   (** trace_implies lemmas *)
 
   Lemma trace_impliesI (P Q : trace S L → Prop) tr :
-    trace_implies P Q tr ↔ (P tr → Q tr).
+    (tr ⊩ P → Q) ↔ ((tr ⊩ P) → (tr ⊩ Q)).
   Proof.
     split; [by intros [|]|].
     intros HPQ.
@@ -161,28 +176,27 @@ Section ltl_lemmas.
     + by left.
   Qed.
 
-  Lemma trace_implies_refl (P : trace S L → Prop) tr :
-    trace_implies P P tr.
+  Lemma trace_implies_refl (P : trace S L → Prop) tr : (tr ⊩ P → P).
   Proof. by apply trace_impliesI. Qed.
 
   (** trace_or lemmas *)
 
   Lemma trace_orI (P Q : trace S L → Prop) (tr : trace S L) :
-    trace_or P Q tr ↔ P tr ∨ Q tr.
+    (tr ⊩ P ⋓ Q) ↔ P tr ∨ Q tr.
   Proof. done. Qed.
 
   Lemma trace_or_l (P Q : trace S L → Prop) (tr : trace S L) :
-    P tr → trace_or P Q tr.
+    (tr ⊩ P) → (tr ⊩ P ⋓ Q).
   Proof. intros HP. by left. Qed.
 
   Lemma trace_or_r (P Q : trace S L → Prop) (tr : trace S L) :
-    Q tr → trace_or P Q tr.
+    (tr ⊩ Q) → (tr ⊩ P ⋓ Q).
   Proof. intros HP. by right. Qed.
 
   (** trace_and lemmas *)
 
   Lemma trace_andI (P Q : trace S L → Prop) (tr : trace S L) :
-    trace_and P Q tr ↔ P tr ∧ Q tr.
+    (tr ⊩ P ⋒ Q) ↔ (tr ⊩ P) ∧ (tr ⊩ Q).
   Proof.
     split.
     - intros HPQ.
@@ -204,7 +218,7 @@ Section ltl_lemmas.
 
   Lemma trace_now_mono_strong (P Q : S → option L → Prop) tr :
     (∀ s l, trfirst tr = s → trfirst_label tr = l → P s l → Q s l) →
-    (↓P) tr → (↓Q) tr.
+    (tr ⊩ ↓P) → (tr ⊩ ↓Q).
   Proof.
     destruct tr as [s|s l tr].
     - rewrite /trace_now /pred_at /=. intros HPQ Htr. by apply HPQ.
@@ -212,49 +226,49 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_now_mono (P Q : S → option L → Prop) tr :
-    (∀ s l, P s l → Q s l) → (↓P) tr → (↓Q) tr.
-  Proof. intros. eapply trace_now_mono_strong; [|done]. by eauto. Qed.
+    (∀ s l, P s l → Q s l) → (tr ⊩ ↓P) → (tr ⊩ ↓Q).
+  Proof. intros. eapply trace_now_mono_strong; [|naive_solver]. by eauto. Qed.
 
   Lemma trace_now_not P (tr : trace S L) :
-    (↓ (λ s l, ¬ P s l)) tr ↔ trace_not (↓ P) tr.
+    (↓ (λ s l, ¬ P s l)) tr ↔ (tr ⊩ ⫬ ↓ P).
   Proof. by destruct tr. Qed.
 
   Lemma trace_now_exists {A} (P : A → S → option L → Prop) (tr : trace S L) :
-    (↓ (λ s l, ∃ (x:A), P x s l)) tr → ∃ (x:A), (↓ P x) tr.
+    (tr ⊩ ↓ (λ s l, ∃ (x:A), P x s l)) → ∃ (x:A), (tr ⊩ ↓ P x).
   Proof. rewrite /trace_now /pred_at. intros H. by destruct tr. Qed.
 
   Lemma trace_now_or (P Q : S → option L → Prop) tr :
-    (↓ (P \2/ Q)) tr → (↓ P) tr ∨ (↓ Q) tr.
+    (tr ⊩ ↓ (P \2/ Q)) → (tr ⊩ ↓ P) ∨ (tr ⊩ ↓ Q).
   Proof. rewrite /trace_now /pred_at. by destruct tr=>/=. Qed.
 
-  Lemma trace_now_and P Q (tr : trace S L) :
-    (↓ (P /2\ Q)) tr ↔ trace_and (↓P) (↓Q) tr .
-  Proof. rewrite trace_andI. destruct tr; done. Qed.
+  Lemma trace_now_and (P Q : S → option L → Prop) :
+    (↓ (P /2\ Q)) ⇔ ((↓P) ⋒ (↓Q)).
+  Proof. intros tr. rewrite trace_andI. destruct tr; done. Qed.
 
   (* TODO: Maybe remove *)
   Lemma trace_now_split P Q (tr : trace S L) :
-    (↓ P) tr → (↓ Q) tr → (↓ (P /2\ Q)) tr.
+    (tr ⊩ ↓ P) → (tr ⊩ ↓ Q) → (tr ⊩ ↓ (P /2\ Q)).
   Proof. intros. apply trace_now_and. rewrite trace_andI. done. Qed.
 
   (** trace_eventually lemmas *)
 
   Lemma trace_eventually_intro P (tr : trace S L) :
-    P tr → (◊ P) tr.
+    (tr ⊩ P) → (tr ⊩ ◊ P).
   Proof. by constructor 1. Qed.
 
   Lemma trace_eventually_cons (P : trace S L → Prop) s l (tr : trace S L) :
-    (◊ P) tr → (◊ P) (s -[l]-> tr).
+    (tr ⊩ ◊ P) → (s -[l]-> tr ⊩ ◊ P).
   Proof. intros. by constructor 2. Qed.
 
   Lemma trace_eventually_idemp (P : trace S L → Prop) (tr : trace S L) :
-    (◊◊P) tr → (◊P) tr.
+    (tr ⊩ ◊◊P) → (tr ⊩ ◊P).
   Proof.
     intros Htr. induction Htr using trace_eventually_ind; [done|].
     apply trace_eventually_cons. done.
   Qed.
 
   Lemma trace_eventuallyI_alt (P : trace S L → Prop) tr :
-    (◊ P) tr ↔ (∃ tr', trace_suffix_of tr' tr ∧ (◊ P) tr').
+    (tr ⊩ ◊ P) ↔ (∃ tr', trace_suffix_of tr' tr ∧ (tr' ⊩ ◊ P)).
   Proof.
     split.
     - intros Heventually.
@@ -279,7 +293,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_eventuallyI (P : trace S L → Prop) tr :
-    (◊ P) tr ↔ (∃ tr', trace_suffix_of tr' tr ∧ P tr').
+    (tr ⊩ ◊ P) ↔ (∃ tr', trace_suffix_of tr' tr ∧ (tr' ⊩ P)).
   Proof.
     split.
     - intros Heventually.
@@ -295,7 +309,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_eventually_until (P : trace S L → Prop) (tr : trace S L) :
-    (◊P) tr → trace_until (trace_not P) (P) tr.
+    (tr ⊩ ◊P) → (tr ⊩ trace_until (trace_not P) P).
   Proof.
     assert (∀ tr, P tr ∨ ¬ P tr) as Hdec by by intros; apply ExcludedMiddle.
     induction 1 using trace_eventually_ind; [by constructor|].
@@ -305,7 +319,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_eventually_mono_strong (P Q : trace S L → Prop) tr :
-    (∀ tr', trace_suffix_of tr' tr → P tr' → Q tr') → (◊P) tr → (◊Q) tr.
+    (∀ tr', trace_suffix_of tr' tr → (tr' ⊩ P) → (tr' ⊩ Q)) → (tr ⊩ ◊P) → (tr ⊩ ◊Q).
   Proof.
     intros HPQ.
     induction 1 using trace_eventually_ind.
@@ -319,27 +333,27 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_eventually_mono (P Q : trace S L → Prop) tr :
-    (∀ tr, P tr → Q tr) → (◊P) tr → (◊Q) tr.
+    (∀ tr, (tr ⊩ P) → (tr ⊩ Q)) → (tr ⊩ ◊P) → (tr ⊩ ◊Q).
   Proof.
-    intros. eapply trace_eventually_mono_strong; [|done]. intros. by apply H.
+    intros. eapply trace_eventually_mono_strong; [|naive_solver]. intros. by apply H.
   Qed.
 
   Lemma trace_eventually_next (P : trace S L → Prop) (tr : trace S L) :
-    (◊ ○ P) tr → (◊ P) tr.
+    (tr ⊩ ◊ ○ P) → (tr ⊩ ◊ P).
   Proof.
     intros Hnext.
     induction Hnext using trace_eventually_ind.
     { destruct tr; [inversion H; naive_solver|].
-      constructor 2; [done|]. constructor. by eapply trace_next_elim. }
+      constructor 2; [done|]. constructor. by unshelve eapply trace_next_elim. }
     constructor 2; [done|]. apply IHHnext.
   Qed.
 
   Lemma trace_eventually_suffix_of (P : trace S L → Prop) tr1 tr2 :
-    trace_suffix_of tr1 tr2 → (◊P) tr1 → (◊P) tr2.
+    trace_suffix_of tr1 tr2 → (tr1 ⊩ ◊P) → (tr2 ⊩ ◊P).
   Proof. intros Hsuffix HP. apply trace_eventuallyI_alt. by exists tr1. Qed.
 
   Lemma trace_eventually_or (P Q : trace S L → Prop) tr :
-    (◊ (P \1/ Q)) tr → (◊ P) tr ∨ (◊ Q) tr.
+    (tr ⊩ ◊ (P \1/ Q)) → (tr ⊩ ◊ P) ∨ (tr ⊩ ◊ Q).
   Proof.
     intros Hdisj.
     induction Hdisj using trace_eventually_ind.
@@ -352,20 +366,20 @@ Section ltl_lemmas.
   (** trace_always lemmas *)
 
   Lemma trace_always_cons (P : trace S L → Prop) s l (tr : trace S L) :
-    (□ P) (s -[l]-> tr) → (□ P) tr.
+    (s -[l]-> tr ⊩ □ P) → (tr ⊩ □ P).
   Proof.
     intros Htr Htr'. apply Htr. clear Htr. by apply trace_eventually_cons.
   Qed.
 
   Lemma trace_always_idemp P (tr : trace S L) :
-    (□ P) tr → (□ □ P) tr.
+    (tr ⊩ □ P) → (tr ⊩ □ □ P).
   Proof.
     intros Htr Htr'. induction Htr'; [by apply H|].
     apply IHHtr'. by apply trace_always_cons in Htr.
   Qed.
 
   Lemma trace_always_elim (P : trace S L → Prop) (tr : trace S L) :
-    (□P) tr → P tr.
+    (tr ⊩ □P) → (tr ⊩ P).
   Proof.
     intros Htr.
     assert (P tr ∨ ¬ P tr) as [|HP] by apply ExcludedMiddle; [done|].
@@ -376,7 +390,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_always_mono (P Q : trace S L → Prop) tr :
-    (∀ tr, trace_implies P Q tr) → (□P) tr → (□Q) tr.
+    (∀ tr, (tr ⊩ P → Q)) → (tr ⊩ □P) → (tr ⊩ □Q).
   Proof.
     intros HPQ HP HQ. apply HP. eapply trace_eventually_mono; [|done].
     clear HP HQ. intros tr' HP HQ. apply HP.
@@ -384,7 +398,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_always_mono_strong (P Q : trace S L → Prop) tr :
-    (∀ tr', trace_suffix_of tr' tr → trace_implies P Q tr') → (□P) tr → (□Q) tr.
+    (∀ tr', trace_suffix_of tr' tr → (tr' ⊩ P → Q)) → (tr ⊩ □P) → (tr ⊩ □Q).
   Proof.
     intros HPQ HP HQ. apply HP. eapply trace_eventually_mono_strong; [|done].
     clear HP HQ. intros tr' Htr' HP HQ. apply HP.
@@ -392,7 +406,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_alwaysI_alt (P : trace S L → Prop) tr :
-    (□P) tr ↔ (∀ tr', trace_suffix_of tr' tr → (□ P) tr').
+    (tr ⊩ □P) ↔ (∀ tr', trace_suffix_of tr' tr → (tr' ⊩ □ P)).
   Proof.
     split.
     - intros Htr tr' Hsuffix Htr'.
@@ -411,11 +425,11 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_always_suffix_of (P : trace S L → Prop) tr1 tr2 :
-    trace_suffix_of tr2 tr1 → (□P) tr1 → (□P) tr2.
+    trace_suffix_of tr2 tr1 → (tr1 ⊩ □P) → (tr2 ⊩ □P).
   Proof. rewrite (trace_alwaysI_alt _ tr1). intros Hsuffix HP. by eapply HP. Qed.
 
   Lemma trace_alwaysI (P : trace S L → Prop) tr :
-    (□P) tr ↔ (∀ tr', trace_suffix_of tr' tr → P tr').
+    (tr ⊩ □P) ↔ (∀ tr', trace_suffix_of tr' tr → (tr' ⊩ P)).
   Proof.
     split.
     - intros HP tr' Hsuff. rewrite trace_alwaysI_alt in HP.
@@ -425,14 +439,14 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_always_eventually_always_until (P : trace S L → Prop) (tr : trace S L) :
-    (□ ◊P) tr → (□ trace_until (trace_not P) (P)) tr.
+    (tr ⊩ □ ◊P) → (tr ⊩ □ trace_until (⫬ P) P).
   Proof.
     rewrite !trace_alwaysI. intros He tr' Hsuff.
     apply trace_eventually_until. apply He=>//.
   Qed.
 
   Lemma trace_always_forall {A} (P : A → trace S L → Prop) tr :
-    (∀ (x:A), (□ (P x)) tr) ↔ (□ (λ tr', ∀ x, P x tr')) tr.
+    (∀ (x:A), (tr ⊩ □ (P x))) ↔ (tr ⊩ □ (λ tr', ∀ x, P x tr')).
   Proof.
     split.
     - intros Htr Htr'.
@@ -450,7 +464,7 @@ Section ltl_lemmas.
 
   (* TODO: This breaks naming convention *)
   Lemma trace_always_universal (P : trace S L → Prop) (tr : trace S L) :
-    (∀ tr, P tr) → (□P) tr.
+    (∀ tr, (tr ⊩ P)) → (tr ⊩ □P).
   Proof.
     intros ? H. induction H using trace_eventually_ind; [|done].
     simplify_eq. specialize (H0 tr). done.
@@ -458,7 +472,7 @@ Section ltl_lemmas.
 
   (* TODO: This is a bit of a weird statement *)
   Lemma trace_always_implies (P Q : trace S L → Prop) tr :
-    (□(P → Q)) tr → (□P) tr → (□ Q) tr.
+    (tr ⊩ □(P → Q)) → (tr ⊩ □P) → (tr ⊩ □ Q).
   Proof.
     intros HPQ HP.
     eapply trace_always_mono_strong; [|done].
@@ -468,7 +482,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_always_eventually P (tr : trace S L) :
-    (□ P) tr → (◊ P) tr.
+    (tr ⊩ □ P) → (tr ⊩ ◊ P).
   Proof.
     intros Halways. eapply trace_eventuallyI_alt. exists tr.
     split; [apply trace_suffix_of_refl|]. apply trace_eventually_intro.
@@ -476,7 +490,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_always_eventually_suffix_of tr1 tr2 (P : trace S L → Prop) :
-    trace_suffix_of tr1 tr2 → (□◊ P) tr1 → (□◊ P) tr2.
+    trace_suffix_of tr1 tr2 → (tr1 ⊩ □◊ P) → (tr2 ⊩ □◊ P).
   Proof.
     intros [n Hn] H1.
     apply trace_alwaysI.
@@ -495,7 +509,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_always_eventually_always_implies (P Q : trace S L → Prop) tr :
-    trace_always_eventually_implies P Q tr → (□P) tr → (◊Q) tr.
+    trace_always_eventually_implies P Q tr → (tr ⊩ □P) → (tr ⊩ ◊Q).
   Proof.
     intros HPQ HP.
     eapply trace_always_implies in HP; [|done].
@@ -516,10 +530,10 @@ Section ltl_lemmas.
     eapply trace_eventually_mono; [apply HQ|by apply HPQ; apply HP].
   Qed.
 
-  Lemma trace_always_not_not_eventually (P : trace S L → Prop) (tr : trace S L) :
-    (□ (trace_not P)) tr ↔ trace_not (◊ P) tr.
+  Lemma trace_always_not_not_eventually (P : trace S L → Prop) :
+    (□ ⫬ P) ⇔ (⫬ ◊ P).
   Proof.
-    split.
+    intros tr. split.
     - intros Halways Heventually.
       induction Heventually.
       { apply Halways. apply trace_eventually_intro. by apply P_NNP. }
@@ -534,16 +548,16 @@ Section ltl_lemmas.
       intros Heventually'. apply Heventually. by apply trace_eventually_cons.
   Qed.
 
-  Lemma trace_eventually_not_not_always (P : trace S L → Prop) (tr : trace S L) :
-    (◊ trace_not P) tr ↔ (trace_not (□ P)) tr.
+  Lemma trace_eventually_not_not_always (P : trace S L → Prop) :
+    (◊ ⫬ P) ⇔ (⫬ □ P).
   Proof.
-    split.
+    intros tr. split.
     - intros Heventually. apply P_NNP. done.
     - intros Halways. apply NNP_P in Halways. done.
   Qed.
 
   Lemma trace_always_and P Q (tr : trace S L) :
-    (□ trace_and P Q) tr ↔ ((□ P) tr ∧ (□ Q) tr).
+    (tr ⊩ □ P ⋒ Q) ↔ ((tr ⊩ □ P) ∧ (tr ⊩ □ Q)).
   Proof.
     split.
     - intros HPQ.
@@ -570,24 +584,24 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_weak_until_always P Q (tr : trace S L) :
-    (□P) tr → trace_weak_until P Q tr.
+    (tr ⊩ □P) → (tr ⊩ trace_weak_until P Q).
   Proof. intros HP. by apply trace_or_r. Qed.
 
   Lemma trace_always_implies_always_strong (P Q : trace S L → Prop) (tr : trace S L) :
-    (∀ tr', trace_suffix_of tr' tr → (□P) tr' → Q tr') → ((□P) tr → (□ Q) tr).
+    (∀ tr', trace_suffix_of tr' tr → (tr' ⊩ □P) → (tr' ⊩ Q)) → ((tr ⊩ □P) → (tr ⊩ □ Q)).
   Proof.
     intros HPQ HP%trace_always_idemp. eapply trace_always_mono_strong; [|done].
     intros ??. by apply trace_impliesI, HPQ.
   Qed.
 
   Lemma trace_always_implies_always (P Q : trace S L → Prop) (tr : trace S L) :
-    (∀ tr, (□P) tr → Q tr) → ((□P) tr → (□ Q) tr).
+    (∀ tr, (tr ⊩ □P) → (tr ⊩ Q)) → (tr ⊩ □P) → (tr ⊩ □ Q).
   Proof. intros Hi. apply trace_always_implies_always_strong. naive_solver. Qed.
 
-  Lemma trace_eventually_until_eventually (Q P : trace S L → Prop) tr :
-    (◊ P) tr ↔ (◊ (trace_until Q P)) tr.
+  Lemma trace_eventually_until_eventually (Q P : trace S L → Prop) :
+    (◊ P) ⇔ (◊ (trace_until Q P)).
   Proof.
-    split.
+    intros tr. split.
     - intros [tr' [Hsuff HP]]%trace_eventuallyI. apply trace_eventuallyI.
       exists tr'; split=>//. by constructor.
     - intros [tr' [Hsuff HP]]%trace_eventuallyI. induction HP as [|????? IH].
@@ -596,7 +610,7 @@ Section ltl_lemmas.
   Qed.
 
   Lemma trace_always_eventually_label_infinite P (tr : trace S L) :
-    (□◊ℓ↓P) tr → infinite_trace tr.
+    (tr ⊩ □◊ℓ↓P) → infinite_trace tr.
   Proof.
     intros Hltl n. revert tr Hltl. induction n as [|n IH]; first naive_solver.
     intros tr Hltl.
@@ -607,14 +621,73 @@ Section ltl_lemmas.
       destruct Hsuff as [[|m] Hafter]=>//. simpl in Hafter. by simplify_eq.
     - simpl. apply IH. by eapply trace_always_cons.
   Qed.
+
+  #[global] Instance iff2_rr : RewriteRelation (@iff2 S L) := {}.
+
+  #[global] Instance trace_iff2_refl : Reflexive (@iff2 S L).
+  Proof. rewrite /iff2. intros ??. naive_solver. Qed.
+  #[global] Instance trace_iff2_trans : Transitive (@iff2 S L).
+  Proof. rewrite /iff2. intros ??????. naive_solver. Qed.
+  #[global] Instance trace_iff2_symm : Symmetric (@iff2 S L).
+  Proof. rewrite /iff2. intros ????. naive_solver. Qed.
+
+  #[global] Instance trace_and_proper :
+    Proper ((@iff2 S L) ==> (@iff2 S L) ==> @iff2 S L) (@trace_and S L).
+  Proof. rewrite /iff2. intros ???????. rewrite !trace_andI. naive_solver. Qed.
+  #[global] Instance trace_or_proper :
+    Proper ((@iff2 S L) ==> (@iff2 S L) ==> @iff2 S L) (@trace_or S L).
+  Proof. rewrite /iff2. intros ???????. rewrite !trace_orI. naive_solver. Qed.
+  #[global] Instance trace_not_proper :
+    Proper ((@iff2 S L) ==> @iff2 S L) (@trace_not S L).
+  Proof. rewrite /iff2. intros ????. rewrite !trace_notI. naive_solver. Qed.
+  #[global] Instance trace_always_proper :
+    Proper ((@iff2 S L) ==> @iff2 S L) (@trace_always S L).
+  Proof. rewrite /iff2. intros ????. rewrite !trace_alwaysI. naive_solver. Qed.
+  #[global] Instance trace_eventually_proper :
+    Proper ((@iff2 S L) ==> @iff2 S L) (@trace_eventually S L).
+  Proof. rewrite /iff2. intros ????. rewrite !trace_eventuallyI. naive_solver. Qed.
+  #[global] Instance trace_iff2_proper :
+    Proper ((@iff2 S L) ==> (@iff2 S L) ==> iff) (@iff2 S L).
+  Proof. rewrite /iff2. intros ??????. naive_solver. Qed.
+  #[global] Instance trace_appl_proper tr :
+    Proper ((@iff2 S L) ==> iff) (λ P, P tr).
+  Proof. rewrite /iff2. intros ???. naive_solver. Qed.
+  #[global] Instance trace_sat_proper tr :
+    Proper ((@iff2 S L) ==> iff) (ltl_sat tr).
+  Proof. rewrite /iff2. intros ???. naive_solver. Qed.
+
+  Lemma trace_not_and (P Q : trace S L → Prop) :
+    (⫬ (P ⋒ Q)) ⇔ (⫬ P) ⋓ (⫬ Q).
+  Proof. intros ?. rewrite /trace_and trace_not_idemp //. Qed.
+
+  Lemma trace_not_or (P Q : trace S L → Prop) :
+    (⫬ (P ⋓ Q)) ⇔ ((⫬ P) ⋒ (⫬ Q)).
+  Proof. intros ?. rewrite /trace_and !trace_not_idemp //. Qed.
+
+  Lemma trace_not_impl (P Q : trace S L → Prop) :
+    (⫬ (P → Q)) ⇔ (P ⋒ (⫬ Q)).
+  Proof. rewrite /trace_implies trace_not_or trace_not_idemp //. Qed.
+
 End ltl_lemmas.
+
+Ltac trace_push_neg_once H :=
+  match goal with
+  | H: context [⫬ ?P ⋒ ?Q] |- _ => rewrite trace_not_and in H
+  | H: context [⫬ ?P ⋓ ?Q] |- _ => rewrite trace_not_or in H
+  | H: context [⫬ (?P → ?Q)] |- _ => rewrite trace_not_impl in H
+  | H: context [⫬ □ ?P] |- _ => rewrite -trace_eventually_not_not_always in H
+  | H: context [⫬ ◊ ?P] |- _ => rewrite -trace_always_not_not_eventually in H
+  end.
+
+Ltac trace_push_neg H := repeat trace_push_neg_once H.
+
 
 Section ltl_theorems.
   Context {S L : Type}.
 
   (* Strong fairness implies our (network) fairness *)
   Lemma SF_implies_OF (P Q: trace S L → Prop) tr :
-    ((□◊ P) → (□◊ Q))%trace tr → (□ ((□◊ P) → (◊ Q))) tr.
+    (tr ⊩ (□◊ P) → (□◊ Q)) → (tr ⊩ □ ((□◊ P) → (◊ Q))).
   Proof.
     intros Hsf. apply trace_alwaysI. intros tr' Hsuff.
     apply trace_impliesI. intros Hae.
@@ -624,20 +697,20 @@ Section ltl_theorems.
   Qed.
 
   Lemma OF_implies_SF (P Q: trace S L → Prop) tr :
-    (□ ((□◊ P) → (◊ Q))) tr → ((□◊ P) → (□◊ Q))%trace tr.
+    (tr ⊩ □ ((□◊ P) → (◊ Q))) → (tr ⊩ (□◊ P) → (□◊ Q)).
   Proof.
     intros Hsf. apply trace_impliesI.
     intros HP. apply trace_always_idemp in HP. revert HP.
     by apply trace_always_implies.
   Qed.
 
-  Theorem SF_equiv_OF (P Q: trace S L → Prop) tr :
-    ((□◊ P) → (□◊ Q))%trace tr ≡ (□ ((□◊ P) → (◊ Q))) tr.
+  Theorem SF_equiv_OF (P Q: trace S L → Prop) :
+    ((□◊ P) → (□◊ Q)) ⇔ (□ ((□◊ P) → (◊ Q))).
   Proof. split; [apply SF_implies_OF|apply OF_implies_SF]. Qed.
 
   (* Our (scheduling) Fairness implies Strong Fairness *)
   Lemma OF_implies_SF' (P Q: trace S L → Prop) tr :
-    (□ (P → (◊ Q)))%trace tr → ((□◊ P) → (□◊ Q))%trace tr.
+    (tr ⊩ □ (P → (◊ Q))) → (tr ⊩ (□◊ P) → (□◊ Q)).
   Proof.
     intros Htr. apply trace_impliesI.
     apply trace_always_implies.
@@ -667,7 +740,7 @@ Section stutter.
   Notation upto_stutter := (upto_stutter Us Ul).
 
   Definition ltl_se (P: ltl_pred St L) (Q: ltl_pred S' L') :=
-    ∀ tr tr', upto_stutter tr tr' → (P tr ↔ Q tr').
+    ∀ tr tr', upto_stutter tr tr' → ((tr ⊩ P) ↔ (tr' ⊩ Q)).
 
   #[local] Lemma upto_stutter_mono' :
     monotone2 (upto_stutter_ind Us Ul).
@@ -737,7 +810,7 @@ Section stutter.
     intros Hp1 Hp2 Hp3 Heq1 Heq2 tr tr' Hupto; split.
     - induction 1 as [tr Hnow| s ℓ tr Hsil Htu IH].
       + destruct tr as [s|s ℓ tr], tr' as [s'|s' ℓ' tr'] =>//=;
-        rewrite /trace_now /pred_at /= Heq1 Heq2 in Hnow *.
+        rewrite /trace_now /pred_at /= ltl_sat_def Heq1 Heq2 in Hnow *.
         * punfold Hupto. inversion Hupto; simplify_eq; naive_solver.
         * punfold Hupto. inversion Hupto; simplify_eq; naive_solver.
         * punfold Hupto. inversion Hupto; simplify_eq. destruct Hnow as [|[?[? HP2]]]. naive_solver.
@@ -751,7 +824,7 @@ Section stutter.
     - punfold Hupto. induction Hupto as [s|tr tr' s ℓ Hsil Hs1 Hs2 IH|tr tr' s ℓ s' ℓ' Hs Hl].
       + rewrite /trace_now /pred_at //=. intros HP. constructor 1. naive_solver.
       + intros Hnow. constructor 2; naive_solver.
-      + rewrite /trace_now /pred_at //= Heq2. intros Hnow. constructor 1. rewrite Heq1.
+      + rewrite /trace_now /pred_at //= ltl_sat_def Heq2. intros Hnow. constructor 1. rewrite Heq1.
         naive_solver.
   Qed.
 
@@ -825,7 +898,7 @@ Section stutter.
   Lemma ltl_se_forall {X} P P':
     (∀ (x : X), ltl_se (P x) (P' x)) →
     ltl_se (λ tr, ∀ x, P x tr) (λ tr, ∀ x, P' x tr).
-  Proof. intros Hse tr1 tr2 Hupto. naive_solver. Qed.
+  Proof. intros Hse tr1 tr2 Hupto. rewrite !ltl_sat_def. naive_solver. Qed.
 End stutter.
 
 Section traces_match.
@@ -837,13 +910,13 @@ Section traces_match.
   Notation tm := (traces_match Rl Rs trans1 trans2).
 
   Definition ltl_tme (P: ltl_pred S1 L1) (Q: ltl_pred S2 L2) :=
-    ∀ tr tr', tm tr tr' → (P tr ↔ Q tr').
+    ∀ tr tr', tm tr tr' → ((tr ⊩ P) ↔ (tr' ⊩ Q)).
 
   Lemma ltl_tme_use {P Q tr1 tr2}:
     ltl_tme P Q →
     tm tr1 tr2 →
-    P tr1 →
-    Q tr2.
+    (tr1 ⊩ P) →
+    (tr2 ⊩ Q).
   Proof. intros Htme Htm. rewrite Htme //. Qed.
 
   Lemma ltl_tme_now P P':
@@ -888,5 +961,5 @@ Section traces_match.
   Lemma ltl_tme_forall {X} P P':
     (∀ (x : X), ltl_tme (P x) (P' x)) →
     ltl_tme (λ tr, ∀ x, P x tr) (λ tr, ∀ x, P' x tr).
-  Proof. intros Hse tr1 tr2 Hupto. naive_solver. Qed.
+  Proof. intros Hse tr1 tr2 Hupto. rewrite !ltl_sat_def. naive_solver. Qed.
 End traces_match.

@@ -110,14 +110,13 @@ Section fairness.
     □ (□◊ ℓ↓send_filter msg → ◊ ℓ↓ deliver_filter msg).
 
   Definition jm_network_fair_delivery (mtr : jmtrace) : Prop :=
-    ∀ msg, jm_network_fair_delivery_of msg mtr.
+    ∀ msg, (mtr ⊩ jm_network_fair_delivery_of msg).
 
   Definition jm_network_fair_send_receive_of msg : jmtrace → Prop :=
     □ (□◊ℓ↓send_filter msg → □◊ℓ↓ any_recv_filter (m_destination msg) → ◊ℓ↓ recv_filter msg).
 
   Definition jm_network_fair_send_receive (mtr : jmtrace) : Prop :=
-    ∀ msg, jm_network_fair_send_receive_of msg mtr.
-
+    ∀ msg, (mtr ⊩ jm_network_fair_send_receive_of msg).
 
   Definition usr_send_filter msg : lts_label M → Prop :=
     λ l, ∃ ρ, l = (ρ, Some $ Send msg).
@@ -138,7 +137,7 @@ Section fairness.
     □ (□◊ℓ↓ usr_send_filter msg → □◊ℓ↓ usr_any_recv_filter (m_destination msg) → ◊ℓ↓ usr_recv_filter msg).
 
   Definition usr_network_fair_send_receive (utr : lts_trace M) : Prop :=
-    ∀ msg, usr_network_fair_send_receive_of msg utr.
+    ∀ msg, (utr ⊩ usr_network_fair_send_receive_of msg).
 End fairness.
 
 Instance aneris_good_lang : GoodLang aneris_lang.
@@ -198,7 +197,7 @@ Definition ex_fair_network_of msg : extrace aneris_lang → Prop :=
   □ (□◊ ℓ↓ex_send_filter msg → ◊ ℓ↓ex_deliver_filter msg).
 
 Definition ex_fair_network (extr : extrace aneris_lang) : Prop :=
-  ∀ msg, ex_fair_network_of msg extr.
+  ∀ msg, (extr ⊩ ex_fair_network_of msg).
 
 Section exec_fairness.
   Context `{LM: LiveModel aneris_lang (joint_model M net_model)}.
@@ -243,7 +242,7 @@ Section fairness.
                              eq eq (λ _ _ _, True) (λ _ _ _, True) P P).
 
   Lemma trim_preserves_network_fairness (tr: jmtrace):
-    jm_network_fair_delivery tr →
+    (tr ⊩ jm_network_fair_delivery) →
     jm_network_fair_delivery (trim_trace tr).
   Proof.
     rewrite /jm_network_fair_delivery /jm_network_fair_delivery_of.
@@ -283,13 +282,13 @@ Section user_fairness.
   Local Lemma not_receive_buffer {msg rest s ℓ} {tr : jmtrace} :
     let sa := m_destination msg in
    (∃ pre : list message, buffer_of sa (trfirst (s -[ ℓ ]-> tr)) = pre ++ msg :: rest) →
-   jmtrace_valid (s -[ ℓ ]-> tr) →
-   trace_not (ℓ↓ any_recv_filter (m_destination msg)) (s -[ ℓ ]-> tr) →
+   ((s -[ ℓ ]-> tr) ⊩ jmtrace_valid) →
+   (s -[ ℓ ]-> tr ⊩ ⫬ (ℓ↓ any_recv_filter (m_destination msg))) →
    ∃ pre : list message, buffer_of sa (trfirst tr) = pre ++ msg :: rest.
   Proof.
     intros sa Hbuf1 Hv Hnot.
     apply trace_always_elim in Hv. simpl in Hv.
-    destruct (trfirst tr) eqn:Heq. rewrite Heq in Hv.
+    destruct (trfirst tr) eqn:Heq. rewrite ltl_sat_def /= Heq in Hv.
     destruct Hbuf1 as (pre&Hbuf1). simpl in Hbuf1.
     inversion Hv as [| AA BB CC DD Hnet FF|??????? Hnet]; simplify_eq.
     - by exists pre.
@@ -311,9 +310,9 @@ Section user_fairness.
   Qed.
 
   Proposition network_fairness_user (jmtr: jmtrace) :
-    jmtrace_valid jmtr →
-    jm_network_fair_delivery jmtr →
-    jm_network_fair_send_receive jmtr.
+    (jmtr ⊩ jmtrace_valid) →
+    (jmtr ⊩ jm_network_fair_delivery) →
+    (jmtr ⊩ jm_network_fair_send_receive).
   Proof.
     intros Hv Hf msg. apply trace_alwaysI. intros tr' Hsuff.
     apply trace_impliesI. intros Hae.
@@ -330,8 +329,8 @@ Section user_fairness.
     assert (∃ rest, (buffer_of sa (trfirst tr1) = msg::rest)) as [rest Hbuf1].
     { do 2 eapply trace_always_suffix_of in Hv=>//.
       apply trace_always_elim in Hv. simpl in Hv.
-      destruct (trfirst tr1) eqn:Heq. rewrite Heq in Hv.
-      rewrite /trace_label /pred_at /deliver_filter /= in Hdel.
+      destruct (trfirst tr1) eqn:Heq. rewrite ltl_sat_def /= Heq in Hv.
+      rewrite ltl_sat_def /trace_label /pred_at /deliver_filter /= in Hdel.
       inversion Hv as [|???? Hnet|]; simplify_eq.
       inversion Hnet; simplify_eq.
       eexists. simpl. rewrite lookup_total_insert. done. }
@@ -360,7 +359,7 @@ Section user_fairness.
         have Hv' := Hv.
         rewrite /any_recv_filter in Hnow. destruct Hnow as (ρ&omsg&Heq). simplify_eq.
         apply trace_always_elim in Hv. simpl in Hv.
-        destruct (trfirst tr2) eqn:Heq. rewrite Heq in Hv.
+        destruct (trfirst tr2) eqn:Heq. rewrite ltl_sat_def /= Heq in Hv.
         destruct Hbuf as (pre&Hbuf1). simpl in Hbuf1.
         inversion Hv as [| | ??????? Hnet]; simplify_eq.
         simpl in Hbuf1.
@@ -398,7 +397,7 @@ Section user_fairness.
       destruct tr2 as [|s2 ℓ2 tr3] eqn:Heq; first done.
       destruct Hnow as (ρ&omsg&Heq'). simplify_eq.
       apply trace_always_elim in Hv. simpl in Hv.
-      destruct (trfirst tr3) eqn:Heq. rewrite Heq in Hv.
+      destruct (trfirst tr3) eqn:Heq. rewrite ltl_sat_def /= Heq in Hv.
       destruct Hbuf2 as (pre2&Hbuf2). simpl in Hbuf2.
       inversion Hv as [| | ??????? Hnet]; simplify_eq.
       inversion Hnet; simplify_eq.
@@ -413,10 +412,10 @@ Section user_fairness.
   Qed.
 
   Proposition network_fairness_project_usr (jmtr: jmtrace) (utr: lts_trace M) :
-    jmtrace_valid jmtr →
+    (jmtr ⊩ jmtrace_valid) →
     upto_stutter_env jmtr utr →
-    jm_network_fair_delivery jmtr →
-    usr_network_fair_send_receive utr.
+    (jmtr ⊩ jm_network_fair_delivery) →
+    (utr ⊩ usr_network_fair_send_receive).
   Proof.
     move=> Hval ? /network_fairness_user Hf // msg. specialize (Hf Hval msg).
     have Hse //: ltl_se_env (M := M) (jm_network_fair_send_receive_of msg) (usr_network_fair_send_receive_of msg);

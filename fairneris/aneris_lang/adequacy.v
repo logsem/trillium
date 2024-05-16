@@ -732,8 +732,8 @@ Section lm_network.
 
   Proposition program_model_refinement_downward_eventually extr utr (P : action aneris_lang → Prop) :
     program_model_refinement extr utr →
-    (◊ ℓ↓ (λ '(_, α), ∃ α', α = Some α' ∧ P α')) utr →
-    (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')) extr.
+    (utr ⊩ ◊ ℓ↓ (λ '(_, α), ∃ α', α = Some α' ∧ P α'))→
+    (extr ⊩ ◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')).
   Proof.
     rewrite /program_model_refinement /model_refinement /rel_compose.
     intros (auxtr&?&jmtr&?&ttr&?&?) Hev.
@@ -741,9 +741,9 @@ Section lm_network.
     have Heq: ltl_se_env (M := M) (N := net_model)
       (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')) ((◊ ℓ↓ λ '(_, α), ∃ α', α = Some α' ∧ P α')) .
     { apply ltl_se_eventually_now. intros [[??]|?]; naive_solver. }
-    rewrite -(Heq ttr) // in Hev. move=> {Heq}.
+    rewrite -(Heq ttr) // in Hev. clear Heq.
 
-    have {}Hev : (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')) jmtr.
+    have {}Hev : (jmtr ⊩ ◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ')).
     { by eapply trimmed_of_eventually_back. }
 
     have Heq: fuel_se
@@ -753,7 +753,7 @@ Section lm_network.
     { apply ltl_se_eventually_now. intros [? α ??|?|?]; [|naive_solver|naive_solver]. split.
       - intros (?&?&?&?&?). simplify_eq. naive_solver.
       - intros (?&?&?&?&?&?). simpl in *. simplify_eq. naive_solver. }
-    rewrite -(Heq auxtr) // in Hev. move=> {Heq}.
+    rewrite -(Heq auxtr) // in Hev. clear Heq.
 
     have Heq: exaux_tme (LM := LM)
       (◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ P ℓ'))
