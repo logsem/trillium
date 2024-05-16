@@ -731,9 +731,9 @@ Section primitive_laws.
     iMod (model_state_interp_has_fuels_decr with "Hm Hf") as "[$ $]". by iFrame.
   Qed.
 
-  Lemma has_fuels_dealloc E tid fs ρ (δ:joint_model Mod net_model) :
-    ρ ∉ live_roles _ δ → frag_model_is δ.1 -∗ tid ↦M fs -∗
-    |~{E}~| frag_model_is δ.1 ∗ tid ↦M (delete ρ fs).
+  Lemma has_fuels_dealloc E tid fs ρ (δ: Mod) :
+    ρ ∉ usr_live_roles δ → frag_model_is δ -∗ tid ↦M fs -∗
+    |~{E}~| frag_model_is δ ∗ tid ↦M (delete ρ fs).
   Proof.
     iIntros (Hnin) "Hst Hf". rewrite weakestpre.pre_step_unseal.
     iIntros (extr atr) "[Hσ [% Hm]]".
@@ -1180,7 +1180,7 @@ Section primitive_laws.
     ▷ sh ↪[ip_of_address saR] skt -∗
     ▷ saR ⤳ (R, T) -∗
     saR ⤇ φ -∗
-    (∀ om r,
+    ▷ (∀ om r,
        ((⌜r = NONEV⌝ ∗ ⌜om = Recv saR None⌝ ∗
         sh ↪[ip_of_address saR] skt ∗ saR ⤳ (R, T)) ∨
        (∃ msg,
@@ -1413,7 +1413,7 @@ Section primitive_laws.
     ▷ a ⤳ (R, T) -∗
     ▷ to ⤇ φ -∗
     (if is_dup then ⌜msg ∈ T⌝ else ▷ φ msg) -∗
-    (sh ↪[ip_of_address a] skt -∗ a ⤳ (R, {[ msg ]} ∪ T) -∗
+    ▷ (sh ↪[ip_of_address a] skt -∗ a ⤳ (R, {[ msg ]} ∪ T) -∗
      Φ (mkVal (ip_of_address a) #(String.length mbody)) (Some (Send msg))) -∗
     sswp k E ζ
          (mkExpr ip

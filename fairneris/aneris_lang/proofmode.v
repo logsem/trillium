@@ -273,32 +273,42 @@ Ltac simpl_has_fuels :=
   iEval (rewrite ?[in has_fuels _ _]fmap_insert ?[in has_fuels _ _]/= ?[in has_fuels _ _]fmap_empty) in "#∗".
 
 Tactic Notation "wp_pure" open_constr(efoc) :=
-  let solve_fuel _ :=
-    let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
-    iAssumptionCore || fail "wp_pure: cannot find" fs in
   iStartProof;
   lazymatch goal with
   | |- envs_entails _ (wp ?s ?E ?locale ?e ?Q) =>
     let e := eval simpl in e in
     reshape_expr e ltac:(fun K e' =>
       unify e' efoc;
-      eapply (tac_wp_pure _ _ _ _ _ K e');
-        [
-        |
-        | tc_solve
-        | trivial
-        | let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
-          iAssumptionCore || fail "wp_pures: cannot find" fs
-        |tc_solve
-        | pm_reduce;
-          simpl_has_fuels;
-          wp_finish
-        ] ; [ solve_fuel_positive
-            | try apply map_non_empty_singleton; try apply insert_non_empty; try done
-            |])
+      eapply (tac_wp_pure _ _ _ _ _ (@fill base_lang.base_ectxi_lang K e') _ _ 1);
+      [ let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
+       iAssumptionCore || fail "wp_pure: cannot find" fs
+      | tc_solve
+      | try solve_fuel_positive
+      | try apply map_non_empty_singleton; try apply insert_non_empty; try done
+      | try naive_solver
+      | tc_solve
+      | pm_reduce; simpl_has_fuels; wp_finish
+      ])
     || fail "wp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
+  end.
+
+Tactic Notation "mu_fuel" :=
+  let solve_fuel _ :=
+    let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
+    iAssumptionCore || fail "wp_pure: cannot find" fs in
+  iStartProof;
+  lazymatch goal with
+  | |- envs_entails _ (MU ?E ?locale None ?P) =>
+      eapply (tac_mu_fuel _ locale E);
+      [let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
+       iAssumptionCore || fail "mu_fuel: cannot find" fs
+      | try apply map_non_empty_singleton; try apply insert_non_empty; try done
+      | try solve_fuel_positive
+      | pm_reduce; simpl_has_fuels; wp_finish
+      ]
   | _ => fail "wp_pure: not a 'wp'"
   end.
+
 
 (* TODO: do this in one go, without [repeat]. *)
 Ltac wp_pures :=

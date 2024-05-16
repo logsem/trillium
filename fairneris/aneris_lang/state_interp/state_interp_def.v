@@ -238,20 +238,6 @@ Section Aneris_AS.
   Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
-  Definition ipA := "0.0.0.0".
-  Definition saA := SocketAddressInet ipA 80.
-  Definition sA := mkSocket (Some saA) true.
-  Definition tidA := 0.
-  Definition localeA := (ipA, tidA).
-
-  Definition ipB := "0.0.0.1".
-  Definition saB := SocketAddressInet ipB 80.
-  Definition sB := mkSocket (Some saB) true.
-  Definition tidB := 0.
-  Definition localeB := (ipB, tidB).
-
-  Definition mAB := mkMessage saA saB "Hello".
-
   Definition map_oζα
              (f : execution_trace aneris_lang → auxiliary_trace LM → iProp Σ)
              oζα : execution_trace aneris_lang → auxiliary_trace LM → iProp Σ :=
