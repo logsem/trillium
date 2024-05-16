@@ -6,7 +6,6 @@ From iris.algebra Require Import auth excl.
 From fairneris.prelude Require Import collect gset_map gmultiset.
 From trillium.program_logic Require Export weakestpre.
 From fairneris Require Export fairness fuel env_model.
-From fairneris Require Import retransmit_model.
 From fairneris.lib Require Import gen_heap_light.
 From fairneris.algebra Require Import disj_gsets.
 From fairneris.aneris_lang Require Export

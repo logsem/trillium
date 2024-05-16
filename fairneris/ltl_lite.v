@@ -573,13 +573,16 @@ Section ltl_lemmas.
     (□P) tr → trace_weak_until P Q tr.
   Proof. intros HP. by apply trace_or_r. Qed.
 
-  (* TODO: Remove? *)
+  Lemma trace_always_implies_always_strong (P Q : trace S L → Prop) (tr : trace S L) :
+    (∀ tr', trace_suffix_of tr' tr → (□P) tr' → Q tr') → ((□P) tr → (□ Q) tr).
+  Proof.
+    intros HPQ HP%trace_always_idemp. eapply trace_always_mono_strong; [|done].
+    intros ??. by apply trace_impliesI, HPQ.
+  Qed.
+
   Lemma trace_always_implies_always (P Q : trace S L → Prop) (tr : trace S L) :
     (∀ tr, (□P) tr → Q tr) → ((□P) tr → (□ Q) tr).
-  Proof.
-    intros HPQ HP%trace_always_idemp. eapply trace_always_mono; [|done].
-    intros ?. apply trace_impliesI, HPQ.
-  Qed.
+  Proof. intros Hi. apply trace_always_implies_always_strong. naive_solver. Qed.
 
   Lemma trace_eventually_until_eventually (Q P : trace S L → Prop) tr :
     (◊ P) tr ↔ (◊ (trace_until Q P)) tr.

@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl.
 From trillium Require Import adequacy.
 From trillium.prelude Require Import relations.
-From fairneris Require Import fairness retransmit_model fair_resources.
+From fairneris Require Import fairness fair_resources.
 From fairneris.aneris_lang Require Import aneris_lang resources network_model.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def.
 From fairneris.aneris_lang.state_interp Require Import state_interp_config_wp.

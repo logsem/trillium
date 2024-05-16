@@ -198,8 +198,18 @@ Section traces.
     specialize (Hinf (n+m)).
     rewrite after_sum' Hafter // in Hinf.
   Qed.
-  End after.
 
+  Lemma trace_suffix_of_singleton (tr: trace St L) s :
+    trace_suffix_of tr ⟨ s ⟩ ↔ tr = ⟨ s ⟩.
+  Proof.
+    split.
+    - destruct tr.
+      + rewrite /trace_suffix_of. intros (n & Hafter).
+        destruct n=>//=. naive_solver.
+      + rewrite /trace_suffix_of. intros (n & Hafter). destruct n=>//=.
+    - intros ->. by exists 0.
+  Qed.
+  End after.
 End traces.
 
 Delimit Scope trace_scope with trace.

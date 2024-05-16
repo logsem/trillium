@@ -85,6 +85,25 @@ Section user_fairness.
 
   Definition usr_fair_scheduling (mtr : lts_trace M) : Prop :=
     ∀ ρ, usr_fair_scheduling_mtr ρ mtr.
+
+  Lemma eventually_my_step (P: M → Prop) (ρ : usr_role M) (mtr : lts_trace M):
+    usr_fair_scheduling mtr →
+    usr_trace_valid mtr →
+    (∀ s1 s2 ρ' l, ρ ≠ ρ' → lts_trans M s1 (ρ', l) s2 → P s1 → P s2) →
+    (↓ (λ s _, P s)) mtr →
+    (◊ ↓ (λ s l, match l with Some (ρ', _) => ρ' = ρ ∧ P s | None => False end)) mtr.
+  Proof. Admitted.
+
+  Lemma eventually_my_step_loop (s: M) (ρ : usr_role M) (mtr : lts_trace M):
+    usr_fair_scheduling mtr →
+    usr_trace_valid mtr →
+    (∀ s1 s2 ρ' l, ρ ≠ ρ' → lts_trans M s1 (ρ', l) s2 → s1 = s2) →
+    (↓ (λ s' _, s' = s)) mtr →
+    (◊ ↓ (λ s' l, match l with Some (ρ', _) => ρ' = ρ ∧ s' = s | None => False end)) mtr.
+  Proof.
+    intros ?? Ht Hnow. apply (eventually_my_step (λ s', s' = s))=>//.
+    intros s1 s2 ρ' l Hneq Htrans <-. symmetry. eapply Ht=>//.
+  Qed.
 End user_fairness.
 
 Inductive joint_trans {M: UserModel} {N: EnvModel} :

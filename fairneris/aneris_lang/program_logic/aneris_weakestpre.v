@@ -1,7 +1,6 @@
 From iris.proofmode Require Import base tactics classes.
 From fairneris Require Export fairness env_model.
 From trillium.program_logic Require Export weakestpre.
-From fairneris Require Export retransmit_model.
 From fairneris.lib Require Import singletons.
 From fairneris.aneris_lang Require Export resources network base_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp_def state_interp.
