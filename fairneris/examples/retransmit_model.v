@@ -65,8 +65,8 @@ Inductive retransmit_trans :
   retransmit_trans st (Arole, Some (Send mAB)) st
 | B_RecvFail :
   retransmit_trans Start (Brole, Some (Recv saB None)) Start
-| B_RecvSucc msg :
-  retransmit_trans Start (Brole, Some (Recv saB (Some msg))) Received
+| B_RecvSucc :
+  retransmit_trans Start (Brole, Some (Recv saB (Some mAB))) Received
 | B_SendDone :
   retransmit_trans Received (Brole, Some (Send mDone)) Done
 .
@@ -144,86 +144,6 @@ Proof. apply trace_always_universal.
   by destruct mtr'; set_solver.
 Qed.
 
-(* Lemma B_always_live_infinite (mtr : mtrace) : *)
-(*   ¬ retransmit_terminating_role Brole mtr → *)
-(*   (□ (trace_now (λ s _, retransmit_role_enabled_model Brole s))) mtr. *)
-(* Proof. *)
-(*   intros Hnt. apply trace_alwaysI. intros mtr' Hsuff. *)
-(*   rewrite /trace_now /pred_at /retransmit_role_enabled_model. *)
-(*   have ? : Brole ∈ retransmit_live_roles (trfirst mtr'); last destruct mtr' =>//=. *)
-(*   apply NNP_P => Hin. apply Hnt. *)
-(*   rewrite /retransmit_terminating_role. left. *)
-(*   eapply (trace_eventually_suffix_of _ mtr') =>//. apply trace_eventually_intro. *)
-(*   by destruct mtr'. *)
-(* Qed. *)
-
-Lemma B_always_live_always_eventually_receive (mtr : mtrace) :
-  (mtr ⊩ usr_fair) →
-  (mtr ⊩ usr_trace_valid) →
-  (mtr ⊩ □ (trace_now (λ s _, s = Start))) →
-  (mtr ⊩ □◊ℓ↓ usr_any_recv_filter saB).
-Proof.
-  intros Hf Hval Hae. apply trace_alwaysI. intros mtr' Hsuff.
-  (* have Hfs': retransmit_fair_scheduling mtr'. *)
-  (* { by apply mtrace_fair_always, (trace_always_suffix_of _ _ _ Hsuff), trace_always_elim in Hf as [??]. } *)
-  (* rewrite /retransmit_fair_scheduling in Hfs'. *)
-  (* specialize (Hfs' Brole). *)
-  (* rewrite /retransmit_fair_scheduling_mtr in Hfs'. *)
-  (* rewrite /trace_always_eventually_implies_now in Hfs'. *)
-  (* rewrite /trace_always_eventually_implies in Hfs'. *)
-  (* have He: (↓ λ s _, s = Start) mtr'. *)
-  (* { apply trace_always_elim in Hfs'. *)
-  (*   apply (trace_always_suffix_of _ _ _ Hsuff) in Hae. *)
-  (*   by apply trace_always_elim in Hae. } *)
-  (* have He': (↓ λ s _, retransmit_role_enabled_model Brole s) mtr'. *)
-  (* { eapply trace_now_mono=>//. move=> s l /= ->. *)
-  (*   rewrite /retransmit_role_enabled_model. set_solver. } *)
-  (* apply trace_always_elim in Hfs'. *)
-  (* rewrite trace_impliesI in Hfs'. *)
-  (* specialize (Hfs' He'). clear He'. *)
-
-
-  (* apply trace_eventuallyI in Hfs' as (mtr'' & Hsuff' & Hfs''). *)
-  (* apply (trace_eventually_suffix_of _ mtr'') =>//. *)
-  (* have Hsuff2: trace_suffix_of mtr'' mtr by eapply trace_suffix_of_trans. *)
-  (* have He': retransmit_role_enabled_model Brole (trfirst mtr''). *)
-  (* { apply (trace_always_suffix_of _ _ _ Hsuff2) in Hae. *)
-  (*   eapply trace_always_elim in Hae. by destruct mtr''. } *)
-  (* destruct mtr'' as [|s [ρ α]]; destruct Hfs''=>//. *)
-  (* apply trace_eventually_intro=>//=. *)
-  (* rewrite /trace_label /pred_at /any_recv_filter /=. *)
-  (* apply (trace_always_suffix_of _ _ _ Hsuff2), trace_always_elim in Hval. *)
-  (* inversion Hval; simplify_eq; naive_solver. *)
-Admitted.
-
-(* Lemma B_always_receives (mtr : mtrace) : *)
-(*   mtrace_fair mtr → *)
-(*   mtrace_valid mtr → *)
-(*   ¬ retransmit_terminating_role Brole mtr → *)
-(*   (□◊ℓ↓ any_recv_filter saB) mtr. *)
-(* Proof. *)
-(*   intros Hf Hval Hnt. *)
-(*   apply B_always_live_infinite in Hnt. *)
-(*   apply B_always_live_always_eventually_receive in Hnt =>//. *)
-(* Qed. *)
-
-
-(* Lemma retransmit_fair_traces_eventually_A mtr : *)
-(*   retransmit_fair_scheduling_mtr Arole mtr → *)
-(*   (◊ (↓ (λ _ ℓ, option_map fst ℓ = Some $ Arole))) mtr. *)
-(* Proof. *)
-(*   intros Hfair. *)
-(*   pose proof (A_always_live mtr) as HA. *)
-(*   eapply trace_always_eventually_always_implies; [|done]. *)
-(*   eapply trace_always_eventually_always_mono; [| |apply Hfair]. *)
-(*   - intros Htr. apply trace_implies_refl. *)
-(*   - intros tr. *)
-(*     apply trace_impliesI. *)
-(*     apply trace_now_mono. *)
-(*     intros s l. intros [Htr|Htr]; [|done]. *)
-(*     rewrite /retransmit_role_enabled_model in Htr. set_solver. *)
-(* Qed. *)
-
 Lemma retransmit_fair_traces_eventually_mAB (mtr : mtrace) :
   (mtr ⊩ usr_trace_valid) → (mtr ⊩ usr_fair) →
   (mtr ⊩ ◊ ℓ↓ usr_send_filter mAB).
@@ -262,33 +182,125 @@ Proof.
   Unshelve. exact inhabitant.
 Qed.
 
+Lemma retransmit_node_B_receives (mtr : mtrace) :
+  (mtr ⊩ usr_trace_valid) → (mtr ⊩ usr_fair) →
+  (mtr ⊩ ↓ (λ s _, s = Start)) →
+  (mtr ⊩ ◊ ℓ↓ usr_any_recv_filter saB).
+Proof.
+  intros Hval [_ Hfair] Hs.
+  have {}Hs : trfirst mtr = Start.
+  { rewrite ltl_sat_def /trace_now /pred_at /= in Hs *. destruct mtr; set_solver. }
+  specialize (Hfair Brole). apply trace_always_elim in Hfair.
+  rewrite trace_impliesI in Hfair. ospecialize (Hfair _).
+  { rewrite ltl_sat_def /trace_now /pred_at /= in Hs *. destruct mtr; set_solver. }
+  apply trace_eventually_until in Hfair.
+  induction Hfair as [tr Hnow|s [ρ α] tr Hlater Hh IH].
+  - apply trace_eventually_intro.
+    rewrite ltl_sat_def /trace_now /trace_label /pred_at /= in Hnow *.
+    destruct tr; first naive_solver set_solver.
+    destruct Hnow as [Hnow|[α Hnow]]; first naive_solver set_solver.
+    simplify_eq. apply trace_always_elim in Hval.
+    rewrite /usr_trans_valid ltl_sat_def /usr_any_recv_filter /= in Hval *.
+    inversion Hval; simplify_eq; naive_solver.
+  - apply trace_eventually_cons, IH=>//. by apply trace_always_cons in Hval.
+    apply trace_always_elim in Hval.
+    rewrite /usr_trans_valid ltl_sat_def /usr_any_recv_filter /= in Hval.
+    inversion Hval; simplify_eq; try naive_solver. exfalso. apply Hlater.
+    right. naive_solver.
+Qed.
 
-(* Lemma B_terminates (mtr : mtrace) : *)
-(*   mtrace_fair mtr → *)
-(*   mtrace_valid mtr → *)
-(*   retransmit_terminating_role Brole mtr. *)
-(* Proof. *)
-(*   intros Hf Hval. apply NNP_P. intros Hnt. *)
-(*   have Haer := Hnt. *)
-(*   apply B_always_receives in Haer =>//. *)
-(*   have Haes: (□ ◊ ℓ↓ send_filter mAB) mtr. *)
-(*   { apply retransmit_fair_traces_always_eventually_mAB =>//. destruct Hf =>//. } *)
-(*   have Har: (◊ ℓ↓ recv_filter mAB) mtr. *)
-(*   { destruct Hf as [Hsf Hnf]. *)
-(*     specialize (Hnf mAB). *)
-(*     apply trace_always_elim in Hnf. *)
-(*     rewrite !trace_impliesI in Hnf. *)
-(*     naive_solver. } *)
-(*   apply trace_eventuallyI in Har as (mtr' & Hsuff & Hr). *)
-(*   destruct mtr' as [| s [ρ α] mtr'']; first naive_solver. *)
+Lemma retransmit_fair_node_B_receives (mtr : mtrace) :
+  (mtr ⊩ usr_trace_valid) → (mtr ⊩ usr_fair) →
+  (mtr ⊩ ↓ (λ s _, s = Start)) →
+  (mtr ⊩ ◊ ↓ (λ s _, s = Received)).
+Proof.
+  intros Hval Hfair Hstart. have [Hfairn Hfairs] := Hfair.
+  specialize (Hfairn mAB).
+  apply trace_always_elim in Hfairn.
+  rewrite trace_impliesI in Hfairn.
+  ospecialize (Hfairn _).
+  { apply retransmit_fair_traces_always_eventually_mAB=>//. }
+  apply trace_eventually_next.
+  eapply (trace_eventually_mono_strong (ℓ↓ usr_recv_filter mAB)).
+  { rewrite /trace_label /trace_now /pred_at /=. move=> [|s l mtr'] Hsuff //.
+    rewrite !ltl_sat_def /usr_recv_filter. destruct l as [? [[|] | ]]; simpl.
+    1, 3: naive_solver. intros [ρ ?]. simplify_eq; simpl.
+    eapply trace_always_suffix_of, trace_always_elim in Hval =>//.
+    rewrite ltl_sat_def in Hval. apply trace_next_intro.
+    inversion Hval; simplify_eq; simpl. destruct mtr'=>//=. }
 
-(*   apply Hnt. *)
-(*   left. apply trace_eventuallyI. exists mtr''. split. *)
-(*   { eapply trace_suffix_of_trans=>//. exists 1. done. } *)
+  apply trace_anyways.
+  intros Hc. trace_push_neg Hc.
 
-(*   apply (trace_always_suffix_of _ _ _ Hsuff), trace_always_elim in Hval. *)
-(*   have ? : Brole ∉ retransmit_live_roles (trfirst mtr''). *)
-(*   { rewrite /trace_label /pred_at /recv_filter /= in Hr. *)
-(*     inversion Hval; simplify_eq; try set_solver. } *)
-(*   rewrite /trace_now /pred_at /=. destruct mtr''=>//. *)
-(* Qed. *)
+  have Ha: (mtr ⊩ □ usr_trans_valid aneris_lang ⋒ ⫬ ℓ↓ usr_recv_filter mAB).
+  { apply trace_always_and; naive_solver. }
+
+  have Has: (mtr ⊩ □ ↓ (λ s _, s = Start)).
+  { apply (trace_always_next _ _ _ Ha)=>//.
+    rewrite /trace_now /trace_label /pred_at /usr_trans_valid /=.
+    intros tr Hst [Hval' Hnr]%trace_andI Hnf.
+    apply trace_next_elim_inv in Hnf as (s&l&tr'&->&_).
+    apply trace_next_intro.
+    rewrite !ltl_sat_def in Hnr Hval' Hst *.
+    inversion Hval'; simplify_eq=>//; try by destruct tr'=>//.
+    exfalso. apply Hnr. rewrite /usr_recv_filter /=. naive_solver. }
+
+  rewrite trace_impliesI in Hfairn. apply Hfairn.
+  eapply trace_always_mono_strong; last apply Has.
+  intros tr' Hsuff. rewrite trace_impliesI. intros Hs.
+
+  eapply retransmit_node_B_receives=>//.
+  eapply trace_always_suffix_of=>//.
+  rewrite mtrace_fair_always.
+  eapply trace_always_suffix_of; first apply Hsuff.
+  rewrite -mtrace_fair_always //.
+Qed.
+
+Lemma retransmit_fair_node_B_sends (mtr : mtrace) :
+  (mtr ⊩ usr_trace_valid) → (mtr ⊩ usr_fair) →
+  (mtr ⊩ ↓ (λ s _, s = Start)) →
+  (mtr ⊩ ◊ ℓ↓ usr_send_filter mDone).
+Proof.
+  intros Hval Hfair Hs.
+  have Hr : (mtr ⊩ ◊ ↓ (λ s _, s = Received)).
+  { apply retransmit_fair_node_B_receives =>//. }
+
+
+  rewrite trace_eventuallyI in Hr.
+  destruct Hr as (tr & Hsuff & Hr).
+
+  eapply trace_always_suffix_of in Hval=>//.
+  rewrite mtrace_fair_always in Hfair.
+  eapply trace_always_suffix_of in Hfair; last apply Hsuff.
+  rewrite -mtrace_fair_always in Hfair.
+
+  have [Hfairn Hfairs] := Hfair.
+
+  have {}Hr : trfirst tr = Received.
+  { rewrite ltl_sat_def /trace_now /pred_at /= in Hr *. destruct tr; set_solver. }
+  specialize (Hfairs Brole). apply trace_always_elim in Hfairs.
+  rewrite trace_impliesI in Hfairs. ospecialize (Hfairs _).
+  { rewrite ltl_sat_def /trace_now /pred_at /= in Hs *. destruct tr; set_solver. }
+  apply trace_eventually_until in Hfairs.
+  eapply trace_eventually_suffix_of=>//.
+  induction Hfairs as [tr Hnow|s [ρ α] tr Hlater Hh IH].
+  - apply trace_eventually_intro.
+    rewrite ltl_sat_def /trace_now /trace_label /pred_at /= in Hnow *.
+    destruct tr; first naive_solver set_solver.
+    destruct Hnow as [Hnow|[α Hnow]]; first naive_solver set_solver.
+    simplify_eq. apply trace_always_elim in Hval.
+    rewrite /usr_trans_valid ltl_sat_def /usr_send_filter /= in Hval *.
+    inversion Hval; simplify_eq; naive_solver.
+  - apply trace_eventually_cons, IH=>//.
+    + apply trace_suffix_of_cons_l in Hsuff. done.
+    + by apply trace_always_cons in Hval.
+    + eapply trace_always_suffix_of in Hval=>//; last eapply trace_suffix_of_cons_l, trace_suffix_of_refl.
+      rewrite mtrace_fair_always in Hfair.
+      eapply trace_always_cons in Hfair.
+      rewrite -mtrace_fair_always // in Hfair.
+    + intros msg. specialize (Hfairn msg). by apply trace_always_cons in Hfairn.
+    + apply trace_always_elim in Hval.
+      rewrite /usr_trans_valid ltl_sat_def /usr_any_recv_filter /= in Hval.
+      inversion Hval; simplify_eq; try naive_solver. exfalso. apply Hlater.
+      right. naive_solver.
+Qed.

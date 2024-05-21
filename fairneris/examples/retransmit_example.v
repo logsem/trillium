@@ -84,7 +84,7 @@ Section with_Σ.
   Qed.
 
   Lemma wp_A tid f (Hf: f > 9) :
-    {{{ inv Ns retinv ∗ frag_free_roles_are ∅ ∗ is_node ipA ∗ saB ⤇ (λ _, True) ∗
+    {{{ inv Ns retinv ∗ frag_free_roles_are ∅ ∗ is_node ipA ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
           (ipA, tid) ↦M {[ Arole := f ]} ∗ saA ⤳ (∅, ∅) ∗
           free_ports (ip_of_address saA) {[port_of_address saA]} }}}
       (mkExpr (ip_of_address saA) (Aprog saA saB)) @ (ipA, tid); ⊤
@@ -151,10 +151,10 @@ Section with_Σ.
     iPureIntro; lia.
   Qed.
 
-  Lemma wp_wait tid f (Hf: f > 9) sh b R1 T1:
+  Lemma wp_wait tid f (Hf: f > 9) sh b T1:
     {{{ inv Ns retinv ∗ own retransmit_name (◯E retransmit_model.Start) ∗
-          frag_free_roles_are ∅ ∗ is_node ipB ∗ saB ⤇ (λ _, True) ∗
-          (ipB, tid) ↦M {[ Brole := f ]} ∗ saB ⤳ (R1, T1) ∗
+          frag_free_roles_are ∅ ∗ is_node ipB ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
+          (ipB, tid) ↦M {[ Brole := f ]} ∗ saB ⤳ (∅, T1) ∗
           sh ↪[ipB] {| saddress := Some saB; sblock := b |} }}}
       (mkExpr (ip_of_address saB) (wait_receive #(LitSocket sh))) @ (ipB, tid); ⊤
     {{{ v, RET v; ⌜ v.(val_n) = ipB ⌝ ∗ ∃ f' R2 T2, (ipB, tid) ↦M {[ Brole := f' ]} ∗ ⌜ f' > 8 ⌝ ∗
@@ -183,7 +183,7 @@ Section with_Σ.
     { iExists _. iSplit; last iFrame. iPureIntro. lia. }
 
     clear f Hf.
-    iLöb as "IH" forall (f' R1 T1) "Hf".
+    iLöb as "IH" forall (f' T1) "Hf".
     iDestruct "Hf" as %Hf.
 
     wp_pure _.
@@ -220,7 +220,7 @@ Section with_Σ.
       { iPureIntro; lia. }
     - simplify_eq.
       iApply (mu_step_model _ _ _ _ ∅ ∅ _ (Received : retransmit_model) with "Hst [HB] [Hfr //]").
-      { constructor. }
+      { rewrite Hin'. constructor. set_solver. }
       { set_solver. }
       { set_solver. }
       { rewrite fmap_empty map_union_empty //. }
@@ -241,7 +241,7 @@ Section with_Σ.
 
   Lemma wp_B tid f (Hf: f > 20):
     {{{ inv Ns retinv ∗ own retransmit_name (◯E retransmit_model.Start) ∗
-          frag_free_roles_are ∅ ∗ is_node ipB ∗ saA ⤇ (λ _, True) ∗ saB ⤇ (λ _, True) ∗
+          frag_free_roles_are ∅ ∗ is_node ipB ∗ saA ⤇ (λ _, True) ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
           (ipB, tid) ↦M {[ Brole := f ]} ∗ saB ⤳ (∅, ∅) ∗
           free_ports (ip_of_address saB) {[port_of_address saB]} }}}
       (mkExpr (ip_of_address saB) (Bprog saA saB)) @ (ipB, tid); ⊤

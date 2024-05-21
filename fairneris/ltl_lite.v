@@ -622,6 +622,21 @@ Section ltl_lemmas.
     - simpl. apply IH. by eapply trace_always_cons.
   Qed.
 
+  Lemma trace_anyways P (tr : trace S L) :
+    ((tr ⊩ ⫬ P) → (tr ⊩ P)) → (tr ⊩ P).
+  Proof. destruct (ExcludedMiddle (tr ⊩ P)); naive_solver. Qed.
+  Lemma trace_absurd P (tr : trace S L) :
+    ((tr ⊩ ⫬ P) → False) → (tr ⊩ P).
+  Proof. destruct (ExcludedMiddle (tr ⊩ P)); naive_solver. Qed.
+
+  Lemma trace_always_next P Q (tr : trace S L) :
+    (tr ⊩ □ Q) →
+    (tr ⊩ P) →
+    (∀ tr, (tr ⊩ P) → (tr ⊩ Q) → (tr ⊩ ○ ↓ λ _ _, True) → (tr ⊩ ○ P)) →
+    (tr ⊩ □ P).
+  Proof.
+  Admitted.
+
   #[global] Instance iff2_rr : RewriteRelation (@iff2 S L) := {}.
 
   #[global] Instance trace_iff2_refl : Reflexive (@iff2 S L).
