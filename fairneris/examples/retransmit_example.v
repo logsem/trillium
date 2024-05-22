@@ -67,7 +67,7 @@ Section with_Σ.
 
   Definition mAB := mkMessage saA saB "Hello".
 
-  Definition retinv : iProp Σ := ∃ st, frag_model_is st ∗ own retransmit_name (●E st).
+  Definition retinv : iProp Σ := frag_free_roles_are ∅ ∗ ∃ st, frag_model_is st ∗ own retransmit_name (●E st).
 
   Lemma token_update γ (st st' st'' : retransmit_state) :
     own γ (●E st) ∗ own γ (◯E st'') ==∗ own γ (●E st') ∗ own γ (◯E st').
@@ -84,13 +84,13 @@ Section with_Σ.
   Qed.
 
   Lemma wp_A tid f (Hf: f > 9) :
-    {{{ inv Ns retinv ∗ frag_free_roles_are ∅ ∗ is_node ipA ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
+    {{{ inv Ns retinv ∗ is_node ipA ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
           (ipA, tid) ↦M {[ Arole := f ]} ∗ saA ⤳ (∅, ∅) ∗
           free_ports (ip_of_address saA) {[port_of_address saA]} }}}
       (mkExpr (ip_of_address saA) (Aprog saA saB)) @ (ipA, tid); ⊤
     {{{ v, RET v; (ipA, tid) ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(#Hinv & Hfr & #Hisn & #Hmsg & HA & Hrt & Hfp) HΦ".
+    iIntros (Φ) "(#Hinv & #Hisn & #Hmsg & HA & Hrt & Hfp) HΦ".
 
     rewrite /Aprog.
     wp_bind (NewSocket _).
@@ -126,7 +126,7 @@ Section with_Σ.
     wp_bind (SendTo _ _ _).
     iApply sswp_MU_wp_fupd.
 
-    iInv Ns as (st) "(Hst & Hrest)" "Hclose".
+    iInv Ns as "(Hfr & %st & Hst & Hrest)" "Hclose".
     iModIntro.
 
     iApply (wp_send _ _ false with "[Hsh] [HRT] [Hmsg]")=>//=>//=>//.
@@ -139,21 +139,21 @@ Section with_Σ.
     { rewrite fmap_empty map_union_empty //. }
     iIntros "Hst HA Hfr".
 
-    iMod ("Hclose" with "[Hst Hrest]").
-    { iNext. iExists st. iFrame. }
+    iMod ("Hclose" with "[Hst Hrest Hfr]").
+    { iNext. iFrame. iExists st. iFrame. }
     iModIntro.
     simpl.
     rewrite /= ?map_union_empty //.
 
     iApply wp_value'.
     do 2 wp_pure _.
-    iApply ("IH" with "[$] [$] [$] [$] [$] [$] []").
+    iApply ("IH" with "[$] [$] [$] [$] [$] []").
     iPureIntro; lia.
   Qed.
 
   Lemma wp_wait tid f (Hf: f > 9) sh b T1:
     {{{ inv Ns retinv ∗ own retransmit_name (◯E retransmit_model.Start) ∗
-          frag_free_roles_are ∅ ∗ is_node ipB ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
+          is_node ipB ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
           (ipB, tid) ↦M {[ Brole := f ]} ∗ saB ⤳ (∅, T1) ∗
           sh ↪[ipB] {| saddress := Some saB; sblock := b |} }}}
       (mkExpr (ip_of_address saB) (wait_receive #(LitSocket sh))) @ (ipB, tid); ⊤
@@ -162,7 +162,7 @@ Section with_Σ.
         saB ⤳ (R2, T2) ∗ sh ↪[ipB] {| saddress := Some saB; sblock := false |}
     }}}.
   Proof.
-    iIntros (Φ) "(#Hinv & Htok & #Hfr & Hin & #HsockB & HB & Hrt & Hsh) HΦ".
+    iIntros (Φ) "(#Hinv & Htok & Hin & #HsockB & HB & Hrt & Hsh) HΦ".
     rewrite /wait_receive.
     wp_pure _.
 
@@ -191,7 +191,7 @@ Section with_Σ.
 
     iApply sswp_MU_wp_fupd.
 
-    iInv Ns as (st) "(Hst & Hrest)" "Hclose".
+    iInv Ns as "(Hfr & %st & Hst & Hrest)" "Hclose".
     iModIntro.
 
     iApply (wp_recv with "[Hsh] [Hrt] [HsockB]")=>//=>//=>//.
@@ -209,8 +209,8 @@ Section with_Σ.
       { rewrite fmap_empty map_union_empty //. }
       iIntros "Hst HB Hfr'".
 
-      iMod ("Hclose" with "[Hst Hrest]").
-      { iNext. iExists _. iFrame. }
+      iMod ("Hclose" with "[Hst Hrest Hfr']").
+      { iNext. iFrame. iExists _. iFrame. }
       iModIntro.
       iApply wp_value'.
       simpl.
@@ -227,8 +227,8 @@ Section with_Σ.
       iIntros "Hst HB Hfr'".
 
       iMod (token_update with "[$]") as "[Hrest Htok]".
-      iMod ("Hclose" with "[Hst Hrest]").
-      { iNext. iExists Received. iFrame. }
+      iMod ("Hclose" with "[Hst Hrest Hfr']").
+      { iNext. iFrame. iExists Received. iFrame. }
       iModIntro.
       iApply wp_value'.
       simpl.
@@ -241,13 +241,13 @@ Section with_Σ.
 
   Lemma wp_B tid f (Hf: f > 20):
     {{{ inv Ns retinv ∗ own retransmit_name (◯E retransmit_model.Start) ∗
-          frag_free_roles_are ∅ ∗ is_node ipB ∗ saA ⤇ (λ _, True) ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
+          is_node ipB ∗ saA ⤇ (λ _, True) ∗ saB ⤇ (λ msg, ⌜ msg = mAB ⌝) ∗
           (ipB, tid) ↦M {[ Brole := f ]} ∗ saB ⤳ (∅, ∅) ∗
           free_ports (ip_of_address saB) {[port_of_address saB]} }}}
       (mkExpr (ip_of_address saB) (Bprog saA saB)) @ (ipB, tid); ⊤
     {{{ v, RET v; (ipB, tid) ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(#Hinv & Htok & #Hfr & #Hin & #HsockB & #HsockA & HB & Hrt & Hfp) HΦ".
+    iIntros (Φ) "(#Hinv & Htok & #Hin & #HsockB & #HsockA & HB & Hrt & Hfp) HΦ".
 
     rewrite /Bprog.
     wp_bind (NewSocket _).
@@ -279,7 +279,7 @@ Section with_Σ.
     do 2 wp_pure _.
 
     iApply sswp_MU_wp_fupd.
-    iInv Ns as (st) "(Hst & Hrest)" "Hclose".
+    iInv Ns as "(Hfr & %st & Hst & Hrest)" "Hclose".
     iModIntro.
 
 
@@ -298,15 +298,15 @@ Section with_Σ.
     iMod (token_update with "[Hrest Htok]") as "[Hrest Htok]".
     { iFrame. }
 
-    iMod ("Hclose" with "[Hst Hrest]").
-    { iNext. iExists Done. iFrame. }
+    iMod ("Hclose" with "[Hst Hrest Hfr']").
+    { iNext. iFrame. iExists Done. iFrame. }
     iModIntro.
     simpl.
 
     iApply wp_atomic.
     { intros ????? Hs. apply val_stuck in Hs. done. }
 
-    iInv Ns as (st) "(Hst & Hrest)" "Hclose".
+    iInv Ns as "(Hfr & %st & Hst & Hrest)" "Hclose".
     iModIntro.
 
     iPoseProof (timeless with "Hst") as "Hst".
@@ -321,8 +321,8 @@ Section with_Σ.
 
     iApply wp_value'.
 
-    iMod ("Hclose" with "[Hst Hrest]").
-    { iNext. iExists Done. iFrame. }
+    iMod ("Hclose" with "[Hst Hrest Hfr]").
+    { iNext. iFrame. iExists Done. iFrame. }
     iModIntro. iApply ("HΦ"). rewrite map_union_empty delete_insert //.
   Qed.
 

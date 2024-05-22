@@ -101,8 +101,7 @@ Definition continued_simulation_init {Λ M}
   continued_simulation ξ {tr[c]} {tr[s]}.
 
 Definition addrs_to_ip_ports_map (A : gset socket_address) : gmap ip_address (gset port) :=
-  fold_right union ∅ $
-             (λ sa, {[ip_of_address sa := {[port_of_address sa]}]}) <$> (elements A).
+  set_fold (λ sa R, <[ ip_of_address sa := {[ port_of_address sa ]} ]> R) ∅ A.
 
 Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :=
   map_fold (λ ip skts A,
@@ -111,6 +110,18 @@ Definition ports_in_use (skts : gmap ip_address sockets) : gset socket_address :
                              | Some a => {[a]}
                              | None => ∅
                              end ∪ A) ∅ skts ∪ A) ∅ skts.
+
+Lemma ports_in_use_empty skts :
+  (∀ ip m, skts !! ip = Some m → m = ∅) →
+  ports_in_use skts = ∅.
+Proof.
+  induction skts as [|ip m skts Hnew IH] using map_ind; first naive_solver.
+  intros Hemp. rewrite /ports_in_use. rewrite map_fold_insert=>//.
+  - rewrite /ports_in_use in IH. rewrite IH ?union_empty_r_L.
+    + ospecialize (Hemp ip _ _); first rewrite lookup_insert //. rewrite Hemp map_fold_empty //.
+    + intros ip' m' Hlk. eapply (Hemp ip')=>//. rewrite lookup_insert_ne //. naive_solver.
+  - intros j1 j2 z1 z2 y Hneq Hlk1%Hemp Hlk2%Hemp; simplify_eq. rewrite map_fold_empty //.
+Qed.
 
 Definition initial_fuel_map_from `(M: UserModel aneris_lang) `{LMeq: !LiveModelEq LM} `{@anerisPreG M net_model LM LMeq Σ}
   (tp0 : list aneris_expr)
@@ -264,9 +275,6 @@ Theorem simulation_adequacy_multiple_strong
   (* aneris_model_rel_finitary Mdl → *)
   dom (state_heaps σ) = dom (state_sockets σ) →
   config_net_match (es, σ) net_init →
-  (* TODO1: something to relate the socket state and the model one. *)
-  (* TODO2: we need to get a proper LiveModel state that is related to the initial fuel map...
-     but that requires property on fss, i.e. disjointness. *)
   (* Port coherence *)
   ((∀ ip ps, (GSet <$> (addrs_to_ip_ports_map
                               (A ∖ (ports_in_use $ state_sockets σ))))
@@ -551,7 +559,7 @@ Lemma simulation_adequacy_traces Σ
         (Hexfirst : (trfirst extr) = (es, σ))
   :
   continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
-  ∃ (auxtr : auxtrace LM), exaux_traces_match (LM := LM) extr auxtr.
+  ∃ (auxtr : auxtrace LM), exaux_traces_match (LM := LM) extr auxtr ∧ trfirst auxtr = m0.
 Proof.
   intros Hcci.
   opose proof (from_trace_preserves_validity _ (trace_singleton (es, σ)) Hvex _ _) as Hval.
@@ -559,7 +567,8 @@ Proof.
   { rewrite Hexfirst //. }
   eapply continued_simulation_infinite_model_trace in Hcci=>//.
   destruct Hcci as [atr Hatr].
-  exists (to_trace m0 atr).
+  exists (to_trace m0 atr). split; last first.
+  { destruct atr as [| [??] ?] =>//=. }
   eapply (valid_inf_system_trace_implies_traces_match_strong (valid_state_evolution_fairness LM)
             _ _ _ (trace_singleton m0) (from_trace extr) atr
          ).
@@ -616,10 +625,10 @@ Section lm_network.
     :
     continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
     ex_fair extr →
-    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr.
+    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr ∧ trfirst auxtr = m0.
   Proof.
     intros Hcs [Hfn Hfs].
-    destruct (simulation_adequacy_traces _ _ _ _ _ extr Hvex Hexfirst Hcs) as [atr Hatr].
+    destruct (simulation_adequacy_traces _ _ _ _ _ extr Hvex Hexfirst Hcs) as [atr [Hatr ?]].
     eexists _; split=>//. split.
     - rewrite /lm_network_fair_delivery /ex_fair_network in Hfn *.
       rewrite /lm_network_fair_delivery_of /ex_fair_network_of in Hfn *.
@@ -653,29 +662,32 @@ Section lm_network.
           (auxtr : auxtrace LM) :
     lm_fair auxtr →
     auxtrace_valid (LM := LM) auxtr →
-    ∃ jmtr, jm_fair jmtr ∧ jmtrace_valid jmtr ∧ upto_stutter_aux auxtr jmtr.
+    ∃ jmtr, jm_fair jmtr ∧ jmtrace_valid jmtr ∧ upto_stutter_aux auxtr jmtr ∧
+              trfirst jmtr = (trfirst auxtr).(ls_under).
   Proof.
     intros [Hnf Hsf] Hval. have Hval' := Hval.
     apply can_destutter_auxtr in Hval as [jmtr Hupto].
-    exists jmtr; split; [|split]=>//.
+    exists jmtr; split; [|split; [|split]]=>//.
     - split.
       + eapply fuel_network_fairness_destutter=>//.
       + apply (upto_stutter_fairness_ltl _ _) in Hupto=>//.
     - eapply (upto_stutter_preserves_validity (Λ := aneris_lang)) =>//.
+    - punfold Hupto; last apply upto_stutter_mono. inversion Hupto; naive_solver.
   Qed.
 
   Lemma simulation_adequacy_trace_trimed
           (jmtr : jmtrace) :
     jm_fair jmtr →
     jmtrace_valid jmtr →
-    ∃ ttr, jm_fair ttr ∧ jmtrace_valid ttr ∧ trimmed_of jmtr ttr.
+    ∃ ttr, jm_fair ttr ∧ jmtrace_valid ttr ∧ trimmed_of jmtr ttr ∧ trfirst ttr = trfirst jmtr.
   Proof.
-    intros [Ha Hb] Hval. exists (trim_trace jmtr). split; [|split]; last first.
-    { apply trim_trace_trimmed_of. }
-    - rewrite /jmtrace_valid in Hval *. by apply trim_trace_valid.
+    intros [Ha Hb] Hval. exists (trim_trace jmtr). split; [|split; [|split]].
     - split.
       + eapply trim_preserves_network_fairness =>//.
       + eapply trimming_preserves_fair_scheduling=>//.
+    - rewrite /jmtrace_valid in Hval *. by apply trim_trace_valid.
+    - apply trim_trace_trimmed_of.
+    - destruct jmtr=>//=. destruct (decide _)=>//.
   Qed.
 
   Lemma simulation_adequacy_trace_trimmed_user
@@ -683,15 +695,16 @@ Section lm_network.
     jm_fair ttr →
     jmtrace_valid ttr →
     trace_is_trimmed ttr →
-    ∃ utr, usr_fair utr ∧ usr_trace_valid utr ∧ upto_stutter_env ttr utr.
+    ∃ utr, usr_fair utr ∧ usr_trace_valid utr ∧ upto_stutter_env ttr utr ∧ trfirst utr = (trfirst ttr).1.
   Proof.
     intros [Hnf Hsf] Hval Htrim.
-    have [utr ?] : ∃ utr, upto_stutter_env ttr utr.
+    have [utr Huts] : ∃ utr, upto_stutter_env ttr utr.
     { eapply can_destutter. apply env_steps_dec_unless=>//. }
-    exists utr. split; [split|split] =>//.
+    exists utr. split; [split|split; [|split]] =>//.
     - eapply network_fairness_project_usr=>//.
     - eapply usr_project_scheduler_fair=>//.
     - eapply usr_project_valid=>//.
+    - punfold Huts. inversion Huts; naive_solver. apply upto_stutter_mono.
   Qed.
 
   Definition model_refinement : rel (auxtrace LM) (lts_trace M) :=
@@ -705,14 +718,15 @@ Section lm_network.
   Lemma model_refinement_preserves_upward auxtr :
     lm_fair auxtr →
     auxtrace_valid (LM := LM) auxtr →
-    ∃ utr, model_refinement auxtr utr ∧ usr_fair utr ∧ usr_trace_valid utr.
+    ∃ utr, model_refinement auxtr utr ∧ usr_fair utr ∧ usr_trace_valid utr ∧
+             trfirst utr = (trfirst auxtr).(ls_under).1.
   Proof.
     intros Hf Hval.
-    apply simulation_adequacy_trace_remove_fuel in Hval as (?&?&Hval&?) =>//.
-    apply simulation_adequacy_trace_trimed in Hval as (?&?&Hval&?) =>//.
-    apply simulation_adequacy_trace_trimmed_user in Hval as (utr&?&Hval&?) =>//;
+    apply simulation_adequacy_trace_remove_fuel in Hval as (?&?&Hval&?&?) =>//.
+    apply simulation_adequacy_trace_trimed in Hval as (?&?&Hval&?&?) =>//.
+    apply simulation_adequacy_trace_trimmed_user in Hval as (utr&?&Hval&?&?) =>//;
       last by eapply trimmed_of_is_trimmed.
-    rewrite /model_refinement /rel_compose. naive_solver.
+    rewrite /model_refinement /rel_compose. naive_solver congruence.
   Qed.
 
   Proposition program_model_refinement_preserves_upward extr m0 es σ :
@@ -720,14 +734,14 @@ Section lm_network.
     extrace_valid extr →
     ex_fair extr →
     (trfirst extr) = (es, σ) →
-    ∃ utr, program_model_refinement extr utr ∧ usr_fair utr ∧ usr_trace_valid utr.
+    ∃ utr, program_model_refinement extr utr ∧ usr_fair utr ∧ usr_trace_valid utr ∧ trfirst utr = m0.(ls_under).1.
   Proof.
     intros Hf Hval ??.
-    eapply simulation_adequacy_traces_fairness in Hval as (?&?&Hmatch) =>//.
+    eapply simulation_adequacy_traces_fairness in Hval as (?&?&Hmatch&?) =>//.
     have Hmatch' := Hmatch.
     apply exaux_preserves_validity in Hmatch.
-    apply model_refinement_preserves_upward in Hmatch as (utr&?&?&?) =>//.
-    rewrite /program_model_refinement /rel_compose. naive_solver.
+    apply model_refinement_preserves_upward in Hmatch as (utr&?&?&?&?) =>//.
+    rewrite /program_model_refinement /rel_compose. naive_solver congruence.
   Qed.
 
   Proposition program_model_refinement_downward_eventually extr utr (P : action aneris_lang → Prop) :

@@ -43,10 +43,12 @@ Definition messages_received_sent mhm : messages_history :=
 (* [m] has been received *)
 Definition message_received m mhm := m ∈ (messages_received mhm).
 
-Lemma gset_to_gmap_singleton (v: message_soup * message_soup)
-      (a : socket_address) : gset_to_gmap v {[ a ]} = {[a := v]}.
+(* TODO: upstream to stdpp *)
+Lemma gset_to_gmap_singleton {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} {A : Type}
+   (v: A)
+      (a : K) : gset_to_gmap v {[ a ]} = {[a := v]}.
 Proof.
-  assert ({[a]} = {[a]} ∪ (∅: gset socket_address)) as -> by by set_solver.
+  assert ({[a]} = {[a]} ∪ (∅: gset _)) as -> by by set_solver.
   by rewrite (gset_to_gmap_union_singleton v a ∅) gset_to_gmap_empty.
 Qed.
 

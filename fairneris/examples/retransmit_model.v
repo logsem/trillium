@@ -96,7 +96,7 @@ Proof.
             usr_lts := retransmit_lts;
             usr_live_roles := retransmit_live_roles;
             usr_live_spec := retransmit_live_spec_holds;
-            usr_fl _ := 20;
+            usr_fl _ := 25;
           |}).
 Defined.
 

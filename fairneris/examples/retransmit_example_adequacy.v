@@ -1,5 +1,7 @@
 From stdpp Require Import list fin_maps.
 From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import excl_auth.
+From iris.base_logic.lib Require Import invariants.
 From trillium.program_logic Require Import ectx_lifting.
 From fairneris Require Import fairness.
 From fairneris.examples Require Import retransmit_model.
@@ -11,184 +13,151 @@ From fairneris Require Import retransmit_example.
 
 From fairneris.lib Require Import singletons.
 
-Definition initial_state shA shB :=
-  ([mkExpr ipA (Aprog shA); mkExpr ipB (Bprog shB)],
+Definition initial_state :=
+  ([mkExpr ipA (Aprog saA saB); mkExpr ipB (Bprog saA saB)],
      {| state_heaps := {[ipA:=∅; ipB:=∅]};
-        state_sockets := {[ipA := {[shA := (sA, [])]};
-                           ipB := {[shB := (sB, [])]}]};
+        state_sockets := {[ipA:=∅; ipB:=∅]} ;
         state_ms := ∅; |}).
 
-Definition initial_model_state : retransmit_state :=
-  (retransmit_model.Start, ∅, ∅).
+Definition initial_model_state : retransmit_state := retransmit_model.Start.
 
-Lemma retransmit_continued_simulation shA shB :
-  fairly_terminating localeB (initial_state shA shB).
+
+
+Lemma retransmit_continued_simulation extr :
+  trfirst extr = initial_state →
+  extrace_valid extr →
+  ex_fair extr →
+  (extr ⊩ ◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ ℓ' = Send mDone)).
 Proof.
-  assert (anerisPreG retransmit_fair_model (anerisΣ retransmit_fair_model)) as HPreG.
+  intros Hfirst Hval Hfair.
+
+  assert (anerisPreG (live_model_of_user retransmit_model) retransmitΣ) as HPreG.
   { apply _. }
-  eapply (simulation_adequacy_fair_termination_multiple {[saA;saB]} NotStuck _ _ initial_model_state);
-    [| |simpl; lia|set_solver|..|done|]=> /=.
-  { intros ℓ ζ Hmatch Henabled. rewrite /role_enabled_model in Henabled. simpl.
-    assert (ℓ = Arole ∨ ℓ = Brole) as [Heq|Heq] by set_solver; simplify_eq.
-    - assert (ζ = ("0.0.0.0", 0%nat)) as ->.
-      { rewrite /roles_match /locale_retransmit_role in Hmatch.
-        by repeat case_match; simplify_eq. }
-      eexists _. simpl. done.
-    - assert (ζ = ("0.0.0.1", 0%nat)) as ->.
-      { rewrite /roles_match /locale_retransmit_role in Hmatch.
-        by repeat case_match; simplify_eq. }
-      eexists _. simpl. done. }
-  { rewrite /config_state_valid. simpl. split; [done|].
-    rewrite /model_state_socket_coh.
-    intros.
-    (* OBS: Might be able to make this simpler with a total lookup *)
-    rewrite insert_union_singleton_l in H.
-    apply lookup_union_Some in H; [|apply map_disjoint_dom; set_solver].
-    destruct H as [H|H].
-    - destruct (decide (ip = ipA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in H. }
-      rewrite lookup_insert in H.
-      simplify_eq.
-      destruct (decide (sh = shA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in H0. }
-      rewrite lookup_insert in H0.
-      simplify_eq.
-      assert (sa = saA) as -> by set_solver.
-      set_solver.
-    - destruct (decide (ip = ipB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in H. }
-      rewrite lookup_insert in H.
-      simplify_eq.
-      destruct (decide (sh = shB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in H0. }
-      rewrite lookup_insert in H0.
-      simplify_eq.
-      assert (sa = saB) as -> by set_solver.
-      set_solver. }
-  { intros ip ps HPs Sn Hip p Hps.
-    intros sh skt a r Hsh Hskt.
-    intros <-.
-    assert (ports_in_use {[ipA := {[shA := (sA, [])]}; ipB := {[shB := (sB, [])]}]} = {[saA; saB]}) as Heq.
-    { rewrite /ports_in_use.
-      rewrite map_fold_insert_L; [by rewrite !map_fold_singleton| |set_solver].
-      intros j1 j2 z1 z2 y Hneq Hz1 Hz2.
-      rewrite insert_union_singleton_l in Hz1.
-      apply lookup_union_Some in Hz1; last first.
-      { apply map_disjoint_dom. clear. set_solver. }
-      rewrite insert_union_singleton_l in Hz2.
-      apply lookup_union_Some in Hz2; last first.
-      { apply map_disjoint_dom. clear. set_solver. }
-      destruct Hz1 as [Hz1|Hz1], Hz2 as [Hz2|Hz2].
-      - apply lookup_singleton_Some in Hz1 as [<- <-].
-        apply lookup_singleton_Some in Hz2 as [<- <-].
-        done.
-      - apply lookup_singleton_Some in Hz1 as [<- <-].
-        apply lookup_singleton_Some in Hz2 as [<- <-].
-        rewrite !map_fold_singleton=> /=.
-        clear. rewrite !union_empty_r_L !union_assoc_L. set_solver.
-      - apply lookup_singleton_Some in Hz1 as [<- <-].
-        apply lookup_singleton_Some in Hz2 as [<- <-].
-        rewrite !map_fold_singleton=> /=.
-        clear. rewrite !union_empty_r_L !union_assoc_L. set_solver.
-      - apply lookup_singleton_Some in Hz1 as [<- <-].
-        apply lookup_singleton_Some in Hz2 as [<- <-].
-        rewrite !map_fold_singleton=> /=.
-        clear. rewrite !union_empty_r_L !union_assoc_L. set_solver. }
-    rewrite Heq in HPs. clear Heq.
-    rewrite difference_diag_L in HPs. done. }
-  { intros ip Sn Hip.
-    intros sh [skt bs] Hsh.
-    rewrite insert_union_singleton_l in Hip.
-    apply lookup_union_Some in Hip; [|apply map_disjoint_dom; set_solver].
-    destruct Hip as [Hip|Hip].
-    - destruct (decide (ip = ipA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hip. }
-      rewrite lookup_insert in Hip.
-      simplify_eq.
-      destruct (decide (sh = shA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hsh. }
-      rewrite lookup_insert in Hsh.
-      simplify_eq. done.
-    - destruct (decide (ip = ipB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hip. }
-      rewrite lookup_insert in Hip.
-      simplify_eq.
-      destruct (decide (sh = shB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hsh. }
-      rewrite lookup_insert in Hsh.
-      simplify_eq. done. }
-  { intros ip Sn Hip sh sh' skt skt' bs bs' Hsh Hsh' Hskt Heq.
-    rewrite insert_union_singleton_l in Hip.
-    apply lookup_union_Some in Hip; [|apply map_disjoint_dom; set_solver].
-    destruct Hip as [Hip|Hip].
-    - destruct (decide (ip = ipA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hip. }
-      rewrite lookup_insert in Hip.
-      simplify_eq.
-      destruct (decide (sh = shA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hsh. }
-      rewrite lookup_insert in Hsh.
-      destruct (decide (sh' = shA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hsh'. }
-      rewrite lookup_insert in Hsh'.
-      done.
-    - destruct (decide (ip = ipB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hip. }
-      rewrite lookup_insert in Hip.
-      simplify_eq.
-      destruct (decide (sh = shB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hsh. }
-      rewrite lookup_insert in Hsh.
-      destruct (decide (sh' = shB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hsh'. }
-      rewrite lookup_insert in Hsh'.
-      simplify_eq. done. }
-  { intros ip Sn Hip sh skt bs sa Hsh Hskt.
-    rewrite insert_union_singleton_l in Hip.
-    apply lookup_union_Some in Hip; [|apply map_disjoint_dom; set_solver].
-    destruct Hip as [Hip|Hip].
-    - destruct (decide (ip = ipA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hip. }
-      rewrite lookup_insert in Hip.
-      simplify_eq.
-      destruct (decide (sh = shA)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hsh. }
-      rewrite lookup_insert in Hsh. simplify_eq. set_solver.
-    - destruct (decide (ip = ipB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hip. }
-      rewrite lookup_insert in Hip.
-      simplify_eq.
-      destruct (decide (sh = shB)) as [->|Hneq]; last first.
-      { by rewrite lookup_insert_ne in Hsh. }
-      rewrite lookup_insert in Hsh. simplify_eq. set_solver. }
-  iIntros (Hinv) "!> Hunallocated Hrt Hlive Hdead Hσ _ Hfrag Hnode Hst".
-  iDestruct (unallocated_split with "Hunallocated") as "[HA HB]"; [set_solver|].
-  iMod (aneris_state_interp_socket_interp_allocate_singleton with "Hst [HB]")
-    as "[$ #HB]".
-  { rewrite /unallocated to_singletons_singleton. iApply "HB". }
-  iIntros "!>".
-  rewrite big_sepS_union; [|set_solver].
-  iDestruct "Hrt" as "[HrtA HrtB]".
-  rewrite !big_sepS_singleton.
-  rewrite /retransmit_live_roles=> /=.
-  iDestruct (live_roles_own_split with "Hlive") as "[HliveA HliveB]";
-    [set_solver|].
-  replace (dom {[ipA := ∅; ipB := ∅]}) with ({[ipA]} ∪ {[ipB]} : gset _)
-                                            by set_solver.
-  rewrite !big_sepS_union; [|set_solver..].
-  rewrite !big_sepS_singleton.
-  rewrite !lookup_total_insert.
-  rewrite !big_sepM_singleton.
-  simpl.
-  iDestruct "Hnode" as "[HnodeA HnodeB]".
-  iDestruct "Hσ" as "[[_ HshA] [_ HshB]]".
-  iSplitL "HrtA HnodeA HshA HliveA".
-  { iApply (wp_A with "[$HrtA $HshA $HliveA //]").
-    iIntros "!>" (v) "H".
-    iExists _. by iFrame. }
-  iSplitL "HrtB HnodeB HshB HliveB".
-  { iApply (wp_B with "[$HrtB $HshB $HliveB //]").
-    iIntros "!>" (v) "H".
-    iExists _. by iFrame. }
-  done.
+
+  assert (good_fuel_alloc initial_state.1 retransmit_model.Start [ {[ Arole ]}; {[ Brole]} ]) as Hfss.
+  { split; first done. split.
+    - intros n1 n2 fs1 fs2 Hneq. destruct n1 as [|n1]=>//.
+      + rewrite -head_lookup /=. destruct n2 as [|n2]=>//.
+        rewrite -lookup_tail /=. destruct n2.
+        * rewrite -head_lookup /=. naive_solver set_solver.
+        * rewrite -lookup_tail /=. naive_solver set_solver.
+      + rewrite -lookup_tail /=. destruct n1; last by rewrite -lookup_tail //=.
+        rewrite -head_lookup /=. destruct n2 as [|n2]=>//.
+        * rewrite -head_lookup /=. naive_solver set_solver.
+        * rewrite -lookup_tail /=. destruct n2; last by rewrite -lookup_tail //=.
+          rewrite -head_lookup /=. naive_solver set_solver.
+    - intros [|] Hin; [exists 0|exists 1]; rewrite ?tail_lookup ?head_lookup //=; naive_solver set_solver. }
+
+  assert (continued_simulation_init
+            (valid_state_evolution_fairness (live_model_of_user retransmit_model))
+            initial_state (lm_init _ _ _ (∅, ∅) Hfss)
+    ) as Hcs.
+  { eapply (simulation_adequacy_multiple_strong _ {[saA;saB]} NotStuck _ _ _ _ ∅).
+    { rewrite /initial_state /=. lia. }
+    { rewrite //=. }
+    { rewrite /config_net_match /model_state_socket_incl /model_state_socket_coh /=. split=>//. split.
+      - naive_solver.
+      - intros ip Sn sh skt sa ms. destruct (decide (ip = ipA)) as [->|].
+        + rewrite lookup_insert. naive_solver.
+        + destruct (decide (ip = ipB)) as [->|].
+          rewrite lookup_insert_ne // lookup_insert; naive_solver.
+          rewrite lookup_insert_ne // lookup_insert_ne //; naive_solver. }
+    { simpl. intros ip ps ? Sn Hlk p Hin.
+      destruct (decide (ip = ipA)) as [->|]; [|destruct (decide (ip = ipB)) as [->|]].
+      - rewrite lookup_insert in Hlk. simplify_eq Hlk. intros <-.
+        intros ?????. naive_solver.
+      - rewrite lookup_insert_ne in Hlk; last done. rewrite lookup_insert in Hlk.
+        simplify_eq Hlk. intros <-. intros ?????. naive_solver.
+      - rewrite ?lookup_insert_ne in Hlk=>//. }
+    { simpl. apply map_Forall_insert. naive_solver. split. apply map_Forall_empty.
+      apply map_Forall_insert. naive_solver. split; apply map_Forall_empty. }
+    { have ?: socket_handlers_coh ∅.
+      { rewrite /socket_handlers_coh. naive_solver. }
+      simpl. apply map_Forall_insert. naive_solver. split=>//.
+      apply map_Forall_insert. naive_solver. split; [done | apply map_Forall_empty]. }
+    { simpl. apply map_Forall_insert. naive_solver. split=>//.
+      apply map_Forall_insert. naive_solver. split; [done | apply map_Forall_empty]. }
+    { done. }
+
+    iIntros (Hinv) "!> Hunallocated Hrt Hlive Hfp Hσ HFR Hfuel Hnode Hst".
+    iDestruct (unallocated_split with "Hunallocated") as "[HA HB]"; [set_solver|].
+
+    iMod (own_alloc (●E retransmit_model.Start ⋅ ◯E retransmit_model.Start)) as (γ) "[HresA HresF]".
+    { apply auth_both_valid_2; eauto. by compute. }
+
+    pose (X := {| retransmit_name := γ |} : retransmitG retransmitΣ).
+
+    rewrite (subseteq_empty_difference_L ∅); last set_solver.
+    iMod (inv_alloc (nroot .@ "retransmit") _ retinv with "[Hσ HresA HFR]") as "#Hinv".
+    { iNext. rewrite /retinv. iFrame. iExists _. iFrame. }
+
+    iMod (aneris_state_interp_socket_interp_allocate_singleton with "Hst [HA]")
+      as "[Hst #HA]".
+    { rewrite /unallocated to_singletons_singleton. iApply "HA". }
+    iMod (aneris_state_interp_socket_interp_allocate_singleton with "Hst [HB]")
+      as "[$ #HB]".
+    { rewrite /unallocated to_singletons_singleton. iApply "HB". }
+
+    iIntros "!>".
+    rewrite big_sepS_union; [|set_solver].
+    iDestruct "Hrt" as "[HrtA HrtB]".
+    rewrite !big_sepS_singleton.
+
+    iClear "Hlive".
+
+    rewrite /retransmit_live_roles=> /=.
+    replace (dom {[ipA := ∅; ipB := ∅]}) with ({[ipA]} ∪ {[ipB]} : gset _)
+                                              by set_solver.
+    rewrite !big_sepS_union; [|set_solver..].
+    rewrite !big_sepS_singleton.
+
+    iDestruct "Hnode" as "[HnodeA HnodeB]".
+
+    rewrite /initial_fuel_map /initial_fuel_map_from /=.
+    rewrite (big_sepM_insert _ _ (locale_of _ _)) ; [|set_solver..].
+    rewrite (big_sepM_insert _ _ (locale_of _ _)) ; [|set_solver..].
+    iDestruct "Hfuel" as "(HfuelA & HfuelB & _)".
+
+    rewrite ports_in_use_empty ?difference_empty_L; last first.
+    { intros ip m. destruct (decide (ip = ipA)) as [->|]; [|destruct (decide (ip = ipB)) as [->|]].
+      - rewrite lookup_insert. naive_solver.
+      - rewrite lookup_insert_ne // lookup_insert. naive_solver.
+      - rewrite ?lookup_insert_ne //. }
+
+    rewrite /addrs_to_ip_ports_map set_fold_disj_union_strong; last first.
+    { set_solver. }
+    { intros sa sa' m ???. apply insert_commute.
+      destruct (decide (sa = saA)) as [->|]; [|destruct (decide (sa = saB)) as [->|]]=>//.
+      - destruct (decide (sa' = saA)) as [->|]; [|destruct (decide (sa' = saB)) as [->|]]=>//. set_solver.
+      - destruct (decide (sa' = saA)) as [->|]; [|destruct (decide (sa' = saB)) as [->|]]=>//. set_solver.
+      - set_solver. }
+
+    rewrite !set_fold_singleton.
+    rewrite big_sepM_insert //.
+    rewrite big_sepM_insert //.
+    iDestruct "Hfp" as "(HfpB & HfpA & _)".
+
+    iSplitL "HrtA HnodeA HfuelA HfpA".
+    { iApply (wp_A _ (usr_fl (retransmit_model.Start : retransmit_model)) with "[$HrtA HnodeA HfuelA HfpA]").
+      { rewrite //=. lia. }
+      { rewrite /locale_of /=. rewrite gset_to_gmap_singleton. iFrame "#∗". }
+      iFrame.
+      iIntros "!>" (v) "H".
+      rewrite /locale_of. iFrame. }
+    iSplitL "HrtB HnodeB HfuelB HresF HfpB".
+    { iApply (wp_B _ (usr_fl (retransmit_model.Start : retransmit_model)) with "[-]").
+      { rewrite /=. lia. }
+      { rewrite /locale_of /=. rewrite gset_to_gmap_singleton. iFrame "#∗". }
+      iIntros "!>" (v) "H".
+      rewrite /locale_of. iFrame. }
+    done. }
+
+  eapply program_model_refinement_preserves_upward in Hcs =>//.
+  rewrite /= in Hcs. destruct Hcs as (utr & Href & Hafair & Haval & Heq).
+  eapply program_model_refinement_downward_eventually=>//.
+
+  eapply trace_eventually_mono; last apply retransmit_fair_node_B_sends; last first=>//.
+  { rewrite ltl_sat_def /trace_now /pred_at /=. destruct utr=>//. }
+  intros tr. rewrite !ltl_sat_def /trace_label /pred_at /usr_send_filter /=. destruct tr=>//.
+  intros [ρ ->]. naive_solver.
 Qed.
