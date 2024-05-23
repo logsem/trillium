@@ -62,19 +62,14 @@ Definition mBA (n : nat) : message := mkMessage saB saA (StringOfZ n).
 
 Inductive stenning_trans : stenning_state → stenning_role * option aneris_action → stenning_state → Prop :=
 | A_Send n stB :
-  0 < n →
   stenning_trans (ASending n, stB)
                  (Arole, Some $ Send $ mAB n)
                  (AReceiving n, stB)
-| A_RecvFailEmpty n stB :
+| A_RecvFail n stB msg :
+  msg ≠ Some (mBA n) →
   stenning_trans (AReceiving n, stB)
-                 (Arole, Some $ Recv saA None)
+                 (Arole, Some $ Recv saA msg)
                  (ASending n, stB)
-| A_RecvFailWrong n stB msg :
-  msg ≠ mBA n →
-  stenning_trans (AReceiving n, stB)
-                 (Arole, Some $ Recv saA (Some msg))
-                 (AReceiving n, stB)
 | A_RecvSucc n stB :
   stenning_trans (AReceiving n, stB)
                  (Arole, Some $ Recv saA (Some $ mBA n))
@@ -86,12 +81,12 @@ Inductive stenning_trans : stenning_state → stenning_role * option aneris_acti
 | B_RecvFailEmpty stA n :
   stenning_trans (stA, BReceiving n)
                  (Brole, Some $ Recv saB None)
-                 (stA, BSending n)
+                 (stA, BReceiving n)
 | B_RecvFailWrong stA n msg:
   msg ≠ mAB n →
   stenning_trans (stA, BReceiving n)
                  (Brole, Some $ Recv saB (Some msg))
-                 (stA, BReceiving n)
+                 (stA, BSending n)
 | B_RecvSucc stA n :
   stenning_trans (stA, BReceiving n)
                  (Brole, Some $ Recv saB (Some $ mAB n))
