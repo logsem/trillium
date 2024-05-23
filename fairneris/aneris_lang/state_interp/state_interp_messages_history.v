@@ -18,7 +18,7 @@ Set Default Proof Using "Type".
 Import uPred.
 Import RecordSetNotations.
 
-(* TODO: move to stdpp? *)
+(* TODO: use the standard one *)
 Lemma elem_of_list_to_set_disj `{EqDecision A, Countable A} (x : A) l:
   x ∈ l -> x ∈ (list_to_set_disj l : gmultiset _).
 Proof.

@@ -635,7 +635,16 @@ Section ltl_lemmas.
     (∀ tr, (tr ⊩ P) → (tr ⊩ Q) → (tr ⊩ ○ ↓ λ _ _, True) → (tr ⊩ ○ P)) →
     (tr ⊩ □ P).
   Proof.
-  Admitted.
+    intros HQ HP Hi. rewrite trace_alwaysI. intros tr' [n Hn].
+    revert tr' Hn. induction n as [|n IH]; first naive_solver.
+    intros tr'.
+    intros Ha. change (Datatypes.S n) with (1 + n) in Ha. rewrite after_sum in Ha.
+    destruct (after n tr) as [[s1|s1 l1 tr1]|] eqn:Heq=>//. rewrite /= in Ha. simplify_eq.
+    ospecialize (IH _ _)=>//. eapply trace_next_elim.
+    eapply Hi=>//.
+    + eapply trace_always_elim. eapply trace_always_suffix_of in HQ=>//. by exists n.
+    + apply trace_next_intro. destruct tr' as [s|s l tr']; naive_solver.
+  Qed.
 
   #[global] Instance iff2_rr : RewriteRelation (@iff2 S L) := {}.
 
