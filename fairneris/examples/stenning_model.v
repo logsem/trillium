@@ -16,12 +16,12 @@ Proof. intros [l1' ->] [l2' ->]. by do 2 apply suffix_app_r. Qed.
 
 (** The stenning model states *)
 Inductive stenning_A_state :=
-| ASending (n:nat)
-| AReceiving (n:nat).
+| ASending (n:Z)
+| AReceiving (n:Z).
 
 Inductive stenning_B_state :=
-| BSending (n:nat)
-| BReceiving (n:nat).
+| BSending (n:Z)
+| BReceiving (n:Z).
 
 Definition stenning_state : Set := stenning_A_state * stenning_B_state.
 
@@ -54,11 +54,25 @@ Qed.
 
 Definition saA : socket_address := SocketAddressInet "0.0.0.0" 80.
 Definition saB : socket_address := SocketAddressInet "0.0.0.1" 80.
-Definition mAB (n : nat) : message := mkMessage saA saB (StringOfZ n).
-Definition mBA (n : nat) : message := mkMessage saB saA (StringOfZ n).
+Definition mAB (n : Z) : message := mkMessage saA saB (StringOfZ n).
+Definition mBA (n : Z) : message := mkMessage saB saA (StringOfZ n).
 
 
 (* Maybe split into the parallel composition *)
+
+Definition good_message (sender_is_A : bool) (n : Z) (msg : option message) :=
+  ∃ msg', msg = Some msg' ∧
+            ZOfString (m_body msg') = Some n ∧
+            if sender_is_A
+            then m_sender msg' = saA ∧ m_destination msg' = saB
+            else m_sender msg' = saB ∧ m_destination msg' = saA.
+
+Global Instance good_message_decidable b n omsg : Decision (good_message b n omsg).
+Proof. rewrite /good_message. admit. Admitted.
+
+Global Instance wrong_message_decidable omsg :
+  Decision (omsg = None ∨ ∃ msg : message, omsg = Some msg ∧ m_sender msg ≠ saA).
+Proof. Admitted.
 
 Inductive stenning_trans : stenning_state → stenning_role * option aneris_action → stenning_state → Prop :=
 | A_Send n stB :
@@ -66,30 +80,34 @@ Inductive stenning_trans : stenning_state → stenning_role * option aneris_acti
                  (Arole, Some $ Send $ mAB n)
                  (AReceiving n, stB)
 | A_RecvFail n stB msg :
-  msg ≠ Some (mBA n) →
+  ¬ good_message false n msg →
   stenning_trans (AReceiving n, stB)
                  (Arole, Some $ Recv saA msg)
                  (ASending n, stB)
-| A_RecvSucc n stB :
+| A_RecvSucc n stB msg :
+  good_message false n (Some msg) →
   stenning_trans (AReceiving n, stB)
-                 (Arole, Some $ Recv saA (Some $ mBA n))
+                 (Arole, Some $ Recv saA (Some msg))
                  (ASending (1+n), stB)
 | B_Send stA n :
   stenning_trans (stA, BSending n)
                  (Brole, Some $ Send (mBA (n-1)))
                  (stA, BReceiving n)
-| B_RecvFailEmpty stA n :
+| B_RecvFailEmpty stA n omsg:
+  omsg = None ∨ (∃ msg, omsg = Some msg ∧ m_sender msg ≠ saA) →
   stenning_trans (stA, BReceiving n)
-                 (Brole, Some $ Recv saB None)
+                 (Brole, Some $ Recv saB omsg)
                  (stA, BReceiving n)
 | B_RecvFailWrong stA n msg:
-  msg ≠ mAB n →
+  m_sender msg = saA →
+  ¬ good_message true n (Some msg) →
   stenning_trans (stA, BReceiving n)
                  (Brole, Some $ Recv saB (Some msg))
                  (stA, BSending n)
-| B_RecvSucc stA n :
+| B_RecvSucc stA n msg :
+  good_message true n (Some msg) →
   stenning_trans (stA, BReceiving n)
-                 (Brole, Some $ Recv saB (Some $ mAB n))
+                 (Brole, Some $ Recv saB (Some msg))
                  (stA, BSending (1+n))
 .
 
