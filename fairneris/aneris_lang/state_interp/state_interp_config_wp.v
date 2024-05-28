@@ -143,13 +143,14 @@ Section state_interpretation.
     have Hlstep: locale_step (tp1, σ1) (inr lbl) (tp1, σ2) by econstructor.
     destruct σ1; simpl in *; simplify_eq.
     pose (trace_last atr) as δ.
-    pose net' := (env_apply_trans aneris_lang net_model (env_state δ) (inr lbl)).
+    pose net' := (env_apply_trans aneris_lang net_model (env_state δ) lbl).
     unshelve iExists ({| ls_data :=
         {| ls_under := (usr_state δ, net'): fmstate (joint_model Mod net_model); ls_map := δ.(ls_data).(ls_map) |} |}).
     { intros **. eapply ls_map_disj=>//. }
     { intros **. eapply ls_map_live=>//. }
     simpl.
     iExists (Config_step (lbl : fmconfig (joint_model Mod net_model)) lbl).
+    have Hstep' := Hstep.
     inversion Hstep as
       [ip σ Sn Sn' sh a skt R m Hm HSn Hsh HSn' Hsaddr|
         σ|
@@ -159,7 +160,7 @@ Section state_interpretation.
     - destruct H as (Hsteps & Hmatch & Htids).
       iSplitR "Hlive".
       + iFrame "Hauth".
-        iExists γm, mh. iFrame. simpl. iModIntro.        
+        iExists γm, mh. iFrame. simpl. iModIntro.
         iSplit.
         { apply (last_eq_trace_ends_in) in Hex as ->.
           erewrite <- message_history_evolution_deliver_message;
@@ -173,6 +174,7 @@ Section state_interpretation.
             [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       + iModIntro.
+        iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
         iSplit.
         * simpl. iPureIntro.
           rewrite /valid_state_evolution_fairness.
@@ -187,10 +189,8 @@ Section state_interpretation.
           split; [|].
           simpl. split=>//. by apply cfg_labels_match_is_eq.
           by rewrite /tids_smaller ?Hex //= in Htids *.
-        * iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
-          iExists _. iFrame. iPureIntro.
-          unshelve by eapply env_apply_trans_spec_both.
-          exact inhabitant.
+        * iExists _. iFrame. iPureIntro.
+          by eapply env_apply_trans_spec_both.
     - destruct H as (Hsteps & Hmatch & Htids).
       iSplitR "Hlive".
       + iFrame "Hauth". iModIntro. simpl.
@@ -202,8 +202,7 @@ Section state_interpretation.
         iSplitR; [eauto using gnames_coh_update_sockets|].
         iSplitR; [eauto using network_sockets_coh_deliver_message|].
         eauto using messages_history_coh_duplicate_message.
-      + iModIntro.
-        iSplit.
+      + iModIntro. iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)". iSplit.
         * simpl. iPureIntro.
           rewrite /valid_state_evolution_fairness.
           split.
@@ -216,10 +215,8 @@ Section state_interpretation.
           split; [|].
           simpl. split=>//. by apply cfg_labels_match_is_eq.
           by rewrite /tids_smaller ?Hex //= in Htids *.
-        * iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
-          iExists _. iFrame. iFrame. iPureIntro.
-          unshelve by eapply env_apply_trans_spec_both.
-          exact inhabitant.
+        * iExists _. iFrame. iFrame. iPureIntro.
+          by eapply env_apply_trans_spec_both.
     - destruct H as (Hsteps & Hmatch & Htids).
       iSplitR "Hlive".
       + iFrame "Hauth". simpl. iModIntro.
@@ -231,7 +228,7 @@ Section state_interpretation.
         iSplitR; [eauto using gnames_coh_update_sockets|].
         iSplitR; [eauto using network_sockets_coh_deliver_message|].
         eauto using messages_history_coh_drop_message.
-      + iSplitR.
+      + iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)". iSplitR.
         * simpl. iPureIntro.
           rewrite /valid_state_evolution_fairness.
           split.
@@ -244,10 +241,7 @@ Section state_interpretation.
           split; [|].
           simpl. split=>//. by apply cfg_labels_match_is_eq.
           by rewrite /tids_smaller ?Hex //= in Htids *.
-        * iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
-          iExists _. iFrame. iFrame. iPureIntro.
-          unshelve by eapply env_apply_trans_spec_both.
-          exact inhabitant.
+        * iExists _. iFrame. iFrame. iPureIntro.
+          by eapply env_apply_trans_spec_both.
   Qed.
-
 End state_interpretation.

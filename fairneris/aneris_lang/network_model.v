@@ -48,19 +48,14 @@ Definition config_net_match (c : cfg aneris_lang) (δ : net_state) :=
   state_ms c.2 = δ.1 ∧ model_state_socket_incl (state_sockets c.2) δ.2 ∧
     model_state_socket_coh (state_sockets c.2) δ.2.
 
-Definition net_apply_trans (s: net_state) (l: action aneris_lang + config_label aneris_lang) : net_state :=
+Definition net_apply_trans (s: net_state) (l: config_label aneris_lang) : net_state :=
   let '(ms, bs) := s in
   match l with
-  | inl (Send msg) => (ms ⊎ {[+ msg +]}, bs)
-  | inr (Duplicate msg) => (ms ⊎ {[+ msg +]}, bs)
-  | inr (Drop msg) => (ms ∖ {[+ msg +]}, bs)
-  | inr (Deliver msg) =>
+  | Duplicate msg => (ms ⊎ {[+ msg +]}, bs)
+  | Drop msg => (ms ∖ {[+ msg +]}, bs)
+  | Deliver msg =>
       let ms' := bs !!! m_destination msg in
       (ms ∖ {[+ msg +]}, <[m_destination msg := msg::ms']>bs)
-  | inl (Recv _ None) => (ms, bs)
-  | inl (Recv _ (Some msg)) =>
-      let ms' := bs !!! m_destination msg in
-      (ms, <[m_destination msg := take (length ms' - 1) ms']>bs)
   end.
 
 Program Definition net_model : EnvModel aneris_lang :=
@@ -71,7 +66,15 @@ Program Definition net_model : EnvModel aneris_lang :=
     env_fairness _ := True;
   |}.
 Next Obligation.
-  (* Correctness of [net_apply_trans] *)
+  (* rewrite /config_net_match. *)
+  (* intros [ms1 ss1] [ms2 ss2] [?|?|?] ?? Hstep [Hsoup [??]] Heq; simpl in *; simplify_eq. *)
+  (* - econstructor=>//.inversion Hstep. simplify_eq. inv select (language.config_step _ _ _). *)
+  (* - admit. *)
+  (* - econstructor. *)
+
+
+  (* ; try (econstructor; naive_solver). *)
+  (* simpl in Heq. *)
 Admitted.
 Next Obligation.
   (* Correctness of [net_apply_trans] *)

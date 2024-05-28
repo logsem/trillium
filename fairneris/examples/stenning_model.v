@@ -68,11 +68,11 @@ Definition good_message (sender_is_A : bool) (n : Z) (msg : option message) :=
             else m_sender msg' = saB ∧ m_destination msg' = saA.
 
 Global Instance good_message_decidable b n omsg : Decision (good_message b n omsg).
-Proof. rewrite /good_message. admit. Admitted.
+Proof. apply make_decision. Qed.
 
 Global Instance wrong_message_decidable omsg :
   Decision (omsg = None ∨ ∃ msg : message, omsg = Some msg ∧ m_sender msg ≠ saA).
-Proof. Admitted.
+Proof. apply make_decision. Qed.
 
 Inductive stenning_trans : stenning_state → stenning_role * option aneris_action → stenning_state → Prop :=
 | A_Send n stB :
