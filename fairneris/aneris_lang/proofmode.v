@@ -6,7 +6,7 @@ From iris.prelude Require Import options.
 Import uPred.
 
 Lemma tac_wp_expr_eval `{LM: LiveModel aneris_lang (joint_model M net_model)} `{!LiveModelEq LM}
-  `{!anerisG LM Σ} Δ tid E Φ (e e' : expr aneris_lang ) :
+  `{!anerisG LM Σ} Δ tid E Φ (e e' : aneris_expr) :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (WP e' @ tid; E {{ Φ }} : iProp Σ) → envs_entails Δ (WP e @ tid; E {{ Φ }}).
 Proof. by intros ->. Qed.
@@ -210,7 +210,7 @@ Qed.
 
 Lemma tac_wp_value_nofupd
   `{LM : LiveModel aneris_lang (joint_model M net_model)} `{!LiveModelEq LM} `{!anerisG LM Σ}
-  Δ tid E (Φ : val aneris_lang → iProp Σ) v :
+  Δ tid E (Φ : aneris_val → iProp Σ) v :
   envs_entails Δ (Φ v) → envs_entails Δ (WP (aneris_of_val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. by apply wp_value. Qed.
 

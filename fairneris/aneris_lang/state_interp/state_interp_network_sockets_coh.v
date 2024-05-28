@@ -69,8 +69,8 @@ Section state_interpretation.
       eapply HSn; eauto; naive_solver.
   Qed.
 
-  Lemma socket_handlers_coh_update_sblock σ Sn ip sh skt r b :
-    state_sockets σ !! ip = Some Sn →
+  Lemma socket_handlers_coh_update_sblock (S : gmap ip_address _) Sn ip sh skt r b :
+    S !! ip = Some Sn →
     Sn !! sh = Some (skt, r) →
     socket_handlers_coh Sn  →
     socket_handlers_coh
@@ -272,13 +272,13 @@ Section state_interpretation.
       set_solver.
   Qed.
 
-  Lemma network_sockets_coh_update_sblock σ sh skt r ip Sn b :
-    state_sockets σ !! ip = Some Sn →
+  Lemma network_sockets_coh_update_sblock S sh skt r ip Sn b :
+    S !! ip = Some Sn →
     Sn !! sh = Some (skt, r) →
-    network_sockets_coh (state_sockets σ)  →
+    network_sockets_coh S  →
     network_sockets_coh
       (<[ip:=<[sh:=({| saddress := saddress skt;
-                       sblock := b |}, r)]> Sn]> (state_sockets σ)).
+                       sblock := b |}, r)]> Sn]> S).
   Proof.
     rewrite /network_sockets_coh.
     intros ?? Hnets ip' Sn' HSn. ddeq ip' ip; [|eauto].
@@ -376,6 +376,36 @@ Section state_interpretation.
     split; [by eapply socket_messages_coh_deliver_message|].
     split; [by eapply socket_addresses_coh_update_buffer |].
     by eapply socket_unbound_empty_buf_coh_update_buffer.
+  Qed.
+
+  Lemma network_sockets_coh_step (c1 c2 : cfg aneris_lang) lab :
+    locale_step c1 lab c2 →
+    network_sockets_coh $ state_sockets c1.2 →
+    network_sockets_coh $ state_sockets c2.2.
+  Proof.
+    remember c1 as c1'.
+    destruct c1 as [tp1 [h1 ss1 ms1]]. destruct c2 as [tp2 [h2 ss2 ms2]]. simpl.
+    intros Hs Hc. inv Hs.
+    - inv select (prim_step _ _ _ _ _ _); simpl in *.
+      inv select (head_step _ _ _ _ _ _); simpl in *.
+      + inv BaseStep=>//.
+      + inv BaseStep=>//.
+      + eapply network_sockets_coh_alloc_node=>//.
+      + have XX := SocketStep. inv SocketStep; simpl in *.
+        * eapply network_sockets_coh_alloc_socket =>//.
+        * eapply network_sockets_coh_socketbind =>//.
+        * rewrite insert_id //.
+        * rewrite insert_id //.
+        * eapply network_sockets_coh_receive =>//.
+        * rewrite insert_id //.
+        * rewrite insert_id //.
+        * eapply network_sockets_coh_update_sblock=>//.
+        * eapply network_sockets_coh_update_sblock=>//.
+    - inv select (language.config_step _ _ _)=>//.
+      eapply network_sockets_coh_deliver_message=>//.
+      match goal with
+      | H : _ ∈ _ |- _ => apply elem_of_filter in H as [??]; congruence
+      end.
   Qed.
 
 End state_interpretation.

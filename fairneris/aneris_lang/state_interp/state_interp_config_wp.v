@@ -174,7 +174,7 @@ Section state_interpretation.
             [by iApply (local_state_coh_deliver_message with "Hlcoh")|].
         by iApply (free_ips_coh_deliver_message with "Hfreeips").
       + iModIntro.
-        iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)".
+        iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem&%Hcoh)".
         iSplit.
         * simpl. iPureIntro.
           rewrite /valid_state_evolution_fairness.
@@ -184,13 +184,14 @@ Section state_interpretation.
             - destruct (trace_last atr) as [[[??]]] eqn:Heq. simpl.
               rewrite /usr_state. simpl.
               apply NetTrans.
-              by eapply env_apply_trans_spec_trans.
+              eapply env_apply_trans_spec_trans=>//.
             - split=>//.  }
           split; [|].
           simpl. split=>//. by apply cfg_labels_match_is_eq.
           by rewrite /tids_smaller ?Hex //= in Htids *.
-        * iExists _. iFrame. iPureIntro.
+        * iExists _. iFrame. iPureIntro. split.
           by eapply env_apply_trans_spec_both.
+          by eapply env_state_coh_preserved.
     - destruct H as (Hsteps & Hmatch & Htids).
       iSplitR "Hlive".
       + iFrame "Hauth". iModIntro. simpl.
@@ -202,7 +203,7 @@ Section state_interpretation.
         iSplitR; [eauto using gnames_coh_update_sockets|].
         iSplitR; [eauto using network_sockets_coh_deliver_message|].
         eauto using messages_history_coh_duplicate_message.
-      + iModIntro. iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)". iSplit.
+      + iModIntro. iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem&%Hcoh)". iSplit.
         * simpl. iPureIntro.
           rewrite /valid_state_evolution_fairness.
           split.
@@ -215,8 +216,9 @@ Section state_interpretation.
           split; [|].
           simpl. split=>//. by apply cfg_labels_match_is_eq.
           by rewrite /tids_smaller ?Hex //= in Htids *.
-        * iExists _. iFrame. iFrame. iPureIntro.
+        * iExists _. iFrame. iFrame. iPureIntro. split.
           by eapply env_apply_trans_spec_both.
+          by eapply env_state_coh_preserved.
     - destruct H as (Hsteps & Hmatch & Htids).
       iSplitR "Hlive".
       + iFrame "Hauth". simpl. iModIntro.
@@ -228,7 +230,7 @@ Section state_interpretation.
         iSplitR; [eauto using gnames_coh_update_sockets|].
         iSplitR; [eauto using network_sockets_coh_deliver_message|].
         eauto using messages_history_coh_drop_message.
-      + iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem)". iSplitR.
+      + iDestruct "Hlive" as "(%fm&?&?&?&Hst&?&%Hem&%Hcoh)". iSplitR.
         * simpl. iPureIntro.
           rewrite /valid_state_evolution_fairness.
           split.
@@ -241,7 +243,8 @@ Section state_interpretation.
           split; [|].
           simpl. split=>//. by apply cfg_labels_match_is_eq.
           by rewrite /tids_smaller ?Hex //= in Htids *.
-        * iExists _. iFrame. iFrame. iPureIntro.
+        * iExists _. iFrame. iFrame. iPureIntro. split.
           by eapply env_apply_trans_spec_both.
+          by eapply env_state_coh_preserved.
   Qed.
 End state_interpretation.

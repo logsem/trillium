@@ -629,7 +629,7 @@ Proof. by intros; apply AllocS, (not_elem_of_dom (D:=gset loc)), is_fresh. Qed.
 Definition base_locale := nat.
 Definition locale_of (c: list expr) (e : expr) := length c.
 
-Lemma locale_step e1 e2 t1 α σ1 σ2 efs:
+Lemma locale_step_preserved e1 e2 t1 α σ1 σ2 efs:
   head_step e1 σ1 α e2 σ2 efs ->
   locale_of t1 e1 = locale_of t1 e2.
 Proof. done. Qed.
@@ -652,7 +652,7 @@ Definition base_config_step (σ : state) (lbl : base_config_label) (σ' : state)
 Lemma base_mixin : EctxiLanguageMixin of_val to_val fill_item head_step (* base_config_step *) locale_of (* base_config_enabled *).
 Proof.
   split; apply _ || eauto using to_of_val, of_to_val, val_head_stuck,
-    fill_item_val, fill_item_no_val_inj, head_ctx_step_val, locale_step, base_locale_injective.
+    fill_item_val, fill_item_no_val_inj, head_ctx_step_val, locale_step_preserved, base_locale_injective.
   { intros ??? H%Forall2_length. rewrite !prefixes_from_length // in H. }
   (* { apply base_config_enabled_step. } *)
 Qed.
@@ -1075,7 +1075,7 @@ Inductive config_step :
 Definition aneris_locale := (ip_address * nat)%type.
 Definition locale_of (c: list aneris_expr) (e : aneris_expr) := (e.(expr_n), length $ (filter (λ e', e'.(expr_n) = e.(expr_n))) c).
 
-Lemma locale_step e1 e2 α t1 σ1 σ2 efs:
+Lemma locale_step_preserved e1 e2 α t1 σ1 σ2 efs:
   head_step e1 σ1 α e2 σ2 efs ->
   locale_of t1 e1 = locale_of t1 e2.
 Proof.
@@ -1143,7 +1143,7 @@ Proof.
   split; apply _ || eauto using aneris_to_of_val, aneris_of_to_val,
          aneris_val_head_stuck, fill_item_aneris_val,
          fill_item_no_aneris_val_inj, head_ctx_step_aneris_val,
-         locale_step, locale_fill, aneris_locale_injective.
+         locale_step_preserved, locale_fill, aneris_locale_injective.
   { intros t1 t2 e H . rewrite /locale_of. f_equal.
     apply filter_length_equiv, (filter_locales_equiv [] []) =>//. }
 Qed.

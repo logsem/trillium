@@ -5,7 +5,7 @@ From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import saved_prop invariants mono_nat.
 From iris.proofmode Require Import tactics.
 From fairneris.lib Require Import gen_heap_light.
-From fairneris.aneris_lang Require Export aneris_lang network network_model.
+From fairneris.aneris_lang Require Export aneris_lang network.
 From fairneris.algebra Require Import disj_gsets.
 From trillium.events Require Import event.
 From fairneris.aneris_lang Require Import events.
@@ -84,7 +84,8 @@ Definition aneris_localeO := leibnizO aneris_locale.
 Definition live_roleUR (FM : FairModel) :=
   authUR (gset_disjUR $ FM.(fmrole)).
 
-(* Instance aneris_inh: Inhabited (action aneris_lang). *)
+Global Instance aneris_good_lang : GoodLang aneris_lang.
+Proof. Qed.
 
 (** The system CMRA *)
 Class anerisG `(LM : LiveModel aneris_lang (joint_model M Net)) `{!LiveModelEq LM} Σ :=

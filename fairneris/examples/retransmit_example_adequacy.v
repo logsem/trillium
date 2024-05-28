@@ -1,5 +1,6 @@
 From stdpp Require Import list fin_maps.
 From iris.proofmode Require Import proofmode.
+From fairneris.aneris_lang Require Import network_model.
 From iris.algebra Require Import excl_auth.
 From iris.base_logic.lib Require Import invariants.
 From trillium.program_logic Require Import ectx_lifting.
@@ -31,7 +32,7 @@ Lemma retransmit_continued_simulation extr :
 Proof.
   intros Hfirst Hval Hfair.
 
-  assert (anerisPreG (live_model_of_user retransmit_model) retransmitΣ) as HPreG.
+  assert (anerisPreG (live_model_of_user retransmit_model net_model) retransmitΣ) as HPreG.
   { apply _. }
 
   assert (good_fuel_alloc initial_state.1 retransmit_model.Start [ {[ Arole ]}; {[ Brole]} ]) as Hfss.
@@ -49,7 +50,7 @@ Proof.
     - intros [|] Hin; [exists 0|exists 1]; rewrite ?tail_lookup ?head_lookup //=; naive_solver set_solver. }
 
   assert (continued_simulation_init
-            (valid_state_evolution_fairness (live_model_of_user retransmit_model))
+            (valid_state_evolution_fairness (live_model_of_user retransmit_model net_model))
             initial_state (lm_init _ _ _ (∅, ∅) Hfss)
     ) as Hcs.
   { eapply (simulation_adequacy_multiple_strong _ {[saA;saB]} NotStuck _ _ _ _ ∅).

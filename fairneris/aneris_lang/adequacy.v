@@ -390,7 +390,7 @@ Proof.
     apply take_drop_middle in Hlk. naive_solver. }
   { rewrite /model_state_interp. iExists _.
     rewrite /usr_state. iFrame.
-    (iSplit; [|iSplit;[|iSplit]]); iPureIntro; simpl=>//.
+    (iSplit; [|iSplit;[|iSplit; [|iSplit]]]); iPureIntro; simpl=>//.
     - intros ρ Hlive.
       change (initial_fuel_map M es fss st) with (ls_map (lm_init es st fss net_init Hfss)).
       by apply (ls_map_live (lm_init es st fss net_init Hfss)) in Hlive.
@@ -400,7 +400,9 @@ Proof.
       apply Hnotin.
       apply locales_of_list_from_locale_from.
       exists e. apply from_locale_from_Some. apply prefixes_from_spec. list_simplifier.
-      apply take_drop_middle in Hlk. naive_solver. }
+      apply take_drop_middle in Hlk. naive_solver.
+    - admit. (* See if it's proved somewhere already. *)
+  }
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Htake)
           "Hsi Hposts".
   iDestruct "Hsi" as "(Hasi&%Hvalid&Hmod)".
@@ -490,7 +492,7 @@ Proof.
    opose proof (ls_map_agree Hfs1 Hfs2 Hinfs1 _).
    { apply map_included_utils.map_included_subseteq_inv in Hincl2. set_solver. }
    naive_solver.
-Qed.
+Admitted.
 
 Definition aneris_trace := extrace aneris_lang.
 Definition auxtrace (M : Model) := trace (M.(mstate)) (M.(mlabel)).

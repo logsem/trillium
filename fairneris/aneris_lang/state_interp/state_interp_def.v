@@ -8,7 +8,8 @@ From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop gen_heap mono_nat.
 From trillium.program_logic Require Import weakestpre adequacy.
 From trillium.events Require Import event.
-From fairneris Require Import fairness fuel fair_resources env_model.
+From fairneris Require Import fairness fuel env_model.
+From fairneris Require Export fair_resources.
 From fairneris.prelude Require Import collect gset_map gmultiset.
 From fairneris.algebra Require Import disj_gsets.
 From fairneris.aneris_lang Require Import resources events.
@@ -26,7 +27,7 @@ Section definitions.
   Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
-  Implicit Types σ : state aneris_lang.
+  Implicit Types σ : state.
   Implicit Types h : heap.
   Implicit Types H : gmap ip_address heap.
   Implicit Types S : gmap ip_address sockets.

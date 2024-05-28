@@ -48,14 +48,14 @@ Class retransmitPreG Σ := {
   retransmit_done_PreG :> inG Σ (excl_authR retransmitO);
  }.
 Definition retransmitΣ : gFunctors :=
-  #[ anerisΣ (live_model_of_user retransmit_model);
+  #[ anerisΣ (live_model_of_user retransmit_model net_model);
      GFunctor (excl_authR retransmitO) ].
 
 Global Instance subG_retransmitΣ {Σ} : subG retransmitΣ Σ → retransmitPreG Σ.
 Proof. solve_inG. Qed.
 
 Section with_Σ.
-  Context `{anerisG _ _ (live_model_of_user retransmit_model) Σ}.
+  Context `{anerisG _ _ (live_model_of_user retransmit_model net_model) Σ}.
   Context `{!retransmitG Σ}.
   Let Ns := nroot .@ "retransmit".
 

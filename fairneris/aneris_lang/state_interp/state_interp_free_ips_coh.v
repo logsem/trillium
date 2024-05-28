@@ -20,7 +20,7 @@ Section state_interpretation.
   Context `{!LiveModelEq LM}.
   Context `{aG : !anerisG LM Σ}.
 
-  Definition ip_is_free (ip : ip_address) (σ : state aneris_lang) : Prop :=
+  Definition ip_is_free (ip : ip_address) (σ : state) : Prop :=
     state_heaps σ !! ip = None ∧ state_sockets σ !! ip = None.
 
   (** free_ips_coh *)

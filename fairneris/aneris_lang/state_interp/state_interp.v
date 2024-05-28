@@ -19,7 +19,6 @@ From fairneris.aneris_lang.state_interp Require Export
      state_interp_socket_interp_coh
      state_interp_messages_resource_coh
      state_interp_messages_history_coh
-     state_interp_config_wp
      state_interp_messages_history.
 
 From RecordUpdate Require Import RecordSet.

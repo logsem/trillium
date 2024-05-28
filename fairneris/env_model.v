@@ -31,6 +31,7 @@ Context `{GoodLang Λ}.
 Record EnvModel := {
     env_lts :> Lts (action Λ + config_label Λ);
     env_states_match : cfg Λ → env_lts.(lts_state) → Prop;
+    env_state_coh : state Λ → Prop;
     env_apply_trans : env_lts.(lts_state) → config_label Λ → env_lts.(lts_state);
     env_apply_trans_spec_trans : ∀ m1 m2 cl c1 c2,
       locale_step c1 (inr cl) c2 →
@@ -40,12 +41,18 @@ Record EnvModel := {
     env_apply_trans_spec_both : ∀ c1 m1 cl c2 m2,
       env_apply_trans m1 cl = m2 →
       locale_step c1 (inr cl) c2 →
+      env_state_coh c1.2 →
       env_states_match c1 m1 →
       env_states_match c2 m2;
     env_match_internal_step : ∀ ζ c1 m c2,
+      env_state_coh c1.2 →
       locale_step c1 (inl (ζ, None)) c2 →
       env_states_match c1 m →
       env_states_match c2 m;
+    env_state_coh_preserved c1 c2 ζ :
+      locale_step c1 ζ c2 →
+      env_state_coh c1.2 →
+      env_state_coh c2.2;
     env_fairness: trace env_lts.(lts_state) (action Λ + config_label Λ) → Prop;
 }.
 
@@ -144,6 +151,8 @@ Arguments usr_fl {_ _ _ _}.
 Arguments usr_live_roles {_ _ _ _}.
 Arguments env_lts {_ _ _}.
 Arguments env_states_match {_ _ _ _ _ _ _}.
+Arguments env_state_coh {_ _ _ _ _ _ N} _ : rename.
+Arguments env_state_coh_preserved {_ _ _ _ _ _ N} _ : rename.
 Arguments joint_model {_ _ _ _ _ _}.
 Arguments joint_trans {_ _ _ _ _ _}.
 Arguments usr_trace_valid {_ _ _ _} _.

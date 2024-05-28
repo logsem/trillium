@@ -62,7 +62,7 @@ Class stenningPreG Σ := {
   stenning_B_PreG :> inG Σ (excl_authR stenning_B_stateO);
  }.
 Definition stenningΣ : gFunctors :=
-  #[ anerisΣ (live_model_of_user stenning_model);
+  #[ anerisΣ (live_model_of_user stenning_model net_model);
      GFunctor (excl_authR stenning_A_stateO);
      GFunctor (excl_authR stenning_B_stateO) ].
 
@@ -70,7 +70,7 @@ Global Instance subG_stenningΣ {Σ} : subG stenningΣ Σ → stenningPreG Σ.
 Proof. solve_inG. Qed.
 
 Section with_Σ.
-  Context `{anerisG _ _ (live_model_of_user stenning_model) Σ}.
+  Context `{anerisG _ _ (live_model_of_user stenning_model net_model) Σ}.
   Context `{!stenningG Σ}.
   Let Ns := nroot .@ "stenning".
 
