@@ -401,8 +401,17 @@ Proof.
       apply locales_of_list_from_locale_from.
       exists e. apply from_locale_from_Some. apply prefixes_from_spec. list_simplifier.
       apply take_drop_middle in Hlk. naive_solver.
-    - admit. (* See if it's proved somewhere already. *)
-  }
+    - intros ip Sn Hlk. split_and!.
+      + apply (map_Forall_lookup_1 _ _ _ _ Hsh_coh Hlk).
+      + intros ???? Hlk' ?.
+        have Hfa := map_Forall_lookup_1 _ _ _ _ Hbuf_coh Hlk.
+        have /= -> := map_Forall_lookup_1 _ _ _ _ Hfa Hlk'.
+        set_solver.
+      + apply (map_Forall_lookup_1 _ _ _ _ Hsa_coh Hlk).
+      + intros ??? Hlk' ?.
+        have Hfa := map_Forall_lookup_1 _ _ _ _ Hbuf_coh Hlk.
+        apply (map_Forall_lookup_1 _ _ _ _ Hfa Hlk'). }
+
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Htake)
           "Hsi Hposts".
   iDestruct "Hsi" as "(Hasi&%Hvalid&Hmod)".
@@ -492,7 +501,7 @@ Proof.
    opose proof (ls_map_agree Hfs1 Hfs2 Hinfs1 _).
    { apply map_included_utils.map_included_subseteq_inv in Hincl2. set_solver. }
    naive_solver.
-Admitted.
+Qed.
 
 Definition aneris_trace := extrace aneris_lang.
 Definition auxtrace (M : Model) := trace (M.(mstate)) (M.(mlabel)).

@@ -391,7 +391,7 @@ Section state_interpretation.
       + inv BaseStep=>//.
       + inv BaseStep=>//.
       + eapply network_sockets_coh_alloc_node=>//.
-      + have XX := SocketStep. inv SocketStep; simpl in *.
+      + inv SocketStep; simpl in *.
         * eapply network_sockets_coh_alloc_socket =>//.
         * eapply network_sockets_coh_socketbind =>//.
         * rewrite insert_id //.
