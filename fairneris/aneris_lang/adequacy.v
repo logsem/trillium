@@ -29,12 +29,14 @@ Lemma extrace_property_impl {Λ} c (Φ Ψ : extrace Λ → Prop) :
   extrace_property c Ψ.
 Proof. intros HΦ Himpl extr Hstarts Hvalid. by apply Himpl, HΦ. Qed.
 
-Definition valid_state_evolution_fairness `(LM: LiveModel aneris_lang M)
+Definition valid_state_evolution_fairness `(LM: LiveModel aneris_lang (joint_model M Net))
+           (inv : M → Prop)
            (extr : execution_trace aneris_lang)
            (auxtr : auxiliary_trace (live_model_to_model LM)) :=
   trace_steps LM.(lm_ls_trans) auxtr ∧
   trace_labels_match extr auxtr ∧
-  live_tids (LM := LM) (trace_last extr) (trace_last auxtr).
+  live_tids (LM := LM) (trace_last extr) (trace_last auxtr) ∧
+  inv (trace_last auxtr).(ls_under).1.
 
 Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
   match ft with
@@ -42,8 +44,8 @@ Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
   | _ :tr[ℓ]: _ => Some ℓ
   end.
 
-Lemma rel_finitary_valid_state_evolution_fairness `(LM: LiveModel aneris_lang M):
-  rel_finitary (valid_state_evolution_fairness LM).
+Lemma rel_finitary_valid_state_evolution_fairness `(LM: LiveModel aneris_lang (joint_model M Net)) inv:
+  rel_finitary (valid_state_evolution_fairness LM inv).
 Proof. Admitted.
 
 (* Lemma derive_live_tid_inl c δ (ℓ : fmrole retransmit_fair_model) ζ : *)
@@ -134,6 +136,7 @@ Definition initial_fuel_map `(M: UserModel aneris_lang) `{LMeq: !LiveModelEq LM}
 
 Definition wp_proto_multiple_strong
   `(M: UserModel aneris_lang)
+  (inv : M → Prop)
   `{LM: LiveModel aneris_lang (joint_model M net_model)}
   `{LMeq: !LiveModelEq LM} `{@anerisPreG M net_model LM LMeq Σ}
   (A: gset socket_address) (σ: aneris_lang.state) (s:stuckness) (es : list aneris_expr) (FR: gset (usr_role M))
@@ -153,6 +156,7 @@ Definition wp_proto_multiple_strong
      ([∗ set] ip ∈ dom (state_heaps σ), is_node ip) -∗
      aneris_state_interp σ (∅, ∅) ={⊤}=∗
      ((aneris_state_interp σ (∅, ∅)) : iProp Σ) ∗
+     (□ ∀ st, auth_model_is st ={⊤, ∅}=∗ ⌜ inv st ⌝ ∗ auth_model_is st) ∗
      wptp s es (fmap (λ '(tnew,e), λ v, fork_post (locale_of tnew e) v)
                     (prefixes es))).
 
@@ -270,7 +274,7 @@ Qed.
 Theorem simulation_adequacy_multiple_strong
         `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
         A s (es : list aneris_expr) σ st fss FR net_init
-        (Hfss: good_fuel_alloc es st fss) :
+        (Hfss: good_fuel_alloc es st fss) inv :
   length es >= 1 →
   (* aneris_model_rel_finitary Mdl → *)
   dom (state_heaps σ) = dom (state_sockets σ) →
@@ -287,8 +291,8 @@ Theorem simulation_adequacy_multiple_strong
   map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
   (* Message soup is initially empty *)
   state_ms σ = ∅ →
-  wp_proto_multiple_strong M A σ s es FR st fss →
-  continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) (lm_init es st fss net_init Hfss).
+  wp_proto_multiple_strong M inv A σ s es FR st fss →
+  continued_simulation_init (valid_state_evolution_fairness LM inv) (es, σ) (lm_init es st fss net_init Hfss).
 Proof.
   intros Hlen Hdom Hnetinit Hport_coh Hbuf_coh Hsh_coh Hsa_coh Hms Hwp.
   apply (wp_strong_adequacy_multiple aneris_lang
@@ -377,7 +381,7 @@ Proof.
                      {[k := x]} : gmap.gmapUR _ (exclR (gmap.gmapUR _ natO)))); last first.
     { rewrite (big_opM_fmap). f_equiv. intros ??. rewrite map_fmap_singleton //. }
     rewrite gmap.big_opM_singletons //. }
-  iDestruct ("Hwp") as ">[Hσ $]".
+  iDestruct ("Hwp") as ">(Hσ & #Hinv & $)".
   simpl. rewrite /aneris_state_interp_opt /aneris_state_interp_σ /aneris_state_interp_δ /= Hms /= dom_empty_L.
   iFrame.
   iModIntro.
@@ -415,14 +419,23 @@ Proof.
   iIntros (ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr Hstuck Htake)
           "Hsi Hposts".
   iDestruct "Hsi" as "(Hasi&%Hvalid&Hmod)".
-  iApply fupd_mask_intro; [set_solver|].
-  iIntros "_".
+
+  iAssert (|={⊤, ∅}=>
+             ⌜inv (trace_last atr).(ls_under).1⌝ ∗ model_state_interp (trace_last ex) (trace_last atr))%I with "[Hmod]" as "H".
+  { iDestruct "Hmod" as "(%fm & ? & ? & ? & Hmod & ? & ? &?)".
+    iMod ("Hinv" with "[Hmod]") as "[%SS Hmod]". iFrame.
+    iModIntro. iSplit; first done. iExists fm. iFrame. }
+  iMod "H" as "[%Hinv' Hmod]".
+
+  (* iApply fupd_mask_intro; [set_solver|]. *)
+  (* iIntros "_". *)
+  iModIntro.
   pose proof Hvalid as Hvalid'.
   rewrite /fuel.valid_state_evolution_fairness in Hvalid.
   destruct Hvalid as (Hsteps&Hlabs&Htids).
   iSplit; [done|].
   iSplit; [done|].
-  iSplit.
+  iSplit; [iSplit|done].
   { iPureIntro. rewrite /tids_smaller in Htids.
     intros ρ ζ Hlk. apply ls_mapping_data_inv in Hlk as [?[??]]. apply Htids=>//.
     by eapply elem_of_dom_2. }
@@ -549,13 +562,14 @@ Qed.
 
 Lemma continued_simulation_infinite_model_trace
   `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
+  inv
   es σ m0 iex:
-  continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+  continued_simulation_init (valid_state_evolution_fairness LM inv) (es, σ) m0 →
   valid_inf_exec {tr[ (es, σ) ]} iex →
   exists iatr,
   @valid_inf_system_trace _ LM
     (continued_simulation
-       (valid_state_evolution_fairness LM))
+       (valid_state_evolution_fairness LM inv))
     (trace_singleton (es, σ))
     (trace_singleton m0)
     iex
@@ -564,12 +578,12 @@ Proof. intros Hcs. eexists. (unshelve apply produced_inf_aux_trace_valid_inf)=>/
 
 Lemma simulation_adequacy_traces Σ
   `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
-        es σ m0
+        inv es σ m0
         (extr : aneris_trace)
         (Hvex : extrace_valid extr)
         (Hexfirst : (trfirst extr) = (es, σ))
   :
-  continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+  continued_simulation_init (valid_state_evolution_fairness LM inv) (es, σ) m0 →
   ∃ (auxtr : auxtrace LM), exaux_traces_match (LM := LM) extr auxtr ∧ trfirst auxtr = m0.
 Proof.
   intros Hcci.
@@ -580,7 +594,7 @@ Proof.
   destruct Hcci as [atr Hatr].
   exists (to_trace m0 atr). split; last first.
   { destruct atr as [| [??] ?] =>//=. }
-  eapply (valid_inf_system_trace_implies_traces_match_strong (valid_state_evolution_fairness LM)
+  eapply (valid_inf_system_trace_implies_traces_match_strong (valid_state_evolution_fairness LM inv)
             _ _ _ (trace_singleton m0) (from_trace extr) atr
          ).
   - intros ex atr' Hvse. unfold valid_state_evolution_fairness in Hvse. naive_solver.
@@ -629,17 +643,17 @@ Section lm_network.
     (ltl_tme labels_match live_tids locale_step (lm_ls_trans LM)).
 
   Lemma simulation_adequacy_traces_fairness
-          es σ m0
+          inv es σ m0
           (extr : aneris_trace)
           (Hvex : extrace_valid extr)
           (Hexfirst : (trfirst extr) = (es, σ))
     :
-    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+    continued_simulation_init (valid_state_evolution_fairness LM inv) (es, σ) m0 →
     ex_fair extr →
     ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr ∧ trfirst auxtr = m0.
   Proof.
     intros Hcs [Hfn Hfs].
-    destruct (simulation_adequacy_traces _ _ _ _ _ extr Hvex Hexfirst Hcs) as [atr [Hatr ?]].
+    destruct (simulation_adequacy_traces _ _ _ _ _ _ extr Hvex Hexfirst Hcs) as [atr [Hatr ?]].
     eexists _; split=>//. split.
     - rewrite /lm_network_fair_delivery /ex_fair_network in Hfn *.
       rewrite /lm_network_fair_delivery_of /ex_fair_network_of in Hfn *.
@@ -740,8 +754,8 @@ Section lm_network.
     rewrite /model_refinement /rel_compose. naive_solver congruence.
   Qed.
 
-  Proposition program_model_refinement_preserves_upward extr m0 es σ :
-    continued_simulation_init (valid_state_evolution_fairness LM) (es, σ) m0 →
+  Proposition program_model_refinement_preserves_upward extr m0 inv es σ :
+    continued_simulation_init (valid_state_evolution_fairness LM inv) (es, σ) m0 →
     extrace_valid extr →
     ex_fair extr →
     (trfirst extr) = (es, σ) →

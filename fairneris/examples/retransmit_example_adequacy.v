@@ -50,7 +50,7 @@ Proof.
     - intros [|] Hin; [exists 0|exists 1]; rewrite ?tail_lookup ?head_lookup //=; naive_solver set_solver. }
 
   assert (continued_simulation_init
-            (valid_state_evolution_fairness (live_model_of_user retransmit_model net_model))
+            (valid_state_evolution_fairness (live_model_of_user retransmit_model net_model) (λ _, True))
             initial_state (lm_init _ _ _ (∅, ∅) Hfss)
     ) as Hcs.
   { eapply (simulation_adequacy_multiple_strong _ {[saA;saB]} NotStuck _ _ _ _ ∅).
@@ -138,6 +138,8 @@ Proof.
     rewrite big_sepM_insert //.
     iDestruct "Hfp" as "(HfpB & HfpA & _)".
 
+    iSplit.
+    { iModIntro. iIntros (st) "Hst". iApply fupd_mask_intro. set_solver. iIntros "_". iFrame. }
     iSplitL "HrtA HnodeA HfuelA HfpA".
     { iApply (wp_A _ (usr_fl (retransmit_model.Start : retransmit_model)) with "[$HrtA HnodeA HfuelA HfpA]").
       { rewrite //=. lia. }
