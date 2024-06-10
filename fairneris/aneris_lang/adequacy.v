@@ -575,6 +575,24 @@ Lemma continued_simulation_infinite_model_trace
     iatr.
 Proof. intros Hcs. eexists. (unshelve apply produced_inf_aux_trace_valid_inf)=>//. constructor. Qed.
 
+Lemma valid_inf_system_trace_implies_always
+  `{M: UserModel aneris_lang} `{@anerisPreG M net_model LM LMeq Σ}
+  inv Ψ
+  (tr1 : execution_trace aneris_lang) tr2 tr1' (tr2' : inf_auxiliary_trace LM) :
+  valid_inf_system_trace Ψ tr1 tr2  tr1' tr2' →
+  (∀ ex tr, Ψ ex tr → inv (trace_last tr)) →
+  (to_trace (trace_last tr2) tr2' ⊩ □ ↓ λ (s : LiveState _ (joint_model _ _)) _, inv s).
+Proof.
+    rewrite trace_alwaysI. intros Hval Himpl tr' [n Hn].
+    revert tr' tr1 tr1' tr2 tr2' Hval Hn.
+    induction n as [|n IHn]; intros tr' tr1 tr1' tr2 tr2' Hval Hn.
+    - simpl in *. simplify_eq. rewrite ltl_sat_def /trace_now /pred_at /=.
+      have ?: inv (trace_last tr2); last by destruct tr2' as [|[??]?].
+      inv Hval as [?? Hcs| ????????? Hcs]; naive_solver.
+    - destruct tr2' as [|[ℓ m1]?] eqn:Heq; first (exfalso; naive_solver).
+      cbn in Hn. inv Hval. by eapply IHn.
+Qed.
+
 Lemma simulation_adequacy_traces Σ
   `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
         inv es σ m0
@@ -594,8 +612,10 @@ Proof.
   destruct Hcci as [atr Hatr].
   exists (to_trace m0 atr). split; last first.
   { split; first destruct atr as [| [??] ?] =>//=.
-    admit. }
-
+    change m0 with (trace_last (L := mlabel LM) {tr[ m0 ]}).
+    eapply valid_inf_system_trace_implies_always=>//.
+    intros ex tr Hcs%continued_simulation_rel. rewrite /valid_state_evolution_fairness in Hcs.
+    naive_solver. }
   eapply (valid_inf_system_trace_implies_traces_match_strong (valid_state_evolution_fairness LM inv)
             _ _ _ (trace_singleton m0) (from_trace extr) atr
          ).
@@ -608,7 +628,7 @@ Proof.
   - apply (from_trace_spec (trace_singleton (es, σ))). rewrite Hexfirst //.
   - change m0 with (trace_last (L := mlabel LM) (trace_singleton m0)). apply to_trace_spec.
   - eapply valid_inf_system_trace_mono; last eassumption. by intros ??[??]%continued_simulation_unfold.
-Admitted.
+Qed.
 
 Definition ex_fair_scheduling (tr: aneris_trace) := ∀ ζ, fair_scheduling_ex ζ tr.
 
