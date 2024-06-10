@@ -559,7 +559,6 @@ Proof.
     + eapply IH; eauto.
 Qed.
 
-
 Lemma continued_simulation_infinite_model_trace
   `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
   inv
@@ -584,7 +583,8 @@ Lemma simulation_adequacy_traces Σ
         (Hexfirst : (trfirst extr) = (es, σ))
   :
   continued_simulation_init (valid_state_evolution_fairness LM inv) (es, σ) m0 →
-  ∃ (auxtr : auxtrace LM), exaux_traces_match (LM := LM) extr auxtr ∧ trfirst auxtr = m0.
+  ∃ (auxtr : auxtrace LM), exaux_traces_match (LM := LM) extr auxtr ∧ trfirst auxtr = m0 ∧
+    (auxtr ⊩ □ ↓ λ (s : LiveState aneris_lang (joint_model M net_model)) _, inv s.(ls_under).1).
 Proof.
   intros Hcci.
   opose proof (from_trace_preserves_validity _ (trace_singleton (es, σ)) Hvex _ _) as Hval.
@@ -593,7 +593,9 @@ Proof.
   eapply continued_simulation_infinite_model_trace in Hcci=>//.
   destruct Hcci as [atr Hatr].
   exists (to_trace m0 atr). split; last first.
-  { destruct atr as [| [??] ?] =>//=. }
+  { split; first destruct atr as [| [??] ?] =>//=.
+    admit. }
+
   eapply (valid_inf_system_trace_implies_traces_match_strong (valid_state_evolution_fairness LM inv)
             _ _ _ (trace_singleton m0) (from_trace extr) atr
          ).
@@ -606,7 +608,7 @@ Proof.
   - apply (from_trace_spec (trace_singleton (es, σ))). rewrite Hexfirst //.
   - change m0 with (trace_last (L := mlabel LM) (trace_singleton m0)). apply to_trace_spec.
   - eapply valid_inf_system_trace_mono; last eassumption. by intros ??[??]%continued_simulation_unfold.
-Qed.
+Admitted.
 
 Definition ex_fair_scheduling (tr: aneris_trace) := ∀ ζ, fair_scheduling_ex ζ tr.
 
@@ -650,10 +652,11 @@ Section lm_network.
     :
     continued_simulation_init (valid_state_evolution_fairness LM inv) (es, σ) m0 →
     ex_fair extr →
-    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr ∧ trfirst auxtr = m0.
+    ∃ (auxtr : auxtrace LM), lm_fair auxtr ∧ exaux_traces_match (LM := LM) extr auxtr ∧ trfirst auxtr = m0 ∧
+      (auxtr ⊩ □ ↓ λ (s : LiveState aneris_lang (joint_model M net_model)) _, inv s.(ls_under).1).
   Proof.
     intros Hcs [Hfn Hfs].
-    destruct (simulation_adequacy_traces _ _ _ _ _ _ extr Hvex Hexfirst Hcs) as [atr [Hatr ?]].
+    destruct (simulation_adequacy_traces _ _ _ _ _ _ extr Hvex Hexfirst Hcs) as [atr [Hatr [??]]].
     eexists _; split=>//. split.
     - rewrite /lm_network_fair_delivery /ex_fair_network in Hfn *.
       rewrite /lm_network_fair_delivery_of /ex_fair_network_of in Hfn *.
@@ -684,52 +687,67 @@ Section lm_network.
     usr_network_fair_send_receive tr ∧ usr_fair_scheduling tr.
 
   Lemma simulation_adequacy_trace_remove_fuel
-          (auxtr : auxtrace LM) :
+          (auxtr : auxtrace LM) inv :
     lm_fair auxtr →
     auxtrace_valid (LM := LM) auxtr →
+    (auxtr ⊩ □ ↓ λ (s : LiveState aneris_lang (joint_model M net_model)) _, inv s.(ls_under).1) →
     ∃ jmtr, jm_fair jmtr ∧ jmtrace_valid jmtr ∧ upto_stutter_aux auxtr jmtr ∧
-              trfirst jmtr = (trfirst auxtr).(ls_under).
+              trfirst jmtr = (trfirst auxtr).(ls_under) ∧
+      (jmtr ⊩ □ ↓ λ (s : joint_model M net_model) _, inv s.1).
   Proof.
-    intros [Hnf Hsf] Hval. have Hval' := Hval.
+    intros [Hnf Hsf] Hval Hinv. have Hval' := Hval.
     apply can_destutter_auxtr in Hval as [jmtr Hupto].
-    exists jmtr; split; [|split; [|split]]=>//.
+    exists jmtr; split; [|split; [|split; [|split]]]=>//.
     - split.
       + eapply fuel_network_fairness_destutter=>//.
       + apply (upto_stutter_fairness_ltl _ _) in Hupto=>//.
     - eapply (upto_stutter_preserves_validity (Λ := aneris_lang)) =>//.
     - punfold Hupto; last apply upto_stutter_mono. inversion Hupto; naive_solver.
+    - eapply ltl_se_use. 2: try apply Hupto. 2: apply Hinv.
+      apply ltl_se_always, ltl_se_now_state. naive_solver.
   Qed.
 
   Lemma simulation_adequacy_trace_trimed
-          (jmtr : jmtrace) :
+          (jmtr : jmtrace) inv :
     jm_fair jmtr →
     jmtrace_valid jmtr →
-    ∃ ttr, jm_fair ttr ∧ jmtrace_valid ttr ∧ trimmed_of jmtr ttr ∧ trfirst ttr = trfirst jmtr.
+    (jmtr ⊩ □ ↓ λ (s : joint_model M net_model) _, inv s.1) →
+    ∃ ttr, jm_fair ttr ∧ jmtrace_valid ttr ∧ trimmed_of jmtr ttr ∧ trfirst ttr = trfirst jmtr ∧
+           (ttr ⊩ □ ↓ λ (s : joint_model M net_model) _, inv s.1).
   Proof.
-    intros [Ha Hb] Hval. exists (trim_trace jmtr). split; [|split; [|split]].
+    intros [Ha Hb] Hval Hinv. exists (trim_trace jmtr). split_and!.
     - split.
       + eapply trim_preserves_network_fairness =>//.
       + eapply trimming_preserves_fair_scheduling=>//.
     - rewrite /jmtrace_valid in Hval *. by apply trim_trace_valid.
     - apply trim_trace_trimmed_of.
     - destruct jmtr=>//=. destruct (decide _)=>//.
+    - rewrite trace_alwaysI. intros ttr' Hsuff.
+      eapply trimmed_of_suffix_of in Hsuff. 2: apply trim_trace_trimmed_of.
+      destruct Hsuff as (jmtr' & Hsuff & Htrim).
+      rewrite trace_alwaysI in Hinv. specialize (Hinv _ Hsuff).
+      rewrite !trace_now_state_trfirst in Hinv *.
+      punfold Htrim. inv Htrim=>//. apply trimmed_of_mono.
   Qed.
 
   Lemma simulation_adequacy_trace_trimmed_user
-          (ttr : jmtrace) :
+          (ttr : jmtrace) inv :
     jm_fair ttr →
     jmtrace_valid ttr →
     trace_is_trimmed ttr →
-    ∃ utr, usr_fair utr ∧ usr_trace_valid utr ∧ upto_stutter_env ttr utr ∧ trfirst utr = (trfirst ttr).1.
+    (ttr ⊩ □ ↓ λ (s : joint_model M net_model) _, inv s.1) →
+    ∃ utr, usr_fair utr ∧ usr_trace_valid utr ∧ upto_stutter_env ttr utr ∧ trfirst utr = (trfirst ttr).1 ∧
+       (utr ⊩ □ ↓ λ (s : M) _, inv s).
   Proof.
-    intros [Hnf Hsf] Hval Htrim.
+    intros [Hnf Hsf] Hval Htrim Hinv.
     have [utr Huts] : ∃ utr, upto_stutter_env ttr utr.
     { eapply can_destutter. apply env_steps_dec_unless=>//. }
-    exists utr. split; [split|split; [|split]] =>//.
-    - eapply network_fairness_project_usr=>//.
-    - eapply usr_project_scheduler_fair=>//.
+    exists utr. split_and!=>//.
+    - split. eapply network_fairness_project_usr=>//. eapply usr_project_scheduler_fair=>//.
     - eapply usr_project_valid=>//.
     - punfold Huts. inversion Huts; naive_solver. apply upto_stutter_mono.
+    - eapply ltl_se_use. 2: try apply Huts. 2: apply Hinv.
+      apply ltl_se_always, ltl_se_now_state. naive_solver.
   Qed.
 
   Definition model_refinement : rel (auxtrace LM) (lts_trace M) :=
@@ -740,16 +758,18 @@ Section lm_network.
   Definition program_model_refinement : rel (extrace aneris_lang) (lts_trace M) :=
     exaux_traces_match (LM := LM) >> model_refinement.
 
-  Lemma model_refinement_preserves_upward auxtr :
+  Lemma model_refinement_preserves_upward auxtr inv :
     lm_fair auxtr →
     auxtrace_valid (LM := LM) auxtr →
+    (auxtr ⊩ □ ↓ λ (s : LiveState aneris_lang (joint_model M net_model)) _, inv s.(ls_under).1) →
     ∃ utr, model_refinement auxtr utr ∧ usr_fair utr ∧ usr_trace_valid utr ∧
-             trfirst utr = (trfirst auxtr).(ls_under).1.
+             trfirst utr = (trfirst auxtr).(ls_under).1 ∧
+             (utr ⊩ □ ↓ λ (s : M) _, inv s).
   Proof.
-    intros Hf Hval.
-    apply simulation_adequacy_trace_remove_fuel in Hval as (?&?&Hval&?&?) =>//.
-    apply simulation_adequacy_trace_trimed in Hval as (?&?&Hval&?&?) =>//.
-    apply simulation_adequacy_trace_trimmed_user in Hval as (utr&?&Hval&?&?) =>//;
+    intros Hf Hval Hinv.
+    eapply simulation_adequacy_trace_remove_fuel in Hval as (?&?&Hval&?&?&?) =>//.
+    eapply simulation_adequacy_trace_trimed in Hval as (?&?&Hval&?&?&?) =>//.
+    eapply simulation_adequacy_trace_trimmed_user in Hval as (utr&?&Hval&?&?&?) =>//;
       last by eapply trimmed_of_is_trimmed.
     rewrite /model_refinement /rel_compose. naive_solver congruence.
   Qed.
@@ -762,10 +782,10 @@ Section lm_network.
     ∃ utr, program_model_refinement extr utr ∧ usr_fair utr ∧ usr_trace_valid utr ∧ trfirst utr = m0.(ls_under).1.
   Proof.
     intros Hf Hval ??.
-    eapply simulation_adequacy_traces_fairness in Hval as (?&?&Hmatch&?) =>//.
+    eapply simulation_adequacy_traces_fairness in Hval as (?&?&Hmatch&?&?) =>//.
     have Hmatch' := Hmatch.
     apply exaux_preserves_validity in Hmatch.
-    apply model_refinement_preserves_upward in Hmatch as (utr&?&?&?&?) =>//.
+    eapply model_refinement_preserves_upward in Hmatch as (utr&?&?&?&?&?) =>//.
     rewrite /program_model_refinement /rel_compose. naive_solver congruence.
   Qed.
 

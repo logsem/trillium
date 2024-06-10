@@ -250,6 +250,10 @@ Section ltl_lemmas.
     (tr ⊩ ↓ P) → (tr ⊩ ↓ Q) → (tr ⊩ ↓ (P /2\ Q)).
   Proof. intros. apply trace_now_and. rewrite trace_andI. done. Qed.
 
+  Lemma trace_now_state_trfirst P (tr : trace S L) :
+    (tr ⊩ ↓ (λ s _, P s)) ↔ P (trfirst tr).
+  Proof. intros. destruct tr; naive_solver. Qed.
+
   (** trace_eventually lemmas *)
 
   Lemma trace_eventually_intro P (tr : trace S L) :
@@ -771,6 +775,13 @@ Section stutter.
   Proof. exact (upto_stutter_mono Us Ul). Qed.
   Hint Resolve upto_stutter_mono' : paco.
 
+  Lemma ltl_se_use {P Q tr1 tr2}:
+    ltl_se P Q →
+    upto_stutter tr1 tr2 →
+    (tr1 ⊩ P) →
+    (tr2 ⊩ Q).
+  Proof. intros Htme Htm. rewrite Htme //. Qed.
+
   Definition trace_silent_filter : St → option L → Prop :=
     λ _ ℓ, match ℓ with | Some ℓ' => Ul ℓ' = None | None => False end.
   Instance trace_silent_filter_decision st ℓ : Decision (trace_silent_filter st ℓ).
@@ -821,6 +832,16 @@ Section stutter.
       + intros Hnow. constructor 2; naive_solver.
       + rewrite {1}/trace_now /pred_at //=. intros Hnow. constructor 1.
         apply Hp3. naive_solver.
+  Qed.
+
+  Lemma ltl_se_now_state P P':
+    (∀ s s', Us s = s' → P s ↔ P' s') →
+    ltl_se (↓ (λ s _, P s)) (↓ (λ s _, P' s)).
+  Proof.
+    intros Hp tr tr' Hupto.
+    have Heq: trfirst tr' = Us $ trfirst tr.
+    { punfold Hupto. inv Hupto=>//. }
+    rewrite !trace_now_state_trfirst Heq //. by apply Hp.
   Qed.
 
   Lemma ltl_se_now_or Q Q' P1 P1' P2 P2':
