@@ -136,17 +136,18 @@ Section proof.
       else auth_even_at (N+1) ∗ auth_odd_at N.
   Definition evenodd_inv n := inv Ns (evenodd_inv_inner n).
 
-  Definition even_corr n (N: nat): iProp Σ :=
+  Definition eo_corr n (N: nat) (γ: gname) (d: nat): iProp Σ :=
     frag_model_is N ∗ n ↦ #N ∗
-    auth_even_at (if Nat.even N then N else (N+1)).
+    (* auth_even_at (if Nat.even N then N else (N+1)). *)
+    own γ (●E (if Nat.even (N + d) then N else (N + 1))).
     
-  Definition even_vs n ι: iProp Σ :=
+  Definition eo_vs n ι γ d: iProp Σ :=
     □ |={⊤, ⊤ ∖ ↑ι}=> ∃ (N: nat),
-    (▷ even_corr n N) ∗
-    (▷ (even_corr n (if (Nat.even N) then (N + 1) else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True).
+    (▷ eo_corr n N γ d) ∗
+    (▷ (eo_corr n (if (Nat.even (N + d)) then (N + 1) else N) γ d) ={⊤ ∖ ↑ι, ⊤}=∗ True).
 
-  Lemma even_go_spec' tid n (N: nat) f (Hf: f > 40) ι:
-    {{{  even_vs n ι ∗
+  Lemma even_go_spec tid n (N: nat) f (Hf: f > 40) ι:
+    {{{  eo_vs n ι even_name 0 ∗
          tid ↦M {[ ρEven := f ]} ∗ even_at N ∗
          frag_free_roles_are ∅
     }}}
@@ -158,6 +159,9 @@ Section proof.
     wp_lam. wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic.
     (* iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose". *)
     iPoseProof "VS" as "-#V". iMod "V" as "(%M & (>Hmod & >Hn & >Hauths) & CLOS)".
+
+    rewrite Nat.add_0_r. 
+    
     destruct (Nat.even M) eqn:Heqn.
     - iDestruct (even_agree with "Heven Hauths") as "%Heq".
       iModIntro.
@@ -172,7 +176,8 @@ Section proof.
       iMod ("CLOS" with "[Hmod Hay Hb]") as "_". 
       { iFrame. subst.
         rewrite -(Nat.add_1_r N).
-        iFrame. rewrite Nat2Z.inj_add. iFrame. 
+        iFrame. rewrite Nat2Z.inj_add. iFrame.
+        rewrite Nat.add_0_r. 
         rewrite !Nat.add_1_r Nat.even_succ -Nat.negb_even Heqn. 
         replace (S (S N)) with (N + 2) by lia. iFrame. }
       iModIntro. simpl. wp_pures.
@@ -192,25 +197,35 @@ Section proof.
       iMod ("CLOS" with "[Hmod Hb Hauths]").
       { iFrame.
         subst. iFrame.
-        rewrite Nat.add_1_r. rewrite Heqn. iFrame. }
+        rewrite Nat.add_1_r.
+        rewrite Nat.add_0_r.
+        rewrite Heqn. iFrame. }
       iModIntro. simpl. wp_pures.
       iApply ("Hg" with "[] [Heven Hf HFR] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
   Qed.
 
+  (* Definition even_vs n ι: iProp Σ := *)
+  (*   □ |={⊤, ⊤ ∖ ↑ι}=> ∃ (N: nat), *)
+  (*   (▷ even_corr n N) ∗ *)
+  (*   (▷ (even_corr n (if (Nat.even N) then (N + 1) else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True). *)
+
   (* Lemma even_go_spec tid n (N: nat) f (Hf: f > 40) ι: *)
-  (*   {{{  evenodd_inv n ∗ *)
-  (*        tid ↦M {[ ρEven := f ]} ∗ even_at N }}} *)
+  (*   {{{  even_vs n ι ∗ *)
+  (*        tid ↦M {[ ρEven := f ]} ∗ even_at N ∗ *)
+  (*        frag_free_roles_are ∅ *)
+  (*   }}} *)
   (*     incr_loop #n #N @ tid *)
   (*   {{{ RET #(); tid ↦M ∅ }}}. *)
   (* Proof. *)
   (*   iLöb as "Hg" forall (N f Hf). *)
-  (*   iIntros (Φ) "(#Hinv & Hf & Heven) Hk". *)
+  (*   iIntros (Φ) "(#VS & Hf & Heven & HFR) Hk". *)
   (*   wp_lam. wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic. *)
-  (*   iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose". *)
-  (*   destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]". *)
-  (*   - iDestruct (even_agree with "Heven Hay") as "%Heq". *)
+  (*   (* iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose". *) *)
+  (*   iPoseProof "VS" as "-#V". iMod "V" as "(%M & (>Hmod & >Hn & >Hauths) & CLOS)". *)
+  (*   destruct (Nat.even M) eqn:Heqn. *)
+  (*   - iDestruct (even_agree with "Heven Hauths") as "%Heq". *)
   (*     iModIntro. *)
   (*     iApply (wp_step_model_singlerole with "Hmod Hf HFR"). *)
   (*     { constructor. by eauto. } *)
@@ -219,17 +234,19 @@ Section proof.
   (*     iIntros "!> Hb Hmod Hf HFR". *)
   (*     iMod (even_update (M + 2) with "[$]") as "[Hay Heven]". *)
   (*     wp_pures. *)
-  (*     iMod ("Hclose" with "[Hmod Hay Han Hb HFR]"). *)
-  (*     { iNext. iExists _. iFrame. subst. iEval (rewrite -Nat.add_1_r). *)
-  (*       rewrite Nat2Z.inj_add !Nat.add_1_r Nat.even_succ -Nat.negb_even Heqn. *)
-  (*       iFrame. replace (S (S N)) with (N + 2) by lia. iFrame. } *)
-  (*     iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H". *)
+  (*     iModIntro. *)
+  (*     iMod ("CLOS" with "[Hmod Hay Hb]") as "_".  *)
+  (*     { iFrame. subst. *)
+  (*       rewrite -(Nat.add_1_r N). *)
+  (*       iFrame. rewrite Nat2Z.inj_add. iFrame.  *)
+  (*       rewrite !Nat.add_1_r Nat.even_succ -Nat.negb_even Heqn.  *)
+  (*       replace (S (S N)) with (N + 2) by lia. iFrame. } *)
   (*     iModIntro. simpl. wp_pures. *)
   (*     replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia. *)
-  (*     iApply ("Hg" with "[] [Heven Hf] [$]"); last first. *)
+  (*     iApply ("Hg" with "[] [Heven Hf HFR] [$]"); last first. *)
   (*     { iFrame "∗#". subst. iFrame. } *)
   (*     iPureIntro; lia. *)
-  (*   - iDestruct (even_agree with "Heven Hay") as "%Heq". rewrite -> Heq in *. *)
+  (*   - iDestruct (even_agree with "Heven Hauths") as "%Heq". rewrite -> Heq in *. *)
   (*     iModIntro. *)
   (*     iApply (wp_step_model_singlerole with "Hmod Hf HFR"). *)
   (*     { apply even_fail. rewrite -Nat.negb_even. rewrite Heqn. done. } *)
@@ -237,13 +254,13 @@ Section proof.
   (*     iApply (wp_cmpxchg_fail with "Hn"); [intros Hne; simplify_eq; lia|done|]. *)
   (*     iIntros "!> Hb Hmod Hf HFR". *)
   (*     wp_pures. *)
-  (*     iMod ("Hclose" with "[Hmod Hb Hay Han HFR]"). *)
-  (*     { iNext. simplify_eq. iExists _. iFrame. *)
+  (*     iModIntro.  *)
+  (*     iMod ("CLOS" with "[Hmod Hb Hauths]"). *)
+  (*     { iFrame. *)
   (*       subst. iFrame. *)
   (*       rewrite Nat.add_1_r. rewrite Heqn. iFrame. } *)
-  (*     iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H". *)
   (*     iModIntro. simpl. wp_pures. *)
-  (*     iApply ("Hg" with "[] [Heven Hf] [$]"); last first. *)
+  (*     iApply ("Hg" with "[] [Heven Hf HFR] [$]"); last first. *)
   (*     { iFrame "∗#". } *)
   (*     iPureIntro; lia. *)
   (* Qed. *)
@@ -320,19 +337,20 @@ Section proof.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".    
     destruct eo.
-    - iApply (even_go_spec' with "[$Hf $FR $Heo]"); [lia| |done].
-      rewrite /even_vs. iModIntro.
+    - iApply (even_go_spec with "[$Hf $FR $Heo]"); [lia| |done].
+      rewrite /eo_vs. iModIntro.
       iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
       { apply top_subseteq. }
       iDestruct "OPEN" as (M) "(>Hmod & >Hn & Hauths)".
-      rewrite if_sep_comm. iDestruct "Hauths" as "[E O]". 
+      rewrite if_sep_comm. iDestruct "Hauths" as "[E O]".      
       iModIntro. iExists _. iSplitL "Hmod Hn E".
-      { iFrame. destruct (Nat.even M); auto. }
+      { iFrame. rewrite Nat.add_0_r. destruct (Nat.even M); auto. }
       iIntros "(?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       iNext. iFrame.
+      rewrite !Nat.add_0_r.
       rewrite if_sep_comm. destruct (Nat.even M) eqn:e.
-      + rewrite Nat.add_1_r Nat.even_succ -Nat.negb_even e Nat.add_1_r.
-        iFrame.
+      + rewrite Nat.add_1_r. rewrite Nat.even_succ -Nat.negb_even.
+        rewrite e. simpl. iFrame. 
       + rewrite e. iFrame.  
     - iApply (odd_go_spec with "[$Hf $Heo FR]"); [lia| |done].
       by iFrame. 
