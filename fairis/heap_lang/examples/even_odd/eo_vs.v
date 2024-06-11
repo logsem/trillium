@@ -129,7 +129,7 @@ Section proof.
 
   Definition evenodd_inv_inner n : iProp Σ :=
     ∃ N,
-      frag_free_roles_are ∅ ∗
+      (* frag_free_roles_are ∅ ∗ *)
       frag_model_is N ∗ n ↦ #N ∗
       if Nat.even N
       then auth_even_at N ∗ auth_odd_at (N+1)
@@ -249,17 +249,18 @@ Section proof.
   (* Qed. *)
 
   Lemma odd_go_spec tid n (N: nat) f (Hf: f > 40):
-    {{{ evenodd_inv n ∗ tid ↦M {[ ρOdd := f ]} ∗ odd_at N }}}
+    {{{ evenodd_inv n ∗ tid ↦M {[ ρOdd := f ]} ∗ odd_at N ∗ 
+        frag_free_roles_are ∅}}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iLöb as "Hg" forall (N f Hf).
-    iIntros (Φ) "(#Hinv & Hf & Hodd) Hk".
+    iIntros (Φ) "(#Hinv & Hf & Hodd & HFR) Hk".
     wp_lam.
     wp_pures.
     wp_bind (CmpXchg _ _ _).
     iApply wp_atomic.
-    iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose".
+    iInv Ns as (M) "(>Hmod & >Hn & Hauths)" "Hclose".
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]"; last first.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq".
       iModIntro.
@@ -270,7 +271,7 @@ Section proof.
       iIntros "!> Hb Hmod Hf HFR".
       iMod (odd_update (M + 2) with "[$]") as "[Han Hodd]".
       wp_pures.
-      iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
+      iMod ("Hclose" with "[Hmod Hay Han Hb]").
       { iNext. iExists _. iFrame. subst.
         rewrite Nat.add_1_r Nat.even_succ -Nat.negb_even Heqn Nat.add_1_r.
         replace (S (S N)) with (N + 2) by lia. iFrame.
@@ -278,7 +279,7 @@ Section proof.
       iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H". iModIntro.
       simpl. wp_pures.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
-      iApply ("Hg" with "[] [Hodd Hf] [$]"); last first.
+      iApply ("Hg" with "[] [Hodd Hf HFR] [$]"); last first.
       { iFrame "∗#". simplify_eq. done. }
       iPureIntro; lia.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq". rewrite -> Heq in *.
@@ -290,12 +291,12 @@ Section proof.
         [by intros Hneq; simplify_eq; lia|done|].
       iIntros "!> Hb Hmod Hf HFR".
       wp_pures.
-      iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
+      iMod ("Hclose" with "[Hmod Hb Hay Han]").
       { iNext. simplify_eq. iExists _. iFrame.
         rewrite Heqn. iFrame. }
       iApply fupd_mask_intro; [done|]. iIntros "H". iMod "H". iModIntro.
       simpl. wp_pures.
-      iApply ("Hg" with "[] [Hodd Hf] [$]"); last first.
+      iApply ("Hg" with "[] [Hodd Hf HFR] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
   Qed.
@@ -317,13 +318,13 @@ Section proof.
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
+    iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".    
     destruct eo.
     - iApply (even_go_spec' with "[$Hf $FR $Heo]"); [lia| |done].
       rewrite /even_vs. iModIntro.
       iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
       { apply top_subseteq. }
-      iDestruct "OPEN" as (M) "(>HFR & >Hmod & >Hn & Hauths)".
+      iDestruct "OPEN" as (M) "(>Hmod & >Hn & Hauths)".
       rewrite if_sep_comm. iDestruct "Hauths" as "[E O]". 
       iModIntro. iExists _. iSplitL "Hmod Hn E".
       { iFrame. destruct (Nat.even M); auto. }
@@ -333,7 +334,8 @@ Section proof.
       + rewrite Nat.add_1_r Nat.even_succ -Nat.negb_even e Nat.add_1_r.
         iFrame.
       + rewrite e. iFrame.  
-    - iApply (odd_go_spec with "[$Hf $Heo]"); [lia|done|done].
+    - iApply (odd_go_spec with "[$Hf $Heo FR]"); [lia| |done].
+      by iFrame. 
   Qed.
 
 End proof.
@@ -342,27 +344,38 @@ Section proof_start.
   Context `{!heapGS Σ the_model, !evenoddG Σ}.
   Let Ns := nroot .@ "even_odd".
 
+  Lemma frag_free_roles_are_sep: forall fr1 fr2 (DISJ: fr1 ## fr2), 
+        frag_free_roles_are (fr1 ∪ fr2) ⊣⊢ frag_free_roles_are fr1 ∗ frag_free_roles_are fr2.
+  Proof.
+    intros. rewrite /frag_free_roles_are /frag_free_roles_are.    
+    rewrite -gset.gset_op.
+    rewrite -gset.gset_disj_union; auto. 
+    rewrite -own_op. by rewrite -auth_frag_op.
+  Qed. 
+
   Lemma start_spec tid n N1 N2 f (Hf: f > 60) :
     {{{ evenodd_inv n ∗ tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
-        even_at N1 ∗ odd_at N2 }}}
+        even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
       start #n @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof using All.
-    iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at) HΦ". unfold start.
+    iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". unfold start.
+    rewrite <- (union_empty_l_L ∅). 
+    iDestruct (frag_free_roles_are_sep with "HFR") as "[HFR1 HFR2]"; [set_solver| ].
     wp_pures.
     wp_bind (Load _).
     iApply wp_atomic.
-    iInv Ns as (M) "(>HFR & >Hmod & >Hn & Hauths)" "Hclose".
+    iInv Ns as (M) "(>Hmod & >Hn & Hauths)" "Hclose".
     iIntros "!>". wp_load. iIntros "!>".
     destruct (Nat.even M) eqn:Heven.
     - iDestruct "Hauths" as "[Heven Hodd]".
       iDestruct (even_agree with "Heven_at Heven") as %<-.
       iDestruct (odd_agree with "Hodd_at Hodd") as %<-.
-      iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ]") as "_".
+      iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ HFR1 HFR2]") as "_".
       { iIntros "!>". iExists _. iFrame. rewrite Heven. iFrame. }
       iIntros "!>". wp_pures. wp_bind (Fork _).
       iApply (wp_role_fork _ tid _ _ _ {[ρOdd := _]} {[ρEven := _]}
-               with "[Hf] [Heven_at]").
+               with "[Hf ] [Heven_at HFR1]").
       { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
       { intros Hempty%map_positive_l. set_solver. }
       { rewrite has_fuels_gt_1; last solve_fuel_positive.
@@ -371,12 +384,12 @@ Section proof_start.
         rewrite map_union_comm; [done|].
         apply map_disjoint_dom. set_solver. }
       { iIntros (tid') "!> Hf".
-        iApply (incr_loop_spec with "[Heven_at $Hf]"); [lia|iFrame "#∗"|].
+        iApply (incr_loop_spec with "[Heven_at $Hf HFR1]"); [lia|iFrame "#∗"|].
         by iIntros "!>?". }
       iIntros "!> Hf".
       iIntros "!>".
       wp_pures.
-      iApply (wp_role_fork _ tid _ _ _ ∅ {[ρOdd := _]} with "[Hf] [Hodd_at]").
+      iApply (wp_role_fork _ tid _ _ _ ∅ {[ρOdd := _]} with "[Hf] [Hodd_at HFR2]").
       { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
       { rewrite map_union_comm.
         - intros Hempty%map_positive_l. set_solver.
@@ -389,28 +402,28 @@ Section proof_start.
       { iIntros (tid') "!> Hf".
         wp_pures.
         replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
-        iApply (incr_loop_spec with "[Hodd_at $Hf]"); [lia|iFrame "#∗"|].
+        iApply (incr_loop_spec with "[Hodd_at $Hf HFR2]"); [lia|iFrame "#∗"|].
         by iIntros "!>?". }
       iIntros "!> Hf". by iApply "HΦ".
     - iDestruct "Hauths" as "[Heven Hodd]".
       iDestruct (even_agree with "Heven_at Heven") as %<-.
       iDestruct (odd_agree with "Hodd_at Hodd") as %<-.
-      iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ]") as "_".
+      iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ HFR1 HFR2]") as "_".
       { iIntros "!>". iExists _. iFrame. rewrite Heven. iFrame. }
       iIntros "!>". wp_pures. wp_bind (Fork _).
       iApply (wp_role_fork _ tid _ _ _ {[ρEven := _]} {[ρOdd := _]}
-               with "[Hf] [Hodd_at]").
+               with "[Hf] [Hodd_at HFR2]").
       { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
       { intros Hempty%map_positive_l. set_solver. }
       { rewrite has_fuels_gt_1; last solve_fuel_positive.
         rewrite !fmap_insert fmap_empty //.
         rewrite insert_union_singleton_l. done. }
       { iIntros (tid') "!> Hf".
-        iApply (incr_loop_spec with "[Hodd_at $Hf]"); [lia|iFrame "#∗"|].
+        iApply (incr_loop_spec with "[Hodd_at $Hf HFR2]"); [lia|iFrame "#∗"|].
         by iIntros "!>?". }
       iIntros "!> Hf !>".
       wp_pures.
-      iApply (wp_role_fork _ tid _ _ _ ∅ {[ρEven := _]} with "[Hf] [Heven_at]").
+      iApply (wp_role_fork _ tid _ _ _ ∅ {[ρEven := _]} with "[Hf] [Heven_at HFR1]").
       { apply map_disjoint_dom. rewrite !dom_singleton. set_solver. }
       { rewrite map_union_comm.
         - intros Hempty%map_positive_l. set_solver.
@@ -423,7 +436,7 @@ Section proof_start.
       { iIntros (tid') "!> Hf".
         wp_pures.
         replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
-        iApply (incr_loop_spec with "[Heven_at $Hf]"); [lia|iFrame "#∗"|].
+        iApply (incr_loop_spec with "[Heven_at $Hf HFR1]"); [lia|iFrame "#∗"|].
         by iIntros "!>?". }
       iIntros "!> Hf". by iApply "HΦ".
   Qed.
