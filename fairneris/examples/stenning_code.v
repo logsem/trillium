@@ -228,7 +228,7 @@ Section with_Σ.
         wp_pure _. iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
   Qed.
 
-  Lemma wp_sever tid (f : nat) (Hf: f > 40) :
+  Lemma wp_server tid (f : nat) (Hf: f > 40) :
     {{{ inv Ns retinv ∗ is_node ipB ∗ saA ⤇ (λ msg, ⌜ msg = msg⌝) ∗ saB ⤇ (λ msg, ⌜ msg = msg⌝) ∗
           own stenning_B_name (◯E (BReceiving 0)) ∗
           (ipB, tid) ↦M {[ Brole := f ]} ∗ saB ⤳ (∅, ∅) ∗
