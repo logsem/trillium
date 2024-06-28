@@ -125,6 +125,7 @@ Section with_Σ.
 
     wp_bind (SendTo _ _ _).
     iApply sswp_MU_wp_fupd.
+    iApply sswp_fupd_alt.
 
     iInv Ns as "(Hfr & %st & Hst & Hrest)" "Hclose".
     iModIntro.
@@ -132,6 +133,7 @@ Section with_Σ.
     iApply (wp_send _ _ false with "[Hsh] [HRT] [Hmsg]")=>//=>//=>//.
     iNext. iIntros "Hsh HRT".
 
+    iApply MU_fupd_alt.
     iApply (mu_step_model _ _ _ _ ∅ ∅ _ st with "Hst [HA] [Hfr //]").
     { constructor. }
     { set_solver. }
@@ -190,6 +192,7 @@ Section with_Σ.
     wp_bind (ReceiveFrom _).
 
     iApply sswp_MU_wp_fupd.
+    iApply sswp_fupd_alt.
 
     iInv Ns as "(Hfr & %st & Hst & Hrest)" "Hclose".
     iModIntro.
@@ -202,6 +205,7 @@ Section with_Σ.
     iIntros (om r) "H".
     iDestruct "H" as "[(%Hr&%Hom&Hsh&Hrt)|(%msg & %Hr & %Hom & %Hdest & Hsh & Hrt & %Hin')]".
     - simplify_eq.
+      iApply MU_fupd_alt.
       iApply (mu_step_model _ _ _ _ ∅ ∅ _ (retransmit_model.Start : retransmit_model) with "Hst [HB] [Hfr //]").
       { constructor. }
       { set_solver. }
@@ -219,6 +223,7 @@ Section with_Σ.
       iApply ("IH" with "[$] [$] [$] [$] [$] [$]").
       { iPureIntro; lia. }
     - simplify_eq.
+      iApply MU_fupd_alt.
       iApply (mu_step_model _ _ _ _ ∅ ∅ _ (Received : retransmit_model) with "Hst [HB] [Hfr //]").
       { rewrite Hin'. constructor. set_solver. }
       { set_solver. }
@@ -279,6 +284,8 @@ Section with_Σ.
     do 2 wp_pure _.
 
     iApply sswp_MU_wp_fupd.
+    iApply sswp_fupd_alt.
+
     iInv Ns as "(Hfr & %st & Hst & Hrest)" "Hclose".
     iModIntro.
 
@@ -288,6 +295,7 @@ Section with_Σ.
 
     iDestruct (token_agree with "Hrest Htok") as %->.
 
+    iApply MU_fupd_alt.
     iApply (mu_step_model _ _ _ _ ∅ ∅ _ (Done : lts_state retransmit_model) with "Hst [HB] [Hfr //]").
     { constructor. }
     { set_solver. }

@@ -95,6 +95,8 @@ Section with_Σ.
   Definition ipA := ip_of_address saA.
   Definition ipB := ip_of_address saB.
 
+
+
   Lemma wp_client tid (f : nat) (Hf: f > 40) :
     {{{ inv Ns retinv ∗ is_node ipA ∗ saA ⤇ (λ msg, ⌜ msg = msg⌝) ∗ saB ⤇ (λ msg, ⌜ msg = msg⌝) ∗
           own stenning_A_name (◯E (ASending 0)) ∗
@@ -147,6 +149,7 @@ Section with_Σ.
 
     wp_bind (SendTo _ _ _).
     iApply sswp_MU_wp_fupd.
+    iApply sswp_fupd_alt.
 
     iInv Ns as "Hi" "Hclose". iModIntro.
     iApply (wp_send _ _ false with "[Hsh] [HRT] [HsA]")=>//=>//=>//.
@@ -154,6 +157,7 @@ Section with_Σ.
     iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
     iDestruct (token_agree with "HstA Hst") as %->.
 
+    iApply MU_fupd_alt.
     iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((AReceiving n, stB) : stenning_model) with "Hmod [Hf] [Hfr //]").
     { simpl. constructor. }
     { set_solver. }
@@ -168,6 +172,7 @@ Section with_Σ.
 
     wp_bind (ReceiveFrom _).
     iApply sswp_MU_wp_fupd.
+    iApply sswp_fupd_alt.
     iInv Ns as "Hi" "Hclose". iModIntro.
 
     iApply (wp_recv with "[Hsh] [HRT] [HsB]")=>//=>//=>//.
@@ -183,6 +188,7 @@ Section with_Σ.
     - iDestruct "Hmsg" as "[(-> & %Heq & Hsh & HRT)|(%msg' & -> & %Heq & %Heqdest & Hsh & HRT & Hnew)]".
       { simplify_eq. naive_solver. }
       destruct Hgood as (?&Hbody&?&?). simplify_eq.
+      iApply MU_fupd_alt.
       iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((ASending (1+n), stB) : stenning_model) with "Hmod [Hf] [Hfr //]").
       { constructor. exists msg'. naive_solver. }
       { set_solver. }
@@ -202,7 +208,8 @@ Section with_Σ.
       { iPureIntro; lia. }
       { rewrite Z.add_comm //. }
       { iPureIntro; lia. }
-    - iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((ASending n, stB) : stenning_model) with "Hmod [Hf] [Hfr //]").
+    - iApply MU_fupd_alt.
+      iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((ASending n, stB) : stenning_model) with "Hmod [Hf] [Hfr //]").
       { simpl. by apply A_RecvFail. }
       { set_solver. }
       { set_solver. }
@@ -279,6 +286,7 @@ Section with_Σ.
 
     wp_bind (ReceiveFrom _).
     iApply sswp_MU_wp_fupd.
+    iApply sswp_fupd_alt.
     iInv Ns as "Hi" "Hclose". iModIntro.
 
     iApply (wp_recv with "[Hsh] [HRT] [HsA]")=>//=>//=>//.
@@ -295,6 +303,7 @@ Section with_Σ.
     - iDestruct "Hmsg" as "[(-> & %Heq & Hsh & HRT)|(%msg' & -> & %Heq & %Heqdest & Hsh & HRT & Hnew)]".
       { simplify_eq. naive_solver. }
       destruct Hgood as (?&Hbody&?&?). simplify_eq.
+      iApply MU_fupd_alt.
       iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, BSending (1 + (1 + n))) : stenning_model) with "Hmod [Hf] [Hfr //]").
       { constructor. exists msg'. naive_solver. }
       { set_solver. }
@@ -313,6 +322,7 @@ Section with_Σ.
 
       wp_bind (SendTo _ _ _).
       iApply sswp_MU_wp_fupd.
+      iApply sswp_fupd_alt.
 
       iInv Ns as "Hi" "Hclose". iModIntro.
       iApply (wp_send _ _ false with "[Hsh] [HRT] [HsB]")=>//=>//=>//.
@@ -320,6 +330,7 @@ Section with_Σ.
       iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
       iDestruct (token_agree with "HstB Hst") as %->.
 
+      iApply MU_fupd_alt.
       iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, (BReceiving (1+(1+n)))) : stenning_model) with "Hmod [Hf] [Hfr //]").
       { simpl. replace (Send _) with (Send (mBA $ (1 + (1 + n)) - 1)). constructor. f_equal.
         rewrite /mBA //=. do 2 f_equal. lia. }
@@ -335,7 +346,8 @@ Section with_Σ.
       iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
       { iPureIntro; lia. }
       { rewrite Z.add_comm //. }
-    - iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, BReceiving (1+n)) : stenning_model) with "Hmod [Hf] [Hfr //]").
+    - iApply MU_fupd_alt.
+      iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, BReceiving (1+n)) : stenning_model) with "Hmod [Hf] [Hfr //]").
       { simpl. by apply B_RecvFailEmpty. }
       { set_solver. }
       { set_solver. }
@@ -352,6 +364,7 @@ Section with_Σ.
     - iDestruct "Hmsg" as "[(-> & %Heq & Hsh & HRT)|(%msg' & -> & %Heq & %Heqdest & Hsh & HRT & Hnew)]".
       { simplify_eq. naive_solver. }
       simplify_eq. have ?: m_sender msg' = saA by apply NNP_P; naive_solver.
+      iApply MU_fupd_alt.
       iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, BSending (1 + n)) : stenning_model) with "Hmod [Hf] [Hfr //]").
       { constructor=>//. }
       { set_solver. }
@@ -367,11 +380,14 @@ Section with_Σ.
       + do 3 wp_pure _; first by rewrite /= Heq. do 5 wp_pure _. rewrite bool_decide_false; last first.
         { intros ?; simplify_eq. apply Hbad. rewrite /good_message Z.add_comm //. naive_solver. }
         do 2 wp_pure _. wp_bind (SendTo _ _ _).
-        iApply sswp_MU_wp_fupd. iInv Ns as "Hi" "Hclose". iModIntro.
+        iApply sswp_MU_wp_fupd.
+        iApply sswp_fupd_alt.
+        iInv Ns as "Hi" "Hclose". iModIntro.
         iApply (wp_send _ _ false with "[Hsh] [HRT] [HsB]")=>//=>//=>//.
         iNext. iIntros "Hsh HRT". clear stA.
         iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
         iDestruct (token_agree with "HstB Hst") as %->.
+        iApply MU_fupd_alt.
         iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, (BReceiving (1+n))) : stenning_model) with "Hmod [Hf] [Hfr //]").
         { simpl. replace (Send _) with (Send (mBA $ (1 + n) - 1)). constructor. f_equal.
           rewrite /mBA //=. do 2 f_equal. lia. }
@@ -386,11 +402,14 @@ Section with_Σ.
         iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
       + do 3 wp_pure _; first by rewrite /= Heq. do 7 wp_pure _.
         wp_bind (SendTo _ _ _).
-        iApply sswp_MU_wp_fupd. iInv Ns as "Hi" "Hclose". iModIntro.
+        iApply sswp_MU_wp_fupd.
+        iApply sswp_fupd_alt.
+        iInv Ns as "Hi" "Hclose". iModIntro.
         iApply (wp_send _ _ false with "[Hsh] [HRT] [HsB]")=>//=>//=>//.
         iNext. iIntros "Hsh HRT". clear stA.
         iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
         iDestruct (token_agree with "HstB Hst") as %->.
+        iApply MU_fupd_alt.
         iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, (BReceiving (1+n))) : stenning_model) with "Hmod [Hf] [Hfr //]").
         { simpl. replace (Send _) with (Send (mBA $ (1 + n) - 1)). constructor. f_equal.
           rewrite /mBA //=. do 2 f_equal. lia. }

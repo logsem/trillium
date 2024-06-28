@@ -159,7 +159,7 @@ Lemma tac_mu_fuel
   let Δother := envs_delete true i false Δ in
   let Δ' := envs_snoc Δother false i (has_fuels ζ ((λ m, m - 1)%nat <$> fs)) in
   envs_entails Δ' P →
-  envs_entails Δ (MU E ζ None P).
+  envs_entails Δ (MU E E ζ None P).
 Proof.
   rewrite envs_entails_unseal=> ???.
   intros Δother Δ' Hccl.
@@ -298,7 +298,7 @@ Tactic Notation "mu_fuel" :=
     iAssumptionCore || fail "wp_pure: cannot find" fs in
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (MU ?E ?locale None ?P) =>
+  | |- envs_entails _ (MU ?E ?E ?locale None ?P) =>
       eapply (tac_mu_fuel _ locale E);
       [let fs := match goal with |- _ = Some (_, has_fuels _ ?fs) => fs end in
        iAssumptionCore || fail "mu_fuel: cannot find" fs

@@ -256,59 +256,84 @@ Notation state_interp_oos ζ α := (aneris_state_interp_opt (Some (ζ,α))).
 Definition sswp `{LM:LiveModel aneris_lang (joint_model M Net)}
            `{!LiveModelEq LM}
            `{!anerisG LM Σ} (s : stuckness)
-           E ζ (e1:aneris_expr) (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) : iProp Σ :=
-  ⌜TCEq (aneris_to_val e1) None⌝ ∧
+           E1 E2 ζ (e1:aneris_expr) (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) : iProp Σ :=
+  |={E1,E2}=>
+  (⌜TCEq (aneris_to_val e1) None⌝) ∧
   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace LM) K
     (tp1 tp2:list aneris_expr) σ1,
   ⌜valid_exec extr⌝ -∗
   ⌜locale_of tp1 (ectx_fill K e1) = ζ⌝ -∗
   ⌜trace_ends_in extr (tp1 ++ ectx_fill K e1 :: tp2, σ1)⌝ -∗
-  state_interp extr atr ={E,∅}=∗
+  state_interp extr atr ={E2,∅}=∗
   ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
   ∀ α e2 σ2 efs,
-  ⌜prim_step e1 σ1 α e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
+  ⌜prim_step e1 σ1 α e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E2}=>
   state_interp_oos ζ α
     (trace_extend extr (inl (ζ,α)) (tp1 ++ ectx_fill K e2 :: tp2, σ2))
     atr ∗ Φ e2 α ∗ ⌜efs = []⌝.
 
 Definition MU `{LM:LiveModel aneris_lang (joint_model M Net)}
            `{!LiveModelEq LM}
-           `{!anerisG LM Σ} E ζ α (P : iProp Σ) : iProp Σ :=
+           `{!anerisG LM Σ} E1 E2 ζ α (P : iProp Σ) : iProp Σ :=
   ∀ (extr : execution_trace aneris_lang) (atr : auxiliary_trace LM),
-  state_interp_oos ζ α extr atr ={E}=∗
-  ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) ∗ P.
+  state_interp_oos ζ α extr atr ={E1}=∗
+  ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) ∗ (|={E1,E2}=> P).
 
 Lemma sswp_MU_wp_fupd `{LM:LiveModel aneris_lang (joint_model M Net)}
       `{!LiveModelEq LM}
       `{!anerisG LM Σ} s E E' ζ e Φ :
-  (|={E,E'}=> sswp s E' ζ e (λ e' α, MU E' ζ α ((|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))))%I -∗
+  (sswp s E E' ζ e (λ e' α, MU E' E ζ α (WP e' @ s; ζ; E {{ Φ }})))%I -∗
   WP e @ s; ζ; E {{ Φ }}.
 Proof.
   rewrite wp_unfold /wp_pre.
   iIntros "Hsswp".
   replace (language.to_val e) with (aneris_to_val e) by eauto.
   destruct (aneris_to_val e) eqn:Heqn.
-  { iMod "Hsswp" as (Hval) "_". inversion Hval as [Heq]. by simplify_eq. }
+  { iDestruct "Hsswp" as "[Hval _]". iMod "Hval" as %Hval.
+    inversion Hval as [Heq]. by simplify_eq. }
   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
-  iMod "Hsswp" as "[_ Hsswp]".
-  iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp".
+  iDestruct "Hsswp" as "[_ Hsswp]".
+  iMod ("Hsswp" with "[//] [//] [//] Hσ") as ">[%Hs Hsswp]".
   iModIntro. iSplit; [done|].
   iIntros (α e2 σ2 efs Hstep).
   iDestruct ("Hsswp" with "[//]") as "Hsswp".
   iApply (step_fupdN_wand with "Hsswp"). iIntros ">(Hσ & HMU & ->)".
-  iMod ("HMU" with "Hσ") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
-  iExists _, _. rewrite right_id_L. by iFrame.
+  iMod ("HMU" with "Hσ") as (??) "[Hσ Hwp]". iMod "Hwp".
+  iExists _, _. rewrite right_id_L. iModIntro. by iFrame.
 Qed.
+
+(* Lemma sswp_MU_wp_fupd `{LM:LiveModel aneris_lang (joint_model M Net)} *)
+
+(*       `{!LiveModelEq LM} *)
+(*       `{!anerisG LM Σ} s E E' ζ e Φ : *)
+(*   (|={E,E'}=> sswp s E' ζ e (λ e' α, MU E' ζ α ((|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))))%I -∗ *)
+(*   WP e @ s; ζ; E {{ Φ }}. *)
+(* Proof. *)
+(*   rewrite wp_unfold /wp_pre. *)
+(*   iIntros "Hsswp". *)
+(*   replace (language.to_val e) with (aneris_to_val e) by eauto. *)
+(*   destruct (aneris_to_val e) eqn:Heqn. *)
+(*   { iMod "Hsswp" as (Hval) "_". inversion Hval as [Heq]. by simplify_eq. } *)
+(*   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ". *)
+(*   iMod "Hsswp" as "[_ Hsswp]". *)
+(*   iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp". *)
+(*   iModIntro. iSplit; [done|]. *)
+(*   iIntros (α e2 σ2 efs Hstep). *)
+(*   iDestruct ("Hsswp" with "[//]") as "Hsswp". *)
+(*   iApply (step_fupdN_wand with "Hsswp"). iIntros ">(Hσ & HMU & ->)". *)
+(*   iMod ("HMU" with "Hσ") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro. *)
+(*   iExists _, _. rewrite right_id_L. by iFrame. *)
+(* Qed. *)
 
 Lemma sswp_wand `{LM:LiveModel aneris_lang (joint_model M Net)}
       `{!LiveModelEq LM}
       `{!anerisG LM Σ} s E ζ e
       (Φ Ψ : aneris_expr → option (action aneris_lang) → iProp Σ) :
-  (∀ e α, Φ e α -∗ Ψ e α) -∗ sswp s E ζ e Φ -∗ sswp s E ζ e Ψ.
+  (∀ e α, Φ e α -∗ Ψ e α) -∗ sswp s E E ζ e Φ -∗ sswp s E E ζ e Ψ.
 Proof.
-  rewrite /sswp. iIntros "HΦΨ [%Hval Hsswp]".
-  iSplit; [done|].
-  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+  rewrite /sswp. iIntros "HΦΨ >[Hval Hsswp]".
+  iSplitL "Hval"; [done|].
+  iIntros "!>" (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
   iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp".
   iModIntro. iSplit; [done|].
   iIntros (α e2 σ2 efs Hstep).
@@ -317,10 +342,35 @@ Proof.
   iFrame. iModIntro. iSplit; [|done]. by iApply "HΦΨ".
 Qed.
 
+Lemma sswp_fupd `{LM:LiveModel aneris_lang (joint_model M Net)}
+      `{!LiveModelEq LM}
+      `{!anerisG LM Σ} s E1 E2 ζ e P
+      (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+  (|={E1,E2}=> P) -∗ (P -∗ sswp s E2 E2 ζ e Φ) -∗ sswp s E1 E2 ζ e Φ.
+Proof.
+  rewrite /sswp. iIntros ">HP Hsswp".
+  iMod ("Hsswp" with "HP") as "[Hval Hsswp]". iModIntro.
+  iSplit; [done|].
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+  iMod ("Hsswp" with "[//] [//] [//] Hσ") as (Hs) "Hsswp".
+  iModIntro. iSplit; [done|].
+  iIntros (α e2 σ2 efs Hstep).
+  iDestruct ("Hsswp" with "[//]") as "Hsswp".
+  iApply (step_fupdN_wand with "Hsswp"). iIntros ">(Hσ & HMU & ->)".
+  iFrame. iModIntro. done.
+Qed.
+
+Lemma sswp_fupd_alt `{LM:LiveModel aneris_lang (joint_model M Net)}
+      `{!LiveModelEq LM}
+      `{!anerisG LM Σ} s E1 E2 ζ e
+      (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
+  (|={E1,E2}=> sswp s E2 E2 ζ e Φ) -∗ sswp s E1 E2 ζ e Φ.
+Proof. rewrite /sswp. by iIntros ">Hsswp". Qed.
+
 Lemma MU_wand `{LM:LiveModel aneris_lang (joint_model M Net)}
       `{!LiveModelEq LM}
       `{!anerisG LM Σ} E ζ α (P Q : iProp Σ) :
-  (P -∗ Q) -∗ MU E ζ α P -∗ MU E ζ α Q.
+  (P -∗ Q) -∗ MU E E ζ α P -∗ MU E E ζ α Q.
 Proof.
   rewrite /MU. iIntros "HPQ HMU".
   iIntros (extr atr) "Hσ".
@@ -328,16 +378,39 @@ Proof.
   iExists _, _. iFrame. by iApply "HPQ".
 Qed.
 
+(* Lemma MU_fupd `{LM:LiveModel aneris_lang (joint_model M Net)} *)
+(*       `{!LiveModelEq LM} *)
+(*       `{!anerisG LM Σ} E1 E2 ζ α (P Q : iProp Σ) : *)
+(*   (|={E1,E2}=> P) -∗ (P -∗ MU E2 E2 ζ α Q) -∗ MU E1 E2 ζ α Q. *)
+(* Proof. *)
+(*   rewrite /MU. iIntros ">HP HMU". *)
+(*   iIntros (extr atr) "Hσ". *)
+(*   iMod ("HMU" with "HP Hσ") as (??) "[Hσ HP]". iModIntro. *)
+(*   iExists _, _. iFrame. *)
+(* Qed. *)
+
+(* Lemma MU_fupd_alt `{LM:LiveModel aneris_lang (joint_model M Net)} *)
+(*       `{!LiveModelEq LM} *)
+(*       `{!anerisG LM Σ} E1 E2 ζ α (P : iProp Σ) : *)
+(*   (|={E1,E2}=> MU E2 E2 ζ α P) -∗ MU E1 E2 ζ α P . *)
+(* Proof. rewrite /MU. by iIntros ">HMU". Qed. *)
+
+Lemma MU_fupd_alt `{LM:LiveModel aneris_lang (joint_model M Net)}
+      `{!LiveModelEq LM}
+      `{!anerisG LM Σ} E1 E2 ζ α (P : iProp Σ) :
+  (MU E1 E1 ζ α (|={E1,E2}=> P)) -∗ MU E1 E2 ζ α P .
+Proof.
+  rewrite /MU. iIntros "HMU".
+  iIntros (extr atr) "Hσ". iMod ("HMU" with "Hσ") as (??) "[Hσ >HP]".
+  iModIntro. iExists _,_. iFrame.
+Qed.
+
 Lemma sswp_MU_wp `{LM:LiveModel aneris_lang (joint_model M Net)}
       `{!LiveModelEq LM}
       `{!anerisG LM Σ} s E ζ e (Φ : aneris_val → iProp Σ) :
-  sswp s E ζ e (λ e' α, MU E ζ α (WP e' @ s; ζ;  E {{ Φ }})) -∗
+  sswp s E E ζ e (λ e' α, MU E E ζ α (WP e' @ s; ζ;  E {{ Φ }})) -∗
   WP e @ s; ζ; E {{ Φ }}.
-Proof.
-  iIntros "Hsswp". iApply sswp_MU_wp_fupd. iModIntro.
-  iApply (sswp_wand with "[] Hsswp").
-  iIntros (??) "HMU". iApply (MU_wand with "[] HMU"). by iIntros "$ !>".
-Qed.
+Proof. iApply sswp_MU_wp_fupd. Qed.
 
 Section primitive_laws.
   Context `{LM: LiveModel aneris_lang (joint_model Mod net_model)}.
@@ -368,7 +441,7 @@ Section primitive_laws.
   Lemma mu_step_fuel ζ E fs P :
     fs ≠ ∅ → ▷ ζ ↦M++ fs -∗
     (ζ ↦M fs -∗ P) -∗
-    MU E ζ None P.
+    MU E E ζ None P.
   Proof.
     iIntros (?) ">HfuelS HP".
     iIntros (ex atr) "[Hσ Hm]".
@@ -392,7 +465,7 @@ Section primitive_laws.
     (frag_model_is s2 -∗
      ζ ↦M ({[ρ:=(Mod.(usr_fl) s2)]} ∪ fs) -∗
      frag_free_roles_are fr -∗ P) -∗
-    MU E ζ α P.
+    MU E E ζ α P.
   Proof.
     iIntros (Htrans Hlive Hdom) ">Hst >Hfuel1 >Hfr HP".
     iIntros (ex atr) "[Hσ Hm]".
@@ -641,7 +714,7 @@ Section primitive_laws.
 
   Lemma sswp_pure_step s E ζ (e1 e2 : aneris_expr) (Φ : Prop) (Ψ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     PureExec Φ 1 e1 e2 → Φ → ▷ (Ψ e2 None) -∗
-    sswp s E ζ e1 Ψ.
+    sswp s E E ζ e1 Ψ.
   Proof.
     iIntros (Hpe HΦ) "HΨ".
     assert (pure_step e1 e2) as Hps.
@@ -651,6 +724,7 @@ Section primitive_laws.
     { destruct Hps as [Hred _].
       specialize (Hred (mkState ∅ ∅ ∅)).
       by eapply reducible_not_val. }
+    iModIntro.
     iSplit; [done|].
     iIntros (extr atr K tp1 tp2 σ1 Hvalid Htp1 Hex) "Hσ".
     iMod fupd_mask_subseteq as "Hclose"; last iModIntro; [by set_solver|].
@@ -690,10 +764,11 @@ Section primitive_laws.
   Lemma wp_alloc n s E ζ v (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     ▷ is_node n -∗
     (∀ (l:loc), l ↦[n] v -∗ Φ (mkExpr n (Val $ LitV $ LitLoc l)) None) -∗
-    sswp s E ζ (mkExpr n (Alloc None (Val v))) Φ.
+    sswp s E E ζ (mkExpr n (Alloc None (Val v))) Φ.
   Proof.
     iIntros "Hn HΦ".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
     iMod "Hn".
@@ -737,10 +812,11 @@ Section primitive_laws.
   Lemma wp_load n s E ζ l q v (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     ▷ l ↦[n]{q} v -∗
     ▷ (l ↦[n]{q} v -∗ Φ (mkExpr n v) None) -∗
-    sswp s E ζ (mkExpr n (Load (Val $ LitV $ LitLoc l))) Φ.
+    sswp s E E ζ (mkExpr n (Load (Val $ LitV $ LitLoc l))) Φ.
   Proof.
     iIntros "Hl HΦ".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
     rewrite (last_eq_trace_ends_in _ _ Hex).
@@ -784,10 +860,11 @@ Section primitive_laws.
   Lemma wp_store n s E ζ l v1 v2 (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     ▷ l ↦[n] v1 -∗
     ▷ (l ↦[n] v2 -∗ Φ (mkExpr n #()) None) -∗
-    sswp s E ζ (mkExpr n (Store #l (Val v2))) Φ.
+    sswp s E E ζ (mkExpr n (Store #l (Val v2))) Φ.
   Proof.
     iIntros "Hl HΦ".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
     rewrite (last_eq_trace_ends_in _ _ Hex).
@@ -831,10 +908,11 @@ Section primitive_laws.
   Lemma wp_new_socket ip s E ζ (Φ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     ▷ is_node ip -∗
     (∀ sh, sh ↪[ip] (mkSocket None true) -∗ Φ (mkVal ip (LitV (LitSocket sh))) None) -∗
-    sswp s E ζ (mkExpr ip (NewSocket #())) Φ.
+    sswp s E E ζ (mkExpr ip (NewSocket #())) Φ.
   Proof.
     iIntros "Hn HΦ".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
     iMod "Hn".
@@ -896,12 +974,13 @@ Section primitive_laws.
     ▷ free_ports (ip_of_address a) {[port_of_address a]} -∗
     ▷ sh ↪[ip_of_address a] skt -∗
     (sh ↪[ip_of_address a] (skt<| saddress := Some a |>) -∗ Φ (mkVal (ip_of_address a) #0) None) -∗
-    sswp s E ζ (mkExpr ip
+    sswp s E E ζ (mkExpr ip
               (SocketBind (Val $ LitV $ LitSocket sh)
                           (Val $ LitV $ LitSocketAddress a))) Φ.
   Proof.
     iIntros (-> ?) "Hp Hsh HΦ".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
     iMod "Hp".
@@ -955,13 +1034,14 @@ Section primitive_laws.
     saddress skt = Some a →
     ▷ sh ↪[ip] skt -∗
     (sh ↪[ip] skt<|sblock := true|> -∗ Φ (mkVal ip #()) None) -∗
-    sswp s E ζ (mkExpr ip (SetReceiveTimeout
+    sswp s E E ζ (mkExpr ip (SetReceiveTimeout
                   (Val $ LitV $ LitSocket sh)
                   (Val $ LitV $ LitInt 0)
                   (Val $ LitV $ LitInt 0))) Φ.
   Proof.
     iIntros (??) "Hsh HΦ".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
     iMod "Hsh".
@@ -1012,13 +1092,14 @@ Section primitive_laws.
     (0 ≤ n1 ∧ 0 <= n2 ∧ 0 < n1 + n2)%Z →
     ▷ sh ↪[ip] skt -∗
     (sh ↪[ip] skt<|sblock := false|> -∗ Φ (mkVal ip #()) None) -∗
-    sswp s E ζ (mkExpr ip (SetReceiveTimeout
+    sswp s E E ζ (mkExpr ip (SetReceiveTimeout
                   (Val $ LitV $ LitSocket sh)
                   (Val $ LitV $ LitInt n1)
                   (Val $ LitV $ LitInt n2))) Φ.
   Proof.
     iIntros (???) "Hsh HΦ".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "([Hσ Hauth] & [% Hm])".
     iMod "Hsh".
@@ -1083,7 +1164,7 @@ Section primitive_laws.
            saR ⤳ ({[msg]} ∪ R, T) ∗
            (⌜msg ∉ R⌝ -∗ φ msg))) -∗
        Φ (mkVal (ip_of_address saR) r) (Some om)) -∗
-    sswp k E ζ
+    sswp k E E ζ
          (mkExpr ip
                  (ReceiveFrom (Val $ LitV $ LitSocket sh))) Φ.
   Proof.
@@ -1092,6 +1173,7 @@ Section primitive_laws.
     { iDestruct "Hrt" as "[(%send & %recv & _ & _ & _ & $ & _) _]". }
     iDestruct "Hrt" as "[Hrt Hown]".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "[[Hσ Hauth] [%Hvalid Hm]]".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
@@ -1306,7 +1388,7 @@ Section primitive_laws.
     (if is_dup then ⌜msg ∈ T⌝ else ▷ φ msg) -∗
     ▷ (sh ↪[ip_of_address a] skt -∗ a ⤳ (R, {[ msg ]} ∪ T) -∗
      Φ (mkVal (ip_of_address a) #(String.length mbody)) (Some (Send msg))) -∗
-    sswp k E ζ
+    sswp k E E ζ
          (mkExpr ip
                  (SendTo (Val $ LitV $ LitSocket sh) #mbody #to)) Φ.
   Proof.
@@ -1317,6 +1399,7 @@ Section primitive_laws.
     { iNext. by iDestruct "Hφ" as (γ) "[H _]". }
     iDestruct "Hrt" as "[Hrt Hown]".
     rewrite /sswp.
+    iModIntro.
     iSplit; [done|].
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hlocale Hex) "[[Hσ Hauth] [%Hvalid Hm]]".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
