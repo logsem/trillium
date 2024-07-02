@@ -25,6 +25,14 @@ Inductive stenning_B_state :=
 
 Definition stenning_state : Set := stenning_A_state * stenning_B_state.
 
+Definition stenning_get_n (st : stenning_state) : Z * Z :=
+  match st with
+  | (ASending n, BSending m) => (n, m)
+  | (ASending n, BReceiving m) => (n, m)
+  | (AReceiving n, BSending m) => (n, m)
+  | (AReceiving n, BReceiving m) => (n, m)
+  end.
+
 #[global] Instance stenning_state_eqdec : EqDecision stenning_state.
 Proof. intros ??. apply make_decision. Qed.
 #[global] Instance stenning_state_inhabited : Inhabited stenning_state.

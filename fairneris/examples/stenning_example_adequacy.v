@@ -91,7 +91,7 @@ Proof.
 
     rewrite (subseteq_empty_difference_L ∅); last set_solver.
     iMod (inv_alloc (nroot .@ "stenning") _ retinv with "[Hσ HresAA HresAB HFR]") as "#Hinv".
-    { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. }
+    { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. simpl. naive_solver. }
 
     iMod (aneris_state_interp_socket_interp_allocate_singleton with "Hst [HA]")
       as "[Hst #HA]".

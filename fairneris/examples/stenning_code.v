@@ -75,7 +75,8 @@ Section with_Σ.
   Let Ns := nroot .@ "stenning".
 
   Definition retinv : iProp Σ := frag_free_roles_are ∅ ∗
-    ∃ stA stB, frag_model_is (stA, stB) ∗ own stenning_A_name (●E stA) ∗ own stenning_B_name (●E stB).
+     ∃ stA stB, frag_model_is (stA, stB) ∗ own stenning_A_name (●E stA) ∗ own stenning_B_name (●E stB) ∗
+      ⌜ let (n, m) := stenning_get_n (stA, stB) in (n = m ∨ n + 1 = m)%Z ⌝.
 
   Lemma token_update γ {A: ofe} {_: inG Σ (excl_authR A)} (st st' st'' : A) :
     own γ (●E st) ∗ own γ (◯E st'') ==∗ own γ (●E st') ∗ own γ (◯E st').
@@ -83,7 +84,6 @@ Section with_Σ.
     rewrite -!own_op. iApply own_update. apply excl_auth_update.
   Qed.
 
-                                               (*  TODO:   can we do better?     *)
   Lemma token_agree γ {A: ofe} `{OfeDiscrete A, @LeibnizEquiv A (ofe_equiv A)} {_: inG Σ (excl_authR A)} (st st' : A) :
     own γ (●E st) -∗ own γ (◯E st') -∗ ⌜ st = st' ⌝.
   Proof.
@@ -171,7 +171,7 @@ Section with_Σ.
     iInv Ns as "Hi" "Hclose". iModIntro.
 
     iApply (wp_recv with "[Hsh] [HRT] [HsB]")=>//=>//=>//.
-    iNext. clear stB. iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
+    iNext. clear stB. iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB & %Hnm)".
     iDestruct (token_agree with "HstA Hst") as %->.
 
     iIntros (om r) "Hmsg".
@@ -192,7 +192,7 @@ Section with_Σ.
       rewrite map_union_empty /usr_fl /=.
       iMod (token_update with "[$HstA $Hst]") as "[HstA Hst]".
       iMod ("Hclose" with "[Hfr Hmod HstA HstB]").
-      { iNext. rewrite /retinv. iFrame. iExists (ASending (1+n)), _. iFrame. }
+      { iNext. rewrite /retinv. iFrame. iExists (ASending (1+n)), _. iFrame. admit. }
       iModIntro. iApply wp_value'. do 5 wp_pure _.
       rewrite bool_decide_true; last by do 2 f_equal.
       do 3 wp_pure _.
@@ -211,7 +211,7 @@ Section with_Σ.
       rewrite map_union_empty /usr_fl /=.
       iMod (token_update with "[$HstA $Hst]") as "[HstA Hst]".
       iMod ("Hclose" with "[Hfr Hmod HstA HstB]").
-      { iNext. rewrite /retinv. iFrame. iExists (ASending n), _. iFrame. }
+      { iNext. rewrite /retinv. iFrame. iExists (ASending n), _. iFrame. admit. }
       iModIntro. iApply wp_value'. simpl.
       iDestruct "Hmsg" as "[(-> & %Heq & Hsh & HRT)|(%msg & -> & %Heq & %Heqdest & Hsh & HRT & Hnew)]".
       + do 3 wp_pure _. iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
@@ -226,7 +226,7 @@ Section with_Σ.
         rewrite bool_decide_false; last first.
         { intros Hc. simplify_eq. apply Hbad. eexists; split=>//. }
         wp_pure _. iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
-  Qed.
+  Admitted.
 
   Lemma wp_server tid (f : nat) (Hf: f > 40) :
     {{{ inv Ns retinv ∗ is_node ipB ∗ saA ⤇ (λ msg, ⌜ msg = msg⌝) ∗ saB ⤇ (λ msg, ⌜ msg = msg⌝) ∗
@@ -282,7 +282,7 @@ Section with_Σ.
     iInv Ns as "Hi" "Hclose". iModIntro.
 
     iApply (wp_recv with "[Hsh] [HRT] [HsA]")=>//=>//=>//.
-    iNext. iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
+    iNext. iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB & %Hnm)".
     iDestruct (token_agree with "HstB Hst") as %->.
 
     iIntros (om r) "Hmsg".
@@ -304,7 +304,7 @@ Section with_Σ.
       rewrite map_union_empty /usr_fl /=.
       iMod (token_update with "[$HstB $Hst]") as "[HstB Hst]".
       iMod ("Hclose" with "[Hfr Hmod HstA HstB]").
-      { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. }
+      { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. admit. }
       iModIntro. iApply wp_value'. do 5 wp_pure _.
       rewrite bool_decide_true; last by do 2 f_equal.
       do 3 wp_pure _.
@@ -316,8 +316,8 @@ Section with_Σ.
 
       iInv Ns as "Hi" "Hclose". iModIntro.
       iApply (wp_send _ _ false with "[Hsh] [HRT] [HsB]")=>//=>//=>//.
-      iNext. iIntros "Hsh HRT". clear stA.
-      iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
+      iNext. iIntros "Hsh HRT". clear Hnm stA.
+      iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB & Hnm)".
       iDestruct (token_agree with "HstB Hst") as %->.
 
       iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, (BReceiving (1+(1+n)))) : stenning_model) with "Hmod [Hf] [Hfr //]").
@@ -330,7 +330,7 @@ Section with_Σ.
 
       iMod (token_update with "[$HstB $Hst]") as "[HstB Hst]".
       iMod ("Hclose" with "[Hfr Hmod HstA HstB]").
-      { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. }
+      { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. admit. }
       rewrite map_union_empty /usr_fl /=. iModIntro. iApply wp_value'. do 3 wp_pure _.
       iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
       { iPureIntro; lia. }
@@ -343,7 +343,7 @@ Section with_Σ.
       iIntros "Hmod Hf Hfr".
       rewrite map_union_empty /usr_fl /=.
       iMod ("Hclose" with "[Hfr Hmod HstA HstB]").
-      { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. }
+      { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. admit. }
       iModIntro. iApply wp_value'.
       iDestruct "Hmsg" as "[(-> & %Heq & Hsh & HRT)|(%msg' & -> & %Heq & %Heqdest & Hsh & HRT & Hnew)]".
       + do 3 wp_pure _. iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
@@ -361,7 +361,7 @@ Section with_Σ.
       rewrite map_union_empty /usr_fl /=.
       iMod (token_update with "[$HstB $Hst]") as "[HstB Hst]".
       iMod ("Hclose" with "[Hfr Hmod HstA HstB]").
-      { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. }
+      { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. admit. }
       iModIntro. iApply wp_value'. do 5 wp_pure _. rewrite bool_decide_true; last by do 2 f_equal.
       destruct (ZOfString (m_body msg')) as [?|] eqn:Heq.
       + do 3 wp_pure _; first by rewrite /= Heq. do 5 wp_pure _. rewrite bool_decide_false; last first.
@@ -369,8 +369,8 @@ Section with_Σ.
         do 2 wp_pure _. wp_bind (SendTo _ _ _).
         iApply sswp_MU_wp_fupd. iInv Ns as "Hi" "Hclose". iModIntro.
         iApply (wp_send _ _ false with "[Hsh] [HRT] [HsB]")=>//=>//=>//.
-        iNext. iIntros "Hsh HRT". clear stA.
-        iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
+        iNext. iIntros "Hsh HRT". clear Hnm stA.
+        iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB & Hnm)".
         iDestruct (token_agree with "HstB Hst") as %->.
         iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, (BReceiving (1+n))) : stenning_model) with "Hmod [Hf] [Hfr //]").
         { simpl. replace (Send _) with (Send (mBA $ (1 + n) - 1)). constructor. f_equal.
@@ -381,15 +381,15 @@ Section with_Σ.
         iIntros "Hmod Hf Hfr".
         iMod (token_update with "[$HstB $Hst]") as "[HstB Hst]".
         iMod ("Hclose" with "[Hfr Hmod HstA HstB]").
-        { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. }
+        { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. admit. }
         rewrite map_union_empty /usr_fl /=. iModIntro. iApply wp_value'. do 2 wp_pure _.
         iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
       + do 3 wp_pure _; first by rewrite /= Heq. do 7 wp_pure _.
         wp_bind (SendTo _ _ _).
         iApply sswp_MU_wp_fupd. iInv Ns as "Hi" "Hclose". iModIntro.
         iApply (wp_send _ _ false with "[Hsh] [HRT] [HsB]")=>//=>//=>//.
-        iNext. iIntros "Hsh HRT". clear stA.
-        iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB)".
+        iNext. iIntros "Hsh HRT". clear Hnm stA.
+        iDestruct "Hi" as "(Hfr & %stA & %stB & Hmod & HstA & HstB & %Hnm)".
         iDestruct (token_agree with "HstB Hst") as %->.
         iApply (mu_step_model _ _ _ _ ∅ ∅ _ ((stA, (BReceiving (1+n))) : stenning_model) with "Hmod [Hf] [Hfr //]").
         { simpl. replace (Send _) with (Send (mBA $ (1 + n) - 1)). constructor. f_equal.
@@ -400,8 +400,8 @@ Section with_Σ.
         iIntros "Hmod Hf Hfr".
         iMod (token_update with "[$HstB $Hst]") as "[HstB Hst]".
         iMod ("Hclose" with "[Hfr Hmod HstA HstB]").
-        { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. }
+        { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. admit. }
         rewrite map_union_empty /usr_fl /=. iModIntro. iApply wp_value'. do 2 wp_pure _.
         iApply ("IH" with "[] [Hst] [$] [$] [] [$HRT] [$]")=>//.
-  Qed.
+  Admitted.
 End with_Σ.
