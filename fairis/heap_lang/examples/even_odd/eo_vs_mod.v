@@ -58,7 +58,8 @@ Section Models.
     
     Inductive thread_trans: TS -> TA * option TR -> TS -> Prop :=
     | thread_step n : Nat.even (n + d) → thread_trans n (inl (step_sync n), Some ρT) (S n)
-    | thread_loop n : Nat.odd (n + d) → thread_trans n (inr step_loop, None) n
+    | thread_loop n : Nat.odd (n + d) → thread_trans n (inr step_loop, Some ρT) n
+    | thread_env n : Nat.odd (n + d) → thread_trans n (inl (step_sync n), None) (S n)
     .
     
     Definition thread_model: ActionModel := {| amTrans := thread_trans |}.
@@ -69,7 +70,8 @@ Section Models.
 
     Lemma thread_AM_fin_branch': AM_fin_branch' thread_model.
     Proof.
-      red. exists (fun n => n' ← [n; S n]; a ← [inl $ step_sync n; inr step_loop];
+      red. exists (fun n => n' ← [n; S n]; 
+                      a ← [inl $ step_sync n; inr step_loop];
                       ρ ← [Some ρT; None]; mret (n', a, ρ)).
       intros * STEP.
       repeat (setoid_rewrite elem_of_list_bind).
@@ -88,12 +90,14 @@ Section Models.
       destruct (decide (Nat.even (s1 + d))).
       - destruct (decide (s2 = S s1 /\ oρ = Some ρT /\ a = inl (step_sync s1))) as [(-> & -> & ->)|?].
         + left. by econstructor.
-        + contra. rewrite -Nat.negb_even in H3. by apply negb_prop_elim in H3.
+        + contra; rewrite -Nat.negb_even in H3; by apply negb_prop_elim in H3.
       - pose proof n as n'. 
         apply negb_prop_intro in n. rewrite Nat.negb_even in n.
-        destruct (decide (s2 = s1 /\ oρ = None /\ a = inr step_loop)) as [(-> & -> & ->)|?].
+        destruct (decide (s2 = s1 /\ oρ = Some ρT /\ a = inr step_loop)) as [(-> & -> & ->)|?].
         + left. by econstructor.
-        + contra.
+        + destruct (decide (s2 = S s1 /\ oρ = None /\ a = inl (step_sync s1))) as [(-> & -> & ->)|?].
+          * left. by econstructor.
+          * contra.
     Qed.
 
     Lemma thread_AM_strong: AM_strong_lr thread_model.
@@ -101,8 +105,8 @@ Section Models.
       apply fin_branch_strong; auto using thread_AM_step_dec, thread_AM_fin_branch'.
     Qed.
     
-    Opaque PrivA. 
-    Opaque TR. 
+    (* Opaque PrivA.  *)
+    (* Opaque TR.  *)
       
   End ThreadModel.
   
@@ -135,22 +139,6 @@ Section Models.
     - apply prod_AM_step_dec; apply thread_AM_step_dec.
   Qed.
 
-  (* TODO: move *)
-  Definition extract_Somes {A: Type} (l: list (option A)): list A :=
-    flat_map (from_option (fun a => [a]) []) l.
-
-  Lemma extract_Somes_spec {A: Type} (l: list (option A)):
-    forall a, In (Some a) l <-> In a (extract_Somes l).
-  Proof. 
-    intros. rewrite /extract_Somes.
-    rewrite in_flat_map_Exists.
-    rewrite List.Exists_exists. simpl.
-    erewrite ex_det_iff with (a := Some a). 
-    2: { intros ? [? ?]. destruct a'; try done.
-         simpl in H0. set_solver. }
-    simpl. set_solver.
-  Qed.
-
   Definition the_fair_model: FairModel.
     unshelve eapply (AM2FM prod_model). 
   Proof.
@@ -172,8 +160,15 @@ Section Models.
     - intros (?&?&STEP). inversion STEP; subst.
       1, 3: by left; eexists; split; eauto. 
       all: by right; eexists; split; eauto.
-    - intros [[? [-> (?&?&STEP)]]| [? [-> (?&?&STEP)]]].
-      + eauto. 
+    - (* !!! relies on the definition of thread_model *)
+      (* !!! only holds in s1 = s2 *)
+      intros [[ρ1 [-> (a1&?&STEP)]]| [? [-> (?&?&STEP)]]].
+      + simpl in a1. unfold TA in a1.
+        destruct a1 as [[n]| ].
+        * inversion STEP; subst. rewrite Nat.add_0_r in H3.
+          eexists _, (_, _). simpl.
+          eapply (@pt_sync1 _ _ _ fact_TA); eauto.
+          2: { eapply thread_env.        
   Abort. 
 
   Definition the_model: LiveModel heap_lang the_fair_model :=
