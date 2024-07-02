@@ -9,70 +9,12 @@ From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang.examples.even_odd Require Import action_model.
 
-Section ActionModel.
 
-  (* Class PreModel := { *)
-  (*     pmState: Type; *)
-  (*     pmPubA: Type; *)
-  (*     pmPrivA: Type; *)
-  (*     pmA: Type := pmPubA + pmPrivA; *)
-  (*     pmTrans: pmState -> option pmA -> pmState -> Prop; *)
-  (* }. *)
-    
-  (* Class PreModel (pmPubA: Type) := { *)
-  (*     pmState: Type; *)
-  (*     pmPrivA: Type; *)
-  (*     pmRole: Type; *)
-  (*     pmA: Type := option pmPubA + pmPrivA; *)
-  (*     pmTrans: pmState -> pmA * pmRole -> pmState -> Prop; *)
-  (* }. *)
-
-  Class ActionModel := {
-      amSt: Type;
-      (* amPubA: Type; *)
-      (* amPrivA: Type; *)
-      (* amA: Type := amPubA + amPrivA; *)
-      amA: Type;
-      amRole: Type;
-      amTrans: amSt -> amA * option amRole -> amSt -> Prop;
-  }.
-
-  Section AMProduct.
-    Context {AM1 AM2: ActionModel}.
-    Context {PA: Type}. 
-    Context {fact_act: PA -> option (@amA AM1) * option (@amA AM2)}.
-
-    Let PS: Type := @amSt AM1 * @amSt AM2.
-    Let PR: Type := @amRole AM1 + @amRole AM2.
-
-    Inductive ProdTrans: PS -> PA * option PR -> PS -> Prop :=
-    | pt_inner1 s1 s1' s2 a1 r1 pa
-        (LBL: fact_act pa = (Some a1, None))
-        (STEP1: amTrans s1 (a1, Some r1) s1'):
-      ProdTrans (s1, s2) (pa, Some (inl r1)) (s1', s2)
-    | pt_inner2 s2 s2' s1 a2 r2 pa
-        (LBL: fact_act pa = (None, Some a2))
-        (STEP2: amTrans s2 (a2, Some r2) s2'):
-      ProdTrans (s1, s2) (pa, Some (inr r2)) (s1, s2')
-    | pt_sync1 s1 s1' s2 s2' a1 a2 r1 pa
-        (LBL: fact_act pa = (Some a1, Some a2))
-        (STEP1: amTrans s1 (a1, Some r1) s1')
-        (STEP1: amTrans s2 (a2, None) s2'):
-      ProdTrans (s1, s2) (pa, Some (inl r1)) (s1', s2')
-    | pt_sync2 s1 s1' s2 s2' a1 a2 r2 pa
-        (LBL: fact_act pa = (Some a1, Some a2))
-        (STEP1: amTrans s1 (a1, None) s1')
-        (STEP1: amTrans s2 (a2, Some r2) s2'):
-      ProdTrans (s1, s2) (pa, Some (inr r2)) (s1', s2')
-    .
-    
-    Global Instance ProdAM: ActionModel := {| amTrans := ProdTrans; |}.
-        
-  End AMProduct.
-
-End ActionModel.
-
+  Lemma ex_and_comm {T: Type} (A: Prop) (B: T -> Prop):
+    (exists t, A /\ B t) <-> A /\ exists t, B t.
+  Proof. split; intros (?&?&?); eauto. Qed.
 
 Import derived_laws_later.bi.
 
@@ -92,53 +34,152 @@ Definition start : val :=
     (Fork (incr_loop "l" "x") ;;
     Fork (incr_loop "l" ("x"+#1))).
 
-(** * Definition of the model! *)
 
-Inductive EO := ρEven | ρOdd.
+Section Models.
 
-#[global] Instance EO_eqdec: EqDecision EO.
-Proof. solve_decision. Qed.
+  Inductive PubA := step_sync (k: nat).
 
-#[global] Instance EO_countable: Countable EO.
-Proof.
-  refine
-    ({|
-        encode eo := match eo with ρEven => 1 | ρOdd => 2 end;
-        decode p := match p with 1 => Some ρEven | 2 => Some ρOdd | _ => None end;
-      |})%positive.
-  intros eo. by destruct eo.
-Qed.
+  Global Instance PubA_EqDec: EqDecision PubA.
+  Proof.
+    intros [x] [y]. destruct (decide (x = y)); [left | right]; set_solver.
+  Qed. 
 
-#[global] Instance EO_inhabited: Inhabited EO.
-Proof. exact (populate ρEven). Qed.
+  Section ThreadModel.
+    Context (d: nat).
 
-Inductive eotrans: nat -> option EO -> nat -> Prop :=
-| even_trans n : Nat.even n → eotrans n (Some ρEven) (S n)
-| even_fail n : Nat.odd n → eotrans n (Some ρEven) n
-| odd_trans n : Nat.odd n → eotrans n (Some ρOdd) (S n)
-| odd_fail n : Nat.even n → eotrans n (Some ρOdd) n.
+    Definition PrivA := unit.
+    Let step_loop: PrivA := (). 
+    
+    Definition TA: Type := PubA + PrivA. 
+    Definition TR := unit.
+    Definition ρT: TR := (). 
+    
+    Definition TS := nat. 
+    
+    Inductive thread_trans: TS -> TA * option TR -> TS -> Prop :=
+    | thread_step n : Nat.even (n + d) → thread_trans n (inl (step_sync n), Some ρT) (S n)
+    | thread_loop n : Nat.odd (n + d) → thread_trans n (inr step_loop, None) n
+    .
+    
+    Definition thread_model: ActionModel := {| amTrans := thread_trans |}.
 
-Definition eo_live_roles : gset EO := {[ ρOdd; ρEven ]}.
+    (* Global Instance TR_eqdec: EqDecision TR. *)
+    (* apply _.  *)
+    (* Qed.  *)
 
-Lemma live_spec_holds : forall s ρ s', eotrans s (Some ρ) s' -> ρ ∈ eo_live_roles.
-Proof.
-  intros n eo n' Htrans. rewrite /eo_live_roles.
-  inversion Htrans; simplify_eq; try set_solver; try lia; destruct n'; try set_solver; lia.
-Qed.
+    Lemma thread_AM_fin_branch': AM_fin_branch' thread_model.
+    Proof.
+      red. exists (fun n => n' ← [n; S n]; a ← [inl $ step_sync n; inr step_loop];
+                      ρ ← [Some ρT; None]; mret (n', a, ρ)).
+      intros * STEP.
+      repeat (setoid_rewrite elem_of_list_bind).
+      setoid_rewrite elem_of_list_ret.
+      eexists. apply and_comm. rewrite -ex_and_comm.
+      eexists. apply and_comm. rewrite -!and_assoc. apply and_comm. rewrite -ex_and_comm.
+      eexists. apply and_comm. rewrite -!and_assoc.
+      split; [reflexivity| ].
+      inversion STEP; subst; set_solver.
+    Qed.
 
-Definition the_fair_model: FairModel.
-Proof.
-  refine({|
-            fmstate := nat;
-            fmrole := EO;
-            fmtrans := eotrans;
-            live_roles _ := eo_live_roles;
-            fm_live_spec := live_spec_holds;
-          |}).
-Defined.
+    Lemma thread_AM_step_dec: AM_step_dec thread_model.
+    Proof.
+      red. intros.
+      Local Ltac contra := right; intros TRANS; inversion TRANS; subst; try tauto; try lia.
+      destruct (decide (Nat.even (s1 + d))).
+      - destruct (decide (s2 = S s1 /\ oρ = Some ρT /\ a = inl (step_sync s1))) as [(-> & -> & ->)|?].
+        + left. by econstructor.
+        + contra. rewrite -Nat.negb_even in H3. by apply negb_prop_elim in H3.
+      - pose proof n as n'. 
+        apply negb_prop_intro in n. rewrite Nat.negb_even in n.
+        destruct (decide (s2 = s1 /\ oρ = None /\ a = inr step_loop)) as [(-> & -> & ->)|?].
+        + left. by econstructor.
+        + contra.
+    Qed.
 
-Definition the_model: LiveModel heap_lang the_fair_model :=
-  {| lm_fl (x: fmstate the_fair_model) := 61%nat; |}.
+    Lemma thread_AM_strong: AM_strong_lr thread_model.
+    Proof. 
+      apply fin_branch_strong; auto using thread_AM_step_dec, thread_AM_fin_branch'.
+    Qed.
+    
+    Opaque PrivA. 
+    Opaque TR. 
+      
+  End ThreadModel.
+  
+  Definition even_AM := thread_model 0. 
+  Definition odd_AM := thread_model 1.
+
+  Definition prodA: Type := PubA + (PrivA + PrivA). 
+  Definition fact_TA (pa: prodA): option (amA even_AM) * option (amA odd_AM) := 
+    match pa with
+    | inl s => (Some $ inl s, Some $ inl s)
+    | inr (inl p) => (Some $ inr p, None)
+    | inr (inr p) => (None, Some $ inr p)
+    end. 
+
+  Definition prod_model := ProdAM (fact_act := fact_TA). 
+
+  Lemma prod_AM_strong_lr: AM_strong_lr prod_model.
+  Proof. 
+    apply fin_branch_strong.
+    - unshelve eapply prod_AM_fin_branch'.  
+      2, 3: apply thread_AM_fin_branch'. 
+      { exact (fun '(oa1, oa2) => 
+                 match oa1, oa2 with
+                 | Some (inl pa1), Some _ => inl pa1
+                 | Some (inr pa1), None => inr (inl pa1)
+                 | None, Some (inr pa2) => inr (inr pa2)
+                 | _, _ => inl (step_sync 0)
+                 end). }
+      red. intros [?|[?|?]]; reflexivity.
+    - apply prod_AM_step_dec; apply thread_AM_step_dec.
+  Qed.
+
+  (* TODO: move *)
+  Definition extract_Somes {A: Type} (l: list (option A)): list A :=
+    flat_map (from_option (fun a => [a]) []) l.
+
+  Lemma extract_Somes_spec {A: Type} (l: list (option A)):
+    forall a, In (Some a) l <-> In a (extract_Somes l).
+  Proof. 
+    intros. rewrite /extract_Somes.
+    rewrite in_flat_map_Exists.
+    rewrite List.Exists_exists. simpl.
+    erewrite ex_det_iff with (a := Some a). 
+    2: { intros ? [? ?]. destruct a'; try done.
+         simpl in H0. set_solver. }
+    simpl. set_solver.
+  Qed.
+
+  Definition the_fair_model: FairModel.
+    unshelve eapply (AM2FM prod_model). 
+  Proof.
+    apply prod_AM_strong_lr. 
+  Defined.
+
+  Lemma tfm_live_roles st: 
+    live_roles the_fair_model st =
+     set_map inl (AM_live_roles (thread_AM_strong 0) st.1) ∪
+     set_map inr (AM_live_roles (thread_AM_strong 1) st.2).
+  Proof.
+    destruct st as [st1 st2]. simpl.
+    apply set_eq. intros ρ.
+    rewrite elem_of_union. rewrite !elem_of_map. 
+    setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr).
+    setoid_rewrite <- (AM_live_roles_spec (thread_AM_strong 0)).
+    setoid_rewrite <- (AM_live_roles_spec (thread_AM_strong 1)).
+    split.
+    - intros (?&?&STEP). inversion STEP; subst.
+      1, 3: by left; eexists; split; eauto. 
+      all: by right; eexists; split; eauto.
+    - intros [[? [-> (?&?&STEP)]]| [? [-> (?&?&STEP)]]].
+      + eauto. 
+  Abort. 
+
+  Definition the_model: LiveModel heap_lang the_fair_model :=
+    {| lm_fl (x: fmstate the_fair_model) := 61%nat; |}.
+
+End Models.  
 
 (** The CMRAs we need. *)
 Class evenoddG Σ := EvenoddG {
@@ -149,14 +190,18 @@ Class evenoddG Σ := EvenoddG {
 Class evenoddPreG Σ := {
   evenodd_PreG :> inG Σ (excl_authR natO);
  }.
-Definition evenoddΣ : gFunctors :=
-  #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].
 
-Global Instance subG_evenoddΣ {Σ} : subG evenoddΣ Σ → evenoddPreG Σ.
-Proof. solve_inG. Qed.
+(* Definition evenoddΣ : gFunctors := *)
+(*   #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ]. *)
+
+(* Global Instance subG_evenoddΣ {Σ} : subG evenoddΣ Σ → evenoddPreG Σ. *)
+(* Proof. solve_inG. Qed. *)
 
 Section proof.
   Context `{!heapGS Σ the_model, !evenoddG Σ}.
+  (* Context `{EM__G: ExecutionModel heap_lang M__G} `{@heapGS Σ _ EM__G, evenoddG Σ}. *)
+  (* Context {ifG: fairnessGS the_model Σ}. *)
+
   Let Ns := nroot .@ "even_odd".
 
   Definition even_at (n: nat) := own even_name (◯E n).
@@ -193,14 +238,14 @@ Section proof.
 
   Definition evenodd_inv_inner n : iProp Σ :=
     ∃ N,
-      frag_model_is N ∗ n ↦ #N ∗
+      frag_model_is (N, N) ∗ n ↦ #N ∗
       if Nat.even N
       then auth_even_at N ∗ auth_odd_at (N+1)
       else auth_even_at (N+1) ∗ auth_odd_at N.
   Definition evenodd_inv n := inv Ns (evenodd_inv_inner n).
 
   Definition eo_corr n (N: nat) (γ: gname) (d: nat): iProp Σ :=
-    frag_model_is N ∗ n ↦ #N ∗
+    frag_model_is (N, N) ∗ n ↦ #N ∗
     own γ (●E (if Nat.even (N + d) then N else (N + 1))).
     
   Definition eo_vs n ι γ d: iProp Σ :=
@@ -212,20 +257,24 @@ Section proof.
   Lemma even_succ_negb n: Nat.even (S n) = negb $ Nat.even n.
   Proof. by rewrite Nat.even_succ Nat.negb_even. Qed. 
 
-  Lemma eo_go_spec tid n ρ (N: nat) f (Hf: f > 40) ι γ d
-    (STEP: forall k, fmtrans the_fair_model k (Some ρ) 
-                  (if (Nat.even (k + d)) then (k + 1) else k))
+  Lemma eo_go_spec  (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι γ d
+    (STEP: forall k,
+        let k' := if (Nat.even (k + d)) then (k + 1) else k in
+        fmtrans the_fair_model (k, k) (Some ρ) (k', k'))
         :
     {{{  eo_vs n ι γ d ∗
-         tid ↦M {[ ρ := f ]} ∗ own γ (◯E N) ∗
+         has_fuels tid {[ ρ := f ]} ∗ own γ (◯E N) ∗
          frag_free_roles_are ∅
     }}}
       incr_loop #n #N @ tid
-    {{{ RET #(); tid ↦M ∅ }}}.
+    {{{ RET #(); has_fuels tid ∅ }}}.
   Proof.
     iLöb as "Hg" forall (N f Hf).
-    iIntros (Φ) "(#VS & Hf & Heven & HFR) Hk".
-    wp_lam. wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic.
+    iIntros (Φ). iIntros "(#VS & Hf & Heven & HFR) Hk".
+
+    rewrite /incr_loop.
+    wp_lam.
+    wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic.
     iPoseProof "VS" as "-#V". iMod "V" as "(%M & (>Hmod & >Hn & >Hauths) & CLOS)".
 
     destruct (Nat.even (M + d)) eqn:Heqn.
