@@ -25,13 +25,18 @@ Inductive stenning_B_state :=
 
 Definition stenning_state : Set := stenning_A_state * stenning_B_state.
 
-Definition stenning_get_n (st : stenning_state) : Z * Z :=
+Definition stenning_get_n_A (st : stenning_A_state) : Z :=
   match st with
-  | (ASending n, BSending m) => (n, m)
-  | (ASending n, BReceiving m) => (n, m)
-  | (AReceiving n, BSending m) => (n, m)
-  | (AReceiving n, BReceiving m) => (n, m)
+  | ASending n => n
+  | AReceiving n => n
   end.
+Definition stenning_get_n_B (st : stenning_B_state) : Z :=
+  match st with
+  | BSending n => n
+  | BReceiving n => n
+  end.
+Definition stenning_get_n (st : stenning_state) : Z * Z :=
+  (stenning_get_n_A st.1, stenning_get_n_B st.2).
 
 #[global] Instance stenning_state_eqdec : EqDecision stenning_state.
 Proof. intros ??. apply make_decision. Qed.
@@ -65,15 +70,19 @@ Definition saB : socket_address := SocketAddressInet "0.0.0.1" 80.
 Definition mAB (n : Z) : message := mkMessage saA saB (StringOfZ n).
 Definition mBA (n : Z) : message := mkMessage saB saA (StringOfZ n).
 
-
-(* Maybe split into the parallel composition *)
-
 Definition good_message (sender_is_A : bool) (n : Z) (msg : option message) :=
   ∃ msg', msg = Some msg' ∧
             ZOfString (m_body msg') = Some n ∧
             if sender_is_A
             then m_sender msg' = saA ∧ m_destination msg' = saB
             else m_sender msg' = saB ∧ m_destination msg' = saA.
+
+Lemma good_message_inj b n n' msg :
+  good_message b n msg → good_message b n' msg → n = n'.
+Proof.
+  rewrite /good_message. intros (?&?&Hn&?) (?&?&Hn'&?).
+  by simplify_eq.
+Qed.
 
 Global Instance good_message_decidable b n omsg : Decision (good_message b n omsg).
 Proof. apply make_decision. Qed.
