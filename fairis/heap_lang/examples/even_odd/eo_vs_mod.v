@@ -250,7 +250,15 @@ Section proof.
 
   (* TODO: move *)
   Lemma even_succ_negb n: Nat.even (S n) = negb $ Nat.even n.
-  Proof. by rewrite Nat.even_succ Nat.negb_even. Qed. 
+  Proof. by rewrite Nat.even_succ Nat.negb_even. Qed.
+
+  (* TODO: move *)
+  Lemma odd_succ_negb n: Nat.odd (S n) = negb $ Nat.odd n.
+  Proof. by rewrite Nat.odd_succ Nat.negb_odd. Qed.
+
+  Lemma TMP_live_roles_same n m:
+    live_roles the_fair_model (n, n) = live_roles the_fair_model (m, m).
+  Proof. Admitted. 
 
   Lemma eo_go_spec  (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι γ d
     (STEP: forall k,
@@ -277,7 +285,9 @@ Section proof.
       iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf HFR").
       { specialize (STEP N). rewrite Heqn in STEP. apply STEP. }
-      { set_solver. }
+      {
+        (* TODO: derive from (abstracted) properties of submodels *)
+        erewrite TMP_live_roles_same. reflexivity. }
       iApply (wp_cmpxchg_suc with "Hn"); [by do 3 f_equiv|done|].
       iIntros "!> Hb Hmod Hf HFR".
       iMod (they_update _ _ _ (N + 2) with "[$]") as "[Hay Heven]".
@@ -290,7 +300,10 @@ Section proof.
         rewrite even_succ_negb Heqn. simpl.
         rewrite -Nat.add_assoc.
         rewrite Nat2Z.inj_add. iFrame. }
-      iModIntro. simpl. wp_pures.
+      iModIntro. simpl.
+
+      (* wp_pures. *) (*???*)
+      do 3 wp_pure _.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
       iApply ("Hg" with "[] [Heven Hf HFR] [$]"); last first.
       { iFrame "∗#". }
@@ -308,7 +321,9 @@ Section proof.
       iMod ("CLOS" with "[Hmod Hb Hauths]").
       { iFrame.
         by rewrite Heqn. }  
-      iModIntro. simpl. wp_pures.
+      iModIntro. simpl.
+      (* wp_pures. *)
+      do 2 wp_pure _. 
       iApply ("Hg" with "[] [Heven Hf HFR] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
@@ -316,38 +331,47 @@ Section proof.
 
   Lemma even_go_spec tid n (N: nat) f (Hf: f > 40) ι:
     {{{  eo_vs n ι even_name 0 ∗
-         tid ↦M {[ ρEven := f ]} ∗ own even_name (◯E N) ∗
+         tid ↦M {[ inl ρT := f ]} ∗ own even_name (◯E N) ∗
          frag_free_roles_are ∅
     }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     apply eo_go_spec; auto.
-    intros. rewrite Nat.add_0_r Nat.add_1_r.
-    destruct (Nat.even k) eqn:?; econstructor; eauto.
-    by rewrite -Nat.negb_even Heqb.  
-  Qed.
+
+    (* !!! relies on transparent thread_model *)
+    intros k. rewrite Nat.even_add. rewrite Nat.add_1_r.  
+    destruct (Nat.even k) eqn:E. 
+    - simpl. eapply amfm_role_step with (a := inl (step_sync k)).
+      econstructor; eauto.
+      + econstructor. by rewrite Nat.even_add E.
+      + econstructor. rewrite Nat.add_1_r Nat.odd_succ. by rewrite E.
+    - simpl. eapply amfm_role_step with (a := inr (inl ())).
+      econstructor; eauto.
+      econstructor. rewrite Nat.add_0_r -Nat.negb_even E. done.
+  Qed. 
 
   Lemma odd_go_spec tid n (N: nat) f (Hf: f > 40) ι:
     {{{  eo_vs n ι odd_name 1 ∗
-         tid ↦M {[ ρOdd := f ]} ∗ odd_at N ∗
+         tid ↦M {[ inr ρT := f ]} ∗ odd_at N ∗
          frag_free_roles_are ∅
     }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     apply eo_go_spec; auto.
-    intros. rewrite Nat.add_1_r.
-    rewrite Nat.even_succ. 
-    destruct (Nat.odd k) eqn:?; econstructor; eauto.
-    by rewrite -Nat.negb_odd Heqb.  
-  Qed.
 
-  Definition role_frag (eo : EO) : nat → iProp Σ :=
-    match eo with
-    | ρEven => even_at
-    | ρOdd => odd_at
-    end.
+    (* !!! relies on transparent thread_model *)
+    intros k. rewrite Nat.add_1_r Nat.even_succ. 
+    destruct (Nat.odd k) eqn:O. 
+    - simpl. eapply amfm_role_step with (a := inl (step_sync k)).
+      econstructor; eauto.
+      + econstructor. by rewrite Nat.odd_add O.
+      + econstructor. rewrite Nat.add_1_r Nat.even_succ. by rewrite O.
+    - simpl. eapply amfm_role_step with (a := inr (inr ())).
+      econstructor; eauto.
+      econstructor. rewrite Nat.add_1_r odd_succ_negb O. done.
+  Qed.
 
   (* TODO: move *)
   Lemma if_sep_comm (b: bool) (P1 Q1 P2 Q2: iProp Σ):
@@ -358,14 +382,29 @@ Section proof.
     (if b then f x else f y) = f (if b then x else y).
   Proof. by destruct b. Qed. 
 
-  Lemma incr_loop_spec tid n (N : nat) f (Hf: f > 40) (eo : EO) :
-    {{{ evenodd_inv n ∗ tid ↦M {[ eo := f ]} ∗ (role_frag eo) N ∗
+  Inductive EO' := eoE | eoO.
+  
+  Definition eo_frag (eo: EO') : nat → iProp Σ :=
+    match eo with
+    | eoE => even_at
+    | eoO => odd_at
+    end.
+
+  (* !!! depends on known role of thread_model *)
+  Definition eo_role (eo: EO'): fmrole the_fair_model :=
+    match eo with
+    | eoE => inl ρT
+    | eoO => inr ρT
+    end.
+
+  Lemma incr_loop_spec (eo : EO') tid n (N : nat) f (Hf: f > 40) :
+    {{{ evenodd_inv n ∗ tid ↦M {[ eo_role eo := f ]} ∗ (eo_frag eo) N ∗
         frag_free_roles_are ∅ }}}
       incr_loop #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".    
-    destruct eo.
+    iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
+    destruct eo; simpl in *. 
     - iApply (even_go_spec with "[$Hf $FR $Heo]"); [lia| |done].
       rewrite /eo_vs. iModIntro.
       iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
@@ -418,8 +457,11 @@ Section proof_start.
     rewrite -own_op. by rewrite -auth_frag_op.
   Qed. 
 
+  Let ρEven: fmrole the_fair_model := inl ρT.
+  Let ρOdd: fmrole the_fair_model := inr ρT.
+
   Lemma start_spec tid n N1 N2 f (Hf: f > 60) :
-    {{{ evenodd_inv n ∗ tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
+    {{{ evenodd_inv n ∗ tid ↦M {[ inl ρT := f; inr ρT := f ]} ∗
         even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
       start #n @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
@@ -465,9 +507,10 @@ Section proof_start.
       destruct (Nat.even M); try reflexivity.
       f_equiv. rewrite map_union_comm; auto. apply map_disjoint_dom. set_solver. }
     { iIntros (tid') "!> Hf".
-      iApply (incr_loop_spec with "[-]"); [|iFrame "#∗"|]; [lia| ..].
-      2: { iNext. by iIntros. }
-      destruct (Nat.even M); iFrame. }
+      iApply (incr_loop_spec (if Nat.even M then eoE else eoO) with "[-]").
+      2: { destruct (Nat.even M); iFrame "#∗". }
+      { lia. }
+      intuition. }
 
     iIntros "!> Hf".
     iIntros "!>".
@@ -483,9 +526,10 @@ Section proof_start.
     { iIntros (tid') "!> Hf".
       wp_pures.
       replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
-      iApply (incr_loop_spec with "[-]"); [|iFrame "#∗"|]; [lia| ..].
-      2: { iNext. by iIntros. }
-      destruct (Nat.even M); iFrame. }
+      iApply (incr_loop_spec (if Nat.even M then eoO else eoE) with "[-]").
+      2: { destruct (Nat.even M); iFrame "#∗". }
+      { lia. }
+      intuition. }
 
     iIntros "!> Hf". by iApply "HΦ".
   Qed.
