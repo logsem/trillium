@@ -1,22 +1,5 @@
 From trillium.fairness Require Import fairness.
-
-  Lemma ex2_comm {A B: Type} (P: A -> B -> Prop):
-    (exists (a: A) (b: B), P a b) <-> (exists (b: B) (a: A), P a b).
-  Proof. 
-    split; intros (?&?&?); eauto. 
-  Qed. 
-
-  Lemma iff_and_impl_helper {A B: Prop} (AB: A -> B):
-    A /\ B <-> A.
-  Proof. tauto. Qed.     
-
-  Lemma ex_det_iff {A: Type} (P: A -> Prop) a
-    (DET: forall a', P a' -> a' = a):
-    (exists a', P a') <-> P a.
-  Proof. 
-    split; [| by eauto].
-    intros [? ?]. erewrite <- DET; eauto.
-  Qed. 
+From trillium.fairness.heap_lang.examples.even_odd Require Import utils.
 
 Section ActionModel.
 
@@ -72,15 +55,6 @@ Section ActionModel.
     intros. rewrite elem_of_list_filter. rewrite bool_decide_spec.
     symmetry. apply iff_and_impl_helper. intuition.
   Qed.
-
-  (* TODO: move *)
-  Lemma ex_prod {A B: Type} (P: A * B -> Prop):
-    (exists ab, P ab) <-> (exists a b, P (a, b)).
-  Proof.
-    split.
-    - intros [[??] ?]. eauto.
-    - intros (?&?&?). eauto.
-  Qed. 
 
   Lemma fin_branch_strong (AM: ActionModel) `{Countable (amRole AM)}
     (FIN: AM_fin_branch' AM) (DEC: AM_step_dec AM):
@@ -205,23 +179,6 @@ Section ActionModel.
         + destruct (D1 s1 a1 None s1'), (D2 s2 a2 (Some ρ2) s2').
           2-4: inv_step.
           left. econstructor; eauto.
-    Qed.
-
-    (* TODO: move *)
-    Lemma ex_proper3 {A B C: Prop} (P Q: A -> B -> C -> Prop)
-      (EQUIV: forall a b c, P a b c <-> Q a b c):
-      (exists a b c, P a b c) <-> (exists a b c, Q a b c).
-    Proof.
-      set_solver.
-    Qed. 
-      
-    (* TODO: move *)
-    Lemma ex_prod' {A B: Type} (P: A -> B -> Prop):
-      (exists a b, P a b) <-> (exists ab, P ab.1 ab.2).
-    Proof.
-      split.
-      - intros (?&?&?). eexists (_, _). eauto.
-      - intros [[??] ?]. eauto.
     Qed.
 
     Lemma prod_AM_fin_branch' (FIN1: AM_fin_branch' AM1) (FIN2: AM_fin_branch' AM2)
