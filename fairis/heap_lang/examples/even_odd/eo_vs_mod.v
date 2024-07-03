@@ -123,19 +123,24 @@ Section Models.
 
   Definition prod_model := ProdAM (fact_act := fact_TA). 
 
+  Lemma prod_AM_fin_branch': AM_fin_branch' prod_model.
+  Proof. 
+    unshelve eapply prod_AM_fin_branch'.  
+    2, 3: apply thread_AM_fin_branch'. 
+    { exact (fun '(oa1, oa2) => 
+               match oa1, oa2 with
+               | Some (inl pa1), Some _ => inl pa1
+               | Some (inr pa1), None => inr (inl pa1)
+               | None, Some (inr pa2) => inr (inr pa2)
+               | _, _ => inl (step_sync 0)
+               end). }
+    red. intros [?|[?|?]]; reflexivity.
+  Qed. 
+
   Lemma prod_AM_strong_lr: AM_strong_lr prod_model.
   Proof. 
     apply fin_branch_strong.
-    - unshelve eapply prod_AM_fin_branch'.  
-      2, 3: apply thread_AM_fin_branch'. 
-      { exact (fun '(oa1, oa2) => 
-                 match oa1, oa2 with
-                 | Some (inl pa1), Some _ => inl pa1
-                 | Some (inr pa1), None => inr (inl pa1)
-                 | None, Some (inr pa2) => inr (inr pa2)
-                 | _, _ => inl (step_sync 0)
-                 end). }
-      red. intros [?|[?|?]]; reflexivity.
+    - apply prod_AM_fin_branch'. 
     - apply prod_AM_step_dec; apply thread_AM_step_dec.
   Qed.
 
