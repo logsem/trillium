@@ -81,6 +81,23 @@ Section ThreadModel.
     apply fin_branch_strong; auto using thread_AM_step_dec, thread_AM_fin_branch'.
   Qed.
 
+  (* TODO: can we make it work with non-trivial set of roles? *)
+  Local Lemma thread_roles_equal (ρ1 ρ2: amRole thread_model):
+    ρ1 = ρ2.
+  Proof. 
+    by destruct ρ1, ρ2.
+  Qed.
+
+  Lemma thread_AM_lr_exact n: AM_live_roles thread_AM_strong n = {[ ρT ]}.
+  Proof.
+    apply set_eq. intros ρ. rewrite elem_of_singleton. 
+    rewrite -AM_live_roles_spec. pose proof (thread_roles_equal ρ ρT) as ->.
+    split; auto. intros _.
+    destruct (decide (Nat.even (n + d))).
+    - do 2 eexists. econstructor. eauto.
+    - apply negb_prop_intro in n0. rewrite Nat.negb_even in n0. 
+      do 2 eexists. by eapply thread_loop.
+  Qed. 
 
   Section Proofs. 
     Context `{LM__p: LiveModel heap_lang M__p}.
@@ -123,38 +140,38 @@ Section ThreadModel.
     Context (proj_st: fmstate M__p -> amSt thread_model).
     Context (lift_role: amRole thread_model -> fmrole M__p). 
 
-    Definition eo_corr l (st: fmstate M__p): iProp Σ :=
-      let N := proj_st st in
-      frag_model_is st ∗ l ↦ #(N: nat) ∗
-      own th_name (●E (if Nat.even (N + d) then N else (N + 1))).
+    Definition cur_n (st: amSt thread_model) (n: nat) := st = n. 
     
+    Definition eo_corr l (st: fmstate M__p) (N: nat): iProp Σ :=
+      let st__t := proj_st st in
+      frag_model_is st ∗ l ↦ #N ∗ ⌜ cur_n st__t N ⌝ ∗
+      own th_name (●E (if Nat.even (N + d) then N else (N + 1))).
+
+    Definition glob_step st st' ρ__t N :=
+      proj_st st' = N /\ fmtrans M__p st (Some $ lift_role ρ__t) st' /\
+      (AM_live_roles thread_AM_strong (proj_st st') ⊆ AM_live_roles thread_AM_strong (proj_st st) ->
+       live_roles M__p st' ⊆ live_roles M__p st).
+
     Definition eo_vs l ι ρ__t: iProp Σ :=
-      □ |={⊤, ⊤ ∖ ↑ι}=> ∃ st,
-      (▷ eo_corr l st) ∗
+      □ |={⊤, ⊤ ∖ ↑ι}=> ∃ st__p N,
+      let st__t := proj_st st__p in
+      (* ⌜ cur_n st__t N ⌝ ∗ *)
+      (▷ eo_corr l st__p N) ∗
       (* (▷ (eo_corr l (if (Nat.even (N + d)) then (N + 1) else N) γ d) ={⊤ ∖ ↑ι, ⊤}=∗ True). *)
-      (let N := proj_st st in
+      (      
        (⌜ Nat.even (N + d) ⌝ →
-        ⌜ amTrans _ N (inl $ step_sync N, Some ρ__t) (N + 1)%nat ⌝ →
-        ∃ (* a *) st', ⌜ proj_st st' = (N + 1)%nat ⌝ ∗ 
-                       ⌜ fmtrans M__p st (Some $ lift_role ρ__t) st' ⌝ ∗
-                       ⌜ live_roles M__p st' ⊆ live_roles M__p st ⌝ ∗
-                       (▷ (eo_corr l st') ={⊤ ∖ ↑ι, ⊤}=∗ True)
-      ) ∗
+        ∀ st__t', ⌜ amTrans _ st__t (inl $ step_sync N, Some ρ__t) st__t' ⌝ ∗ ⌜ cur_n st__t' (N + 1)%nat ⌝ →
+        ∃ (* a *) st__p', ⌜ glob_step st__p st__p' ρ__t (N + 1)%nat ⌝ ∗ 
+                       (▷ (eo_corr l st__p' (N + 1)) ={⊤ ∖ ↑ι, ⊤}=∗ True)
+       ) ∗
        (⌜ Nat.odd (N + d) ⌝ →
-        ∀ a, ⌜ amTrans _ N (inr a, Some ρ__t) N ⌝ →
-        ∃ (* a *) st', ⌜ proj_st st' = N ⌝ ∗ 
-                       ⌜ fmtrans M__p st (Some $ lift_role ρ__t) st' ⌝ ∗
-                       ⌜ live_roles M__p st' ⊆ live_roles M__p st ⌝ ∗
-                       (▷ (eo_corr l st') ={⊤ ∖ ↑ι, ⊤}=∗ True)
-      ) 
+        ∀ st__t' a, ⌜ amTrans _ st__t (inr a, Some ρ__t) st__t' ⌝ ∗ ⌜ cur_n st__t' N ⌝ →
+        ∃ (* a *) st__p', ⌜ glob_step st__p st__p' ρ__t N ⌝ ∗
+                       (▷ (eo_corr l st__p' N) ={⊤ ∖ ↑ι, ⊤}=∗ True)
+       )
       ).
 
-  (* TODO: can we make it work with non-trivial set of roles? *)
-  Local Lemma thread_roles_equal (ρ1 ρ2: amRole thread_model):
-    ρ1 = ρ2.
-  Proof. 
-    by destruct ρ1, ρ2.
-  Qed. 
+  
 
   Lemma eo_go_spec (tid: locale heap_lang) n ρ__t (N: nat) f (Hf: f > 40) ι
     (FL: forall st, lm_fl LM__p st >= 61):
@@ -172,18 +189,21 @@ Section ThreadModel.
     rewrite /incr_loop.
     wp_lam.
     wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic.
-    iPoseProof "VS" as "-#V". iMod "V" as "(%st & (>Hmod & >Hn & >Hauths) & CLOS)".
+    iPoseProof "VS" as "-#V". iMod "V" as "(%st & %M & (>Hmod & >Hn & >-> & >Hauths) & CLOS)".
 
-    remember (proj_st st) as M.
+    remember (proj_st st) as st__t. 
 
     destruct (Nat.even (M + d)) eqn:Heqn.
     - iDestruct (th_agree with "Heven Hauths") as "->".
       iModIntro.
       iDestruct "CLOS" as "[CLOS _]". iSpecialize ("CLOS" with "[]"); [done| ].
       iSpecialize ("CLOS" with "[]").
-      { iPureIntro. rewrite Nat.add_1_r. simpl. econstructor. intuition. }
-      iDestruct "CLOS" as (st') "(%ST'&%STEP&%LR&CLOS)".
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR"); eauto. 
+      { iPureIntro. split; [| reflexivity]. 
+        rewrite Nat.add_1_r. simpl. econstructor. intuition. }
+      
+      iDestruct "CLOS" as (st') "((%ST'&%STEP&%LR)&CLOS)".
+      iApply (wp_step_model_singlerole with "Hmod Hf HFR"); eauto.
+      { apply LR. simpl. by rewrite !thread_AM_lr_exact. } 
       iApply (wp_cmpxchg_suc with "Hn"); [by do 3 f_equiv|done|].
       iIntros "!> Hb Hmod Hf HFR".
       iMod (th_update _ _ _ (N + 2) with "[$]") as "[Hay Heven]".
@@ -191,7 +211,7 @@ Section ThreadModel.
       iModIntro.
       iMod ("CLOS" with "[Hmod Hay Hb]") as "_". 
       { replace (Z.of_nat N + 1)%Z with (Z.of_nat (N + 1)) by lia. rewrite -ST'. 
-        iFrame.
+        iFrame. iSplitR; [done| ]. 
         rewrite ST'. rewrite Nat.add_shuffle0. rewrite Nat.even_add.
         rewrite Heqn. simpl. 
         rewrite -Nat.add_assoc. done. }
@@ -209,16 +229,19 @@ Section ThreadModel.
       iDestruct "CLOS" as "[_ CLOS]". iSpecialize ("CLOS" with "[]").
       { iPureIntro. by rewrite -Nat.negb_even Heqn. } 
       iSpecialize ("CLOS" with "[]").
-      { iPureIntro. simpl. econstructor. by rewrite -Nat.negb_even Heqn. }
-      iDestruct "CLOS" as (st') "(%ST'&%STEP&%LR&CLOS)".
+      { iPureIntro. simpl. split; [| reflexivity].
+        econstructor. by rewrite -Nat.negb_even Heqn. }
+      iDestruct "CLOS" as (st') "((%ST'&%STEP&%LR)&CLOS)".
  
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR"); eauto. 
+      iApply (wp_step_model_singlerole with "Hmod Hf HFR"); eauto.
+      { apply LR. simpl. by rewrite !thread_AM_lr_exact. } 
+
       iApply (wp_cmpxchg_fail with "Hn"); [intros Hne; simplify_eq; lia|done|].
       iIntros "!> Hb Hmod Hf HFR".
       wp_pures.
       iModIntro. 
       iMod ("CLOS" with "[Hmod Hb Hauths]").
-      { rewrite -ST'. iFrame.
+      { rewrite -ST'. iFrame. iSplitR; [done| ]. 
         by rewrite ST' Heqn. }  
       iModIntro. simpl.
       (* wp_pures. *)
@@ -234,8 +257,11 @@ Section ThreadModel.
 End ThreadModel.
 
 
-
 (* ******************** *)
 Global Opaque PrivA.
 Global Opaque TR.
 Global Opaque incr_loop.   
+Global Opaque TS. 
+Global Opaque thread_model. 
+Global Opaque PrivA. 
+(* Global Opaque thread_trans.  *)
