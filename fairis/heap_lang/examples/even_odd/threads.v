@@ -128,20 +128,20 @@ Section ThreadModel.
       frag_model_is st ∗ l ↦ #(N: nat) ∗
       own th_name (●E (if Nat.even (N + d) then N else (N + 1))).
     
-    Definition eo_vs l ι: iProp Σ :=
+    Definition eo_vs l ι ρ__t: iProp Σ :=
       □ |={⊤, ⊤ ∖ ↑ι}=> ∃ st,
       (▷ eo_corr l st) ∗
       (* (▷ (eo_corr l (if (Nat.even (N + d)) then (N + 1) else N) γ d) ={⊤ ∖ ↑ι, ⊤}=∗ True). *)
       (let N := proj_st st in
        (⌜ Nat.even (N + d) ⌝ →
-        ∀ ρ__t, ⌜ amTrans _ N (inl $ step_sync N, Some ρ__t) (N + 1)%nat ⌝ →
+        ⌜ amTrans _ N (inl $ step_sync N, Some ρ__t) (N + 1)%nat ⌝ →
         ∃ (* a *) st', ⌜ proj_st st' = (N + 1)%nat ⌝ ∗ 
                        ⌜ fmtrans M__p st (Some $ lift_role ρ__t) st' ⌝ ∗
                        ⌜ live_roles M__p st' ⊆ live_roles M__p st ⌝ ∗
                        (▷ (eo_corr l st') ={⊤ ∖ ↑ι, ⊤}=∗ True)
       ) ∗
        (⌜ Nat.odd (N + d) ⌝ →
-        ∀ a ρ__t, ⌜ amTrans _ N (inr a, Some ρ__t) N ⌝ →
+        ∀ a, ⌜ amTrans _ N (inr a, Some ρ__t) N ⌝ →
         ∃ (* a *) st', ⌜ proj_st st' = N ⌝ ∗ 
                        ⌜ fmtrans M__p st (Some $ lift_role ρ__t) st' ⌝ ∗
                        ⌜ live_roles M__p st' ⊆ live_roles M__p st ⌝ ∗
@@ -158,7 +158,7 @@ Section ThreadModel.
 
   Lemma eo_go_spec (tid: locale heap_lang) n ρ__t (N: nat) f (Hf: f > 40) ι
     (FL: forall st, lm_fl LM__p st >= 61):
-    {{{  eo_vs n ι ∗
+    {{{  eo_vs n ι ρ__t ∗
          has_fuels tid {[ lift_role ρ__t := f ]} ∗ own th_name (◯E N) ∗
          frag_free_roles_are ∅
     }}}
@@ -180,7 +180,7 @@ Section ThreadModel.
     - iDestruct (th_agree with "Heven Hauths") as "->".
       iModIntro.
       iDestruct "CLOS" as "[CLOS _]". iSpecialize ("CLOS" with "[]"); [done| ].
-      iSpecialize ("CLOS" $! ρT with "[]").
+      iSpecialize ("CLOS" with "[]").
       { iPureIntro. rewrite Nat.add_1_r. simpl. econstructor. intuition. }
       iDestruct "CLOS" as (st') "(%ST'&%STEP&%LR&CLOS)".
       iApply (wp_step_model_singlerole with "Hmod Hf HFR"); eauto. 
@@ -208,7 +208,7 @@ Section ThreadModel.
       subst.
       iDestruct "CLOS" as "[_ CLOS]". iSpecialize ("CLOS" with "[]").
       { iPureIntro. by rewrite -Nat.negb_even Heqn. } 
-      iSpecialize ("CLOS" $! ρT with "[]").
+      iSpecialize ("CLOS" with "[]").
       { iPureIntro. simpl. econstructor. by rewrite -Nat.negb_even Heqn. }
       iDestruct "CLOS" as (st') "(%ST'&%STEP&%LR&CLOS)".
  
