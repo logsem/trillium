@@ -639,6 +639,38 @@ Section FlattenGset.
 End FlattenGset.
 
 
+Section Arithmetic.
+
+  Lemma even_succ_negb n: Nat.even (S n) = negb $ Nat.even n.
+  Proof. by rewrite Nat.even_succ Nat.negb_even. Qed.
+
+  Lemma odd_succ_negb n: Nat.odd (S n) = negb $ Nat.odd n.
+  Proof. by rewrite Nat.odd_succ Nat.negb_odd. Qed.
+
+  Lemma even_plus1_negb n: Nat.even (n + 1) = negb $ Nat.even n.
+  Proof. by rewrite Nat.add_1_r even_succ_negb. Qed. 
+
+  Lemma odd_plus1_negb n: Nat.odd (n + 1) = negb $ Nat.odd n.
+  Proof. by rewrite Nat.add_1_r odd_succ_negb. Qed.
+
+End Arithmetic.
+
+
+Section If.
+
+  Lemma if_arg2_comm {A B C: Type} (b: bool) (P1 P2: A) (Q1 Q2: B) (f: A -> B -> C):
+    (if b then f P1 Q1 else f P2 Q2) = f (if b then P1 else P2) (if b then Q1 else Q2). 
+  Proof. destruct b; auto. Qed. 
+
+  (* Lemma if_sep_comm (b: bool) (P1 Q1 P2 Q2: iProp Σ): *)
+  (*    (if b then (P1 ∗ Q1) else (P2 ∗ Q2)) ⊣⊢ (if b then P1 else P2) ∗ (if b then Q1 else Q2). *)
+  (* Proof. destruct b; set_solver. Qed.  *)
+
+  Lemma if_arg_comm {A B: Type} (b: bool) (x y: A) (f: A -> B):
+    (if b then f x else f y) = f (if b then x else y).
+  Proof. by destruct b. Qed. 
+
+End If.
 (* Ltac forward_gen H tac := *)
 (*   match type of H with *)
 (*   | ?X -> _ => let H' := fresh in assert (H':X) ; [tac|specialize (H H'); clear H'] *)

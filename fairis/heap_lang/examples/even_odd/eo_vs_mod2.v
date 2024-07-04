@@ -9,7 +9,7 @@ From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness.heap_lang.examples.even_odd Require Import action_model threads.
+From trillium.fairness.heap_lang.examples.even_odd Require Import action_model threads utils.
 
 
 Import derived_laws_later.bi.
@@ -82,8 +82,6 @@ Class evenoddG (Σ: gFunctors) := EvenoddG {
   even_name: gname;
   odd_name: gname;
   eoPreG :> evenoddPreG Σ;
-  (* evenodd_n_G :> inG Σ (excl_authR natO); *)
-  (* thread_G :> threadG Σ; *)
  }.
 
 (* Definition evenoddΣ : gFunctors := *)
@@ -94,8 +92,6 @@ Class evenoddG (Σ: gFunctors) := EvenoddG {
 
 Section proof.
   Context `{!heapGS Σ the_model, !evenoddG Σ}.
-  (* Context `{EM__G: ExecutionModel heap_lang M__G} `{@heapGS Σ _ EM__G, evenoddG Σ}. *)
-  (* Context {ifG: fairnessGS the_model Σ}. *)
 
   Let Ns := nroot .@ "even_odd".
 
@@ -130,75 +126,6 @@ Section proof.
       else auth_even_at (N+1) ∗ auth_odd_at N.
   Definition evenodd_inv n := inv Ns (evenodd_inv_inner n).
 
-
-  (* TODO: move *)
-  Lemma even_succ_negb n: Nat.even (S n) = negb $ Nat.even n.
-  Proof. by rewrite Nat.even_succ Nat.negb_even. Qed.
-
-  (* TODO: move *)
-  Lemma odd_succ_negb n: Nat.odd (S n) = negb $ Nat.odd n.
-  Proof. by rewrite Nat.odd_succ Nat.negb_odd. Qed.
-
-  (* TODO: move *)
-  Lemma even_plus1_negb n: Nat.even (n + 1) = negb $ Nat.even n.
-  Proof. by rewrite Nat.add_1_r even_succ_negb. Qed. 
-
-  (* TODO: move *)
-  Lemma odd_plus1_negb n: Nat.odd (n + 1) = negb $ Nat.odd n.
-  Proof. by rewrite Nat.add_1_r odd_succ_negb. Qed.
-
-  (* Lemma even_go_spec tid n (N: nat) f (Hf: f > 40) ι: *)
-  (*   {{{  eo_vs n ι even_name 0 ∗ *)
-  (*        tid ↦M {[ inl ρT := f ]} ∗ own even_name (◯E N) ∗ *)
-  (*        frag_free_roles_are ∅ *)
-  (*   }}} *)
-  (*     incr_loop #n #N @ tid *)
-  (*   {{{ RET #(); tid ↦M ∅ }}}. *)
-  (* Proof. *)
-  (*   apply eo_go_spec; auto. *)
-
-  (*   (* !!! relies on transparent thread_model *) *)
-  (*   intros k. rewrite Nat.even_add. rewrite Nat.add_1_r.   *)
-  (*   destruct (Nat.even k) eqn:E.  *)
-  (*   - simpl. eapply amfm_role_step with (a := inl (step_sync k)). *)
-  (*     econstructor; eauto. *)
-  (*     + econstructor. by rewrite Nat.even_add E. *)
-  (*     + econstructor. rewrite Nat.add_1_r Nat.odd_succ. by rewrite E. *)
-  (*   - simpl. eapply amfm_role_step with (a := inr (inl ())). *)
-  (*     econstructor; eauto. *)
-  (*     econstructor. rewrite Nat.add_0_r -Nat.negb_even E. done. *)
-  (* Qed.  *)
-
-  (* Lemma odd_go_spec tid n (N: nat) f (Hf: f > 40) ι: *)
-  (*   {{{  eo_vs n ι odd_name 1 ∗ *)
-  (*        tid ↦M {[ inr ρT := f ]} ∗ odd_at N ∗ *)
-  (*        frag_free_roles_are ∅ *)
-  (*   }}} *)
-  (*     incr_loop #n #N @ tid *)
-  (*   {{{ RET #(); tid ↦M ∅ }}}. *)
-  (* Proof. *)
-  (*   apply eo_go_spec; auto. *)
-
-  (*   (* !!! relies on transparent thread_model *) *)
-  (*   intros k. rewrite Nat.add_1_r Nat.even_succ.  *)
-  (*   destruct (Nat.odd k) eqn:O.  *)
-  (*   - simpl. eapply amfm_role_step with (a := inl (step_sync k)). *)
-  (*     econstructor; eauto. *)
-  (*     + econstructor. by rewrite Nat.odd_add O. *)
-  (*     + econstructor. rewrite Nat.add_1_r Nat.even_succ. by rewrite O. *)
-  (*   - simpl. eapply amfm_role_step with (a := inr (inr ())). *)
-  (*     econstructor; eauto. *)
-  (*     econstructor. rewrite Nat.add_1_r odd_succ_negb O. done. *)
-  (* Qed. *)
-
-  (* TODO: move *)
-  Lemma if_sep_comm (b: bool) (P1 Q1 P2 Q2: iProp Σ):
-     (if b then (P1 ∗ Q1) else (P2 ∗ Q2)) ⊣⊢ (if b then P1 else P2) ∗ (if b then Q1 else Q2).
-  Proof. destruct b; set_solver. Qed. 
-
-  Lemma if_arg_comm {A B: Type} (b: bool) (x y: A) (f: A -> B):
-    (if b then f x else f y) = f (if b then x else y).
-  Proof. by destruct b. Qed. 
 
   Inductive EO' := eoE | eoO.
   
@@ -291,7 +218,7 @@ Section proof.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
     iDestruct "OPEN" as (M) "(>Hmod & >Hn & Hauths)".
-    rewrite if_sep_comm. iDestruct "Hauths" as "[E O]".
+    rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
     iModIntro. iExists _. iSplitL "Hmod Hn E".
     { rewrite /eo_corr. simpl. iFrame.
       simpl. iFrame. rewrite Nat.add_0_r. destruct (Nat.even M); auto. }
@@ -385,7 +312,7 @@ Section proof_start.
     iInv Ns as (M) "(>Hmod & >Hn & Hauths)" "Hclose".
     iIntros "!>". wp_load. iIntros "!>".
     
-    rewrite if_sep_comm !if_arg_comm.
+    rewrite if_arg2_comm !if_arg_comm.
     iDestruct "Hauths" as "[Heven Hodd]".
     iDestruct (even_agree with "Heven_at Heven") as %<-.
     iDestruct (odd_agree with "Hodd_at Hodd") as %<-.
