@@ -320,6 +320,118 @@ Section proof.
       Unshelve. 2: exact (inl (step_sync M)). simpl. subst k. done.
   Qed.
 
+  Lemma lr_pres_odd_sync ρ__o st__e st__o st__e' st__o' M 
+    (CUR__E : cur_n 0 st__e M)
+    (CUR__O : cur_n 1 st__o M)
+    (O : Nat.odd M = true)    
+    (STEP : amTrans (thread_model 1) st__o (inl (step_sync M), Some ρ__o) st__o')    
+    (CUR__O' : cur_n 1 st__o' (M + 1))
+    (STEP2 : amTrans even_AM st__e (inl (step_sync M), None) st__e')
+    (LR__o : AM_live_roles (thread_AM_strong 1) st__o'
+          ⊆ AM_live_roles (thread_AM_strong 1) st__o):
+  AM_live_roles prod_AM_strong_lr (st__e', st__o')
+  ⊆ AM_live_roles prod_AM_strong_lr (st__e, st__o).
+  Proof.
+    apply elem_of_subseteq. intros ρ.
+    setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr).
+    intros (a&st''&STEP').
+    simpl in STEP'.
+
+    destruct ρ as [ρ__e' | ρ__o'];
+      revgoals. 
+    { (* TODO: is it possible to unify these proofs in _sync and _priv? *)
+      clear -STEP' LR__o M Ns CUR__O STEP2 CUR__O' O. 
+
+      inversion STEP'; subst.
+      - (* role under consideration makes private step in new state *)        
+        assert (ρ__o' ∈ AM_live_roles (thread_AM_strong 1) st__o) as IN.
+        { apply LR__o. apply AM_live_roles_spec. eauto. }
+        apply AM_live_roles_spec in IN as (ao_ & st_ & STEP_).
+        destruct ao_ as [[k]| ].
+        + (* in old state it could make a _public_ step *)
+          assert (k = M) as ->.
+          { eapply odd_sync_step_inv; eauto. }
+          do 2 eexists. eapply pt_sync2; eauto.
+          Unshelve. 2: exact (inl $ step_sync M). done.
+        + do 2 eexists. eapply pt_inner2; [| eauto].
+          Unshelve. 2: exact (inr $ inr p). done.
+      - destruct a2 as [[k]| ]. 
+        2: { clear -LBL. destruct a; simpl in *; [set_solver| ].
+             destruct s; set_solver. }
+        eapply odd_sync_step_inv in STEP0 as [-> ?]; eauto.
+        rewrite odd_plus1_negb in H. by rewrite O in H. }
+
+    (* TODO: is it possible to unify these proofs in _sync and _priv? *)
+    clear -STEP' Ns STEP2 O CUR__E.
+ 
+    assert (ρ__e' ∈ AM_live_roles (thread_AM_strong 0) st__e) as IN.
+    { eapply even_sync_lr_nonincr; eauto.  
+      apply AM_live_roles_spec.
+      inversion STEP'; eauto. }
+    apply AM_live_roles_spec in IN as (ae_ & st_ & STEP_).
+    destruct ae_ as [[k]| ].
+    + (* in old state it could make a _public_ step *)
+      eapply even_sync_step_inv in STEP_ as [-> ?]; eauto.
+      rewrite -Nat.negb_odd O in H. done.
+    + do 2 eexists. eapply pt_inner1; [| eauto].
+      Unshelve. 2: exact (inr $ inl p). done.
+  Qed. 
+
+  Lemma lr_pres_odd_priv ρ__o st__e st__o (st__o': amSt (thread_model 1)) M (a__o : PrivA)
+  (CUR__E : cur_n 0 st__e M)
+  (CUR__O : cur_n 1 st__o M)
+  (E : Nat.even M)  
+  (STEP : amTrans (thread_model 1) st__o (inr a__o, Some ρ__o) st__o')
+  (CUR__O' : cur_n 1 st__o' M)
+  (LR__o : AM_live_roles (thread_AM_strong 1) st__o'
+      ⊆ AM_live_roles (thread_AM_strong 1) st__o):
+  AM_live_roles prod_AM_strong_lr (st__e, st__o')
+  ⊆ AM_live_roles prod_AM_strong_lr (st__e, st__o).
+  Proof. 
+    assert (Nat.odd M = false) as O.
+    { rewrite -Nat.negb_even. by destruct (Nat.even M). } 
+    apply elem_of_subseteq. intros ρ.
+    setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr).
+    intros (a&st''&STEP').
+    simpl in STEP'.
+
+    destruct ρ as [ρ__e' | ρ__o'];
+      revgoals. 
+    { (* TODO: is it possible to unify these proofs in _sync and _priv? *)
+      clear -STEP' LR__o Ns CUR__O CUR__O' O.
+      
+      inversion STEP'; subst.
+      - (* role under consideration makes private step in new state *)
+        assert (ρ__o' ∈ AM_live_roles (thread_AM_strong 1) st__o) as IN.
+        { apply LR__o.
+          apply AM_live_roles_spec. eauto. }
+        apply AM_live_roles_spec in IN as (ao_ & st_ & STEP_).
+        destruct ao_ as [[k]| ].
+        + (* in old state it could make a _public_ step *)
+          eapply odd_sync_step_inv in STEP_ as [-> ?]; eauto.
+          by rewrite O in H. 
+        + do 2 eexists. eapply pt_inner2; [| eauto].
+          Unshelve. 2: exact (inr $ inr p). done.
+      - destruct a2 as [[k]| ]. 
+        2: { clear -LBL. destruct a; simpl in *; [set_solver| ].
+             destruct s; set_solver. }
+        eapply odd_sync_step_inv in STEP2 as [-> ?]; eauto.
+        by rewrite O in H. }
+
+    (* TODO: is it possible to unify these proofs in _sync and _priv? *)
+    clear -STEP' Ns CUR__O CUR__E.
+    inversion STEP'; subst.
+    - do 2 eexists. eapply pt_inner1; eauto.
+    - destruct a1 as [[k]| ]. 
+      2: { clear -LBL. destruct a; simpl in *; [set_solver| ].
+           destruct s; set_solver. }
+      pose proof STEP1 as XX. eapply even_sync_step_inv in XX as [EQ ?]; eauto. 
+      edestruct (odd_syncable M st__o) as (st__o_ & STEP2_ & ?); eauto.
+      do 2 eexists. eapply pt_sync1. 
+      2, 3: eauto.
+      Unshelve. 2: exact (inl (step_sync M)). simpl. subst k. done.
+  Qed.
+
 
   Lemma even_spec tid l (N : nat) ρ f (Hf: f > 40) :
     {{{ evenodd_inv l ∗ tid ↦M {[ inl ρ := f ]} ∗ even_at N ∗
@@ -399,7 +511,7 @@ Section proof.
         - econstructor. simpl.
           eapply pt_sync2; eauto. 
           Unshelve. 2: exact (inl (step_sync M)). done.
-        - simpl. intros LR__e. admit. }
+        - simpl. intros LR__e. eapply lr_pres_odd_sync; eauto. }
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       (* rewrite !Nat.add_0_r. *)
       iNext. iFrame. simpl. rewrite !even_plus1_negb -!Nat.negb_odd E.  
@@ -412,9 +524,8 @@ Section proof.
         { econstructor. simpl. econstructor; eauto.
           Unshelve. 2: exact (inr $ inr a__o). done. }
         simpl. intros.
-        (* eapply lr_pres_even_priv; eauto. *)
-        admit. 
-      }
+        eapply lr_pres_odd_priv; eauto.
+        rewrite -Nat.negb_odd. by rewrite E. }
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       iNext. iFrame. simpl.
       rewrite -!Nat.negb_odd odd_plus1_negb E. simpl. iFrame. done. 
