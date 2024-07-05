@@ -25,12 +25,75 @@ Definition start : val :=
     Fork (incr_loop "l" ("x"+#1))).
 
 
+Definition BuildSubModel (St Priv Role: Type) Trans := {|
+   amSt := St;
+   amA := PubA + Priv;
+   amRole := Role;
+   amTrans := Trans;
+|}.
+
+
+Record EvenModel := {
+    eSt: Type;
+    ePriv: Type;
+    eRole: Type;
+    eTrans;
+    even_role_eqdec :> EqDecision eRole;
+    even_role_cnt :> Countable eRole;
+    cur_even: eSt -> nat -> Prop;
+
+    even_AM := BuildSubModel eSt ePriv eRole eTrans;
+    even_AM_strong: AM_strong_lr even_AM;
+    even_AM_fin_branch': AM_fin_branch' even_AM;
+
+    even_syncable n st (EVEN: Nat.odd n) (CUR: cur_even st n):
+      exists st', amTrans even_AM st (inl (step_sync n), None) st' /\ cur_even st' (n + 1);
+    even_sync_step_inv st__e st__e' k N ρ
+      (STEP: amTrans even_AM st__e (inl (step_sync k), Some ρ) st__e')
+      (CUR: cur_even st__e N):
+      k = N /\ Nat.even N;
+    even_sync_lr_nonincr st__e st__e' M
+      (STEP: amTrans even_AM st__e (inl (step_sync M), None) st__e'):
+      AM_live_roles even_AM_strong st__e' ⊆ AM_live_roles even_AM_strong st__e;
+}.
+
+Record OddModel := {
+    oSt: Type;
+    oPriv: Type;
+    oRole: Type;
+    oTrans;
+    odd_role_eqdec :> EqDecision oRole;
+    odd_role_cnt :> Countable oRole;
+    cur_odd: oSt -> nat -> Prop;
+
+    odd_AM := BuildSubModel oSt oPriv oRole oTrans;
+    odd_AM_strong: AM_strong_lr odd_AM;
+    odd_AM_fin_branch': AM_fin_branch' odd_AM;
+
+    odd_syncable n st (ODD: Nat.odd n) (CUR: cur_odd st n):
+      exists st', amTrans odd_AM st (inl (step_sync n), None) st' /\ cur_odd st' (n + 1);
+    odd_sync_step_inv st__e st__e' k N ρ
+      (STEP: amTrans odd_AM st__e (inl (step_sync k), Some ρ) st__e')
+      (CUR: cur_odd st__e N):
+      k = N /\ Nat.odd N;
+    odd_sync_lr_nonincr st__e st__e' M
+      (STEP: amTrans odd_AM st__e (inl (step_sync M), None) st__e'):
+      AM_live_roles odd_AM_strong st__e' ⊆ AM_live_roles odd_AM_strong st__e;
+}.
+
+(* Arguments ePriv {_}. *)
+(* Arguments oPriv {_}. *)
+
+
 Section Models.
   
-  Definition even_AM := thread_model 0. 
-  Definition odd_AM := thread_model 1.
+  Context (even_impl: EvenModel). 
+  Context (odd_impl: OddModel).
 
-  Definition prodA: Type := PubA + (PrivA + PrivA). 
+  Let even_AM := @even_AM even_impl. 
+  Let odd_AM := @odd_AM odd_impl. 
+
+  Definition prodA: Type := PubA + (@ePriv even_impl + @oPriv odd_impl). 
   Definition fact_TA (pa: prodA): option (amA even_AM) * option (amA odd_AM) := 
     match pa with
     | inl s => (Some $ inl s, Some $ inl s)
@@ -42,8 +105,9 @@ Section Models.
 
   Lemma prod_AM_fin_branch': AM_fin_branch' prod_model.
   Proof. 
-    unshelve eapply prod_AM_fin_branch'.  
-    2, 3: apply thread_AM_fin_branch'. 
+    unshelve eapply prod_AM_fin_branch'.
+    3: apply odd_AM_fin_branch'. 
+    2: apply even_AM_fin_branch'. 
     { exact (fun '(oa1, oa2) => 
                match oa1, oa2 with
                | Some (inl pa1), Some _ => inl pa1
@@ -52,13 +116,27 @@ Section Models.
                | _, _ => inl (step_sync 0)
                end). }
     red. intros [?|[?|?]]; reflexivity.
-  Qed. 
+  Qed.
 
+  Local Instance prod_role_eqdec: EqDecision (amRole prod_model).
+  Proof.
+    unshelve eapply sum_eq_dec.
+    - simpl. apply even_impl.
+    - simpl. apply odd_impl.
+  Defined. 
+    
+  Local Instance prod_role_cnt: Countable (amRole prod_model).
+  Proof.
+    unshelve eapply sum_countable.
+    - simpl. apply even_impl.
+    - simpl. apply odd_impl.
+  Defined. 
+    
   Lemma prod_AM_strong_lr: AM_strong_lr prod_model.
   Proof. 
     apply fin_branch_strong.
     - apply prod_AM_fin_branch'. 
-    - apply prod_AM_step_dec; apply thread_AM_step_dec.
+    - unshelve eapply prod_AM_step_dec.  apply thread_AM_step_dec.
   Qed.
 
   Definition the_fair_model: FairModel.
