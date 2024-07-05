@@ -139,24 +139,6 @@ Section proof.
     | eoO => odd_at
     end.
 
-  (* !!! depends on known role of thread_model *)
-  Definition eo_role (eo: EO'): fmrole the_fair_model :=
-    match eo with
-    | eoE => inl ρT
-    | eoO => inr ρT
-    end.
-
-  (* TODO: require it from thread *)
-  Lemma odd_syncable n (st: amSt odd_AM)
-    (EVEN: Nat.even n) (CUR: cur_n 1 st n):
-    exists st', amTrans odd_AM st (inl (step_sync n), None) st' /\ cur_n 1 st' (n + 1).
-  Proof. Admitted. 
-  (* TODO: require it from thread *)
-  Lemma even_syncable n (st: amSt even_AM)
-    (EVEN: Nat.odd n) (CUR: cur_n 0 st n):
-    exists st', amTrans even_AM st (inl (step_sync n), None) st'.
-  Proof. Admitted. 
-
   (* (* TODO: overapproximation. *) *)
   (* (* more relaxed condition would require specifying how LR of factor models *)
   (*    are related to LR of the product model *) *)
@@ -254,55 +236,22 @@ Section proof.
   (*    set_map inr (AM_live_roles (thread_AM_strong 1) N). *)
   (* Proof. apply tfm_live_roles'. Qed.  *)
 
-  (* Lemma lr_pres *)
-  (*   ρ__e *)
-  (*   (st__e : amSt even_AM) *)
-  (*   (st__o : amSt odd_AM) *)
-  (*   (M : nat) *)
-  (*   (CUR__E : cur_n 0 st__e M) *)
-  (*   (CUR__O : cur_n 1 st__o M) *)
-  (*   (E : Nat.even M = true) *)
-  (*   (st__e' : amSt (thread_model 0)) *)
-  (*   (STEP : amTrans (thread_model 0) st__e (inl (step_sync M), Some ρ__e) st__e') *)
-  (*   (CUR__E' : cur_n 0 st__e' (M + 1)) *)
-  (*   (st__o' : amSt odd_AM) *)
-  (*   (STEP2 : amTrans odd_AM st__o (inl (step_sync M), None) st__o') *)
-  (*   (LR__e : AM_live_roles (thread_AM_strong 0) st__e' *)
-  (*         ⊆ AM_live_roles (thread_AM_strong 0) st__e): *)
-  (* AM_live_roles prod_AM_strong_lr (st__e', st__o') *)
-  (* ⊆ AM_live_roles prod_AM_strong_lr (st__e, st__o). *)
-  (* Proof. *)
-  (*   apply elem_of_subseteq. intros ρ. *)
-  (*   setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr). *)
-  (*   intros (a&st''&STEP'). *)
-  (*   simpl in STEP'. *)
-  (*   destruct ρ as [ρ__e' | ρ__o'].  *)
-  (*   { inversion STEP'; subst. *)
-  (*     - (* role under consideration makes private step in new state *) *)
-  (*       assert (ρ__e' ∈ AM_live_roles (thread_AM_strong 0) st__e) as IN. *)
-  (*       { apply LR__e.  *)
-  (*         apply AM_live_roles_spec. eauto. } *)
-  (*       apply AM_live_roles_spec in IN as (ae_ & st_ & STEP_). *)
-  (*       destruct ae_ as [[k]| ]. *)
-  (*       + (* in old state it could make a _public_ step *) *)
-  (*         assert (k = M) as -> by admit. *)
-  (*         (* ^ *) *)
-  (*         do 2 eexists. eapply pt_sync1; eauto. *)
-  (*         Unshelve. 2: exact (inl $ step_sync M). done. *)
-  (*       + do 2 eexists. eapply pt_inner1; [| eauto].  *)
-  (*          Unshelve. 2: exact (inr $ inl p). done. *)
-  (*     -  *)
-  (*         Unshelve. 2: exact (inl $ step_sync M). done. *)
-  (*         2: { apply STEP.  *)
-  (*       exists a, (st_, st__o). *)
-  (*       eapply pt_inner1; [apply LBL| ]. done.  *)
+  (* TODO: require it from thread *)
+  Lemma odd_syncable n (st: amSt odd_AM)
+    (EVEN: Nat.even n) (CUR: cur_n 1 st n):
+    exists st', amTrans odd_AM st (inl (step_sync n), None) st' /\ cur_n 1 st' (n + 1).
+  Proof. Admitted. 
+  (* TODO: require it from thread *)
+  Lemma even_syncable n (st: amSt even_AM)
+    (EVEN: Nat.odd n) (CUR: cur_n 0 st n):
+    exists st', amTrans even_AM st (inl (step_sync n), None) st'.
+  Proof. Admitted. 
 
   Lemma even_sync_step_inv st__e st__e' k N ρ
     (STEP: amTrans even_AM st__e (inl (step_sync k), Some ρ) st__e')
     (CUR: cur_n 0 st__e N):
     k = N /\ Nat.even N.
-  Proof. Admitted. 
-    
+  Proof. Admitted.     
   Lemma odd_sync_step_inv st__e st__e' k N ρ
     (STEP: amTrans odd_AM st__e (inl (step_sync k), Some ρ) st__e')
     (CUR: cur_n 1 st__e N):
@@ -312,6 +261,10 @@ Section proof.
   Lemma odd_sync_lr_nonincr st__o st__o' M
     (STEP: amTrans odd_AM st__o (inl (step_sync M), None) st__o'):
     AM_live_roles (thread_AM_strong 1) st__o' ⊆ AM_live_roles (thread_AM_strong 1) st__o.
+  Proof. Admitted. 
+  Lemma even_sync_lr_nonincr st__e st__e' M
+    (STEP: amTrans even_AM st__e (inl (step_sync M), None) st__e'):
+    AM_live_roles (thread_AM_strong 0) st__e' ⊆ AM_live_roles (thread_AM_strong 0) st__e.
   Proof. Admitted. 
     
   Lemma lr_pres_even_sync
