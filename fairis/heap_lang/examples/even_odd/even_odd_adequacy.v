@@ -280,7 +280,8 @@ Proof.
   intros Hstutter Hmtr n.
   revert auxtr mtr Hstutter Hmtr.
   induction n as [|n IHn]; intros auxtr mtr Hstutter Hmtr.
-  { punfold Hstutter; [|apply upto_stutter_mono].
+  { 
+    punfold Hstutter; [|apply upto_stutter_mono].
     induction Hstutter as
       [|auxtr mtr s ℓ Hℓ Hauxtr_first Hmtr_first CIHstutter IHstutter|
       auxtr mtr s ℓ δ ρ Hs Hℓ CIHstutter].
@@ -396,48 +397,73 @@ Proof. solve_decision. Qed.
 
 (** Proof that program refines model up to ξ_evenodd *)
 
-Lemma evenodd_sim l :
-  continued_simulation
-    (sim_rel_with_user the_model (ξ_evenodd_trace l))
-    (trace_singleton ([start #l], {| heap := {[l:=#0]};  used_proph_id := ∅ |}))
-    (trace_singleton (initial_ls (LM := the_model) 0 0)).
+
+(* Lemma start_spec_use l γ_even_at γ_odd_at `{heapGS evenoddΣ the_model}: *)
+(*   {{{ evenodd_inv l ∗ *)
+(*       0 ↦M gset_to_gmap 61 (eo_live_roles: gset (fmrole the_fair_model)) ∗ *)
+(*       own γ_even_at (◯E 0) ∗ *)
+(*       own γ_odd_at (◯E 1) }}} *)
+(*     start #l @0 *)
+(*   {{{ RET _; 0 ↦M ∅ }}}. *)
+
+Lemma start_spec_use Σ
+  (l : loc)
+  (Hinv : heapGS Σ the_model)
+  (eoΣ: evenoddG Σ)
+  :
+  {{{ inv (nroot.@"even_odd") (evenodd_inv_inner l) ∗
+      0 ↦M gset_to_gmap 61 eo_live_roles ∗
+      own even_name (◯E 0) ∗
+      own odd_name (◯E 1) }}}
+    start #l @0
+  {{{ x, RET x; 0 ↦M ∅ }}}.
+Proof.  
+  simpl. rewrite /eo_live_roles.
+  replace (gset_to_gmap 61 {[ρOdd; ρEven]}) with
+    ({[ρEven := 61; ρOdd := 61]} : gmap _ _); last first.
+  { rewrite /gset_to_gmap. simpl.
+    rewrite !map_fmap_union. rewrite !map_fmap_singleton.
+    rewrite map_union_comm; last first.
+    { rewrite map_disjoint_singleton_l.
+      by rewrite lookup_insert_ne. }
+    by rewrite -!insert_union_l left_id. }
+  iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at) HΦ".
+  iApply (start_spec with "[$Hf Heven_at Hodd_at $Hinv]"); [lia| by iFrame| ].
+  iIntros "!>?". by iApply "HΦ".
+Qed.    
+
+
+Lemma dom_locales
+  (c: cfg heap_lang)
+  (fm : gmap (locale heap_lang) (gmap (fmrole the_fair_model) nat))
+  (Htp : fuel_map_preserve_threadpool c.1 fm)
+  (HMζ : ∀ i : nat, i < length c.1 → fm !! i = Some ∅):
+  dom fm = list_to_set (locales_of_list c.1).
 Proof.
-  assert (evenoddPreG evenoddΣ) as HPreG'.
-  { apply _. }
-  assert (heapGpreS evenoddΣ the_model) as HPreG.
-  { apply _. }
-  eapply (strong_simulation_adequacy
-            evenoddΣ _ NotStuck _ _ _ ∅); [|set_solver|].
-  { eapply rel_finitary_sim_rel_with_user_sim_rel.
-    eapply valid_state_evolution_finitary_fairness_simple.
-    intros ?. simpl. apply (model_finitary s1). }
-  iIntros (?) "!> Hσ Hs Hr Hf".
-  iMod (own_alloc (●E 0  ⋅ ◯E 0))%nat as (γ_even_at) "[Heven_at_auth Heven_at]".
-  { apply auth_both_valid_2; eauto. by compute. }
-  iMod (own_alloc (●E 1  ⋅ ◯E 1))%nat as (γ_odd_at) "[Hodd_at_auth Hodd_at]".
-  { apply auth_both_valid_2; eauto. by compute. }
-  pose (the_names := {|
-   even_name := γ_even_at;
-   odd_name := γ_odd_at;
-  |}).
-  iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner l) with "[Hσ Hs Hr Heven_at_auth Hodd_at_auth]") as "#Hinv".
-  { iNext. unfold evenodd_inv_inner. iExists 0.
-    replace (∅ ∖ live_roles the_fair_model 0) with
-      (∅:gset (fmrole the_fair_model)) by set_solver.
-    rewrite /eo_live_roles big_sepM_singleton. by iFrame. }
-  iModIntro.
-  iSplitL.
-  { simpl. rewrite /eo_live_roles.
-    replace (gset_to_gmap 61 {[ρOdd; ρEven]}) with
-      ({[ρEven := 61; ρOdd := 61]} : gmap _ _); last first.
-    { rewrite /gset_to_gmap. simpl.
-      rewrite !map_fmap_union. rewrite !map_fmap_singleton.
-      rewrite map_union_comm; last first.
-      { rewrite map_disjoint_singleton_l.
-        by rewrite lookup_insert_ne. }
-      by rewrite -!insert_union_l left_id. }
-    iApply (start_spec with "[$Hf $Heven_at $Hodd_at $Hinv]"); [lia|].
-    by iIntros "!>?". }
+  apply set_eq.
+  intros x. rewrite elem_of_dom.
+  rewrite elem_of_list_to_set.
+  split.
+  - intros HSome.
+    destruct (decide (x ∈ locales_of_list c.1)) as [|Hnin]; [done|].
+    apply Htp in Hnin.
+    destruct HSome as [??]. set_solver. 
+  - intros Hin. exists ∅. apply HMζ.
+    rewrite locales_of_list_indexes in Hin.
+    rewrite /indexes in Hin.
+    apply elem_of_lookup_imap_1 in Hin as (i&?&->&HSome).
+    by apply lookup_lt_is_Some_1.
+Qed.
+
+Lemma eo_rah l `(!heapGS Σ the_model) (eoΣ: evenoddG Σ):
+  inv (nroot.@"even_odd") (evenodd_inv_inner l) -∗
+  rel_always_holds NotStuck [λ _ : language.val heap_lang, 0 ↦M ∅]
+    (λ (extr : execution_trace heap_lang) (atr : auxiliary_trace the_model),
+       ξ_evenodd_trace l extr (map_underlying_trace atr))
+    ([start #l], {| heap := {[l := #0]}; used_proph_id := ∅ |}) 
+    (initial_ls (0: fmstate the_fair_model) 0).
+Proof.
+  iIntros "#Hinv".
   iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck %Hequiv [_ [Hσ Hδ]] Hposts".
   iInv "Hinv" as (M) "(>HFR & >Hmod & >Hn & _)" "Hclose".
   iApply fupd_mask_intro; [set_solver|].
@@ -473,21 +499,10 @@ Proof.
       iDestruct (big_sepL_delete with "Hposts") as "[Hpost _]"; [done|].
       by iDestruct (has_fuels_agree with "Hfm Hpost") as "?". }
     assert (dom fm = list_to_set $ locales_of_list c.1).
-    { rewrite Hends in Htp. apply set_eq.
-      intros x. rewrite elem_of_dom.
-      rewrite elem_of_list_to_set.
-      split.
-      - intros HSome.
-        destruct (decide (x ∈ locales_of_list c.1)) as [|Hnin]; [done|].
-        apply Htp in Hnin.
-        destruct HSome as [??]. simplify_eq.
-      - intros Hin. exists ∅. apply HMζ.
-        rewrite locales_of_list_indexes in Hin.
-        rewrite /indexes in Hin.
-        apply elem_of_lookup_imap_1 in Hin as (i&?&->&HSome).
-        by apply lookup_lt_is_Some_1. }
+    { subst. apply dom_locales; auto. }
     assert (live_roles _ M = ∅) as Hlive.
-    { apply set_eq. intros i. split; [|done].
+    { clear -Hfmdead HMζ Hfmle Hsmaller Hends.
+      apply set_eq. intros i. split; [|done].
       intros (ζ&fs&HSome&Hfs)%Hfmdead.
       assert (fm !! ζ = Some ∅).
       { apply HMζ.
@@ -506,6 +521,44 @@ Proof.
   - iPureIntro.
     apply Forall_forall.
     intros e He. by apply Hnstuck.
+Qed.   
+
+Lemma evenodd_sim l :
+  continued_simulation
+    (sim_rel_with_user the_model (ξ_evenodd_trace l))
+    (trace_singleton ([start #l], {| heap := {[l:=#0]};  used_proph_id := ∅ |}))
+    (trace_singleton (initial_ls (LM := the_model) 0 0)).
+Proof.
+  assert (evenoddPreG evenoddΣ) as HPreG'.
+  { apply _. }
+  assert (heapGpreS evenoddΣ the_model) as HPreG.
+  { apply _. }
+  eapply (strong_simulation_adequacy
+            evenoddΣ _ NotStuck _ _ _ ∅); [|set_solver|].
+  { eapply rel_finitary_sim_rel_with_user_sim_rel.
+    eapply valid_state_evolution_finitary_fairness_simple.
+    intros ?. simpl. apply (model_finitary s1). }
+  iIntros (?) "!> Hσ Hs Hr Hf".
+  iMod (own_alloc (●E 0  ⋅ ◯E 0))%nat as (γ_even_at) "[Heven_at_auth Heven_at]".
+  { apply auth_both_valid_2; eauto. by compute. }
+  iMod (own_alloc (●E 1  ⋅ ◯E 1))%nat as (γ_odd_at) "[Hodd_at_auth Hodd_at]".
+  { apply auth_both_valid_2; eauto. by compute. }
+  pose (the_names := {|
+   even_name := γ_even_at;
+   odd_name := γ_odd_at;
+  |}).
+  iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner l) with "[Hσ Hs Hr Heven_at_auth Hodd_at_auth]") as "#Hinv".
+  { iNext. unfold evenodd_inv_inner. iExists 0.
+    replace (∅ ∖ live_roles the_fair_model 0) with
+      (∅:gset (fmrole the_fair_model)) by set_solver.
+    rewrite /eo_live_roles big_sepM_singleton. by iFrame. }
+  iModIntro.
+  iSplitL.
+  2: by iApply eo_rah. 
+  iApply (start_spec_use with "[-]").
+  Unshelve. 3: exact the_names.
+  { by iFrame. }
+  iNext. by iIntros "**".
 Qed.
 
 CoInductive extrace_maximal {Λ} : extrace Λ → Prop :=
@@ -567,44 +620,20 @@ Proof.
   by f_equiv.
 Qed.
 
-(** Proof that the execution trace satisfies the liveness properties *)
-Theorem evenodd_ex_liveness (l:loc) (extr : heap_lang_extrace) :
-  extrace_maximal extr →
-  (∀ tid, fair_ex tid extr) →
-  trfirst extr = ([start #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
+Lemma extr_props (l: loc)
+  (extr : heap_lang_extrace)
+  (Hmaximal : extrace_maximal extr)
+  (Hfair : ∀ tid : locale heap_lang, fair_ex tid extr)
+  (Hfirst : trfirst extr = ([start #l], {| heap := {[l := #0]}; used_proph_id := ∅ |}))
+  (auxtr : auxtrace the_model)
+  (Hmatch_strong : traces_match labels_match
+                    (λ (x0 : cfg heap_lang) (x1 : lm_ls the_model),
+                       live_tids x0 x1 ∧ ξ_evenodd l x0 x1) locale_step
+                    (λ (δ : lm_ls the_model) (ℓ : lm_lbl the_model) 
+                       (b : lm_ls the_model), lm_ls_trans the_model δ ℓ b) extr
+                    auxtr):
   evenodd_ex_progress l extr ∧ evenodd_ex_mono l extr.
-Proof.
-  intros Hmaximal Hfair Hfirst.
-  pose proof Hmaximal as Hvalid%extrace_maximal_valid.
-  pose proof (evenodd_sim l) as Hsim.
-  assert (∃ iatr,
-             valid_inf_system_trace
-               (continued_simulation (sim_rel_with_user the_model (ξ_evenodd_trace l)))
-               (trace_singleton (trfirst extr))
-               (trace_singleton (initial_ls (LM:=the_model) 0 0))
-               (from_trace extr)
-               iatr) as [iatr Hiatr].
-  { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
-    Unshelve.
-    - rewrite Hfirst. done.
-    - eapply from_trace_preserves_validity; eauto; first econstructor. }
-  assert (∃ (auxtr : auxtrace the_model),
-             traces_match labels_match
-               (live_tids /2\ (ξ_evenodd l))
-               locale_step
-               the_model.(lm_ls_trans) extr auxtr) as [auxtr Hmatch_strong].
-  { exists (to_trace (initial_ls (LM := the_model) 0 0 ) iatr).
-    eapply (valid_inf_system_trace_implies_traces_match_strong
-              (continued_simulation (sim_rel_with_user the_model (ξ_evenodd_trace l)))); eauto.
-    - intros ? ? Hξ%continued_simulation_rel. by destruct Hξ as [[_ Hξ] _].
-    - intros ? ? Hξ%continued_simulation_rel. by destruct Hξ as [[Hξ _] _].
-    - intros extr' auxtr' Hξ%continued_simulation_rel.
-      destruct Hξ as [_ [Hξ1 Hξ2]].
-      split; [done|].
-      destruct Hξ2 as [n [Hξ21 Hξ22]].
-      exists n. split; [done|]. by destruct auxtr'.
-    - by apply from_trace_spec.
-    - by apply to_trace_spec. }
+Proof. 
   assert (exaux_traces_match extr auxtr) as Hmatch.
   { eapply traces_match_impl; [done| |done]. by intros ??[??]. }
   assert (auxtrace_valid auxtr) as Hstutter.
@@ -644,5 +673,49 @@ Proof.
   - pose proof (evenodd_mdl_is_mono mtr Hinf'' Hvalid'' Hfair'' Hfirst'')
       as Hmono.
     eapply (evenodd_aux_ex_mono_preserved l _ auxtr).
-    { eapply traces_match_impl; [done| |apply Hmatch_strong]. by intros ??[??]. }     by eapply evenodd_mtr_aux_mono_preserved.
+    { eapply traces_match_impl; [done| |apply Hmatch_strong]. by intros ??[??]. }
+    by eapply evenodd_mtr_aux_mono_preserved.
+Qed. 
+
+
+(** Proof that the execution trace satisfies the liveness properties *)
+Theorem evenodd_ex_liveness (l:loc) (extr : heap_lang_extrace) :
+  extrace_maximal extr →
+  (∀ tid, fair_ex tid extr) →
+  trfirst extr = ([start #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
+  evenodd_ex_progress l extr ∧ evenodd_ex_mono l extr.
+Proof.
+  intros Hmaximal Hfair Hfirst.
+  pose proof Hmaximal as Hvalid%extrace_maximal_valid.
+  pose proof (evenodd_sim l) as Hsim.
+  assert (∃ iatr,
+             valid_inf_system_trace
+               (continued_simulation (sim_rel_with_user the_model (ξ_evenodd_trace l)))
+               (trace_singleton (trfirst extr))
+               (trace_singleton (initial_ls (LM:=the_model) 0 0))
+               (from_trace extr)
+               iatr) as [iatr Hiatr].
+  { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
+    Unshelve.
+    - rewrite Hfirst. done.
+    - eapply from_trace_preserves_validity; eauto; first econstructor. }
+  assert (∃ (auxtr : auxtrace the_model),
+             traces_match labels_match
+               (live_tids /2\ (ξ_evenodd l))
+               locale_step
+               the_model.(lm_ls_trans) extr auxtr) as [auxtr Hmatch_strong].
+  { exists (to_trace (initial_ls (LM := the_model) 0 0 ) iatr).
+    eapply (valid_inf_system_trace_implies_traces_match_strong
+              (continued_simulation (sim_rel_with_user the_model (ξ_evenodd_trace l)))); eauto.
+    - intros ? ? Hξ%continued_simulation_rel. by destruct Hξ as [[_ Hξ] _].
+    - intros ? ? Hξ%continued_simulation_rel. by destruct Hξ as [[Hξ _] _].
+    - intros extr' auxtr' Hξ%continued_simulation_rel.
+      destruct Hξ as [_ [Hξ1 Hξ2]].
+      split; [done|].
+      destruct Hξ2 as [n [Hξ21 Hξ22]].
+      exists n. split; [done|]. by destruct auxtr'.
+    - by apply from_trace_spec.
+    - by apply to_trace_spec. }
+
+  eapply extr_props; eauto. 
 Qed.
