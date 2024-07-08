@@ -91,7 +91,67 @@ Record EvenModel := {
     even_sync_lr_nonincr st__e st__e' M
       (STEP: amTrans even_AM st__e (inl (step_sync M), None) st__e'):
       AM_live_roles even_AM_strong st__e' ⊆ AM_live_roles even_AM_strong st__e;
+
+  even_corr 
+    {M__p : FairModel} {LM__p : LiveModel heap_lang M__p}
+    {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p}
+    (threadG0 : threadG Σ) 
+  (proj_st : M__p → amSt even_AM) (l : loc) (st : M__p) 
+  (N : nat) :=
+  let st__t := proj_st st in
+  (frag_model_is st ∗ l ↦ #N ∗ ⌜cur_even st__t N⌝ ∗
+   own th_name (●E (if Nat.even N then N else N + 1)))%I;
+  glob_step_even {M__p : FairModel}
+    (proj_st : fmstate M__p → amSt even_AM)
+  (lift_role : amRole even_AM → fmrole M__p) 
+  (st st' : M__p) (ρ__t : amRole even_AM) (st__e' : amSt even_AM) := 
+  proj_st st' = st__e'
+  ∧ fmtrans M__p st (Some (lift_role ρ__t)) st'
+    ∧ (AM_live_roles even_AM_strong (proj_st st')
+       ⊆ AM_live_roles even_AM_strong (proj_st st)
+       → live_roles M__p st' ⊆ live_roles M__p st);
+  even_vs {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
+  {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
+  (proj_st : fmstate M__p → amSt even_AM) (lift_role : 
+                                            amRole even_AM → 
+                                            fmrole M__p) 
+  (l : loc) (ι : namespace) (ρ__t : amRole even_AM) := 
+  (□ (|={⊤,⊤ ∖ ↑ι}=>
+        ∃ (st__p : M__p) (N : nat),
+          let st__t := proj_st st__p in
+          ▷ even_corr threadG0 proj_st l st__p N ∗
+          (⌜Nat.even N⌝
+           → ∀ st__t' : amSt even_AM,
+               ⌜amTrans even_AM st__t (inl (step_sync N), Some ρ__t)
+                  st__t'⌝ ∗ ⌜cur_even st__t' (N + 1)⌝
+               → ∃ st__p' : M__p,
+                   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'%nat⌝ ∗
+                   (▷ even_corr threadG0 proj_st l st__p' (N + 1) ={⊤ ∖ ↑ι,⊤}=∗ True)) ∗
+          (⌜Nat.odd N⌝
+           → ∀ (st__t' : amSt even_AM) (a : ePriv),
+               ⌜amTrans even_AM st__t (inr a, Some ρ__t) st__t'⌝ ∗
+               ⌜cur_even st__t' N⌝
+               → ∃ st__p' : M__p,
+                   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'⌝ ∗
+                   (▷ even_corr threadG0 proj_st l st__p' N ={⊤ ∖ ↑ι,⊤}=∗ True))))%I;
+  even_prog: val;
+  even_spec {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
+  {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
+  (proj_st : M__p → amSt even_AM) (lift_role: amRole even_AM → fmrole M__p) 
+  (tid : locale heap_lang) (n : loc) (ρ__t : amRole even_AM) 
+  (N f : nat) (FUEL: f > 40) (ι : namespace) (FL: ∀ st : M__p, lm_fl LM__p st ≥ 61):
+      {{{ even_vs proj_st lift_role n ι ρ__t ∗
+        tid ↦M {[lift_role ρ__t := f]} ∗
+        own th_name (◯E N) ∗
+        frag_free_roles_are ∅ }}}
+          even_prog #n #N@tid
+        {{{ RET #(); tid ↦M ∅ }}};
+
+  ρ__e: amRole even_AM;
 }.
+
+
+
 
 Record OddModel := {
     oSt: Type;
@@ -120,6 +180,63 @@ Record OddModel := {
     odd_sync_lr_nonincr st__e st__e' M
       (STEP: amTrans odd_AM st__e (inl (step_sync M), None) st__e'):
       AM_live_roles odd_AM_strong st__e' ⊆ AM_live_roles odd_AM_strong st__e;
+
+  odd_corr 
+    {M__p : FairModel} {LM__p : LiveModel heap_lang M__p}
+    {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p}
+    (threadG0 : threadG Σ) 
+  (proj_st : M__p → amSt odd_AM) (l : loc) (st : M__p) 
+  (N : nat) :=
+  let st__t := proj_st st in
+  (frag_model_is st ∗ l ↦ #N ∗ ⌜cur_odd st__t N⌝ ∗
+   own th_name (●E (if Nat.odd N then N else N + 1)))%I;
+  glob_step_odd {M__p : FairModel}
+    (proj_st : fmstate M__p → amSt odd_AM)
+  (lift_role : amRole odd_AM → fmrole M__p) 
+  (st st' : M__p) (ρ__t : amRole odd_AM) (st__e' : amSt odd_AM) := 
+  proj_st st' = st__e'
+  ∧ fmtrans M__p st (Some (lift_role ρ__t)) st'
+    ∧ (AM_live_roles odd_AM_strong (proj_st st')
+       ⊆ AM_live_roles odd_AM_strong (proj_st st)
+       → live_roles M__p st' ⊆ live_roles M__p st);
+  odd_vs {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
+  {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
+  (proj_st : fmstate M__p → amSt odd_AM) (lift_role : 
+                                            amRole odd_AM → 
+                                            fmrole M__p) 
+  (l : loc) (ι : namespace) (ρ__t : amRole odd_AM) := 
+  (□ (|={⊤,⊤ ∖ ↑ι}=>
+        ∃ (st__p : M__p) (N : nat),
+          let st__t := proj_st st__p in
+          ▷ odd_corr threadG0 proj_st l st__p N ∗
+          (⌜Nat.odd N⌝
+           → ∀ st__t' : amSt odd_AM,
+               ⌜amTrans odd_AM st__t (inl (step_sync N), Some ρ__t)
+                  st__t'⌝ ∗ ⌜cur_odd st__t' (N + 1)⌝
+               → ∃ st__p' : M__p,
+                   ⌜glob_step_odd proj_st lift_role st__p st__p' ρ__t st__t'%nat⌝ ∗
+                   (▷ odd_corr threadG0 proj_st l st__p' (N + 1) ={⊤ ∖ ↑ι,⊤}=∗ True)) ∗
+          (⌜Nat.even N⌝
+           → ∀ (st__t' : amSt odd_AM) (a : oPriv),
+               ⌜amTrans odd_AM st__t (inr a, Some ρ__t) st__t'⌝ ∗
+               ⌜cur_odd st__t' N⌝
+               → ∃ st__p' : M__p,
+                   ⌜glob_step_odd proj_st lift_role st__p st__p' ρ__t st__t'⌝ ∗
+                   (▷ odd_corr threadG0 proj_st l st__p' N ={⊤ ∖ ↑ι,⊤}=∗ True))))%I;
+  odd_prog: val;
+  odd_spec {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
+  {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
+  (proj_st : M__p → amSt odd_AM) (lift_role: amRole odd_AM → fmrole M__p) 
+  (tid : locale heap_lang) (n : loc) (ρ__t : amRole odd_AM) 
+  (N f : nat) (FUEL: f > 40) (ι : namespace) (FL: ∀ st : M__p, lm_fl LM__p st ≥ 61):
+      {{{ odd_vs proj_st lift_role n ι ρ__t ∗
+        tid ↦M {[lift_role ρ__t := f]} ∗
+        own th_name (◯E N) ∗
+        frag_free_roles_are ∅ }}}
+          odd_prog #n #N@tid
+        {{{ RET #(); tid ↦M ∅ }}};
+
+  ρ__o: amRole odd_AM;
 }.
 
 (* Arguments ePriv {_}. *)
@@ -565,83 +682,15 @@ Section proof.
   (* From trillium.fairness.heap_lang.examples.even_odd Require Import threads. *)
   (* eo_go_spec *)
   
-  Definition even_corr
-    {M__p : FairModel} {LM__p : LiveModel heap_lang M__p}
-    {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p}
-    (threadG0 : threadG Σ) 
-  (proj_st : M__p → amSt even_AM) (l : loc) (st : M__p) 
-  (N : nat) :=
-  let st__t := proj_st st in
-  (frag_model_is st ∗ l ↦ #N ∗ ⌜cur_even _ st__t N⌝ ∗
-   own th_name (●E (if Nat.even N then N else N + 1)))%I. 
-
-
-  Definition glob_step_even {M__p : FairModel}
-    (proj_st : fmstate M__p → amSt even_AM)
-  (lift_role : amRole even_AM → fmrole M__p) 
-  (st st' : M__p) (ρ__t : amRole even_AM) (N : amSt even_AM) := 
-  proj_st st' = N
-  ∧ fmtrans M__p st (Some (lift_role ρ__t)) st'
-    ∧ (AM_live_roles (even_AM_strong _) (proj_st st')
-       ⊆ AM_live_roles (even_AM_strong _) (proj_st st)
-       → live_roles M__p st' ⊆ live_roles M__p st). 
-
-
-  Definition even_vs {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
-  {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
-  (proj_st : fmstate M__p → amSt even_AM) (lift_role : 
-                                            amRole even_AM → 
-                                            fmrole M__p) 
-  (l : loc) (ι : namespace) (ρ__t : amRole even_AM) := 
-  (□ (|={⊤,⊤ ∖ ↑ι}=>
-        ∃ (st__p : M__p) (N : nat),
-          let st__t := proj_st st__p in
-          ▷ even_corr threadG0 proj_st l st__p N ∗
-          (⌜Nat.even N⌝
-           → ∀ st__t' : amSt even_AM,
-               ⌜amTrans even_AM st__t (inl (step_sync N), Some ρ__t)
-                  st__t'⌝ ∗ ⌜cur_even _ st__t' (N + 1)⌝
-               → ∃ st__p' : M__p,
-                   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'%nat⌝ ∗
-                   (▷ even_corr threadG0 proj_st l st__p' (N + 1) ={⊤ ∖ ↑ι,⊤}=∗ True)) ∗
-          (⌜Nat.odd N⌝
-           → ∀ (st__t' : amSt even_AM) (a : ePriv even_impl),
-               ⌜amTrans even_AM st__t (inr a, Some ρ__t) st__t'⌝ ∗
-               ⌜cur_even _ st__t' N⌝
-               → ∃ st__p' : M__p,
-                   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'⌝ ∗
-                   (▷ even_corr threadG0 proj_st l st__p' N ={⊤ ∖ ↑ι,⊤}=∗ True))))%I. 
-
-  Variable (even_prog: val). 
-
-  Lemma even_spec :
-∀ {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
-  {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
-  (proj_st : M__p → amSt even_AM) (lift_role : 
-                                            amRole even_AM → 
-                                            fmrole M__p) 
-  (tid : locale heap_lang) (n : loc) (ρ__t : amRole even_AM) 
-  (N f : nat),
-  f > 40
-  → ∀ ι : namespace,
-      (∀ st : M__p, lm_fl LM__p st ≥ 61)
-      → {{{ even_vs proj_st lift_role n ι ρ__t ∗
-        tid ↦M {[lift_role ρ__t := f]} ∗
-        own th_name (◯E N) ∗
-        frag_free_roles_are ∅ }}}
-          even_prog #n #N@tid
-        {{{ RET #(); tid ↦M ∅ }}}.
-  Proof. Admitted. 
-  
   Lemma even_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
     {{{ evenodd_inv l ∗ tid ↦M {[ inl ρ := f ]} ∗ even_at N ∗
         frag_free_roles_are ∅ }}}
-      even_prog #l #N @ tid
+      (even_prog even_impl) #l #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
     
-    iApply (@even_spec (the_fair_model _ _) _ _ _ evenThreadG fst inl 
+    iApply (@even_spec even_impl (the_fair_model _ _) _ _ _ evenThreadG fst inl 
              with "[$Hf $FR $Heo]"); [lia| simpl; lia | |done].
     rewrite /even_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
@@ -681,25 +730,27 @@ Section proof.
       rewrite E. iFrame. done. 
   Qed.
   
-  Lemma odd_spec tid l (N : nat) ρ f (Hf: f > 40) :
+  Lemma odd_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
     {{{ evenodd_inv l ∗ tid ↦M {[ inr ρ := f ]} ∗ odd_at N ∗
         frag_free_roles_are ∅ }}}
-      incr_loop #l #N @ tid
+      (odd_prog odd_impl) #l #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof. 
     iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
     
-    iApply (@eo_go_spec 1 the_fair_model _ _ _ oddThreadG snd inr
+    iApply (@odd_spec odd_impl (the_fair_model _ _) _ _ _ oddThreadG snd inr
              with "[$Hf $FR $Heo]"); [lia| simpl; lia | |done].
-    rewrite /eo_vs. iModIntro.
+    rewrite /odd_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
     iDestruct "OPEN" as (st__e st__o M) "(>Hmod & >%CUR__E & >%CUR__O & >Hn & Hauths)".
     rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
     iModIntro. iExists _, _. iSplitL "Hmod Hn O".
-    { rewrite /eo_corr. simpl. iFrame.
-      simpl. rewrite even_plus1_negb. destruct (Nat.even M); auto. }
-    simpl. rewrite !odd_plus1_negb even_plus1_negb Nat.negb_even.
+    { rewrite /odd_corr. simpl. iFrame.
+      simpl. rewrite -Nat.negb_odd. destruct (Nat.odd M); auto. }
+    simpl.
+    (* rewrite !odd_plus1_negb even_plus1_negb Nat.negb_even. *)
+    rewrite -Nat.negb_odd.
     destruct (Nat.odd M) eqn:E.
     - iSplitL.
       2: { simpl. by iIntros "%foo". }
@@ -709,12 +760,12 @@ Section proof.
       iExists (st1', st__t'). iSplitR.
       { iPureIntro. repeat split; auto.
         - econstructor. simpl.
-          eapply pt_sync2; eauto. 
+          eapply @pt_sync2; eauto. 
           Unshelve. 2: exact (inl (step_sync M)). done.
         - simpl. intros LR__e. eapply lr_pres_odd_sync; eauto. }
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       (* rewrite !Nat.add_0_r. *)
-      iNext. iFrame. simpl. rewrite !even_plus1_negb -!Nat.negb_odd E.  
+      iNext. iFrame. simpl. rewrite !even_plus1_negb !odd_plus1_negb -!Nat.negb_odd E.  
       simpl. iFrame. done.
     - iSplitR.
       { iIntros "%g". done. }
@@ -728,25 +779,26 @@ Section proof.
         rewrite -Nat.negb_odd. by rewrite E. }
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       iNext. iFrame. simpl.
-      rewrite -!Nat.negb_odd odd_plus1_negb E. simpl. iFrame. done. 
+      rewrite -!Nat.negb_odd E. simpl. iFrame. done. 
   Qed. 
 
   Lemma incr_loop_spec (eo : EO') tid ρ__e ρ__o n (N : nat) f (Hf: f > 40) :
     {{{ evenodd_inv n ∗ tid ↦M {[ if eo then inl ρ__e else inr ρ__o := f ]} ∗ (eo_frag eo) N ∗
         frag_free_roles_are ∅ }}}
-      incr_loop #n #N @ tid
+      (if eo then even_prog even_impl else odd_prog odd_impl) #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
     destruct eo; simpl in *. 
-    - iApply (even_spec with "[$Hf $FR $Heo]"); [lia| ..]; done.
-    - iApply (odd_spec with "[$Hf $FR $Heo]"); [lia| ..]; done.
+    - iApply (even_spec_use with "[$Hf $FR $Heo]"); [lia| ..]; done.
+    - iApply (odd_spec_use with "[$Hf $FR $Heo]"); [lia| ..]; done.
   Qed. 
 
 End proof.
 
 Section proof_start.
-  Context `{!heapGS Σ the_model, !evenoddG Σ}.
+  Context (even_impl: EvenModel) (odd_impl: OddModel).
+  Context `{!heapGS Σ (the_model even_impl odd_impl), !evenoddG Σ}.
   Let Ns := nroot .@ "even_odd".
 
   (* Local Instance evenThreadG: threadG Σ := {| th_name := even_name |}.  *)
@@ -761,18 +813,19 @@ Section proof_start.
     rewrite -own_op. by rewrite -auth_frag_op.
   Qed. 
 
-  Let ρEven: fmrole the_fair_model := inl ρT.
-  Let ρOdd: fmrole the_fair_model := inr ρT.
+  Let ρEven: fmrole (the_fair_model even_impl odd_impl) := inl (ρ__e even_impl).
+  Let ρOdd: fmrole (the_fair_model even_impl odd_impl) := inr (ρ__o odd_impl).
 
   Definition start : val :=
     λ: "l",
       let: "x" := !"l" in
-      (Fork (incr_loop "l" "x") ;;
-       Fork (incr_loop "l" ("x"+#1))).
+      (Fork ((even_prog even_impl) "l" "x") ;;
+       Fork ((odd_prog odd_impl) "l" ("x"+#1))).
 
-
-  Lemma start_spec tid n N1 N2 f (Hf: f > 60) :
-    {{{ evenodd_inv n ∗ tid ↦M {[ inl ρT := f; inr ρT := f ]} ∗
+  Lemma start_spec tid n N1 N2 f (Hf: f > 60)
+    :
+    {{{ evenodd_inv even_impl odd_impl n ∗ 
+        tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
         even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
       start #n @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
@@ -818,7 +871,10 @@ Section proof_start.
       destruct (Nat.even M); try reflexivity.
       f_equiv. rewrite map_union_comm; auto. apply map_disjoint_dom. set_solver. }
     { iIntros (tid') "!> Hf".
-      iApply (incr_loop_spec (if Nat.even M then eoE else eoO) with "[-]").
+      (* iApply (incr_loop_spec even_impl odd_impl (if Nat.even M then eoE else eoO) with "[-]"). *)
+      assert (Nat.even M = true) as -> by admit. 
+      iApply (incr_loop_spec even_impl odd_impl eoE with "[-]").
+      { exact (ρ__o odd_impl). }
       2: { destruct (Nat.even M); iFrame "#∗". }
       { lia. }
       intuition. }
@@ -826,9 +882,13 @@ Section proof_start.
     iIntros "!> Hf".
     iIntros "!>".
     wp_pures.
+    (* TODO: fix this step *)
+    wp_pure _.
+    { destruct (Nat.even M); rewrite lookup_insert_Some; intros [[<- <-]| ]; try lia || set_solver. }
     iApply (wp_role_fork _ tid _ _ _ ∅ _ with "[Hf] [NEXT HFR2]").
     { apply map_disjoint_dom. apply map_disjoint_dom. apply map_disjoint_empty_l. }
     2: { rewrite has_fuels_gt_1; last solve_fuel_positive.
+         2: { destruct (Nat.even M); rewrite lookup_insert_Some; intros [[<- <-]| ]; try lia || set_solver. } 
          rewrite !fmap_insert fmap_empty //.
          rewrite insert_union_singleton_l. 
          rewrite map_union_comm; [done|].
@@ -836,13 +896,19 @@ Section proof_start.
     { rewrite map_empty_union. destruct (Nat.even M); set_solver. }
     { iIntros (tid') "!> Hf".
       wp_pures.
+      (* replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia. *)
+      (* TODO: fix this *)
+      wp_pure _.
+      { destruct (Nat.even M); rewrite lookup_insert_Some; intros [[<- <-]| ]; try lia || set_solver. }
       replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
-      iApply (incr_loop_spec (if Nat.even M then eoO else eoE) with "[-]").
-      2: { destruct (Nat.even M); iFrame "#∗". }
-      { lia. }
-      intuition. }
+      assert (Nat.even M = true) as -> by admit.
+      pose proof (incr_loop_spec even_impl odd_impl eoO tid' (ρ__e even_impl) (ρ__o odd_impl) n (M + 1) (f - 9) ltac:(lia)) as X.
+      iPoseProof (X with "[-]") as "Y".
+      { iFrame "#∗". rewrite /ρOdd.
+        by rewrite -!Nat.sub_add_distr. }
+      iApply "Y". intuition. }
 
     iIntros "!> Hf". by iApply "HΦ".
-  Qed.
+  Admitted. 
 
 End proof_start.
