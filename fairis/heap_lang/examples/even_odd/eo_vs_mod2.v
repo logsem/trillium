@@ -176,8 +176,8 @@ Section Models.
   (* TODO: how to get rid of this? *)
   Local Instance even_st_eqdec': EqDecision (amSt even_AM) := even_st_eqdec even_impl.
   Local Instance odd_st_eqdec': EqDecision (amSt odd_AM) := odd_st_eqdec odd_impl.
-  Local Instance even_st_inh': Inhabited (amSt even_AM) := even_st_inh even_impl.
-  Local Instance odd_st_inh': Inhabited (amSt odd_AM) := odd_st_inh odd_impl.
+  Global Instance even_st_inh': Inhabited (amSt even_AM) := even_st_inh even_impl.
+  Global Instance odd_st_inh': Inhabited (amSt odd_AM) := odd_st_inh odd_impl.
   Local Instance even_role_inh': Inhabited (amRole even_AM) := even_role_inh even_impl. 
   Local Instance odd_role_inh': Inhabited (amRole odd_AM) := odd_role_inh odd_impl.
 
@@ -587,8 +587,8 @@ Section proof.
        → live_roles M__p st' ⊆ live_roles M__p st). 
 
 
-  Definition even_vs (M__p : FairModel) (LM__p : LiveModel heap_lang M__p) 
-  (Σ : gFunctors) (heapGS0 : heapGS Σ LM__p) (threadG0 : threadG Σ) 
+  Definition even_vs {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
+  {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
   (proj_st : fmstate M__p → amSt even_AM) (lift_role : 
                                             amRole even_AM → 
                                             fmrole M__p) 
@@ -613,7 +613,8 @@ Section proof.
                    (▷ even_corr threadG0 proj_st l st__p' N ={⊤ ∖ ↑ι,⊤}=∗ True))))%I. 
 
   Variable (even_prog: val). 
-  Lemma eo_go_spec :
+
+  Lemma even_spec :
 ∀ {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
   {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
   (proj_st : M__p → amSt even_AM) (lift_role : 
@@ -629,19 +630,10 @@ Section proof.
         own th_name (◯E N) ∗
         frag_free_roles_are ∅ }}}
           even_prog #n #N@tid
-        {{{ RET #(); tid ↦M ∅ }}}. 
-
+        {{{ RET #(); tid ↦M ∅ }}}.
+  Proof. Admitted. 
   
-  Lemma even_spec (tid: locale heap_lang) n ρ__t (N: nat) f (Hf: f > 40) ι
-    (FL: forall st, lm_fl LM__p st >= 61):
-    {{{  eo_vs n ι ρ__t ∗
-         has_fuels tid {[ lift_role ρ__t := f ]} ∗ own th_name (◯E N) ∗
-         frag_free_roles_are ∅
-    }}}
-      even_spec #n #N @ tid
-    {{{ RET #(); has_fuels tid ∅ }}}.
-
-  Lemma even_spec tid l (N : nat) ρ f (Hf: f > 40) :
+  Lemma even_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
     {{{ evenodd_inv l ∗ tid ↦M {[ inl ρ := f ]} ∗ even_at N ∗
         frag_free_roles_are ∅ }}}
       even_prog #l #N @ tid
@@ -649,17 +641,18 @@ Section proof.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
     
-    iApply (@eo_go_spec 0 the_fair_model _ _ _ evenThreadG fst inl 
+    iApply (@even_spec (the_fair_model _ _) _ _ _ evenThreadG fst inl 
              with "[$Hf $FR $Heo]"); [lia| simpl; lia | |done].
-    rewrite /eo_vs. iModIntro.
+    rewrite /even_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
+  
     iDestruct "OPEN" as (st__e st__o M) "(>Hmod & >%CUR__E & >%CUR__O & >Hn & Hauths)".
     rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
     iModIntro. iExists _, _. iSplitL "Hmod Hn E".
-    { rewrite /eo_corr. simpl. iFrame.
-      simpl. iFrame. rewrite Nat.add_0_r. destruct (Nat.even M); auto. }
-    simpl. rewrite Nat.add_0_r.
+    { rewrite /even_corr. simpl. iFrame.
+      simpl. iFrame. destruct (Nat.even M); auto. }
+    simpl. 
     destruct (Nat.even M) eqn:E.
     - iSplitL.
       2: { rewrite -Nat.negb_even E. by iIntros "%foo". }
@@ -672,7 +665,6 @@ Section proof.
           Unshelve. 2: exact (inl (step_sync M)). done.
         - simpl. intros LR__e. eapply lr_pres_even_sync; eauto. }
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
-      rewrite !Nat.add_0_r.
       iNext. iFrame. simpl.
       rewrite even_plus1_negb E. simpl. iFrame. done.
     - iSplitR.
@@ -686,7 +678,7 @@ Section proof.
         eapply lr_pres_even_priv; eauto. }
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       iNext. iFrame. simpl. 
-      rewrite !Nat.add_0_r. rewrite E. iFrame. done. 
+      rewrite E. iFrame. done. 
   Qed.
   
   Lemma odd_spec tid l (N : nat) ρ f (Hf: f > 40) :
