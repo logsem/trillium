@@ -155,75 +155,6 @@ Section proof.
     | eoE => even_at
     | eoO => odd_at
     end.
-
-  (* Lemma tfm_live_roles' N st__e st__o (CUR__e: cur_n 0 st__e N) (CUR__o: cur_n 1 st__o N):  *)
-  (*   AM_live_roles prod_AM_strong_lr (st__e, st__o) = *)
-  (*    set_map inl (AM_live_roles (thread_AM_strong 0) st__e) ∪ *)
-  (*    set_map inr (AM_live_roles (thread_AM_strong 1) st__o). *)
-  (* Proof. *)
-  (*   apply set_eq. intros ρ. *)
-  (*   rewrite elem_of_union. rewrite !elem_of_map.  *)
-  (*   setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr). *)
-  (*   setoid_rewrite <- (AM_live_roles_spec (thread_AM_strong 0)). *)
-  (*   setoid_rewrite <- (AM_live_roles_spec (thread_AM_strong 1)). *)
-  (*   split. *)
-  (*   - intros (?&?&STEP). inversion STEP; subst. *)
-  (*     1, 3: by left; eexists; split; eauto.  *)
-  (*     all: by right; eexists; split; eauto. *)
-  (*   - intros [[ρ1 [-> (a1&?&STEP)]]| [ρ2 [-> (a2&?&STEP)]]]. *)
-  (*     + simpl in a1. *)
-  (*       destruct a1 as [[n]| ]. *)
-  (*       * *)
-  (*         (* inversion STEP; subst. *) *)
-  (*         rewrite Nat.add_0_r in H3. *)
-  (*         edestruct (odd_syncable n n) as [st2' STEP2]; eauto. *)
-  (*         eexists _, (_, _). simpl.           *)
-  (*         eapply (@pt_sync1 _ _ _ fact_TA); eauto. *)
-  (*         2: { apply STEP2.  *)
-  (*         Unshelve. 2: exact (inl (step_sync n)). done. *)
-  (*       * do 2 eexists. simpl. econstructor; eauto. *)
-  (*         Unshelve. 2: exact (inr $ inl p). done. *)
-  (*     + simpl in a2. unfold TA in a2. *)
-  (*       destruct a2 as [[n]| ]. *)
-  (*       * inversion STEP; subst. rewrite Nat.add_1_r Nat.even_succ in H3. *)
-  (*         edestruct (even_syncable n n) as [st1' STEP1]; eauto. *)
-  (*         eexists _, (_, _). simpl.           *)
-  (*         eapply (@pt_sync2 _ _ _ fact_TA); eauto. *)
-  (*         Unshelve. 2: exact (inl (step_sync n)). done. *)
-  (*       * do 2 eexists. simpl. econstructor; eauto. *)
-  (*         Unshelve. 2: exact (inr $ inr p). done. *)
-  (* Qed. *)
-
-  (* (* TODO: require it from thread *) *)
-  (* Lemma odd_syncable n (st: amSt odd_AM) *)
-  (*   (EVEN: Nat.even n) (CUR: cur_n 1 st n): *)
-  (*   exists st', amTrans odd_AM st (inl (step_sync n), None) st' /\ cur_n 1 st' (n + 1). *)
-  (* Proof. Admitted.  *)
-  (* (* TODO: require it from thread *) *)
-  (* Lemma even_syncable n (st: amSt even_AM) *)
-  (*   (EVEN: Nat.odd n) (CUR: cur_n 0 st n): *)
-  (*   exists st', amTrans even_AM st (inl (step_sync n), None) st' /\ cur_n 0 st' (n + 1). *)
-  (* Proof. Admitted.  *)
-
-  (* Lemma even_sync_step_inv st__e st__e' k N ρ *)
-  (*   (STEP: amTrans even_AM st__e (inl (step_sync k), Some ρ) st__e') *)
-  (*   (CUR: cur_n 0 st__e N): *)
-  (*   k = N /\ Nat.even N. *)
-  (* Proof using. Admitted.      *)
-  (* Lemma odd_sync_step_inv st__e st__e' k N ρ *)
-  (*   (STEP: amTrans odd_AM st__e (inl (step_sync k), Some ρ) st__e') *)
-  (*   (CUR: cur_n 1 st__e N): *)
-  (*   k = N /\ Nat.odd N. *)
-  (* Proof using. Admitted. *)
-
-  (* Lemma odd_sync_lr_nonincr st__o st__o' M *)
-  (*   (STEP: amTrans odd_AM st__o (inl (step_sync M), None) st__o'): *)
-  (*   AM_live_roles (thread_AM_strong 1) st__o' ⊆ AM_live_roles (thread_AM_strong 1) st__o. *)
-  (* Proof. Admitted.  *)
-  (* Lemma even_sync_lr_nonincr st__e st__e' M *)
-  (*   (STEP: amTrans even_AM st__e (inl (step_sync M), None) st__e'): *)
-  (*   AM_live_roles (thread_AM_strong 0) st__e' ⊆ AM_live_roles (thread_AM_strong 0) st__e. *)
-  (* Proof. Admitted.  *)
    
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
@@ -453,9 +384,6 @@ Section proof.
       Unshelve. 2: exact (inl (step_sync M)). simpl. subst k. done.
   Qed.
 
-  (* From trillium.fairness.heap_lang.examples.even_odd Require Import threads. *)
-  (* eo_go_spec *)
-  
   Lemma even_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
     {{{ evenodd_inv l ∗ tid ↦M {[ inl ρ := f ]} ∗ even_at N ∗
         frag_free_roles_are ∅ }}}
@@ -575,9 +503,7 @@ Section proof_start.
   Context `{!heapGS Σ (the_model even_impl odd_impl), !evenoddG Σ}.
   Let Ns := nroot .@ "even_odd".
 
-  (* Local Instance evenThreadG: threadG Σ := {| th_name := even_name |}.  *)
-  (* Local Instance oddThreadG: threadG Σ := {| th_name := odd_name |}.  *)
-
+  (* TODO: move *)
   Lemma frag_free_roles_are_sep: forall fr1 fr2 (DISJ: fr1 ## fr2), 
         frag_free_roles_are (fr1 ∪ fr2) ⊣⊢ frag_free_roles_are fr1 ∗ frag_free_roles_are fr2.
   Proof.
@@ -596,7 +522,7 @@ Section proof_start.
       (Fork ((even_prog even_impl) "l" "x") ;;
        Fork ((odd_prog odd_impl) "l" ("x"+#1))).
 
-  Lemma start_spec tid n N1 N2 f (Hf: f > 60)
+  Lemma start_spec tid n N1 N2 f (Hf: f > 60) (EVEN: N1 < N2)
     :
     {{{ evenodd_inv even_impl odd_impl n ∗ 
         tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
@@ -616,27 +542,15 @@ Section proof_start.
     rewrite if_arg2_comm !if_arg_comm.
     iDestruct "Hauths" as "[Heven Hodd]".
     iDestruct (even_agree with "Heven_at Heven") as %<-.
-    iDestruct (odd_agree with "Hodd_at Hodd") as %<-.    
-    
+    iDestruct (odd_agree with "Hodd_at Hodd") as %<-.
+    destruct (Nat.even M) eqn:E; [| lia].     
 
-    iAssert ((if Nat.even M then auth_even_at else auth_odd_at) M ∗
-             (if Nat.even M then auth_odd_at else auth_even_at) (M + 1))%I
-      with "[Heven Hodd] "as "[CUR_AUTH NEXT_AUTH]".
-    { destruct (Nat.even M); iFrame. }
-
-    iAssert ((if Nat.even M then even_at else odd_at) M ∗
-             (if Nat.even M then odd_at else even_at) (M + 1))%I
-      with "[Heven_at Hodd_at] "as "[CUR NEXT]".
-    { destruct (Nat.even M); iFrame. }
-    
-
-    iMod ("Hclose" with "[-Hf CUR NEXT HΦ HFR1 HFR2]") as "_".
-    { iIntros "!>". iExists _. iFrame.
-      destruct (Nat.even M); iFrame; done. }
+    iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ HFR1 HFR2]") as "_".
+    { iIntros "!>". iExists _. iFrame. 
+      rewrite E. iFrame; done. }
     iIntros "!>". wp_pures. wp_bind (Fork _).
-    iApply (wp_role_fork _ tid _ _ _ {[if Nat.even M then ρOdd else ρEven := _]}
-                         {[if Nat.even M then ρEven else ρOdd := _]}
-             with "[Hf ] [CUR HFR1]"). 
+    iApply (wp_role_fork _ tid _ _ _ {[ρOdd := _]} {[ρEven := _]}
+             with "[Hf ] [Heven_at HFR1]"). 
     { apply map_disjoint_dom. rewrite !dom_singleton.
       destruct (Nat.even M); set_solver. }
     { intros Hempty%map_positive_l. set_solver. }
@@ -644,47 +558,34 @@ Section proof_start.
       rewrite !fmap_insert fmap_empty //.      
       iApply has_fuels_proper; [..| by iFrame]; auto.
       rewrite !insert_union_singleton_l map_union_empty.
-      destruct (Nat.even M); try reflexivity.
-      f_equiv. rewrite map_union_comm; auto. apply map_disjoint_dom. set_solver. }
+      rewrite map_union_comm; [reflexivity| ].
+      rewrite map_disjoint_dom. set_solver. }
     { iIntros (tid') "!> Hf".
-      (* iApply (incr_loop_spec even_impl odd_impl (if Nat.even M then eoE else eoO) with "[-]"). *)
-      assert (Nat.even M = true) as -> by admit. 
-      iApply (incr_loop_spec even_impl odd_impl eoE with "[-]").
-      { exact (ρ__o odd_impl). }
-      2: { destruct (Nat.even M); iFrame "#∗". }
+      iApply (even_spec_use with "[-]").
+      2: { iFrame "#∗". }
       { lia. }
       intuition. }
 
     iIntros "!> Hf".
     iIntros "!>".
     wp_pures.
-    (* TODO: fix this step *)
-    wp_pure _.
-    { destruct (Nat.even M); rewrite lookup_insert_Some; intros [[<- <-]| ]; try lia || set_solver. }
-    iApply (wp_role_fork _ tid _ _ _ ∅ _ with "[Hf] [NEXT HFR2]").
+    iApply (wp_role_fork _ tid _ _ _ ∅ _ with "[Hf] [Hodd_at HFR2]").
     { apply map_disjoint_dom. apply map_disjoint_dom. apply map_disjoint_empty_l. }
     2: { rewrite has_fuels_gt_1; last solve_fuel_positive.
-         2: { destruct (Nat.even M); rewrite lookup_insert_Some; intros [[<- <-]| ]; try lia || set_solver. } 
          rewrite !fmap_insert fmap_empty //.
          rewrite insert_union_singleton_l. 
          rewrite map_union_comm; [done|].
          apply map_disjoint_dom. set_solver. }
-    { rewrite map_empty_union. destruct (Nat.even M); set_solver. }
+    { rewrite map_empty_union. set_solver. }
     { iIntros (tid') "!> Hf".
       wp_pures.
-      (* replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia. *)
-      (* TODO: fix this *)
-      wp_pure _.
-      { destruct (Nat.even M); rewrite lookup_insert_Some; intros [[<- <-]| ]; try lia || set_solver. }
       replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
-      assert (Nat.even M = true) as -> by admit.
-      pose proof (incr_loop_spec even_impl odd_impl eoO tid' (ρ__e even_impl) (ρ__o odd_impl) n (M + 1) (f - 9) ltac:(lia)) as X.
-      iPoseProof (X with "[-]") as "Y".
-      { iFrame "#∗". rewrite /ρOdd.
-        by rewrite -!Nat.sub_add_distr. }
-      iApply "Y". intuition. }
+      iApply (odd_spec_use with "[-]").
+      2: { iFrame "#∗". }
+      { lia. }
+      intuition. }
 
     iIntros "!> Hf". by iApply "HΦ".
-  Admitted. 
+  Qed. 
 
 End proof_start.
