@@ -616,7 +616,8 @@ Section proof_start.
     rewrite if_arg2_comm !if_arg_comm.
     iDestruct "Hauths" as "[Heven Hodd]".
     iDestruct (even_agree with "Heven_at Heven") as %<-.
-    iDestruct (odd_agree with "Hodd_at Hodd") as %<-.
+    iDestruct (odd_agree with "Hodd_at Hodd") as %<-.    
+    
 
     iAssert ((if Nat.even M then auth_even_at else auth_odd_at) M ∗
              (if Nat.even M then auth_odd_at else auth_even_at) (M + 1))%I
@@ -627,6 +628,7 @@ Section proof_start.
              (if Nat.even M then odd_at else even_at) (M + 1))%I
       with "[Heven_at Hodd_at] "as "[CUR NEXT]".
     { destruct (Nat.even M); iFrame. }
+    
 
     iMod ("Hclose" with "[-Hf CUR NEXT HΦ HFR1 HFR2]") as "_".
     { iIntros "!>". iExists _. iFrame.

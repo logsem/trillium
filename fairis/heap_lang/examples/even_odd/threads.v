@@ -9,16 +9,9 @@ From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness.heap_lang.examples.even_odd Require Import action_model utils.
+From trillium.fairness.heap_lang.examples.even_odd Require Import action_model utils interface.
 
 Close Scope Z. 
-
-Inductive PubA := step_sync (k: nat).
-
-Global Instance PubA_EqDec: EqDecision PubA.
-Proof.
-  intros [x] [y]. destruct (decide (x = y)); [left | right]; set_solver.
-Qed. 
 
 Section ThreadModel.
   Context (d: nat).
@@ -40,10 +33,10 @@ Section ThreadModel.
   
   Definition thread_model: ActionModel := {| amTrans := thread_trans |}.
   
-  (* Global Instance TR_eqdec: EqDecision TR. *)
-  (* apply _.  *)
-  (* Qed.  *)
-  
+  Global Instance TR_inh: Inhabited TR. 
+  apply _.
+  Defined. 
+
   Lemma thread_AM_fin_branch': AM_fin_branch' thread_model.
   Proof.
     red. exists (fun n => n' ← [n; S n]; 
@@ -99,37 +92,31 @@ Section ThreadModel.
       do 2 eexists. by eapply thread_loop.
   Qed. 
 
+  Lemma thread_syncable n (EVEN: Nat.odd (n + d)):
+    amTrans thread_model n (inl (step_sync n), None) (n + 1).
+  Proof.
+    rewrite Nat.add_1_r. by econstructor.
+  Qed. 
+
+  Lemma thread_sync_step_inv n n' k ρ
+      (STEP: amTrans thread_model n (inl (step_sync k), Some ρ) n'):
+      k = n /\ Nat.even (n + d).
+  Proof. 
+    inversion STEP; subst; eauto.
+  Qed.
+
+  Lemma thread_sync_lr_nonincr n n' M
+      (STEP: amTrans thread_model n (inl (step_sync M), None) n'):
+    AM_live_roles thread_AM_strong n' ⊆ AM_live_roles thread_AM_strong n.
+  Proof. 
+    rewrite !thread_AM_lr_exact. done.
+  Qed. 
+
   Section Proofs. 
     Context `{LM__p: LiveModel heap_lang M__p}.
     Context `{!heapGS Σ LM__p}. 
 
-    Class threadG Σ := ThreadG {
-        th_name: gname;
-        th_n_G :> inG Σ (excl_authR natO);
-    }.
-
-    Class threadPreG Σ := {
-        thread_PreG :> inG Σ (excl_authR natO);
-    }.
-
     Context `{!threadG Σ}.
-
-    Definition th_at (n: nat) := own th_name (◯E n).
-    Definition auth_th_at (n: nat) := own th_name (●E n).
-  
-    Lemma th_agree γ (N M: nat) :
-      own γ (◯E N) -∗ own γ (●E M) -∗ ⌜ M = N ⌝.
-    Proof.
-      iIntros "HA HB". iCombine "HB HA" as "H".
-      iDestruct (own_valid with "H") as "%Hval".
-      iPureIntro. by apply excl_auth_agree_L.
-    Qed.
- 
-    Lemma th_update γ (N M P: nat) :
-      own γ (●E N) ∗ own γ (◯E M) ==∗ own γ (●E P) ∗ own γ (◯E P).
-    Proof.
-      rewrite -!own_op. iApply own_update. apply excl_auth_update.
-    Qed.
 
     Definition incr_loop : val :=
       rec: "incr_loop" "l" "n" :=
@@ -256,12 +243,93 @@ Section ThreadModel.
   
 End ThreadModel.
 
+Definition thread_0_even: EvenModel.
+  refine {| cur_even := cur_n 0 |}.
+  - apply thread_AM_fin_branch'.
+  - apply thread_AM_step_dec.
+  - intros. red in CUR. subst st.
+    rewrite (plus_n_O n) in EVEN. 
+    eapply thread_syncable in EVEN.
+    eexists. split; eauto. done.
+  - intros. red in CUR. subst st__e.
+    simpl in *.
+    apply thread_sync_step_inv in STEP as [-> STEP]. 
+    rewrite -plus_n_O in STEP. done.
+  - intros.
+    eapply thread_sync_lr_nonincr; eauto.
+  - iIntros "*" (????) "(#VS&MAP&FRAG&FREE) Post".
+    iApply (eo_go_spec with "[MAP FRAG FREE]").
+    1, 2: by eauto.
+    2: done.
+    simpl in *.
+    iFrame. rewrite /eo_vs. iModIntro. simpl.
+    iMod "VS" as (st__p M) "((ST&CUR&>%CORR&AUTH)&E&O)". red in CORR. 
+    iModIntro. do 2 iExists _.
+    rewrite !Nat.add_0_r.
+    iSplitL "ST CUR AUTH".
+    { iNext. rewrite /eo_corr. rewrite /cur_n.
+      rewrite Nat.add_0_r. iFrame. done. }
+    iSplitL "E".
+    + iIntros "%E" (st__t') "[%STEP %CUR']". iSpecialize ("E" with "[%//]").
+      iDestruct ("E" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)".
+      red in CUR'. subst. 
+      iExists _. iSplitL ""; [done| ]. 
+      iIntros "(?&?&?&?)". iApply "CLOS".
+      iNext. rewrite Nat.add_0_r. iFrame.
+    + iIntros "%O" (st__t' a) "[%STEP %CUR']". iSpecialize ("O" with "[%//]").
+      iDestruct ("O" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)".
+      red in CUR'. subst. 
+      iExists _. iSplitL ""; [done| ]. 
+      iIntros "(?&?&?&?)". iApply "CLOS".
+      iNext. rewrite Nat.add_0_r. iFrame.
+  - exact ρT.
+  Unshelve.
+  apply _.
+Qed. 
 
-(* ******************** *)
-Global Opaque PrivA.
-Global Opaque TR.
-Global Opaque incr_loop.   
-Global Opaque TS. 
-Global Opaque thread_model. 
-Global Opaque PrivA. 
-(* Global Opaque thread_trans.  *)
+    
+Definition thread_1_odd: OddModel.
+  refine {| cur_odd := cur_n 1 |}.
+  - apply thread_AM_fin_branch'.
+  - apply thread_AM_step_dec.
+  - intros. red in CUR. subst st.
+    rewrite -Nat.negb_odd -odd_plus1_negb in ODD. 
+    eapply thread_syncable in ODD.
+    eexists. split; eauto. done.
+  - intros. red in CUR. subst st__e.
+    simpl in *.
+    apply thread_sync_step_inv in STEP as [-> STEP]. 
+    rewrite even_plus1_negb Nat.negb_even in STEP. done.
+  - intros.
+    eapply thread_sync_lr_nonincr; eauto.
+  - iIntros "*" (????) "(#VS&MAP&FRAG&FREE) Post".
+    iApply (eo_go_spec with "[MAP FRAG FREE]").
+    1, 2: by eauto.
+    2: done.
+    simpl in *.
+    iFrame. rewrite /eo_vs. iModIntro. simpl.
+    iMod "VS" as (st__p M) "((ST&CUR&>%CORR&AUTH)&O&E)". red in CORR. 
+    iModIntro. do 2 iExists _.
+    rewrite !even_plus1_negb !Nat.negb_even !odd_plus1_negb. 
+    iSplitL "ST CUR AUTH".
+    { iNext. rewrite /eo_corr. rewrite /cur_n.
+      rewrite even_plus1_negb. iFrame. done. }
+    iSplitL "O".
+    + iIntros "%O" (st__t') "[%STEP %CUR']". iSpecialize ("O" with "[%//]").
+      iDestruct ("O" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)".
+      red in CUR'. subst. 
+      iExists _. iSplitL ""; [done| ]. 
+      iIntros "(?&?&?&?)". iApply "CLOS".
+      iNext. rewrite !even_plus1_negb negb_involutive. iFrame.
+    + iIntros "%E" (st__t' a) "[%STEP %CUR']".
+      rewrite Nat.negb_odd in E. 
+      iSpecialize ("E" with "[%//]").
+      iDestruct ("E" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)".
+      red in CUR'. subst. 
+      iExists _. iSplitL ""; [done| ]. 
+      iIntros "(?&?&?&?)". iApply "CLOS".
+      iNext. rewrite !even_plus1_negb. iFrame.
+  - exact ρT.    
+  Unshelve.
+  apply _.
+Qed. 
