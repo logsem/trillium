@@ -69,11 +69,6 @@ Section ThreadModel.
         * contra.
   Qed.
   
-  Lemma thread_AM_strong: AM_strong_lr thread_model.
-  Proof. 
-    apply fin_branch_strong; auto using thread_AM_step_dec, thread_AM_fin_branch'.
-  Qed.
-
   (* TODO: can we make it work with non-trivial set of roles? *)
   Local Lemma thread_roles_equal (ρ1 ρ2: amRole thread_model):
     ρ1 = ρ2.
@@ -81,7 +76,14 @@ Section ThreadModel.
     by destruct ρ1, ρ2.
   Qed.
 
-  Lemma thread_AM_lr_exact n: AM_live_roles thread_AM_strong n = {[ ρT ]}.
+  Instance thread_extra: ActionModelExtra thread_model.
+  Proof.
+    unshelve esplit; try by apply _.
+    - apply thread_AM_fin_branch'.
+    - apply thread_AM_step_dec. 
+  Qed. 
+
+  Lemma thread_AM_lr_exact n: AM_live_roles ame_strong n = {[ ρT ]}.
   Proof.
     apply set_eq. intros ρ. rewrite elem_of_singleton. 
     rewrite -AM_live_roles_spec. pose proof (thread_roles_equal ρ ρT) as ->.
@@ -107,7 +109,7 @@ Section ThreadModel.
 
   Lemma thread_sync_lr_nonincr n n' M
       (STEP: amTrans thread_model n (inl (step_sync M), None) n'):
-    AM_live_roles thread_AM_strong n' ⊆ AM_live_roles thread_AM_strong n.
+    AM_live_roles ame_strong n' ⊆ AM_live_roles ame_strong n.
   Proof. 
     rewrite !thread_AM_lr_exact. done.
   Qed. 
@@ -136,7 +138,7 @@ Section ThreadModel.
 
     Definition glob_step st st' ρ__t N :=
       proj_st st' = N /\ fmtrans M__p st (Some $ lift_role ρ__t) st' /\
-      (AM_live_roles thread_AM_strong (proj_st st') ⊆ AM_live_roles thread_AM_strong (proj_st st) ->
+      (AM_live_roles ame_strong (proj_st st') ⊆ AM_live_roles ame_strong (proj_st st) ->
        live_roles M__p st' ⊆ live_roles M__p st).
 
     Definition eo_vs l ι ρ__t: iProp Σ :=
@@ -245,8 +247,6 @@ End ThreadModel.
 
 Definition thread_0_even: EvenModel.
   refine {| cur_even := cur_n 0 |}.
-  - apply thread_AM_fin_branch'.
-  - apply thread_AM_step_dec.
   - intros. red in CUR. subst st.
     rewrite (plus_n_O n) in EVEN. 
     eapply thread_syncable in EVEN.
@@ -255,7 +255,7 @@ Definition thread_0_even: EvenModel.
     simpl in *.
     apply thread_sync_step_inv in STEP as [-> STEP]. 
     rewrite -plus_n_O in STEP. done.
-  - intros.
+  - intros. simpl.  
     eapply thread_sync_lr_nonincr; eauto.
   - iIntros "*" (????) "(#VS&MAP&FRAG&FREE) Post".
     iApply (eo_go_spec with "[MAP FRAG FREE]").
@@ -283,15 +283,11 @@ Definition thread_0_even: EvenModel.
       iIntros "(?&?&?&?)". iApply "CLOS".
       iNext. rewrite Nat.add_0_r. iFrame.
   - exact ρT.
-  Unshelve.
-  apply _.
 Qed. 
 
     
 Definition thread_1_odd: OddModel.
   refine {| cur_odd := cur_n 1 |}.
-  - apply thread_AM_fin_branch'.
-  - apply thread_AM_step_dec.
   - intros. red in CUR. subst st.
     rewrite -Nat.negb_odd -odd_plus1_negb in ODD. 
     eapply thread_syncable in ODD.
@@ -329,7 +325,5 @@ Definition thread_1_odd: OddModel.
       iExists _. iSplitL ""; [done| ]. 
       iIntros "(?&?&?&?)". iApply "CLOS".
       iNext. rewrite !even_plus1_negb. iFrame.
-  - exact ρT.    
-  Unshelve.
-  apply _.
-Qed. 
+  - exact ρT.
+Qed.

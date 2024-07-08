@@ -33,13 +33,16 @@ Section Models.
     | inr (inr p) => (None, Some $ inr p)
     end. 
 
-  Definition prod_model := ProdAM (fact_act := fact_TA). 
+  Definition prod_model := ProdAM (fact_act := fact_TA).
+
+  Existing Instance even_AME. 
+  Existing Instance odd_AME.
 
   Lemma prod_AM_fin_branch': AM_fin_branch' prod_model.
   Proof. 
     unshelve eapply prod_AM_fin_branch'.
-    3: apply odd_AM_fin_branch'. 
-    2: apply even_AM_fin_branch'. 
+    3: apply odd_AME. 
+    2: apply even_AME. 
     { exact (fun '(oa1, oa2) => 
                match oa1, oa2 with
                | Some (inl pa1), Some _ => inl pa1
@@ -50,35 +53,13 @@ Section Models.
     red. intros [?|[?|?]]; reflexivity.
   Qed.
 
-  Local Instance prod_role_eqdec: EqDecision (amRole prod_model).
-  Proof.
-    unshelve eapply sum_eq_dec.
-    - simpl. apply even_impl.
-    - simpl. apply odd_impl.
-  Defined. 
-    
-  Local Instance prod_role_cnt: Countable (amRole prod_model).
-  Proof.
-    unshelve eapply sum_countable.
-    - simpl. apply even_impl.
-    - simpl. apply odd_impl.
-  Defined.
-
-  (* TODO: how to get rid of this? *)
-  Local Instance even_st_eqdec': EqDecision (amSt even_AM) := even_st_eqdec even_impl.
-  Local Instance odd_st_eqdec': EqDecision (amSt odd_AM) := odd_st_eqdec odd_impl.
-  Global Instance even_st_inh': Inhabited (amSt even_AM) := even_st_inh even_impl.
-  Global Instance odd_st_inh': Inhabited (amSt odd_AM) := odd_st_inh odd_impl.
-  Local Instance even_role_inh': Inhabited (amRole even_AM) := even_role_inh even_impl. 
-  Local Instance odd_role_inh': Inhabited (amRole odd_AM) := odd_role_inh odd_impl.
-
   Lemma prod_AM_strong_lr: AM_strong_lr prod_model.
   Proof. 
     apply fin_branch_strong.
     - apply prod_AM_fin_branch'. 
     - unshelve eapply prod_AM_step_dec.
-      + apply even_AM_step_dec.
-      + apply odd_AM_step_dec.
+      + apply even_AME.
+      + apply odd_AME. 
   Qed.
 
   Definition the_fair_model: FairModel.
@@ -112,6 +93,9 @@ Class evenoddG (Σ: gFunctors) := EvenoddG {
 Section proof.
   Context (even_impl: EvenModel) (odd_impl: OddModel).
   Context `{!heapGS Σ (the_model even_impl odd_impl), !evenoddG Σ}.
+
+  Existing Instance even_AME. 
+  Existing Instance odd_AME.
 
   Let Ns := nroot .@ "even_odd".
 
@@ -167,8 +151,8 @@ Section proof.
     (STEP : amTrans even_AM st__e (inl (step_sync M), Some ρ__e) st__e')    
     (CUR__E' : cur_even _ st__e' (M + 1))
     (STEP2 : amTrans odd_AM st__o (inl (step_sync M), None) st__o')
-    (LR__e : AM_live_roles (even_AM_strong _) st__e'
-          ⊆ AM_live_roles (even_AM_strong _) st__e):
+    (LR__e : AM_live_roles ame_strong st__e'
+          ⊆ AM_live_roles ame_strong (st__e: amSt even_AM)):
   AM_live_roles (prod_AM_strong_lr _ _) (st__e', st__o')
   ⊆ AM_live_roles (prod_AM_strong_lr _ _) (st__e, st__o).
   Proof.
@@ -183,7 +167,7 @@ Section proof.
 
       inversion STEP'; subst.
       - (* role under consideration makes private step in new state *)        
-        assert (ρ__e' ∈ AM_live_roles (even_AM_strong _) st__e) as IN.
+        assert (ρ__e' ∈ AM_live_roles ame_strong (st__e: amSt even_AM)) as IN.
         { apply LR__e. apply AM_live_roles_spec. eauto. }
         apply AM_live_roles_spec in IN as (ae_ & st_ & STEP_).
         destruct ae_ as [[k]| ].
@@ -204,7 +188,7 @@ Section proof.
     (* TODO: is it possible to unify these proofs in _sync and _priv? *)
     clear -STEP' Ns STEP2 E CUR__O.
  
-    assert (ρ__o' ∈ AM_live_roles (odd_AM_strong _) st__o) as IN.
+    assert (ρ__o' ∈ AM_live_roles ame_strong st__o) as IN.
     { eapply odd_sync_lr_nonincr; eauto.  
       apply AM_live_roles_spec.
       inversion STEP'; eauto. }
@@ -223,8 +207,8 @@ Section proof.
   (O : Nat.odd M)
   (STEP : amTrans even_AM st__e (inr a__e, Some ρ__e) st__e')
   (CUR__E' : cur_even _ st__e' M)
-  (LR__e : AM_live_roles (even_AM_strong _) st__e'
-      ⊆ AM_live_roles (even_AM_strong _) st__e):
+  (LR__e : AM_live_roles ame_strong st__e'
+      ⊆ AM_live_roles ame_strong (st__e: amSt even_AM)):
   AM_live_roles (prod_AM_strong_lr _ _) (st__e', st__o)
   ⊆ AM_live_roles (prod_AM_strong_lr _ odd_impl) (st__e, st__o).
   Proof. 
@@ -241,7 +225,7 @@ Section proof.
       
       inversion STEP'; subst.
       - (* role under consideration makes private step in new state *)
-        assert (ρ__e' ∈ AM_live_roles (even_AM_strong _) st__e) as IN.
+        assert (ρ__e' ∈ AM_live_roles ame_strong (st__e: amSt even_AM)) as IN.
         { apply LR__e.
           apply AM_live_roles_spec. eauto. }
         apply AM_live_roles_spec in IN as (ae_ & st_ & STEP_).
@@ -278,8 +262,8 @@ Section proof.
     (STEP : amTrans odd_AM st__o (inl (step_sync M), Some ρ__o) st__o')    
     (CUR__O' : cur_odd _ st__o' (M + 1))
     (STEP2 : amTrans even_AM st__e (inl (step_sync M), None) st__e')
-    (LR__o : AM_live_roles (odd_AM_strong _) st__o'
-          ⊆ AM_live_roles (odd_AM_strong _) st__o):
+    (LR__o : AM_live_roles ame_strong st__o'
+          ⊆ AM_live_roles ame_strong st__o):
   AM_live_roles (prod_AM_strong_lr _ _) (st__e', st__o')
   ⊆ AM_live_roles (prod_AM_strong_lr _ _) (st__e, st__o).
   Proof.
@@ -295,7 +279,7 @@ Section proof.
 
       inversion STEP'; subst.
       - (* role under consideration makes private step in new state *)        
-        assert (ρ__o' ∈ AM_live_roles (odd_AM_strong _) st__o) as IN.
+        assert (ρ__o' ∈ AM_live_roles ame_strong st__o) as IN.
         { apply LR__o. apply AM_live_roles_spec. eauto. }
         apply AM_live_roles_spec in IN as (ao_ & st_ & STEP_).
         destruct ao_ as [[k]| ].
@@ -316,7 +300,7 @@ Section proof.
     (* TODO: is it possible to unify these proofs in _sync and _priv? *)
     clear -STEP' Ns STEP2 O CUR__E.
  
-    assert (ρ__e' ∈ AM_live_roles (even_AM_strong _) st__e) as IN.
+    assert (ρ__e' ∈ AM_live_roles ame_strong (st__e: amSt even_AM)) as IN.
     { eapply even_sync_lr_nonincr; eauto.  
       apply AM_live_roles_spec.
       inversion STEP'; eauto. }
@@ -335,8 +319,8 @@ Section proof.
   (E : Nat.even M)  
   (STEP : amTrans odd_AM st__o (inr a__o, Some ρ__o) st__o')
   (CUR__O' : cur_odd _ st__o' M)
-  (LR__o : AM_live_roles (odd_AM_strong _) st__o'
-      ⊆ AM_live_roles (odd_AM_strong _) st__o):
+  (LR__o : AM_live_roles ame_strong st__o'
+      ⊆ AM_live_roles ame_strong st__o):
   AM_live_roles (prod_AM_strong_lr _ _) (st__e, st__o')
   ⊆ AM_live_roles (prod_AM_strong_lr even_impl _) (st__e, st__o).
   Proof. 
@@ -354,7 +338,7 @@ Section proof.
       
       inversion STEP'; subst.
       - (* role under consideration makes private step in new state *)
-        assert (ρ__o' ∈ AM_live_roles (odd_AM_strong _) st__o) as IN.
+        assert (ρ__o' ∈ AM_live_roles ame_strong st__o) as IN.
         { apply LR__o.
           apply AM_live_roles_spec. eauto. }
         apply AM_live_roles_spec in IN as (ao_ & st_ & STEP_).
@@ -521,6 +505,9 @@ Section proof_start.
       let: "x" := !"l" in
       (Fork ((even_prog even_impl) "l" "x") ;;
        Fork ((odd_prog odd_impl) "l" ("x"+#1))).
+
+  Existing Instance even_AME. 
+  Existing Instance odd_AME.
 
   Lemma start_spec tid n N1 N2 f (Hf: f > 60) (EVEN: N1 < N2)
     :

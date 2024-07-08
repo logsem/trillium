@@ -52,23 +52,29 @@ Definition BuildSubModel (St Priv Role: Type) Trans := {|
 |}.
 
 
+Class ActionModelExtra (AM: ActionModel) := {
+    ame_role_eqdec :> EqDecision (amRole AM);
+    ame_role_cnt :> Countable (amRole AM);
+    ame_st_eqdec :> EqDecision (amSt AM);
+    ame_st_inh :> Inhabited (amSt AM);
+    ame_role_inh :> Inhabited (amRole AM);
+
+    ame_fin_branch': AM_fin_branch' AM;
+    ame_step_dec: AM_step_dec AM;
+    ame_strong := fin_branch_strong AM (ame_fin_branch') (ame_step_dec);
+}.
+
+
 Record EvenModel := {
     eSt: Type;
     ePriv: Type;
     eRole: Type;
     eTrans;
-    even_role_eqdec :> EqDecision eRole;
-    even_role_cnt :> Countable eRole;
-    even_st_eqdec :> EqDecision eSt;
-    even_st_inh :> Inhabited eSt;
-    even_role_inh :> Inhabited eRole;
 
     cur_even: eSt -> nat -> Prop;
 
     even_AM := BuildSubModel eSt ePriv eRole eTrans;
-    even_AM_strong: AM_strong_lr even_AM;
-    even_AM_fin_branch': AM_fin_branch' even_AM;
-    even_AM_step_dec: AM_step_dec even_AM;
+    even_AME :> ActionModelExtra even_AM;
 
     even_syncable n st (EVEN: Nat.odd n) (CUR: cur_even st n):
       exists st', amTrans even_AM st (inl (step_sync n), None) st' /\ cur_even st' (n + 1);
@@ -78,7 +84,7 @@ Record EvenModel := {
       k = N /\ Nat.even N;
     even_sync_lr_nonincr st__e st__e' M
       (STEP: amTrans even_AM st__e (inl (step_sync M), None) st__e'):
-      AM_live_roles even_AM_strong st__e' ⊆ AM_live_roles even_AM_strong st__e;
+      AM_live_roles ame_strong st__e' ⊆ AM_live_roles ame_strong st__e;
 
   even_corr 
     {M__p : FairModel} {LM__p : LiveModel heap_lang M__p}
@@ -95,8 +101,8 @@ Record EvenModel := {
   (st st' : M__p) (ρ__t : amRole even_AM) (st__e' : amSt even_AM) := 
   proj_st st' = st__e'
   ∧ fmtrans M__p st (Some (lift_role ρ__t)) st'
-    ∧ (AM_live_roles even_AM_strong (proj_st st')
-       ⊆ AM_live_roles even_AM_strong (proj_st st)
+    ∧ (AM_live_roles ame_strong (proj_st st')
+       ⊆ AM_live_roles ame_strong (proj_st st)
        → live_roles M__p st' ⊆ live_roles M__p st);
   even_vs {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
   {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
@@ -146,18 +152,11 @@ Record OddModel := {
     oPriv: Type;
     oRole: Type;
     oTrans;
-    odd_role_eqdec :> EqDecision oRole;
-    odd_role_cnt :> Countable oRole;
-    odd_st_eqdec :> EqDecision oSt;
-    odd_st_inh :> Inhabited oSt;
-    odd_role_inh :> Inhabited oRole;
 
     cur_odd: oSt -> nat -> Prop;
 
     odd_AM := BuildSubModel oSt oPriv oRole oTrans;
-    odd_AM_strong: AM_strong_lr odd_AM;
-    odd_AM_fin_branch': AM_fin_branch' odd_AM;
-    odd_AM_step_dec: AM_step_dec odd_AM;
+    odd_AME :> ActionModelExtra odd_AM;
 
     odd_syncable n st (ODD: Nat.even n) (CUR: cur_odd st n):
       exists st', amTrans odd_AM st (inl (step_sync n), None) st' /\ cur_odd st' (n + 1);
@@ -167,7 +166,7 @@ Record OddModel := {
       k = N /\ Nat.odd N;
     odd_sync_lr_nonincr st__e st__e' M
       (STEP: amTrans odd_AM st__e (inl (step_sync M), None) st__e'):
-      AM_live_roles odd_AM_strong st__e' ⊆ AM_live_roles odd_AM_strong st__e;
+      AM_live_roles ame_strong st__e' ⊆ AM_live_roles ame_strong st__e;
 
   odd_corr 
     {M__p : FairModel} {LM__p : LiveModel heap_lang M__p}
@@ -184,8 +183,8 @@ Record OddModel := {
   (st st' : M__p) (ρ__t : amRole odd_AM) (st__e' : amSt odd_AM) := 
   proj_st st' = st__e'
   ∧ fmtrans M__p st (Some (lift_role ρ__t)) st'
-    ∧ (AM_live_roles odd_AM_strong (proj_st st')
-       ⊆ AM_live_roles odd_AM_strong (proj_st st)
+    ∧ (AM_live_roles ame_strong (proj_st st')
+       ⊆ AM_live_roles ame_strong (proj_st st)
        → live_roles M__p st' ⊆ live_roles M__p st);
   odd_vs {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
   {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
