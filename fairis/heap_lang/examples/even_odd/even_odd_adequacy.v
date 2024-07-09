@@ -398,14 +398,6 @@ Proof. solve_decision. Qed.
 (** Proof that program refines model up to ξ_evenodd *)
 
 
-(* Lemma start_spec_use l γ_even_at γ_odd_at `{heapGS evenoddΣ the_model}: *)
-(*   {{{ evenodd_inv l ∗ *)
-(*       0 ↦M gset_to_gmap 61 (eo_live_roles: gset (fmrole the_fair_model)) ∗ *)
-(*       own γ_even_at (◯E 0) ∗ *)
-(*       own γ_odd_at (◯E 1) }}} *)
-(*     start #l @0 *)
-(*   {{{ RET _; 0 ↦M ∅ }}}. *)
-
 Lemma start_spec_use Σ
   (l : loc)
   (Hinv : heapGS Σ the_model)
@@ -455,6 +447,69 @@ Proof.
     by apply lookup_lt_is_Some_1.
 Qed.
 
+Lemma not_all_val (l: loc) `{!heapGS Σ the_model}
+  (c : cfg heap_lang) δ
+  (Hsmaller : tids_smaller c.1 δ)
+  (fm : gmap (locale heap_lang) (gmap (fmrole the_fair_model) nat))
+  (Hfmle : fuel_map_le fm (ls_map δ))
+  (Hfmdead : fuel_map_preserve_dead fm (live_roles the_fair_model δ))
+  (Htp : fuel_map_preserve_threadpool c.1 fm)
+  (Hall : Forall (λ e : expr, is_Some (to_val e)) c.1):
+  auth_fuel_mapping_is fm -∗
+  posts_of c.1  ([λ _ : language.val heap_lang, 0 ↦M ∅] ++
+                ((λ '(tnew, e), fork_post (language.locale_of tnew e)) <$>
+                 prefixes_from
+                   ([start #l], {| heap := {[l := #0]}; used_proph_id := ∅ |}).1
+                   (drop 1 c.1)))
+  -∗
+  False.
+Proof.
+  iIntros "Hfm Hposts".
+  simpl. 
+  rewrite !big_sepL_omap !big_sepL_zip_with=> /=.
+  iAssert ([∗ list] k↦x ∈ c.1, k ↦M ∅)%I with "[Hposts]" as "Hposts".
+  { destruct c as [es σ]=> /=.
+    iApply (big_sepL_impl with "Hposts").
+    iIntros "!>" (k x HSome) "Hk".
+    assert (is_Some (to_val x)) as [v Hv].
+    { by eapply (Forall_lookup_1 (λ e : expr, is_Some (to_val e))). }
+    rewrite Hv. destruct k; [done|]. destruct es; [done|].
+    simpl in *. rewrite drop_0. rewrite list_lookup_fmap.
+    erewrite prefixes_from_lookup; [|done].
+    simpl. rewrite /locale_of. rewrite take_length.
+    assert (k < length es).
+    { apply lookup_lt_is_Some_1. by eauto. }
+    by replace (k `min` length es) with k by lia. }
+  iAssert (⌜∀ i, i < length c.1 → fm !! i = Some ∅⌝)%I as "%HMζ".
+  { iIntros (i Hlen).
+    assert (is_Some $ c.1 !! i) as [e HSome].
+    { by apply lookup_lt_is_Some_2. }
+    iDestruct (big_sepL_delete with "Hposts") as "[Hpost _]"; [done|].
+    by iDestruct (has_fuels_agree with "Hfm Hpost") as "?". }
+  assert (dom fm = list_to_set $ locales_of_list c.1).
+  { subst. apply dom_locales; auto. }
+  
+  assert (live_roles _ δ = ∅) as Hlive.
+  { clear -Hfmdead HMζ Hfmle Hsmaller.
+    apply set_eq. intros i. split; [|done].
+    intros (ζ&fs&HSome&Hfs)%Hfmdead.
+    assert (fm !! ζ = Some ∅).
+    { apply HMζ.
+      assert (ζ ∈ dom (ls_map δ)) as Hin.
+      { destruct Hfmle as [Hfmle1 Hfmle2].
+        rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
+        apply Hfmle1 in HSome as (?&?&?).
+        by apply elem_of_dom. }
+      apply Hsmaller in Hin as [? Hin].
+      apply lookup_lt_is_Some_1.
+      by apply from_locale_lookup in Hin. }
+    set_solver. }
+  
+  rewrite /live_roles in Hlive. simpl in *.
+  rewrite /eo_live_roles in Hlive. set_solver.
+Qed. 
+ 
+
 Lemma eo_rah l `(!heapGS Σ the_model) (eoΣ: evenoddG Σ):
   inv (nroot.@"even_odd") (evenodd_inv_inner l) -∗
   rel_always_holds NotStuck [λ _ : language.val heap_lang, 0 ↦M ∅]
@@ -477,51 +532,11 @@ Proof.
   rewrite /trace_ends_in in Hends.
   rewrite Hends.
   iSplit.
-  - iIntros "%Hall".
-    rewrite !big_sepL_omap !big_sepL_zip_with=> /=.
-    iAssert ([∗ list] k↦x ∈ c.1, k ↦M ∅)%I with "[Hposts]" as "Hposts".
-    { destruct c as [es σ]=> /=.
-      iApply (big_sepL_impl with "Hposts").
-      iIntros "!>" (k x HSome) "Hk".
-      assert (is_Some (to_val x)) as [v Hv].
-      { by eapply (Forall_lookup_1 (λ e : expr, is_Some (to_val e))). }
-      rewrite Hv. destruct k; [done|]. destruct es; [done|].
-      simpl in *. rewrite drop_0. rewrite list_lookup_fmap.
-      erewrite prefixes_from_lookup; [|done].
-      simpl. rewrite /locale_of. rewrite take_length.
-      assert (k < length es).
-      { apply lookup_lt_is_Some_1. by eauto. }
-      by replace (k `min` length es) with k by lia. }
-    iAssert (⌜∀ i, i < length c.1 → fm !! i = Some ∅⌝)%I as "%HMζ".
-    { iIntros (i Hlen).
-      assert (is_Some $ c.1 !! i) as [e HSome].
-      { by apply lookup_lt_is_Some_2. }
-      iDestruct (big_sepL_delete with "Hposts") as "[Hpost _]"; [done|].
-      by iDestruct (has_fuels_agree with "Hfm Hpost") as "?". }
-    assert (dom fm = list_to_set $ locales_of_list c.1).
-    { subst. apply dom_locales; auto. }
-    assert (live_roles _ M = ∅) as Hlive.
-    { clear -Hfmdead HMζ Hfmle Hsmaller Hends.
-      apply set_eq. intros i. split; [|done].
-      intros (ζ&fs&HSome&Hfs)%Hfmdead.
-      assert (fm !! ζ = Some ∅).
-      { apply HMζ.
-        assert (ζ ∈ dom (ls_map (trace_last auxtr))) as Hin.
-        { destruct Hfmle as [Hfmle1 Hfmle2].
-          rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
-          apply Hfmle1 in HSome as (?&?&?).
-          by apply elem_of_dom. }
-        apply Hsmaller in Hin as [? Hin].
-        rewrite Hends in Hin.
-        apply lookup_lt_is_Some_1.
-        by apply from_locale_lookup in Hin. }
-      by simplify_eq. }
-    rewrite /live_roles in Hlive. simpl in *.
-    rewrite /eo_live_roles in Hlive. set_solver.
+  - iIntros "%Hall". subst c. iApply (not_all_val with "[$]"); eauto. 
   - iPureIntro.
     apply Forall_forall.
     intros e He. by apply Hnstuck.
-Qed.   
+Qed.
 
 Lemma evenodd_sim l :
   continued_simulation
@@ -688,6 +703,7 @@ Proof.
   intros Hmaximal Hfair Hfirst.
   pose proof Hmaximal as Hvalid%extrace_maximal_valid.
   pose proof (evenodd_sim l) as Hsim.
+
   assert (∃ iatr,
              valid_inf_system_trace
                (continued_simulation (sim_rel_with_user the_model (ξ_evenodd_trace l)))
@@ -697,8 +713,9 @@ Proof.
                iatr) as [iatr Hiatr].
   { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
     Unshelve.
-    - rewrite Hfirst. done.
+    - rewrite Hfirst. apply Hsim.
     - eapply from_trace_preserves_validity; eauto; first econstructor. }
+
   assert (∃ (auxtr : auxtrace the_model),
              traces_match labels_match
                (live_tids /2\ (ξ_evenodd l))

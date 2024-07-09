@@ -19,8 +19,8 @@ Set Default Proof Using "Type".
 
 Section Models.
   
-  Context (even_impl: EvenModel). 
-  Context (odd_impl: OddModel).
+  Context {even_impl: EvenModel}. 
+  Context {odd_impl: OddModel}.
 
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
@@ -75,7 +75,6 @@ End Models.
 
 (** The CMRAs we need. *)
 Class evenoddPreG (Σ: gFunctors) := {
-  threadPre_G :> threadPreG Σ;
 }.
 
 Class evenoddG (Σ: gFunctors) := EvenoddG {
@@ -84,15 +83,10 @@ Class evenoddG (Σ: gFunctors) := EvenoddG {
   eoPreG :> evenoddPreG Σ;
  }.
 
-(* Definition evenoddΣ : gFunctors := *)
-(*   #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ]. *)
-
-(* Global Instance subG_evenoddΣ {Σ} : subG evenoddΣ Σ → evenoddPreG Σ. *)
-(* Proof. solve_inG. Qed. *)
-
 Section proof.
-  Context (even_impl: EvenModel) (odd_impl: OddModel).
-  Context `{!heapGS Σ (the_model even_impl odd_impl), !evenoddG Σ}.
+  Context {even_impl: EvenModel} {odd_impl: OddModel}.
+  Context `{!heapGS Σ (@the_model even_impl odd_impl), !evenoddG Σ}.
+  Context {th_preG: threadPreG Σ}. 
 
   Existing Instance even_AME. 
   Existing Instance odd_AME.
@@ -153,11 +147,11 @@ Section proof.
     (STEP2 : amTrans odd_AM st__o (inl (step_sync M), None) st__o')
     (LR__e : AM_live_roles ame_strong st__e'
           ⊆ AM_live_roles ame_strong (st__e: amSt even_AM)):
-  AM_live_roles (prod_AM_strong_lr _ _) (st__e', st__o')
-  ⊆ AM_live_roles (prod_AM_strong_lr _ _) (st__e, st__o).
+  AM_live_roles prod_AM_strong_lr (st__e', st__o')
+  ⊆ AM_live_roles prod_AM_strong_lr (st__e, st__o).
   Proof.
     apply elem_of_subseteq. intros ρ.
-    setoid_rewrite <- (AM_live_roles_spec (prod_AM_strong_lr _ _)).
+    setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr).
     intros (a&st''&STEP').
     simpl in STEP'.
 
@@ -203,19 +197,19 @@ Section proof.
 
   Lemma lr_pres_even_priv ρ__e st__e st__o M (st__e': amSt even_AM) (a__e : ePriv _)
   (CUR__E : cur_even _ st__e M)
-  (CUR__O : cur_odd _ st__o M)
+  (CUR__O : cur_odd _ (st__o: amSt odd_AM) M)
   (O : Nat.odd M)
   (STEP : amTrans even_AM st__e (inr a__e, Some ρ__e) st__e')
   (CUR__E' : cur_even _ st__e' M)
   (LR__e : AM_live_roles ame_strong st__e'
       ⊆ AM_live_roles ame_strong (st__e: amSt even_AM)):
-  AM_live_roles (prod_AM_strong_lr _ _) (st__e', st__o)
-  ⊆ AM_live_roles (prod_AM_strong_lr _ odd_impl) (st__e, st__o).
+  AM_live_roles prod_AM_strong_lr (st__e', st__o)
+  ⊆ AM_live_roles prod_AM_strong_lr (st__e, st__o).
   Proof. 
     assert (Nat.even M = false) as E.
     { rewrite -Nat.negb_odd. by destruct (Nat.odd M). } 
     apply elem_of_subseteq. intros ρ.
-    setoid_rewrite <- (AM_live_roles_spec (prod_AM_strong_lr _ _)).
+    setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr).
     intros (a&st''&STEP').
     simpl in STEP'.
 
@@ -264,11 +258,11 @@ Section proof.
     (STEP2 : amTrans even_AM st__e (inl (step_sync M), None) st__e')
     (LR__o : AM_live_roles ame_strong st__o'
           ⊆ AM_live_roles ame_strong st__o):
-  AM_live_roles (prod_AM_strong_lr _ _) (st__e', st__o')
-  ⊆ AM_live_roles (prod_AM_strong_lr _ _) (st__e, st__o).
+  AM_live_roles prod_AM_strong_lr (st__e', st__o')
+  ⊆ AM_live_roles prod_AM_strong_lr (st__e, st__o).
   Proof.
     apply elem_of_subseteq. intros ρ.
-    setoid_rewrite <- (AM_live_roles_spec (prod_AM_strong_lr _ _)).
+    setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr).
     intros (a&st''&STEP').
     simpl in STEP'.
 
@@ -314,20 +308,20 @@ Section proof.
   Qed. 
 
   Lemma lr_pres_odd_priv ρ__o st__e st__o (st__o': amSt odd_AM) M (a__o : oPriv _)
-  (CUR__E : cur_even _ st__e M)
+  (CUR__E : cur_even _ (st__e: amSt even_AM) M)
   (CUR__O : cur_odd _ st__o M)
   (E : Nat.even M)  
   (STEP : amTrans odd_AM st__o (inr a__o, Some ρ__o) st__o')
   (CUR__O' : cur_odd _ st__o' M)
   (LR__o : AM_live_roles ame_strong st__o'
       ⊆ AM_live_roles ame_strong st__o):
-  AM_live_roles (prod_AM_strong_lr _ _) (st__e, st__o')
-  ⊆ AM_live_roles (prod_AM_strong_lr even_impl _) (st__e, st__o).
+  AM_live_roles prod_AM_strong_lr (st__e, st__o')
+  ⊆ AM_live_roles prod_AM_strong_lr (st__e, st__o).
   Proof. 
     assert (Nat.odd M = false) as O.
     { rewrite -Nat.negb_even. by destruct (Nat.even M). } 
     apply elem_of_subseteq. intros ρ.
-    setoid_rewrite <- (AM_live_roles_spec (prod_AM_strong_lr _ _)).
+    setoid_rewrite <- (AM_live_roles_spec prod_AM_strong_lr).
     intros (a&st''&STEP').
     simpl in STEP'.
 
@@ -376,7 +370,7 @@ Section proof.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
     
-    iApply (@even_spec even_impl (the_fair_model _ _) _ _ _ evenThreadG fst inl 
+    iApply (@even_spec even_impl the_fair_model _ _ _ evenThreadG fst inl 
              with "[$Hf $FR $Heo]"); [lia| simpl; lia | |done].
     rewrite /even_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
@@ -424,7 +418,7 @@ Section proof.
   Proof. 
     iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
     
-    iApply (@odd_spec odd_impl (the_fair_model _ _) _ _ _ oddThreadG snd inr
+    iApply (@odd_spec odd_impl the_fair_model _ _ _ oddThreadG snd inr
              with "[$Hf $FR $Heo]"); [lia| simpl; lia | |done].
     rewrite /odd_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
@@ -483,8 +477,9 @@ Section proof.
 End proof.
 
 Section proof_start.
-  Context (even_impl: EvenModel) (odd_impl: OddModel).
-  Context `{!heapGS Σ (the_model even_impl odd_impl), !evenoddG Σ}.
+  Context {even_impl: EvenModel} {odd_impl: OddModel}.
+  Context `{!heapGS Σ (@the_model even_impl odd_impl), !evenoddG Σ}.
+  Context {th_preG: threadPreG Σ}. 
   Let Ns := nroot .@ "even_odd".
 
   (* TODO: move *)
@@ -497,8 +492,8 @@ Section proof_start.
     rewrite -own_op. by rewrite -auth_frag_op.
   Qed. 
 
-  Let ρEven: fmrole (the_fair_model even_impl odd_impl) := inl (ρ__e even_impl).
-  Let ρOdd: fmrole (the_fair_model even_impl odd_impl) := inr (ρ__o odd_impl).
+  Let ρEven: fmrole (@the_fair_model even_impl odd_impl) := inl (ρ__e even_impl).
+  Let ρOdd: fmrole (@the_fair_model even_impl odd_impl) := inr (ρ__o odd_impl).
 
   Definition start : val :=
     λ: "l",
@@ -511,7 +506,7 @@ Section proof_start.
 
   Lemma start_spec tid n N1 N2 f (Hf: f > 60) (EVEN: N1 < N2)
     :
-    {{{ evenodd_inv even_impl odd_impl n ∗ 
+    {{{ evenodd_inv n ∗ 
         tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
         even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
       start #n @ tid

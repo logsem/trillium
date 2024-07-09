@@ -281,6 +281,14 @@ Section ActionModel.
       am_fmtrans s1 None s2
     .
 
+    Lemma am_fmtrans_action s1 oρ s2:
+      am_fmtrans s1 oρ s2 <-> exists a, amTrans s1 (a, oρ) s2.
+    Proof.
+      split.
+      - intros STEP. inversion STEP; eauto.
+      - intros [a STEP]. destruct oρ; econstructor; eauto.
+    Qed. 
+
     Definition AM2FM : FairModel.
       refine {| fmtrans := am_fmtrans; live_roles := AM_live_roles AM_S |}.
     Proof. 
