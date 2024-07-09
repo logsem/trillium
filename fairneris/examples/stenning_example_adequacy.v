@@ -10,6 +10,7 @@ From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
 From fairneris.aneris_lang Require Import aneris_lang adequacy.
+From fairneris.lib Require Import gen_heap_light.
 From fairneris Require Import stenning_code.
 
 From fairneris.lib Require Import singletons.
@@ -22,12 +23,15 @@ Definition initial_state :=
 
 Definition initial_model_state : stenning_state := (ASending 0, BReceiving 0).
 
+Definition safety_inv := λ st, let (n, m) := stenning_get_n st in (n = m ∨ m = n + 1)%Z.
+
 Lemma stenning_continued_simulation extr :
   trfirst extr = initial_state →
   extrace_valid extr →
   ex_fair extr →
-  True.
-  (* (extr ⊩ ◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ ℓ' = Send mDone)). *)
+  ∃ utr : lts_trace stenning_model,
+    program_model_refinement (LM := live_model_of_user stenning_model net_model) extr utr ∧ usr_fair utr ∧
+      usr_trace_valid utr ∧ trfirst utr = initial_model_state ∧ (utr ⊩ □ ↓ λ s _, safety_inv s).
 Proof.
   intros Hfirst Hval Hfair.
 
@@ -49,7 +53,7 @@ Proof.
     - intros [|] Hin; [exists 0%nat|exists 1%nat]; rewrite ?tail_lookup ?head_lookup //=; naive_solver set_solver. }
 
   assert (continued_simulation_init
-            (valid_state_evolution_fairness (live_model_of_user stenning_model net_model) (λ _, False))
+            (valid_state_evolution_fairness (live_model_of_user stenning_model net_model) safety_inv)
             initial_state (lm_init _ _ _ (∅, ∅) Hfss)
     ) as Hcs.
   { eapply (simulation_adequacy_multiple_strong _ {[saA;saB]} NotStuck _ _ _ _ ∅).
@@ -86,12 +90,23 @@ Proof.
     { apply auth_both_valid_2; eauto. by compute. }
     iMod (own_alloc (●E (BReceiving 0) ⋅ ◯E (BReceiving 0))) as (γB) "[HresAB HresFB]".
     { apply auth_both_valid_2; eauto. by compute. }
+    iMod (gen_heap_light_init (∅ : gmap socket_address Z)) as (γC) "Hw".
 
-    pose (X := {| stenning_A_name := γA; stenning_B_name := γB |} : stenningG stenningΣ).
+    pose (X := {| stenning_A_name := γA; stenning_B_name := γB; stenning_cnt_name := γC |} : stenningG stenningΣ).
+
+    iMod (gen_heap_light_alloc _ saA γC 0%Z with "Hw") as "[Hw [Hcc [Hcci Hccm]]]"; [set_solver|].
+    iMod (gen_heap_light_alloc _ saB γC (-1)%Z with "Hw") as "[Hw [Hcs [Hcsi Hcsm]]]"; [set_solver|].
 
     rewrite (subseteq_empty_difference_L ∅); last set_solver.
-    iMod (inv_alloc (nroot .@ "stenning") _ retinv with "[Hσ HresAA HresAB HFR]") as "#Hinv".
-    { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. simpl. naive_solver. }
+    iMod (inv_alloc (nroot .@ "stenning") _ retinv with "[Hσ HresAA HresAB HFR Hcci Hcsi]") as "#Hinv".
+    { iNext. rewrite /retinv. iFrame. iExists _, _. iFrame. simpl.
+      replace (0-1)%Z with (-1)%Z by lia.
+      replace (1/2/2)%Qp with (1/4)%Qp by compute_done.
+      iFrame. naive_solver. }
+    iMod (inv_alloc (nroot .@ "counter") _
+            (∃ w, gen_heap_light_ctx (L:=socket_address) (V:=Z) stenning_cnt_name w)%I
+           with "[Hw]") as "#Hcinv".
+    { naive_solver. }
 
     iMod (aneris_state_interp_socket_interp_allocate_singleton with "Hst [HA]")
       as "[Hst #HA]".
@@ -140,15 +155,24 @@ Proof.
     iDestruct "Hfp" as "(HfpB & HfpA & _)".
 
     iSplit.
-    { iModIntro. iIntros (st) "Hst". iApply fupd_mask_intro. set_solver. iIntros "_". iFrame. admit. }
-    iSplitL "HrtA HnodeA HfuelA HfpA HresFA".
+    { iModIntro. iIntros (st) "Hst".
+      iInv "Hinv" as ">Hi" "Hclose". rewrite /retinv.
+      iDestruct "Hi" as "(_&%stA&%stB&Hst'&?&?&H)".
+      iApply fupd_mask_intro. set_solver. iIntros "_".
+      iDestruct (model_agree with "Hst Hst'") as %->. cbn.
+      iDestruct "H" as "(%Hstinv&?)". iFrame. iPureIntro. naive_solver. }
+    iSplitL "HrtA HnodeA HfuelA HfpA HresFA Hcc Hccm Hcsm".
     { iApply (wp_client _ (usr_fl (initial_model_state : stenning_model)) with
-               "[HrtA HnodeA HfuelA HfpA HresFA]").
-      { rewrite //=. }
-      { rewrite /locale_of /=. rewrite gset_to_gmap_singleton. iFrame "#∗". }
+               "[HrtA HnodeA HfuelA HfpA HresFA Hcc Hccm Hcsm]").
+      { rewrite //=. lia. }
+      { rewrite /locale_of /=. rewrite gset_to_gmap_singleton. iFrame "#∗".
+        iDestruct "Hcc" as "[??]".
+        replace (1/2/2)%Qp with (1/4)%Qp by compute_done. iFrame.
+
+      }
       iIntros "!>" (v) "H".
       rewrite /locale_of. iFrame. }
-    iSplitL "HrtB HnodeB HfuelB HresFB HfpB".
+    iSplitL "HrtB HnodeB HfuelB HresFB HfpB Hcs".
     { iApply (wp_server _ (usr_fl (initial_model_state : stenning_model)) with "[-]").
       { rewrite /=. lia. }
       { rewrite /locale_of /=. rewrite gset_to_gmap_singleton. iFrame "#∗". }
@@ -157,12 +181,4 @@ Proof.
     done. }
 
   eapply program_model_refinement_preserves_upward in Hcs =>//.
-(*   rewrite /= in Hcs. destruct Hcs as (utr & Href & Hafair & Haval & Heq). *)
-(*   eapply program_model_refinement_downward_eventually=>//. *)
-
-(*   eapply trace_eventually_mono; last apply stenning_fair_node_B_sends; last first=>//. *)
-(*   { rewrite ltl_sat_def /trace_now /pred_at /=. destruct utr=>//. } *)
-(*   intros tr. rewrite !ltl_sat_def /trace_label /pred_at /usr_send_filter /=. destruct tr=>//. *)
-(*   intros [ρ ->]. naive_solver. *)
-(* Qed. *)
-Admitted.
+Qed.

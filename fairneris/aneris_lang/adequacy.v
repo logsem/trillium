@@ -799,7 +799,8 @@ Section lm_network.
     extrace_valid extr →
     ex_fair extr →
     (trfirst extr) = (es, σ) →
-    ∃ utr, program_model_refinement extr utr ∧ usr_fair utr ∧ usr_trace_valid utr ∧ trfirst utr = m0.(ls_under).1.
+    ∃ utr, program_model_refinement extr utr ∧ usr_fair utr ∧ usr_trace_valid utr ∧
+             trfirst utr = m0.(ls_under).1 ∧ (utr ⊩ □ ↓ λ (s : M) _, inv s).
   Proof.
     intros Hf Hval ??.
     eapply simulation_adequacy_traces_fairness in Hval as (?&?&Hmatch&?&?) =>//.

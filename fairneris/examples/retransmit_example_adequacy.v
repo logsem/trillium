@@ -156,7 +156,7 @@ Proof.
     done. }
 
   eapply program_model_refinement_preserves_upward in Hcs =>//.
-  rewrite /= in Hcs. destruct Hcs as (utr & Href & Hafair & Haval & Heq).
+  rewrite /= in Hcs. destruct Hcs as (utr & Href & Hafair & Haval & Heq & Hinv).
   eapply program_model_refinement_downward_eventually=>//.
 
   eapply trace_eventually_mono; last apply retransmit_fair_node_B_sends; last first=>//.
