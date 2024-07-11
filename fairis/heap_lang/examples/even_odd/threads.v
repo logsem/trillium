@@ -141,17 +141,25 @@ Section ThreadModel.
       (AM_live_roles ame_strong (proj_st st') ⊆ AM_live_roles ame_strong (proj_st st) ->
        live_roles M__p st' ⊆ live_roles M__p st).
 
-    Definition eo_vs l ι ρ__t: iProp Σ :=
+    Definition eo_vs l ι ρ__t 
+      tid
+      : iProp Σ :=
       □ |={⊤, ⊤ ∖ ↑ι}=> ∃ st__p N,
       let st__t := proj_st st__p in
-      (* ⌜ cur_n st__t N ⌝ ∗ *)
       (▷ eo_corr l st__p N) ∗
-      (* (▷ (eo_corr l (if (Nat.even (N + d)) then (N + 1) else N) γ d) ={⊤ ∖ ↑ι, ⊤}=∗ True). *)
       (      
        (⌜ Nat.even (N + d) ⌝ →
         ∀ st__t', ⌜ amTrans _ st__t (inl $ step_sync N, Some ρ__t) st__t' ⌝ ∗ ⌜ cur_n st__t' (N + 1)%nat ⌝ →
-        ∃ (* a *) st__p', ⌜ glob_step st__p st__p' ρ__t (N + 1)%nat ⌝ ∗ 
-                       (▷ (eo_corr l st__p' (N + 1)) ={⊤ ∖ ↑ι, ⊤}=∗ True)
+
+        (* ∃  st__p', *)
+        (*   ⌜ glob_step st__p st__p' ρ__t (N + 1)%nat ⌝ ∗  *)
+        (*   (▷ (eo_corr l st__p' (N + 1)) ={⊤ ∖ ↑ι, ⊤}=∗ True) *)
+          ∀ f, ⌜ f >= 1 ⌝ -∗ tid ↦M {[ lift_role ρ__t := f ]} -∗ frag_model_is st__p -∗ frag_free_roles_are ∅ -∗
+                       MU (⊤ ∖ ↑ι) tid (∃ st__p' f', tid ↦M {[ lift_role ρ__t := f' ]}  ∗ frag_model_is st__p' ∗ frag_free_roles_are ∅ ∗ ⌜ f' > 43 ⌝ ∗
+                                         ⌜ proj_st st__p' = st__t' ⌝ ∗
+                                         (▷ (eo_corr l st__p' (N + 1)) ={⊤ ∖ ↑ι, ⊤}=∗ True))
+                
+
        ) ∗
        (⌜ Nat.odd (N + d) ⌝ →
         ∀ st__t' a, ⌜ amTrans _ st__t (inr a, Some ρ__t) st__t' ⌝ ∗ ⌜ cur_n st__t' N ⌝ →
@@ -164,7 +172,7 @@ Section ThreadModel.
 
   Lemma eo_go_spec (tid: locale heap_lang) n ρ__t (N: nat) f (Hf: f > 40) ι
     (FL: forall st, lm_fl LM__p st >= 61):
-    {{{  eo_vs n ι ρ__t ∗
+    {{{  eo_vs n ι ρ__t tid ∗
          has_fuels tid {[ lift_role ρ__t := f ]} ∗ own th_name (◯E N) ∗
          frag_free_roles_are ∅
     }}}
@@ -189,20 +197,23 @@ Section ThreadModel.
       iSpecialize ("CLOS" with "[]").
       { iPureIntro. split; [| reflexivity]. 
         rewrite Nat.add_1_r. simpl. econstructor. intuition. }
-      
-      iDestruct "CLOS" as (st') "((%ST'&%STEP&%LR)&CLOS)".
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR"); eauto.
-      { apply LR. simpl. by rewrite !thread_AM_lr_exact. } 
-      iApply (wp_cmpxchg_suc with "Hn"); [by do 3 f_equiv|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+
+      iSpecialize ("CLOS" with "[] [$] [$] [$]"); [iPureIntro; lia| ].
+      iApply sswp_MU_wp; [done| ].
+      iApply (wp_cmpxchg_suc with "[$]"); try done.  
+      iIntros "!> Hb".
+      iApply (MU_wand with "[-CLOS] [$]"). 
+      iIntros "(%st' & %f' & (Hf& Hmod& HFR & %FUEL' & %ST' & CLOS))".
+
       iMod (th_update _ _ _ (N + 2) with "[$]") as "[Hay Heven]".
       wp_pures.
-      iModIntro.
+      iModIntro. 
       iMod ("CLOS" with "[Hmod Hay Hb]") as "_". 
-      { replace (Z.of_nat N + 1)%Z with (Z.of_nat (N + 1)) by lia. rewrite -ST'. 
+      { replace (Z.of_nat N + 1)%Z with (Z.of_nat (N + 1)) by lia.
+        rewrite -ST'.
         iFrame. iSplitR; [done| ]. 
         rewrite ST'. rewrite Nat.add_shuffle0. rewrite Nat.even_add.
-        rewrite Heqn. simpl. 
+        rewrite Heqn. simpl.
         rewrite -Nat.add_assoc. done. }
       iModIntro. simpl.
 
@@ -271,11 +282,13 @@ Definition thread_0_even: EvenModel.
       rewrite Nat.add_0_r. iFrame. done. }
     iSplitL "E".
     + iIntros "%E" (st__t') "[%STEP %CUR']". iSpecialize ("E" with "[%//]").
-      iDestruct ("E" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)".
-      red in CUR'. subst. 
-      iExists _. iSplitL ""; [done| ]. 
-      iIntros "(?&?&?&?)". iApply "CLOS".
-      iNext. rewrite Nat.add_0_r. iFrame.
+      iDestruct ("E" $! _ with "[%//]") as "E".
+      iIntros "**". iSpecialize ("E" with "[] [$] [$] [$]"); auto.
+      iApply (MU_wand with "[] [$]").
+      iIntros "(% & % & (?&?&?&%&%&CLOS))".
+      do 2 iExists _. iFrame. iApply bi.sep_assoc. iSplitR; [done| ].
+      rewrite /eo_corr. iIntros "(?&?&?&?)". iApply "CLOS". iNext.
+      rewrite Nat.add_0_r. iFrame. 
     + iIntros "%O" (st__t' a) "[%STEP %CUR']". iSpecialize ("O" with "[%//]").
       iDestruct ("O" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)".
       red in CUR'. subst. 
@@ -314,9 +327,10 @@ Definition thread_1_odd: OddModel.
     + iIntros "%O" (st__t') "[%STEP %CUR']". iSpecialize ("O" with "[%//]").
       iDestruct ("O" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)".
       red in CUR'. subst. 
-      iExists _. iSplitL ""; [done| ]. 
-      iIntros "(?&?&?&?)". iApply "CLOS".
-      iNext. rewrite !even_plus1_negb negb_involutive. iFrame.
+      (* iExists _. iSplitL ""; [done| ].  *)
+      (* iIntros "(?&?&?&?)". iApply "CLOS". *)
+      (* iNext. rewrite !even_plus1_negb negb_involutive. iFrame. *)
+      admit. 
     + iIntros "%E" (st__t' a) "[%STEP %CUR']".
       rewrite Nat.negb_odd in E. 
       iSpecialize ("E" with "[%//]").
@@ -326,4 +340,4 @@ Definition thread_1_odd: OddModel.
       iIntros "(?&?&?&?)". iApply "CLOS".
       iNext. rewrite !even_plus1_negb. iFrame.
   - exact ρT.
-Qed.
+Admitted. 

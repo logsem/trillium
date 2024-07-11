@@ -109,7 +109,7 @@ Record EvenModel := {
   (proj_st : fmstate M__p → amSt even_AM) (lift_role : 
                                             amRole even_AM → 
                                             fmrole M__p) 
-  (l : loc) (ι : namespace) (ρ__t : amRole even_AM) := 
+  (l : loc) (ι : namespace) (ρ__t : amRole even_AM) tid := 
   (□ (|={⊤,⊤ ∖ ↑ι}=>
         ∃ (st__p : M__p) (N : nat),
           let st__t := proj_st st__p in
@@ -118,9 +118,17 @@ Record EvenModel := {
            → ∀ st__t' : amSt even_AM,
                ⌜amTrans even_AM st__t (inl (step_sync N), Some ρ__t)
                   st__t'⌝ ∗ ⌜cur_even st__t' (N + 1)⌝
-               → ∃ st__p' : M__p,
-                   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'%nat⌝ ∗
-                   (▷ even_corr threadG0 proj_st l st__p' (N + 1) ={⊤ ∖ ↑ι,⊤}=∗ True)) ∗
+               → 
+                 (* ∃ st__p' : M__p, *)
+                 (*   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'%nat⌝ ∗ *)
+                 (*   (▷ even_corr threadG0 proj_st l st__p' (N + 1) ={⊤ ∖ ↑ι,⊤}=∗ True) *)
+                 ∀ f, ⌜ f >= 1 ⌝ -∗ tid ↦M {[ lift_role ρ__t := f ]} -∗ frag_model_is st__p -∗ frag_free_roles_are ∅ -∗
+                       MU (⊤ ∖ ↑ι) tid (∃ st__p' f', tid ↦M {[ lift_role ρ__t := f' ]}  ∗ frag_model_is st__p' ∗ frag_free_roles_are ∅ ∗ ⌜ f' > 43 ⌝ ∗
+                                         ⌜ proj_st st__p' = st__t' ⌝ ∗
+                                         (▷ (even_corr threadG0 proj_st l st__p' (N + 1)) ={⊤ ∖ ↑ι, ⊤}=∗ True))
+
+          ) ∗
+
           (⌜Nat.odd N⌝
            → ∀ (st__t' : amSt even_AM) (a : ePriv),
                ⌜amTrans even_AM st__t (inr a, Some ρ__t) st__t'⌝ ∗
@@ -134,7 +142,7 @@ Record EvenModel := {
   (proj_st : M__p → amSt even_AM) (lift_role: amRole even_AM → fmrole M__p) 
   (tid : locale heap_lang) (n : loc) (ρ__t : amRole even_AM) 
   (N f : nat) (FUEL: f > 40) (ι : namespace) (FL: ∀ st : M__p, lm_fl LM__p st ≥ 61):
-      {{{ even_vs proj_st lift_role n ι ρ__t ∗
+      {{{ even_vs proj_st lift_role n ι ρ__t tid ∗
         tid ↦M {[lift_role ρ__t := f]} ∗
         own th_name (◯E N) ∗
         frag_free_roles_are ∅ }}}

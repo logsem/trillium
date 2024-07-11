@@ -387,12 +387,26 @@ Section proof.
       2: { rewrite -Nat.negb_even E. by iIntros "%foo". }
       iIntros "_ %st__t' [%STEP %CUR__E']".
       pose proof CUR__O as foo. eapply @odd_syncable in foo as (st2' & STEP2 & CUR__O').
-      2: { set_solver. }      
-      iExists (st__t', st2'). iSplitR.
-      { iPureIntro. repeat split; auto.
-        - econstructor. simpl. econstructor; eauto.
-          Unshelve. 2: exact (inl (step_sync M)). done.
-        - simpl. intros LR__e. eapply lr_pres_even_sync; eauto. }
+      2: { set_solver. }
+
+      iIntros (f') "%F' MAP ST FREE".
+      iApply (MU_wand with "[O CLOS]").
+      2: { iApply (model_step_MU with "[$] [MAP] [$]").
+           4: { iApply (has_fuels_proper with "[$]"); auto.
+                rewrite -(insert_empty (inl _)).
+                rewrite insert_union_singleton_l.
+                apply fin_maps.union_proper; [reflexivity| ].
+                by setoid_rewrite fmap_empty. }
+           { done. }
+           Unshelve. 3: exact (st__t', st2'). 
+           - econstructor. simpl. econstructor; eauto.
+             Unshelve. 2: exact (inl (step_sync M)). done.
+           - simpl. intros LR__e. eapply lr_pres_even_sync; eauto.
+             admit. (* forgot to include this condition in premise for MU *) 
+      }
+      rewrite map_union_empty. iIntros "(?&?&?)". iFrame.
+      rewrite bi.sep_assoc. iSplitR.
+      { iPureIntro. split; auto. simpl. lia. }
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       iNext. iFrame. simpl.
       rewrite even_plus1_negb E. simpl. iFrame. done.
@@ -408,7 +422,7 @@ Section proof.
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       iNext. iFrame. simpl. 
       rewrite E. iFrame. done. 
-  Qed.
+  Admitted. 
   
   Lemma odd_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
     {{{ evenodd_inv l ∗ tid ↦M {[ inr ρ := f ]} ∗ odd_at N ∗
