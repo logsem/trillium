@@ -241,6 +241,108 @@ Proof.
   iIntros "!>". iFrame. by iApply "HΦΨ".
 Qed.
 
+  Definition HL_LM_trace_interp' (extr: execution_trace heap_lang)
+    (lmtr: auxiliary_trace LM) (τ: locale heap_lang): iProp Σ :=
+    match extr with
+    | {tr[ _ ]} => False
+    | extr' :tr[oζ]: c' =>
+        let c := trace_last extr' in
+        let δ := trace_last lmtr in
+        gen_heap_interp c'.2.(heap) ∗
+        model_state_interp c.1 δ ∗
+        ⌜ tids_smaller c.1 δ ⌝ ∗
+        ⌜ oζ = Some τ ⌝ ∗
+        ⌜ locale_step c (Some τ) c' ⌝
+    end.
+
+    Definition MU E ζ (P : iProp Σ) : iProp Σ :=
+    ∀ extr atr,
+      HL_LM_trace_interp' extr atr ζ ={E}=∗
+      ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) ∗ P.
+
+    (* TODO: have similar proof in other repo *)
+    Lemma MSI_tids_smaller (σ: list expr) δ:
+      ⊢ model_state_interp σ δ -∗ ⌜tids_smaller σ δ⌝.
+    Proof. 
+      rewrite /model_state_interp.
+      iIntros "(%fm & %LE & %DEAD & %TP & X)".
+      iPureIntro. red. intros.
+      red in TP.
+    Admitted. 
+
+
+    (* TODO: move *)
+    Lemma locale_fill' e K t1: locale_of t1 (fill K e) = locale_of t1 e.
+    Proof. done. Qed.
+
+
+  Lemma sswp_MU_wp_fupd s E E' ζ e Φ
+    (NVAL: language.to_val e = None)
+    :
+    let sswp_post := λ e', (MU E' ζ ((|={E',E}=> WP e' @ s; ζ; E {{ Φ }})))%I in
+      (|={E,E'}=> sswp s E' e sswp_post)%I -∗
+      WP e @ s; ζ; E {{ Φ }}.
+  Proof.
+    simpl. rewrite wp_unfold /wp_pre.
+    iIntros "Hsswp". rewrite NVAL. 
+    iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+    iMod "Hsswp" as "foo".
+    rewrite /sswp. rewrite NVAL.
+    iSimpl in "Hσ". iDestruct "Hσ" as "(%EV & HEAP & MSI)".
+    iSpecialize ("foo" with "HEAP").
+    iMod "foo" as (Hs) "Hsswp".
+    red in Hextr. rewrite Hextr. 
+    iModIntro. iSplit.
+    { iPureIntro. by rewrite Hextr in Hs. }
+    iIntros (e2 σ2 efs Hstep).
+    iDestruct ("Hsswp" with "[//]") as "Hsswp".
+    iApply (step_fupdN_le 1); [| done| ].
+    { pose proof (trace_length_at_least extr). lia. }
+    simpl.
+    iApply (step_fupd_wand with "Hsswp").
+    iIntros ">(Hσ & HMU & ->)".
+    rewrite /MU. iSpecialize ("HMU" $! (_ :tr[Some ζ]: _)  with "[MSI Hσ]").
+    { rewrite /HL_LM_trace_interp'.
+      iPoseProof (MSI_tids_smaller with "MSI") as "%TS".
+      remember (trace_last extr) as xx. destruct xx as [tp h].
+      inversion Hextr as [[TP H]]. 
+      rewrite -TP in TS. 
+      iApply bi.sep_assoc. iSplitL.
+      2: { iPureIntro. repeat split; eauto.
+           { replace tp with (tp, h).1 in TS by done.
+             rewrite Heqxx in TS. apply TS. }
+           simpl in Hζ. 
+           rewrite -Hζ. simpl.
+           (* rewrite locale_fill'.  *)
+           eapply locale_step_atomic.
+           3: { eapply @fill_step. apply Hstep. } 
+           { rewrite -Heqxx Hextr. simpl. reflexivity. }
+           reflexivity. }
+      rewrite -Heqxx TP. simpl. iFrame. }
+    iMod ("HMU") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
+    iExists _, _. rewrite right_id_L. by iFrame.
+  Qed.
+
+  Lemma MU_wand E ζ (P Q : iProp Σ) :
+    (P -∗ Q) -∗ MU E ζ P -∗ MU E ζ Q.
+  Proof.
+    rewrite /MU. iIntros "HPQ HMU".
+    iIntros (extr atr) "Hσ".
+    iMod ("HMU" with "Hσ") as (??) "[Hσ HP]". iModIntro.
+    iExists _, _. iFrame. by iApply "HPQ".
+  Qed.
+
+  Lemma sswp_MU_wp s E ζ e (Φ : val → iProp Σ)
+    (NVAL: language.to_val e = None):
+    sswp s E e (λ e', MU E ζ (WP e' @ s; ζ;  E {{ Φ }})) -∗
+      WP e @ s; ζ; E {{ Φ }}.
+  Proof.
+    iIntros "Hsswp". iApply sswp_MU_wp_fupd; auto. iModIntro.
+    iApply (sswp_wand with "[] Hsswp").
+    iIntros (?) "HMU". iApply (MU_wand with "[] HMU"). by iIntros "$ !>".
+  Qed.
+
+
 Lemma has_fuels_decr E tid fs :
   tid ↦M++ fs -∗ |~{E}~| tid ↦M fs.
 Proof.
@@ -270,6 +372,30 @@ Proof.
   by iApply ("Hwp" with "HM Hfuels").
 Qed.
 
+(* TODO: move? *)
+Lemma model_step_MU tid E s1 s2 ρ f1 fs fr
+  (Hdom: ρ ∉ dom fs)
+  (TRANS: fmtrans M s1 (Some ρ) s2)
+  (LR: M.(live_roles) s2 ⊆ M.(live_roles) s1):
+  frag_model_is s1 -∗
+  tid ↦M ({[ρ := f1]} ∪ (S <$> fs)) -∗
+  frag_free_roles_are fr -∗
+  MU E tid (frag_model_is s2 ∗
+           tid ↦M ({[ρ := lm_fl LM s2]} ∪ fs) ∗
+           frag_free_roles_are fr).
+Proof.
+  iIntros "Hst Hfuel1 Hfr".
+  rewrite /MU /HL_LM_trace_interp'. iIntros (extr lmtr) "X".
+  destruct extr; [done| ].
+  iDestruct "X" as "(HEAP & MSI & %TS & -> & %STEP)".
+  iMod (update_model_step with "Hfuel1 Hst MSI") as
+    (δ2 Hvse) "(Hfuel & Hst & Hmod)"; eauto.
+  iModIntro. iFrame. iExists _. iPureIntro. done. 
+Qed. 
+ 
+  
+
+
 Lemma wp_step_model s tid ρ (f1 : nat) fs fr s1 s2 E e Φ :
   TCEq (to_val e) None →
   fmtrans M s1 (Some ρ) s2 →
@@ -285,22 +411,16 @@ Lemma wp_step_model s tid ρ (f1 : nat) fs fr s1 s2 E e Φ :
   WP e @ s; tid; E {{ Φ }}.
 Proof.
   iIntros (Hval Htrans Hlive Hdom) ">Hst >Hfuel1 >Hfr Hwp".
-  rewrite wp_unfold /wp_pre.
-  rewrite /sswp. simpl. rewrite Hval.
-  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hexend) "(% & Hsi & Hmi)".
-  iMod ("Hwp" with "Hsi") as (Hred) "Hwp". iIntros "!>".
-  iSplitR; [by rewrite Hexend in Hred|]. iIntros (????). rewrite Hexend.
-  iMod ("Hwp" with "[//]") as "Hwp". iIntros "!>!>". iMod "Hwp". iIntros "!>".
-  iApply step_fupdN_intro; [done|]. iIntros "!>".
-  iMod "Hwp" as "[Hσ [Hwp ->]]".
-  iDestruct (model_agree' with "Hmi Hst") as %Hmeq. iFrame.
-  rewrite /trace_ends_in in Hexend. rewrite -Hexend.
-  iMod (update_model_step with "Hfuel1 Hst Hmi") as
-    (δ2 Hvse) "(Hfuel & Hst & Hmod)"; eauto.
-  - rewrite -Hloc. eapply locale_step_atomic; eauto. by apply fill_step.
-  - iModIntro; iExists δ2, (Take_step ρ tid). rewrite big_sepL_nil. iFrame.
-    iSplit; [done|]. iDestruct ("Hwp" with "Hst Hfuel Hfr") as "Hwp". by iFrame.
-Qed.
+  iApply sswp_MU_wp.
+  { by inversion Hval. }
+  iApply (sswp_wand with "[-Hwp]"); [| by iFrame].
+  simpl. iIntros (e') "POST".
+  iApply (MU_wand with "[POST]").
+  2: { iApply (model_step_MU with "[$] [$] [$]"); eauto. }
+  iIntros "(?&?&?)". by iApply ("POST" with "[$] [$] [$]").
+Qed. 
+
+
 
 Lemma wp_step_model_singlerole s tid ρ (f1 : nat) fr s1 s2 E e Φ :
   TCEq (to_val e) None →
