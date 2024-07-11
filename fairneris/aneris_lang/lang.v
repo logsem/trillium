@@ -749,9 +749,14 @@ Inductive aneris_action :=
 #[global] Instance aneris_action_eqdec : EqDecision aneris_action.
 Proof. solve_decision. Defined.
 #[global] Instance aneris_action_countable : Countable aneris_action.
-Proof. Admitted.
+Proof. admit. Admitted.
+#[global] Instance message_inhabited : Inhabited message.
+Proof.
+  constructor.
+  exact ({| m_sender := inhabitant; m_destination := inhabitant; m_body := inhabitant|}).
+Defined.
 #[global] Instance aneris_action_inhabited : Inhabited aneris_action.
-Proof. Admitted.
+Proof. constructor. exact (Send (inhabitant)). Defined.
 
 (* The network-aware reduction step relation for a given node *)
 Inductive socket_step ip :
@@ -1036,9 +1041,6 @@ Inductive aneris_config_label : Type :=
 | Deliver : message → aneris_config_label
 | Duplicate : message → aneris_config_label
 | Drop : message → aneris_config_label.
-
-#[global] Instance message_inhabited : Inhabited message.
-Proof. Admitted.
 
 #[global] Instance aneris_config_label_eqdec : EqDecision aneris_config_label.
 Proof. solve_decision. Defined.
