@@ -76,7 +76,7 @@ Record EvenModel := {
     even_AM := BuildSubModel eSt ePriv eRole eTrans;
     even_AME :> ActionModelExtra even_AM;
 
-    even_syncable n st (EVEN: Nat.odd n) (CUR: cur_even st n):
+    even_syncable n st (ODD: Nat.odd n) (CUR: cur_even st n):
       exists st', amTrans even_AM st (inl (step_sync n), None) st' /\ cur_even st' (n + 1);
     even_sync_step_inv st__e st__e' k N ρ
       (STEP: amTrans even_AM st__e (inl (step_sync k), Some ρ) st__e')

@@ -248,8 +248,8 @@ End ThreadModel.
 Definition thread_0_even: EvenModel.
   refine {| cur_even := cur_n 0 |}.
   - intros. red in CUR. subst st.
-    rewrite (plus_n_O n) in EVEN. 
-    eapply thread_syncable in EVEN.
+    rewrite (plus_n_O n) in ODD. 
+    eapply thread_syncable in ODD.
     eexists. split; eauto. done.
   - intros. red in CUR. subst st__e.
     simpl in *.
