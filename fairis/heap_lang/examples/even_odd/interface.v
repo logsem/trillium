@@ -92,18 +92,18 @@ Record EvenModel := {
     (threadG0 : threadG Σ) 
   (proj_st : M__p → amSt even_AM) (l : loc) (st : M__p) 
   (N : nat) :=
-  let st__t := proj_st st in
-  (frag_model_is st ∗ l ↦ #N ∗ ⌜cur_even st__t N⌝ ∗
+  (* let st__t := proj_st st in *)
+  (frag_model_is st ∗ l ↦ #N ∗ (* ⌜cur_even st__t N⌝ ∗ *)
    own th_name (●E (if Nat.even N then N else N + 1)))%I;
-  glob_step_even {M__p : FairModel}
-    (proj_st : fmstate M__p → amSt even_AM)
-  (lift_role : amRole even_AM → fmrole M__p) 
-  (st st' : M__p) (ρ__t : amRole even_AM) (st__e' : amSt even_AM) := 
-  proj_st st' = st__e'
-  ∧ fmtrans M__p st (Some (lift_role ρ__t)) st'
-    ∧ (AM_live_roles ame_strong (proj_st st')
-       ⊆ AM_live_roles ame_strong (proj_st st)
-       → live_roles M__p st' ⊆ live_roles M__p st);
+  (* glob_step_even {M__p : FairModel} *)
+  (*   (proj_st : fmstate M__p → amSt even_AM) *)
+  (* (lift_role : amRole even_AM → fmrole M__p)  *)
+  (* (st st' : M__p) (ρ__t : amRole even_AM) (st__e' : amSt even_AM) :=  *)
+  (* proj_st st' = st__e' *)
+  (* ∧ fmtrans M__p st (Some (lift_role ρ__t)) st' *)
+  (*   ∧ (AM_live_roles ame_strong (proj_st st') *)
+  (*      ⊆ AM_live_roles ame_strong (proj_st st) *)
+  (*      → live_roles M__p st' ⊆ live_roles M__p st); *)
   even_vs {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
   {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 
   (proj_st : fmstate M__p → amSt even_AM) (lift_role : 
@@ -114,29 +114,20 @@ Record EvenModel := {
         ∃ (st__p : M__p) (N : nat),
           let st__t := proj_st st__p in
           ▷ even_corr threadG0 proj_st l st__p N ∗
-          (⌜Nat.even N⌝
-           → ∀ st__t' : amSt even_AM,
-               ⌜amTrans even_AM st__t (inl (step_sync N), Some ρ__t) st__t'⌝ ∗
-               ⌜cur_even st__t' (N + 1)⌝ ∗
-               ⌜ AM_live_roles ame_strong st__t' ⊆ AM_live_roles ame_strong st__t ⌝
-               → 
-                 (* ∃ st__p' : M__p, *)
-                 (*   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'%nat⌝ ∗ *)
-                 (*   (▷ even_corr threadG0 proj_st l st__p' (N + 1) ={⊤ ∖ ↑ι,⊤}=∗ True) *)
-                 ∀ f, ⌜ f >= 1 ⌝ -∗ tid ↦M {[ lift_role ρ__t := f ]} -∗ frag_model_is st__p -∗ frag_free_roles_are ∅ -∗
-                       MU (⊤ ∖ ↑ι) tid (∃ st__p' f', tid ↦M {[ lift_role ρ__t := f' ]}  ∗ frag_model_is st__p' ∗ frag_free_roles_are ∅ ∗ ⌜ f' > 43 ⌝ ∗
-                                         ⌜ proj_st st__p' = st__t' ⌝ ∗
-                                         (▷ (even_corr threadG0 proj_st l st__p' (N + 1)) ={⊤ ∖ ↑ι, ⊤}=∗ True))
+          (∀ f, tid ↦M {[ lift_role ρ__t := f ]} -∗ frag_model_is st__p -∗ frag_free_roles_are ∅ -∗
+             MU (⊤ ∖ ↑ι) tid (
+               ∃ st__p' f', tid ↦M {[ lift_role ρ__t := f' ]}  ∗ frag_model_is st__p' ∗ frag_free_roles_are ∅ ∗ ⌜ f' > 43 ⌝ ∗
+                 (▷ (even_corr threadG0 proj_st l st__p' (if Nat.even N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True)))
+          ))%I;
+          (* ∗ *)
 
-          ) ∗
-
-          (⌜Nat.odd N⌝
-           → ∀ (st__t' : amSt even_AM) (a : ePriv),
-               ⌜amTrans even_AM st__t (inr a, Some ρ__t) st__t'⌝ ∗
-               ⌜cur_even st__t' N⌝
-               → ∃ st__p' : M__p,
-                   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'⌝ ∗
-                   (▷ even_corr threadG0 proj_st l st__p' N ={⊤ ∖ ↑ι,⊤}=∗ True))))%I;
+          (* (⌜Nat.odd N⌝ *)
+          (*  → ∀ (st__t' : amSt even_AM) (a : ePriv), *)
+          (*      ⌜amTrans even_AM st__t (inr a, Some ρ__t) st__t'⌝ ∗ *)
+          (*      ⌜cur_even st__t' N⌝ *)
+          (*      → ∃ st__p' : M__p, *)
+          (*          ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'⌝ ∗ *)
+          (*          (▷ even_corr threadG0 proj_st l st__p' N ={⊤ ∖ ↑ι,⊤}=∗ True))))%I; *)
   even_prog: val;
   even_spec {M__p : FairModel} {LM__p : LiveModel heap_lang M__p} 
   {Σ : gFunctors} {heapGS0 : heapGS Σ LM__p} {threadG0 : threadG Σ} 

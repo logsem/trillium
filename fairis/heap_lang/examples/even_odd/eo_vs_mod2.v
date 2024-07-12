@@ -362,6 +362,27 @@ Section proof.
       Unshelve. 2: exact (inl (step_sync M)). simpl. subst k. done.
   Qed.
 
+  Definition st2nat (st: fmstate the_fair_model) N :=
+    cur_even even_impl st.1 N /\ cur_odd odd_impl st.2 N.
+
+  (* TODO: move *)
+  Lemma cur_even_inj: forall e, Inj eq and (cur_even even_impl e).
+  Proof.
+    (* red. intros.  *)
+  Admitted. 
+
+  Global Instance st2nat_inj: forall st, Inj eq and (st2nat st).
+  Proof. 
+    red. rewrite /st2nat. intros [e o] k m EQUIV. simpl in *. 
+    destruct EQUIV as ((X&?)&Y&?).
+    eapply cur_even_inj; eauto.
+  Qed.     
+  
+
+  Lemma even_steppable (n: nat) st (EVEN: Nat.even n) (CUR: cur_even _ st n):
+    exists st' ρ, amTrans even_AM st (inl (step_sync n), Some ρ) st' /\ cur_even _ st' (n + 1).
+  Proof. Admitted.
+
   Lemma even_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
     {{{ evenodd_inv l ∗ tid ↦M {[ inl ρ := f ]} ∗ even_at N ∗
         frag_free_roles_are ∅ }}}
@@ -381,7 +402,49 @@ Section proof.
     iModIntro. iExists _, _. iSplitL "Hmod Hn E".
     { rewrite /even_corr. simpl. iFrame.
       simpl. iFrame. destruct (Nat.even M); auto. }
-    simpl. 
+    simpl.
+
+    iIntros (f') "MAP ST FREE".
+
+    enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some (inl ρ)) st' /\
+                   live_roles _ st' ⊆ live_roles _ ((st__e, st__o): fmstate the_fair_model) /\
+           st2nat st' (if Nat.even M then (M + 1) else M)) as (st' & TRANS & LR & CUR'). 
+    { iApply (MU_wand with "[O CLOS]").
+      2: { iApply (model_step_MU with "[$] [MAP] [$]"); eauto. 
+           2: { iApply (has_fuels_proper with "[$]"); auto.
+                rewrite -(insert_empty (inl _)).
+                rewrite insert_union_singleton_l.
+                apply fin_maps.union_proper; [reflexivity| ].
+                by setoid_rewrite fmap_empty. }
+           done. }
+      iIntros "(MAP & ST & FREE)".
+      rewrite -insert_union_singleton_l.
+      iFrame. iSplitR; [iPureIntro; simpl; lia| ].
+      iIntros "(?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
+      rewrite /evenodd_inv_inner. iNext. iFrame.
+      destruct (Nat.even M) eqn:E.
+      - rewrite even_plus1_negb E. simpl. iFrame.
+        destruct st'. destruct CUR' as [??]. simpl in *. set_solver.
+      - rewrite E. destruct st'. iFrame.
+        destruct CUR' as [??]. simpl in *. set_solver. }
+
+    destruct (Nat.even M) eqn:E.
+    - forward eapply even_steppable as (st__e' & ρ__e & STEP__e & CUR__e'); eauto.
+      forward eapply odd_syncable as (st__o' & STEP__o & CUR__o'); eauto.
+      eexists (_, _). split.
+      { simpl. econstructor. eapply @pt_sync1; eauto.
+        2: { simpl. simpl in STEP__e. eapply @STEP__e.
+             
+        Unshelve. 2: exact (inl (step_sync M)). done.
+
+      
+           
+           Unshelve. 3: exact (st__t', st2'). 
+           - econstructor. simpl. econstructor; eauto.
+             Unshelve. 2: exact (inl (step_sync M)). done.
+           - simpl. intros LR__e. eapply lr_pres_even_sync; eauto. }
+    
+    
     destruct (Nat.even M) eqn:E.
     - iSplitL.
       2: { rewrite -Nat.negb_even E. by iIntros "%foo". }
