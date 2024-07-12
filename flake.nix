@@ -1,10 +1,9 @@
 {
-  description = "A devShell example";
+  description = "A devShell for Fairneris";
 
   inputs = {
     nixpkgs.url      = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url  = "github:numtide/flake-utils";
-    # coq-lsp = { type = "git"; url = "https://github.com/ejgallego/coq-lsp.git"; submodules = true; };
   };
 
   outputs = { self, nixpkgs, flake-utils, ... }:
@@ -20,8 +19,6 @@
         devShell = mkShell rec {
           buildInputs = with coqPackages_8_19; [
             coq
-            coq-lsp
-            coq-elpi
           ];
         };
       }

@@ -1,4 +1,4 @@
-# Trillium / Fairis
+# Trillium / Fairneris
 
 Trillium is a higher-order concurrent separation logic for proving trace
 refinements between programs and models. The logic is
@@ -9,17 +9,18 @@ mechanized in the [Coq proof assistant](https://coq.inria.fr/).
 
 - [`trillium/`](trillium/): The Trillium program logic framework
 
-- [`fairis/`](fairis/): The Fairis instantiation of Trillium for reasoning
+- [`fairis/`](fairneris/): The Fairis instantiation of Trillium for reasoning
   about fair termination of concurrent programs.
-  + [`heap_lang/`](fairis/heap_lang/): HeapLang instantiation with fuel model
-    * [`examples/`](fairis/heap_lang/examples/): Examples and case studies
+  + [`aneris_lang/`](fairneris/heap_lang/): HeapLang instantiation with fuel model
+  + [`examples/`](fairneris/examples/): Examples and case studies
 
 - [`external/`](external/): External dependencies
 
 ## Compiling
 
-The project maintains compatibility with Coq 8.17 and relies on `coqc` being
-available in your shell. Clone the external git submodule dependencies using
+The project maintains compatibility with Coq 8.19 and relies on `coqc` being
+available in your shell. One can use the included nix flake for this.
+Clone the external git submodule dependencies using
 
     git submodule update --init --recursive
 
@@ -29,7 +30,7 @@ Run `make -jN` to build the full development, where `N` is the number of your
 CPU cores.
 
 Note that the compilation of the external dependencies is known to print
-a lot of warning messages when compiled with Coq 8.17.
+a lot of warning messages when compiled with Coq 8.19.
 
 ## Git submodule dependencies
 
@@ -59,9 +60,3 @@ the submodule update to make it visible to other users of the repository.
 Read more about git submodules in [this
 tutorial](https://git-scm.com/book/en/v2/Git-Tools-Submodules).
 
-## Publications
-
-A [preprint](https://iris-project.org/pdfs/2021-submitted-trillium.pdf) is
-available describing Trillium, a program logic framework for both proving
-partial correctness properties and trace properties; Aneris is now an
-instantiation of the Trillium framework.
