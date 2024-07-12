@@ -149,7 +149,9 @@ Section ThreadModel.
       (▷ eo_corr l st__p N) ∗
       (      
        (⌜ Nat.even (N + d) ⌝ →
-        ∀ st__t', ⌜ amTrans _ st__t (inl $ step_sync N, Some ρ__t) st__t' ⌝ ∗ ⌜ cur_n st__t' (N + 1)%nat ⌝ →
+        ∀ st__t', ⌜ amTrans _ st__t (inl $ step_sync N, Some ρ__t) st__t' ⌝ ∗ 
+                ⌜ cur_n st__t' (N + 1)%nat ⌝ ∗
+                ⌜ AM_live_roles ame_strong st__t' ⊆ AM_live_roles ame_strong st__t ⌝ →
 
         (* ∃  st__p', *)
         (*   ⌜ glob_step st__p st__p' ρ__t (N + 1)%nat ⌝ ∗  *)
@@ -195,8 +197,9 @@ Section ThreadModel.
       iModIntro.
       iDestruct "CLOS" as "[CLOS _]". iSpecialize ("CLOS" with "[]"); [done| ].
       iSpecialize ("CLOS" with "[]").
-      { iPureIntro. split; [| reflexivity]. 
-        rewrite Nat.add_1_r. simpl. econstructor. intuition. }
+      { iPureIntro. split; [| split]; [| reflexivity | ]. 
+        - rewrite Nat.add_1_r. simpl. econstructor. intuition.
+        - by rewrite !thread_AM_lr_exact. }
 
       iSpecialize ("CLOS" with "[] [$] [$] [$]"); [iPureIntro; lia| ].
       iApply sswp_MU_wp; [done| ].
@@ -325,8 +328,8 @@ Definition thread_1_odd: OddModel.
       rewrite even_plus1_negb. iFrame. done. }
     iSplitL "O".
     + iIntros "%O" (st__t') "[%STEP %CUR']". iSpecialize ("O" with "[%//]").
-      iDestruct ("O" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)".
-      red in CUR'. subst. 
+      (* iDestruct ("O" $! _ with "[%//]") as (?) "((%&%&%)&CLOS)". *)
+      (* red in CUR'. subst.  *)
       (* iExists _. iSplitL ""; [done| ].  *)
       (* iIntros "(?&?&?&?)". iApply "CLOS". *)
       (* iNext. rewrite !even_plus1_negb negb_involutive. iFrame. *)

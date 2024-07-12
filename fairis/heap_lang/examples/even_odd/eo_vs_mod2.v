@@ -385,7 +385,7 @@ Section proof.
     destruct (Nat.even M) eqn:E.
     - iSplitL.
       2: { rewrite -Nat.negb_even E. by iIntros "%foo". }
-      iIntros "_ %st__t' [%STEP %CUR__E']".
+      iIntros "_ %st__t' (%STEP & %CUR__E' & %LR__E)".
       pose proof CUR__O as foo. eapply @odd_syncable in foo as (st2' & STEP2 & CUR__O').
       2: { set_solver. }
 
@@ -401,9 +401,7 @@ Section proof.
            Unshelve. 3: exact (st__t', st2'). 
            - econstructor. simpl. econstructor; eauto.
              Unshelve. 2: exact (inl (step_sync M)). done.
-           - simpl. intros LR__e. eapply lr_pres_even_sync; eauto.
-             admit. (* forgot to include this condition in premise for MU *) 
-      }
+           - simpl. intros LR__e. eapply lr_pres_even_sync; eauto. }
       rewrite map_union_empty. iIntros "(?&?&?)". iFrame.
       rewrite bi.sep_assoc. iSplitR.
       { iPureIntro. split; auto. simpl. lia. }
@@ -422,7 +420,7 @@ Section proof.
       iIntros "(?&?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       iNext. iFrame. simpl. 
       rewrite E. iFrame. done. 
-  Admitted. 
+  Qed. 
   
   Lemma odd_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
     {{{ evenodd_inv l ∗ tid ↦M {[ inr ρ := f ]} ∗ odd_at N ∗

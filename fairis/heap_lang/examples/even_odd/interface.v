@@ -116,8 +116,9 @@ Record EvenModel := {
           ▷ even_corr threadG0 proj_st l st__p N ∗
           (⌜Nat.even N⌝
            → ∀ st__t' : amSt even_AM,
-               ⌜amTrans even_AM st__t (inl (step_sync N), Some ρ__t)
-                  st__t'⌝ ∗ ⌜cur_even st__t' (N + 1)⌝
+               ⌜amTrans even_AM st__t (inl (step_sync N), Some ρ__t) st__t'⌝ ∗
+               ⌜cur_even st__t' (N + 1)⌝ ∗
+               ⌜ AM_live_roles ame_strong st__t' ⊆ AM_live_roles ame_strong st__t ⌝
                → 
                  (* ∃ st__p' : M__p, *)
                  (*   ⌜glob_step_even proj_st lift_role st__p st__p' ρ__t st__t'%nat⌝ ∗ *)
