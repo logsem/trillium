@@ -148,11 +148,11 @@ Section proof.
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]".
     - iDestruct (even_agree with "Heven Hay") as "%Heq".
       iModIntro.
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      iApply (wp_step_model_singlerole with "Hmod Hf").
       { constructor. by eauto. }
       { set_solver. }
       iApply (wp_cmpxchg_suc with "Hn"); [by do 3 f_equiv|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+      iIntros "!> Hb Hmod Hf".
       iMod (even_update (M + 2) with "[$]") as "[Hay Heven]".
       wp_pures.
       iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
@@ -167,11 +167,11 @@ Section proof.
       iPureIntro; lia.
     - iDestruct (even_agree with "Heven Hay") as "%Heq". rewrite -> Heq in *.
       iModIntro.
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      iApply (wp_step_model_singlerole with "Hmod Hf").
       { apply even_fail. rewrite -Nat.negb_even. rewrite Heqn. done. }
       { set_solver. }
       iApply (wp_cmpxchg_fail with "Hn"); [intros Hne; simplify_eq; lia|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+      iIntros "!> Hb Hmod Hf".
       wp_pures.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
       { iNext. simplify_eq. iExists _. iFrame.
@@ -199,11 +199,11 @@ Section proof.
     destruct (Nat.even M) eqn:Heqn; iDestruct "Hauths" as "[>Hay >Han]"; last first.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq".
       iModIntro.
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      iApply (wp_step_model_singlerole with "Hmod Hf").
       { apply odd_trans. rewrite -Nat.negb_even. rewrite Heqn. done. }
       { set_solver. }
       iApply (wp_cmpxchg_suc with "Hn"); [by do 3 f_equiv|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+      iIntros "!> Hb Hmod Hf".
       iMod (odd_update (M + 2) with "[$]") as "[Han Hodd]".
       wp_pures.
       iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
@@ -219,12 +219,12 @@ Section proof.
       iPureIntro; lia.
     - iDestruct (odd_agree with "Hodd Han") as "%Heq". rewrite -> Heq in *.
       simplify_eq. iModIntro.
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      iApply (wp_step_model_singlerole with "Hmod Hf").
       { apply odd_fail. by eauto. }
       { set_solver. }
       iApply (wp_cmpxchg_fail with "Hn");
         [by intros Hneq; simplify_eq; lia|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+      iIntros "!> Hb Hmod Hf".
       wp_pures.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
       { iNext. simplify_eq. iExists _. iFrame.

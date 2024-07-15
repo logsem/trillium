@@ -227,12 +227,12 @@ Section proof.
     { destruct cn; inversion Hvalid. by simplify_eq. }
     (* Update the model state to maintain program correspondence *)
     iApply (wp_step_model_singlerole _ _ (():fmrole cn_fair_model) (f - 7)
-             with "Hs [Hf] Hr").
+             with "Hs [Hf]").
     { constructor. }
     { simpl. destruct n; set_solver. }
     { by replace (f - 1 - 1 - 1 - 1 - 1 - 1 - 1)%nat with (f - 7)%nat by lia. }
     iApply (wp_store with "Hl").
-    iIntros "!> Hl Hs Hf Hr".
+    iIntros "!> Hl Hs Hf".
     wp_pures.
     iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
     { apply (excl_auth_update _ _ (Z.of_nat n)%Z). }
@@ -275,13 +275,13 @@ Section proof.
     { destruct cn; inversion Hvalid; [done|]. lia. }
     (* Update the model state to maintain program correspondence *)
     iApply (wp_step_model_singlerole _ _ (():fmrole cn_fair_model) (f - 3)
-                                     _ _ (N (S n))
-             with "Hs [Hf] Hr").
+                                     _ (N (S n))
+             with "Hs [Hf]").
     { constructor. }
     { set_solver. }
     { by replace (f - 1 - 1 - 1)%nat with (f - 3)%nat by lia. }
     iApply (wp_store with "Hl").
-    iIntros "!> Hl Hs Hf Hr".
+    iIntros "!> Hl Hs Hf".
     wp_pures.
     iMod (own_update_2 _ _ _ with "Hcn Hm") as "[Hcn Hm]".
     { apply (excl_auth_update _ _ (Z.of_nat (S n))%Z). }

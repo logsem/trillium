@@ -175,11 +175,11 @@ Section proof.
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
       + iModIntro.
-        iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+        iApply (wp_step_model_singlerole with "Hmod Hf").
         { econstructor. lia. }
         { set_solver. }
         iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
-        iIntros "!> Hb Hmod Hf HFR".
+        iIntros "!> Hb Hmod Hf".
         iMod (yes_update 0 with "[$]") as "[Hay Hyes]".
         wp_pures.
         iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
@@ -230,11 +230,11 @@ Section proof.
           iFrame.
       + assert (N = N) by lia. simplify_eq.
         iModIntro.
-        iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+        iApply (wp_step_model_singlerole with "Hmod Hf").
         { constructor. lia. }
         {  simpl. destruct M; [set_solver | destruct M; set_solver]. }
         iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
-        iIntros "!> Hb Hmod Hf HFR".
+        iIntros "!> Hb Hmod Hf".
         iMod (yes_update (M-1) with "[$]") as "[Hay Hyes]".
         wp_pures. iModIntro.
         iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
@@ -256,11 +256,11 @@ Section proof.
     - iDestruct (yes_agree with "Hyes Hay") as "%Heq". rewrite -> Heq in *.
       have HM: M > 0 by lia.
       iModIntro.
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      iApply (wp_step_model_singlerole with "Hmod Hf").
       { constructor. lia. }
       { set_solver. }
       iApply (wp_cmpxchg_fail with "Bb"); [done|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+      iIntros "!> Hb Hmod Hf".
       wp_pures. iModIntro.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
       { iNext. simplify_eq. iExists _, _. iFrame. iFrame. done. }
@@ -307,11 +307,11 @@ Section proof.
       destruct (decide (M = 0)) as [->|Nneq]; first lia.
       destruct (decide (M = 1)) as [->|Nneq1].
       + iModIntro.
-        iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+        iApply (wp_step_model_singlerole with "Hmod Hf").
         { econstructor. }
         { set_solver. }
         iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
-        iIntros "!> Hb Hmod Hf HFR".
+        iIntros "!> Hb Hmod Hf".
         iMod (no_update 0 with "[$]") as "[Han Hno]".
         wp_pures. iModIntro.
         iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").
@@ -344,11 +344,11 @@ Section proof.
       + assert (N = N) by lia. simplify_eq.
         destruct M; first done.
         iModIntro.
-        iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+        iApply (wp_step_model_singlerole with "Hmod Hf").
         { econstructor. }
         { simpl. destruct M; [set_solver | destruct M; set_solver]. }
         iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
-        iIntros "!> Hb Hmod Hf HFR".
+        iIntros "!> Hb Hmod Hf".
         iMod (no_update (M) with "[$]") as "[Han Hno]".
         wp_pures. iModIntro.
         iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
@@ -366,11 +366,11 @@ Section proof.
     - iDestruct (no_agree with "Hno Han") as "%Heq". rewrite -> Heq in *.
       have HM: M > 0 by lia.
       assert (M = N) by lia. simplify_eq. iModIntro.
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      iApply (wp_step_model_singlerole with "Hmod Hf").
       { econstructor. lia. }
       { set_solver. }
       iApply (wp_cmpxchg_fail with "Bb"); [done|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+      iIntros "!> Hb Hmod Hf".
       wp_pures.
       iModIntro.
       iMod ("Hclose" with "[Hmod Hb Hay Han HFR]").

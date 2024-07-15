@@ -33,22 +33,6 @@ Section ModelMono.
 
   Definition evenodd_mtrace : Type := mtrace M.
   
-  Definition st2nat (st: fmstate M) N :=
-    cur_even _ st.1 N /\ cur_odd _ st.2 N.
-
-  (* TODO: move *)
-  Lemma cur_even_inj: forall e, Inj eq and (cur_even even_impl e).
-  Proof.
-    (* red. intros.  *)
-  Admitted. 
-
-  Global Instance st2nat_inj: forall st, Inj eq and (st2nat st).
-  Proof. 
-    red. rewrite /st2nat. intros [e o] k m EQUIV. simpl in *. 
-    destruct EQUIV as ((X&?)&Y&?).
-    eapply cur_even_inj; eauto.
-  Qed.     
-  
   Definition evenodd_mdl_progress (tr : evenodd_mtrace) :=
     ∀ (i: nat), ∃ n, pred_at tr n (λ s _, st2nat s i).
 

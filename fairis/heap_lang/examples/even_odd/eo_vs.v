@@ -231,11 +231,11 @@ Section proof.
     destruct (Nat.even (M + d)) eqn:Heqn.
     - iDestruct (they_agree with "Heven Hauths") as "->".
       iModIntro.
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      iApply (wp_step_model_singlerole with "Hmod Hf").
       { specialize (STEP N). rewrite Heqn in STEP. apply STEP. }
       { set_solver. }
       iApply (wp_cmpxchg_suc with "Hn"); [by do 3 f_equiv|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+      iIntros "!> Hb Hmod Hf".
       iMod (they_update _ _ _ (N + 2) with "[$]") as "[Hay Heven]".
       wp_pures.
       iModIntro.
@@ -254,11 +254,11 @@ Section proof.
     - iDestruct (they_agree with "Heven Hauths") as "%Heq". rewrite -> Heq in *.
       iModIntro.
       subst. 
-      iApply (wp_step_model_singlerole with "Hmod Hf HFR").
+      iApply (wp_step_model_singlerole with "Hmod Hf").
       { specialize (STEP M). rewrite Heqn in STEP. apply STEP. }
       { set_solver. }
       iApply (wp_cmpxchg_fail with "Hn"); [intros Hne; simplify_eq; lia|done|].
-      iIntros "!> Hb Hmod Hf HFR".
+      iIntros "!> Hb Hmod Hf".
       wp_pures.
       iModIntro. 
       iMod ("CLOS" with "[Hmod Hb Hauths]").
