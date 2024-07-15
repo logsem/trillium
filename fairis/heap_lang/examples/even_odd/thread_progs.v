@@ -50,7 +50,6 @@ End ThreadGLemmas.
 Section ProofsGen.  
   Context `{LM__p: LiveModel heap_lang M__p}.
   Context `{!heapGS Σ LM__p}.
-  (* Context (d: nat).  *)
   Context (cond: nat -> bool).
   Hypothesis (COND_S_NEG: forall n, cond (S n) = negb (cond n)). 
   
@@ -62,85 +61,77 @@ Section ProofsGen.
        then "incr_loop" "l" ("n" + #2)
        else "incr_loop" "l" "n").
   
-  Definition eo_corr l (st: fmstate M__p) (N: nat): iProp Σ :=
-    frag_model_is st ∗ l ↦ #N ∗
-    (* own th_name (●E (if Nat.even (N + d) then N else (N + 1))). *)
+  Definition eo_corr l (N: nat): iProp Σ :=
+    l ↦ #N ∗
     own th_name (●E (if cond N then N else (N + 1))).
     
   Definition eo_vs l ι (ρ: fmrole M__p) tid : iProp Σ :=
-    □ |={⊤, ⊤ ∖ ↑ι}=> ∃ st__p N,
-    (▷ eo_corr l st__p N) ∗
-      (∀ f, tid ↦M {[ ρ := f ]} -∗ frag_model_is st__p -∗ frag_free_roles_are ∅ -∗
-              MU (⊤ ∖ ↑ι) tid (
-                ∃ st__p' f', tid ↦M {[ ρ := f' ]}  ∗ frag_model_is st__p' ∗ frag_free_roles_are ∅ ∗ ⌜ f' > 43 ⌝ ∗
-                                                                                                               (▷ (eo_corr l st__p' (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True))).
+    □ |={⊤, ⊤ ∖ ↑ι}=> ∃ N,
+    (▷ eo_corr l N) ∗
+      (∀ f, tid ↦M {[ ρ := f ]} -∗ MU (⊤ ∖ ↑ι) tid (
+                ∃ f', tid ↦M {[ ρ := f' ]}  ∗ ⌜ f' > 43 ⌝ ∗ (▷ (eo_corr l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True))).
   
   Lemma eo_go_spec (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
     (FL: forall st, lm_fl LM__p st >= 61):
     {{{  eo_vs n ι ρ tid ∗
-           has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) ∗
-           frag_free_roles_are ∅
-    }}}
+         has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) }}}
       incr_loop #n #N @ tid
       {{{ RET #(); has_fuels tid ∅ }}}.
   Proof using COND_S_NEG.
     iLöb as "Hg" forall (N f Hf).
-    iIntros (Φ). iIntros "(#VS & Hf & Heven & HFR) Hk".
+    iIntros (Φ). iIntros "(#VS & Hf & Heven) Hk".
                    
     rewrite /incr_loop.
     wp_lam.
     wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic.
-    iPoseProof "VS" as "-#V". iMod "V" as "(%st & %M & (>Hmod & >Hn & >Hauths) & CLOS)".
+    iPoseProof "VS" as "-#V". iMod "V" as "(%M & (>Hn & >Hauths) & CLOS)".
 
-    (* destruct (Nat.even (M + d)) eqn:Heqn. *)
     destruct (cond M) eqn:Heqn.
     - iDestruct (th_agree with "Heven Hauths") as "->".
       iModIntro.
-      iSpecialize ("CLOS" with "[$] [$] [$]"). 
+      iSpecialize ("CLOS" with "[$]"). 
       iApply sswp_MU_wp; [done| ].
       iApply (wp_cmpxchg_suc with "[$]"); try done.  
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
-      iIntros "(%st' & %f' & (Hf& Hmod& HFR & %FUEL' & CLOS))".
+      iIntros "(%f' & (Hf& %FUEL' & CLOS))".
 
       iMod (th_update _ _ _ (N + 2) with "[$]") as "[Hay Heven]".
       wp_pures.
       iModIntro. 
-      iMod ("CLOS" with "[Hmod Hay Hb]") as "_". 
+      iMod ("CLOS" with "[Hay Hb]") as "_". 
       { replace (Z.of_nat N + 1)%Z with (Z.of_nat (N + 1)) by lia.
         iFrame.
         rewrite Nat.add_1_r COND_S_NEG Heqn. simpl.
         by rewrite Nat.add_succ_r. }
       iModIntro. simpl.
 
-      pose proof (FL st').
       do 3 wp_pure _.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
-      iApply ("Hg" with "[] [Heven Hf HFR] [$]"); last first.
+      iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
     - iDestruct (th_agree with "Heven Hauths") as "%Heq". rewrite -> Heq in *.
       iModIntro.
       subst.
 
-      iSpecialize ("CLOS" with "[$] [$] [$]"). 
+      iSpecialize ("CLOS" with "[$]"). 
       iApply sswp_MU_wp; [done| ].
       iApply (wp_cmpxchg_fail with "[$]"); [| done| ].
       { assert (M ≠ M + 1) by lia. set_solver. }
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
-      iIntros "(%st' & %f' & (Hf& Hmod& HFR & %FUEL' & CLOS))".
+      iIntros "(%f' & (Hf & %FUEL' & CLOS))".
 
       iMod (th_update _ _ _ (M + 1) with "[$]") as "[Hay Heven]".
       wp_pures.
       iModIntro. 
-      iMod ("CLOS" with "[Hmod Hay Hb]") as "_". 
+      iMod ("CLOS" with "[Hay Hb]") as "_". 
       { iFrame. by rewrite Heqn. }
       iModIntro. simpl.
 
-      pose proof (FL st').
       do 2 wp_pure _.
-      iApply ("Hg" with "[] [Heven Hf HFR] [$]"); last first.
+      iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
   Qed.

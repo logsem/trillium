@@ -371,27 +371,26 @@ Section proof.
     cur_even even_impl st.1 N /\ cur_odd odd_impl st.2 N.
 
   Lemma even_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
-    {{{ evenodd_inv l ∗ tid ↦M {[ inl ρ := f ]} ∗ even_at N ∗
-        frag_free_roles_are ∅ }}}
+    {{{ evenodd_inv l ∗ tid ↦M {[ inl ρ := f ]} ∗ even_at N }}}
       incr_loop #l #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
+    iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
     
     iApply (@even_spec the_fair_model _ _ _ evenThreadG 
-             with "[$Hf $FR $Heo]"); [lia| simpl; lia | |done].
+             with "[$Hf $Heo]"); [lia| simpl; lia | |done].
     rewrite /eo_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
   
     iDestruct "OPEN" as (st__e st__o M) "(>Hmod & >%CUR__E & >%CUR__O & >Hn & Hauths)".
     rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
-    iModIntro. iExists _, _. iSplitL "Hmod Hn E".
+    iModIntro. iExists _. iSplitL "Hn E".
     { rewrite /eo_corr. simpl. iFrame.
       simpl. iFrame. destruct (Nat.even M); auto. }
     simpl.
 
-    iIntros (f') "MAP ST FREE".
+    iIntros (f') "MAP".
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some (inl ρ)) st' /\
                    live_roles _ st' ⊆ live_roles _ ((st__e, st__o): fmstate the_fair_model) /\
@@ -399,17 +398,17 @@ Section proof.
     { clear CUR__E CUR__O Hf.
 
       iApply (MU_wand with "[O CLOS]").
-      2: { iApply (model_step_MU with "[$] [MAP] [$]"); eauto. 
+      2: { iApply (model_step_MU with "[$] [MAP]"); eauto. 
            2: { iApply (has_fuels_proper with "[$]"); auto.
                 rewrite -(insert_empty (inl _)).
                 rewrite insert_union_singleton_l.
                 apply fin_maps.union_proper; [reflexivity| ].
                 by setoid_rewrite fmap_empty. }
            done. }
-      iIntros "(MAP & ST & FREE)".
+      iIntros "(MAP & ST)".
       rewrite -insert_union_singleton_l.
       iFrame. iSplitR; [iPureIntro; simpl; lia| ].
-      iIntros "(?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
+      iIntros "(?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       rewrite /evenodd_inv_inner. iNext. iFrame.
       destruct (Nat.even M) eqn:E.
       - rewrite even_plus1_negb E. simpl. iFrame.
@@ -441,25 +440,24 @@ Section proof.
   Qed.
   
   Lemma odd_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
-    {{{ evenodd_inv l ∗ tid ↦M {[ inr ρ := f ]} ∗ odd_at N ∗
-        frag_free_roles_are ∅ }}}
+    {{{ evenodd_inv l ∗ tid ↦M {[ inr ρ := f ]} ∗ odd_at N }}}
       incr_loop #l #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof. 
-    iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
+    iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
     
     iApply (@odd_spec the_fair_model _ _ _ oddThreadG
-             with "[$Hf $FR $Heo]"); [lia| simpl; lia | |done].
+             with "[$Hf $Heo]"); [lia| simpl; lia | |done].
     rewrite /eo_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
     iDestruct "OPEN" as (st__e st__o M) "(>Hmod & >%CUR__E & >%CUR__O & >Hn & Hauths)".
     rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
-    iModIntro. iExists _, _. iSplitL "Hmod Hn O".
+    iModIntro. iExists _. iSplitL "Hn O".
     { rewrite /eo_corr. simpl. iFrame.
       simpl. rewrite -Nat.negb_odd. destruct (Nat.odd M); auto. }
 
-    iIntros (f') "MAP ST FREE".
+    iIntros (f') "MAP".
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some (inr ρ)) st' /\
                    live_roles _ st' ⊆ live_roles _ ((st__e, st__o): fmstate the_fair_model) /\
@@ -467,7 +465,7 @@ Section proof.
     { clear CUR__E CUR__O Hf.
 
       iApply (MU_wand with "[E CLOS]").
-      2: { iApply (model_step_MU with "[$] [MAP] [$]"); eauto. 
+      2: { iApply (model_step_MU with "[$] [MAP]"); eauto. 
            2: { iApply (has_fuels_proper with "[$]"); auto.
                 rewrite -(insert_empty (inr _) f').
                 rewrite insert_union_singleton_l.
@@ -475,10 +473,10 @@ Section proof.
                 apply fin_maps.union_proper; [reflexivity| ].
                 by setoid_rewrite fmap_empty. }
            done. }
-      iIntros "(MAP & ST & FREE)".
+      iIntros "(MAP & ST)".
       rewrite -insert_union_singleton_l.
       iFrame. iSplitR; [iPureIntro; simpl; lia| ].
-      iIntros "(?&?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
+      iIntros "(?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       rewrite /evenodd_inv_inner. iNext. iFrame.
       destruct (Nat.odd M) eqn:O.
       - rewrite even_plus1_negb odd_plus1_negb Nat.negb_even -Nat.negb_odd !O. 
@@ -511,15 +509,14 @@ Section proof.
   Qed.
 
   Lemma incr_loop_spec (eo : EO') tid ρ__e ρ__o n (N : nat) f (Hf: f > 40) :
-    {{{ evenodd_inv n ∗ tid ↦M {[ if eo then inl ρ__e else inr ρ__o := f ]} ∗ (eo_frag eo) N ∗
-        frag_free_roles_are ∅ }}}
+    {{{ evenodd_inv n ∗ tid ↦M {[ if eo then inl ρ__e else inr ρ__o := f ]} ∗ (eo_frag eo) N }}}
       (if eo then incr_loop else incr_loop) #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
-    iIntros (Φ) "(#Hinv & Hf & Heo & FR) Hk".
+    iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
     destruct eo; simpl in *. 
-    - iApply (even_spec_use with "[$Hf $FR $Heo]"); [lia| ..]; done.
-    - iApply (odd_spec_use with "[$Hf $FR $Heo]"); [lia| ..]; done.
+    - iApply (even_spec_use with "[$Hf $Heo]"); [lia| ..]; done.
+    - iApply (odd_spec_use with "[$Hf $Heo]"); [lia| ..]; done.
   Qed. 
 
 End proof.
@@ -565,7 +562,7 @@ Section proof_start.
   Proof using All.
     iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". unfold start.
     rewrite <- (union_empty_l_L ∅). 
-    iDestruct (frag_free_roles_are_sep with "HFR") as "[HFR1 HFR2]"; [set_solver| ].
+    (* iDestruct (frag_free_roles_are_sep with "HFR") as "[HFR1 HFR2]"; [set_solver| ]. *)
     wp_pures.
     wp_bind (Load _).
     iApply wp_atomic.
@@ -576,14 +573,14 @@ Section proof_start.
     iDestruct "Hauths" as "[Heven Hodd]".
     iDestruct (even_agree with "Heven_at Heven") as %<-.
     iDestruct (odd_agree with "Hodd_at Hodd") as %<-.
-    destruct (Nat.even M) eqn:E; [| lia].     
+    destruct (Nat.even M) eqn:E; [| lia].
 
-    iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ HFR1 HFR2]") as "_".
+    iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ]") as "_".
     { iIntros "!>". iExists _. iFrame. 
       rewrite E. iFrame; done. }
     iIntros "!>". wp_pures. wp_bind (Fork _).
     iApply (wp_role_fork _ tid _ _ _ {[ρOdd := _]} {[ρEven := _]}
-             with "[Hf ] [Heven_at HFR1]"). 
+             with "[Hf ] [Heven_at]"). 
     { apply map_disjoint_dom. rewrite !dom_singleton.
       destruct (Nat.even M); set_solver. }
     { intros Hempty%map_positive_l. set_solver. }
@@ -603,7 +600,7 @@ Section proof_start.
     iIntros "!> Hf".
     iIntros "!>".
     wp_pures.
-    iApply (wp_role_fork _ tid _ _ _ ∅ _ with "[Hf] [Hodd_at HFR2]").
+    iApply (wp_role_fork _ tid _ _ _ ∅ _ with "[Hf] [Hodd_at]").
     { apply map_disjoint_dom. apply map_disjoint_dom. apply map_disjoint_empty_l. }
     2: { rewrite has_fuels_gt_1; last solve_fuel_positive.
          rewrite !fmap_insert fmap_empty //.
