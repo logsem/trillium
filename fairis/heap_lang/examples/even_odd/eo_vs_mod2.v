@@ -370,14 +370,14 @@ Section proof.
   Definition st2nat (st: fmstate the_fair_model) N :=
     cur_even even_impl st.1 N /\ cur_odd odd_impl st.2 N.
 
-  Lemma even_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
+  Lemma even_spec_use tid l (N : nat) ρ f (Hf: f > 40) (ep: EvenProg):
     {{{ evenodd_inv l ∗ tid ↦M {[ inl ρ := f ]} ∗ even_at N }}}
-      incr_loop #l #N @ tid
+      (e_prog ep) #l #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
     
-    iApply (@even_spec the_fair_model _ _ _ evenThreadG 
+    iApply (@e_spec ep the_fair_model _ _ _ evenThreadG 
              with "[$Hf $Heo]"); [lia| simpl; lia | |done].
     rewrite /eo_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
@@ -439,14 +439,14 @@ Section proof.
       + done.
   Qed.
   
-  Lemma odd_spec_use tid l (N : nat) ρ f (Hf: f > 40) :
+  Lemma odd_spec_use tid l (N : nat) ρ f (Hf: f > 40) (op: OddProg):
     {{{ evenodd_inv l ∗ tid ↦M {[ inr ρ := f ]} ∗ odd_at N }}}
-      incr_loop #l #N @ tid
+      (o_prog op) #l #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof. 
     iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
     
-    iApply (@odd_spec the_fair_model _ _ _ oddThreadG
+    iApply (@o_spec op the_fair_model _ _ _ oddThreadG
              with "[$Hf $Heo]"); [lia| simpl; lia | |done].
     rewrite /eo_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
@@ -508,9 +508,11 @@ Section proof.
       + done.
   Qed.
 
-  Lemma incr_loop_spec (eo : EO') tid ρ__e ρ__o n (N : nat) f (Hf: f > 40) :
+  Lemma incr_loop_spec (eo : EO') tid ρ__e ρ__o n (N : nat) f (Hf: f > 40)
+                       (ep: EvenProg) (op: OddProg)
+    :
     {{{ evenodd_inv n ∗ tid ↦M {[ if eo then inl ρ__e else inr ρ__o := f ]} ∗ (eo_frag eo) N }}}
-      (if eo then incr_loop else incr_loop) #n #N @ tid
+      (if eo then (e_prog ep) else (o_prog op)) #n #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
@@ -524,7 +526,9 @@ End proof.
 Section proof_start.
   (* Context {even_impl: EvenModel} {odd_impl: OddModel}. *)
   Let even_impl := thread_0_even. 
-  Let odd_impl := thread_1_odd. 
+  Let odd_impl := thread_1_odd.
+
+  Context (ep: EvenProg) (op: OddProg). 
 
   Context `{!heapGS Σ (@the_model), !evenoddG Σ}.
   Context {th_preG: threadPreG Σ}. 
@@ -546,8 +550,8 @@ Section proof_start.
   Definition start : val :=
     λ: "l",
       let: "x" := !"l" in
-      (Fork (incr_loop "l" "x") ;;
-       Fork (incr_loop "l" ("x"+#1))).
+      (Fork ((e_prog ep) "l" "x") ;;
+       Fork ((o_prog op) "l" ("x"+#1))).
 
   Existing Instance even_AME. 
   Existing Instance odd_AME.

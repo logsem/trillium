@@ -70,14 +70,19 @@ Section ProofsGen.
     (▷ eo_corr l N) ∗
       (∀ f, tid ↦M {[ ρ := f ]} -∗ MU (⊤ ∖ ↑ι) tid (
                 ∃ f', tid ↦M {[ ρ := f' ]}  ∗ ⌜ f' > 43 ⌝ ∗ (▷ (eo_corr l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True))).
-  
-  Lemma eo_go_spec (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
-    (FL: forall st, lm_fl LM__p st >= 61):
-    {{{  eo_vs n ι ρ tid ∗
+
+  Definition eo_spec (prog: val) :=
+    forall (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
+    (FL: forall st, lm_fl LM__p st >= 61),
+    ⊢ {{{  eo_vs n ι ρ tid ∗
          has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) }}}
-      incr_loop #n #N @ tid
+      prog #n #N @ tid
       {{{ RET #(); has_fuels tid ∅ }}}.
+  
+  Lemma eo_spec_incr_loop: eo_spec incr_loop.
   Proof using COND_S_NEG.
+    red. intros tid n ρ N f Hf ι FL.
+    iIntros "!>". 
     iLöb as "Hg" forall (N f Hf).
     iIntros (Φ). iIntros "(#VS & Hf & Heven) Hk".
                    
@@ -139,8 +144,27 @@ Section ProofsGen.
 End ProofsGen.
 
 
-Definition even_spec `{LM__p: LiveModel heap_lang M__p} `{!heapGS Σ LM__p, !threadG Σ}:=
-    eo_go_spec Nat.even even_succ_negb. 
+Record EvenProg := {
+    e_prog: val;
+    e_spec `{LM__p: LiveModel heap_lang M__p} `{!heapGS Σ LM__p, !threadG Σ}:
+      eo_spec Nat.even e_prog;
+}.
 
-Definition odd_spec `{LM__p: LiveModel heap_lang M__p} `{!heapGS Σ LM__p, !threadG Σ}:=
-    eo_go_spec Nat.odd odd_succ_negb.
+Record OddProg := {
+    o_prog: val;
+    o_spec `{LM__p: LiveModel heap_lang M__p} `{!heapGS Σ LM__p, !threadG Σ}:
+      eo_spec Nat.odd o_prog;
+}.
+
+
+Program Definition incr_loop_even_prog: EvenProg := {| e_prog := incr_loop |}.
+Next Obligation.
+  intros. apply eo_spec_incr_loop. 
+  intros. apply even_succ_negb.
+Qed. 
+
+Program Definition incr_loop_odd_prog: OddProg := {| o_prog := incr_loop |}.
+Next Obligation.
+  intros. apply eo_spec_incr_loop. 
+  intros. apply odd_succ_negb.
+Qed. 
