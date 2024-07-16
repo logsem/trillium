@@ -106,29 +106,7 @@ Section ThreadModel.
     inversion STEP; subst; eauto.
   Qed.
 
-  (* Lemma thread_sync_lr_nonincr n n' M *)
-  (*     (STEP: amTrans thread_model n (inl (step_sync M), None) n'): *)
-  (*   AM_live_roles ame_strong n' ⊆ AM_live_roles ame_strong n. *)
-  (* Proof.  *)
-  (*   rewrite !thread_AM_lr_exact. done. *)
-  (* Qed. *)
- 
   Definition cur_n (st: amSt thread_model) := st. 
-
-  (* Lemma thread_steppable (n: nat) (EVEN: Nat.even (n + d)): *)
-  (*   amTrans thread_model st (inl (step_sync n), Some ρT) st' /\ cur_n st' (n + 1). *)
-  (* Proof. *)
-  (*   red in CUR. subst. *)
-  (*   rewrite Nat.add_1_r.  *)
-  (*   eexists. split; [econstructor| ]; done. *)
-  (* Qed.  *)
-
-  (* Lemma thread_stutterable (n: nat) st (EVEN: Nat.odd (n + d)) (CUR: cur_n st n): *)
-  (*   exists st' a, amTrans thread_model st (inr a, Some ρT) st' /\ cur_n st' n. *)
-  (* Proof. *)
-  (*   red in CUR. subst. *)
-  (*   do 2 eexists. split; [econstructor| ]; done. *)
-  (* Qed. *)
 
 End ThreadModel.
 

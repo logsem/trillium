@@ -114,14 +114,6 @@ Section proof.
   Definition evenodd_inv n := inv Ns (evenodd_inv_inner n).
 
 
-  Inductive EO' := eoE | eoO.
-  
-  Definition eo_frag (eo: EO') : nat → iProp Σ :=
-    match eo with
-    | eoE => even_at
-    | eoO => odd_at
-    end.
-   
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
 
