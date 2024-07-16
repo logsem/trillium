@@ -40,25 +40,33 @@ Record EvenModel := {
     eRole: Type;
     eTrans;
 
-    cur_even: eSt -> nat -> Prop;
+    cur_even: eSt -> nat;
 
     even_AM := BuildSubModel eSt ePriv eRole eTrans;
     even_AME :> ActionModelExtra even_AM;
 
-    even_syncable n st (ODD: Nat.odd n) (CUR: cur_even st n):
-      exists st', amTrans even_AM st (inl (step_sync n), None) st' /\ cur_even st' (n + 1);
-    even_sync_step_inv st__e st__e' k N ρ
-      (STEP: amTrans even_AM st__e (inl (step_sync k), Some ρ) st__e')
-      (CUR: cur_even st__e N):
-      k = N /\ Nat.even N;
-    even_sync_lr_nonincr st__e st__e' M
-      (STEP: amTrans even_AM st__e (inl (step_sync M), None) st__e'):
-      AM_live_roles ame_strong st__e' ⊆ AM_live_roles ame_strong st__e;
+    even_step_inv st st' k ρ
+      (STEP: amTrans even_AM st (inl (step_sync k), Some ρ) st'):
+      cur_even st = k /\ cur_even st' = k + 1 /\ Nat.even k;
+    even_sync_inv st st' k
+      (STEP: amTrans even_AM st (inl (step_sync k), None) st'):
+      cur_even st = k /\ cur_even st' = k + 1 /\ Nat.odd k;
+    even_stutter_inv st st' a ρ
+      (STEP: amTrans even_AM st (inr a, Some ρ) st'):
+      cur_even st = cur_even st' (* /\ Nat.odd (cur_even st) *);
 
     ρ__e: amRole even_AM;
+    even_steppable st (EVEN: Nat.even (cur_even st)):
+      exists st', amTrans even_AM st (inl (step_sync (cur_even st)), Some ρ__e) st';
+    even_syncable st (ODD: Nat.odd (cur_even st)):
+      exists st', amTrans even_AM st (inl (step_sync (cur_even st)), None) st';
+    even_stutterable st (ODD: Nat.odd (cur_even st)):
+      exists st' a, amTrans even_AM st (inr a, Some ρ__e) st';
+
+    even_step_lr_nonincr st st' a oρ
+      (STEP: amTrans even_AM st (a, oρ) st'):
+      AM_live_roles ame_strong st' ⊆ AM_live_roles ame_strong st;
 }.
-
-
 
 
 Record OddModel := {
@@ -67,20 +75,30 @@ Record OddModel := {
     oRole: Type;
     oTrans;
 
-    cur_odd: oSt -> nat -> Prop;
+    cur_odd: oSt -> nat;
 
     odd_AM := BuildSubModel oSt oPriv oRole oTrans;
     odd_AME :> ActionModelExtra odd_AM;
 
-    odd_syncable n st (ODD: Nat.even n) (CUR: cur_odd st n):
-      exists st', amTrans odd_AM st (inl (step_sync n), None) st' /\ cur_odd st' (n + 1);
-    odd_sync_step_inv st__e st__e' k N ρ
-      (STEP: amTrans odd_AM st__e (inl (step_sync k), Some ρ) st__e')
-      (CUR: cur_odd st__e N):
-      k = N /\ Nat.odd N;
-    odd_sync_lr_nonincr st__e st__e' M
-      (STEP: amTrans odd_AM st__e (inl (step_sync M), None) st__e'):
-      AM_live_roles ame_strong st__e' ⊆ AM_live_roles ame_strong st__e;
+    odd_step_inv st st' k ρ
+      (STEP: amTrans odd_AM st (inl (step_sync k), Some ρ) st'):
+      cur_odd st = k /\ cur_odd st' = k + 1 /\ Nat.odd k;
+    odd_sync_inv st st' k
+      (STEP: amTrans odd_AM st (inl (step_sync k), None) st'):
+      cur_odd st = k /\ cur_odd st' = k + 1 /\ Nat.even k;
+    odd_stutter_inv st st' a ρ
+      (STEP: amTrans odd_AM st (inr a, Some ρ) st'):
+      cur_odd st = cur_odd st' (* /\ Nat.even (cur_odd st) *);
 
     ρ__o: amRole odd_AM;
+    odd_steppable st (ODD: Nat.odd (cur_odd st)):
+      exists st', amTrans odd_AM st (inl (step_sync (cur_odd st)), Some ρ__o) st';
+    odd_syncable st (ODD: Nat.even (cur_odd st)):
+      exists st', amTrans odd_AM st (inl (step_sync (cur_odd st)), None) st';
+    odd_stutterable st (ODD: Nat.even (cur_odd st)):
+      exists st' a, amTrans odd_AM st (inr a, Some ρ__o) st';
+
+    odd_step_lr_nonincr st st' a oρ
+      (STEP: amTrans odd_AM st (a, oρ) st'):
+      AM_live_roles ame_strong st' ⊆ AM_live_roles ame_strong st;
 }.

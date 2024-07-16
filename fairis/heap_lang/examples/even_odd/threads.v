@@ -106,62 +106,59 @@ Section ThreadModel.
     inversion STEP; subst; eauto.
   Qed.
 
-  Lemma thread_sync_lr_nonincr n n' M
-      (STEP: amTrans thread_model n (inl (step_sync M), None) n'):
-    AM_live_roles ame_strong n' ⊆ AM_live_roles ame_strong n.
-  Proof. 
-    rewrite !thread_AM_lr_exact. done.
-  Qed.
+  (* Lemma thread_sync_lr_nonincr n n' M *)
+  (*     (STEP: amTrans thread_model n (inl (step_sync M), None) n'): *)
+  (*   AM_live_roles ame_strong n' ⊆ AM_live_roles ame_strong n. *)
+  (* Proof.  *)
+  (*   rewrite !thread_AM_lr_exact. done. *)
+  (* Qed. *)
  
-  Definition cur_n (st: amSt thread_model) (n: nat) := st = n. 
+  Definition cur_n (st: amSt thread_model) := st. 
 
-  Lemma thread_steppable (n: nat) st (EVEN: Nat.even (n + d)) (CUR: cur_n st n):
-    exists st' ρ, amTrans thread_model st (inl (step_sync n), Some ρ) st' /\ cur_n st' (n + 1).
-  Proof.
-    red in CUR. subst.
-    rewrite Nat.add_1_r. 
-    do 2 eexists. split; [econstructor| ]; done.
-  Qed. 
+  (* Lemma thread_steppable (n: nat) (EVEN: Nat.even (n + d)): *)
+  (*   amTrans thread_model st (inl (step_sync n), Some ρT) st' /\ cur_n st' (n + 1). *)
+  (* Proof. *)
+  (*   red in CUR. subst. *)
+  (*   rewrite Nat.add_1_r.  *)
+  (*   eexists. split; [econstructor| ]; done. *)
+  (* Qed.  *)
 
-  Lemma thread_stutterable (n: nat) st (EVEN: Nat.odd (n + d)) (CUR: cur_n st n):
-    exists st' a ρ, amTrans thread_model st (inr a, Some ρ) st' /\ cur_n st' n.
-  Proof.
-    red in CUR. subst.
-    do 3 eexists. split; [econstructor| ]; done.
-  Qed.
+  (* Lemma thread_stutterable (n: nat) st (EVEN: Nat.odd (n + d)) (CUR: cur_n st n): *)
+  (*   exists st' a, amTrans thread_model st (inr a, Some ρT) st' /\ cur_n st' n. *)
+  (* Proof. *)
+  (*   red in CUR. subst. *)
+  (*   do 2 eexists. split; [econstructor| ]; done. *)
+  (* Qed. *)
 
 End ThreadModel.
 
 
 Definition thread_0_even: EvenModel.
-  refine {| cur_even := cur_n 0 |}.
-  - intros. red in CUR. subst st.
-    rewrite (plus_n_O n) in ODD. 
-    eapply thread_syncable in ODD.
-    eexists. split; eauto. done.
-  - intros. red in CUR. subst st__e.
-    simpl in *.
-    apply thread_sync_step_inv in STEP as [-> STEP]. 
-    rewrite -plus_n_O in STEP. done.
-  - intros. simpl.  
-    eapply thread_sync_lr_nonincr; eauto.
-  - exact ρT.
-(* Qed. *)
-Defined.
+  unshelve refine {| cur_even := cur_n 0 |}.
+  4: apply (thread_extra 0).
+  all: cycle 1; simpl in *; unfold cur_n in *. 
+  - intros. inversion STEP; subst; auto.
+    rewrite Nat.add_0_r in H3. repeat split; lia || auto.
+  - intros. inversion STEP; subst; auto.
+    rewrite Nat.add_0_r in H1. repeat split; lia || auto.
+  - intros. inversion STEP; subst; auto.
+  - intros. eexists. econstructor. by rewrite Nat.add_0_r.
+  - intros. eexists. econstructor. by rewrite Nat.add_0_r.
+  - intros. do 2 eexists. econstructor. by rewrite Nat.add_0_r.
+  - intros. by rewrite !thread_AM_lr_exact.
+Qed. 
 
-    
 Definition thread_1_odd: OddModel.
-  refine {| cur_odd := cur_n 1 |}.
-  - intros. red in CUR. subst st.
-    rewrite -Nat.negb_odd -odd_plus1_negb in ODD. 
-    eapply thread_syncable in ODD.
-    eexists. split; eauto. done.
-  - intros. red in CUR. subst st__e.
-    simpl in *.
-    apply thread_sync_step_inv in STEP as [-> STEP]. 
-    rewrite even_plus1_negb Nat.negb_even in STEP. done.
-  - intros.
-    eapply thread_sync_lr_nonincr; eauto.
-  - exact ρT.
-(* Qed.  *)
-Defined. 
+  unshelve refine {| cur_odd := cur_n 1 |}.
+  4: apply (thread_extra 1).
+  all: cycle 1; simpl in *; unfold cur_n in *. 
+  - intros. inversion STEP; subst; auto.
+    rewrite even_plus1_negb Nat.negb_even in H3. repeat split; lia || auto.
+  - intros. inversion STEP; subst; auto.
+    rewrite odd_plus1_negb Nat.negb_odd in H1. repeat split; lia || auto.
+  - intros. inversion STEP; subst; auto.
+  - intros. eexists. econstructor. by rewrite even_plus1_negb Nat.negb_even.
+  - intros. eexists. econstructor. by rewrite odd_plus1_negb Nat.negb_odd.
+  - intros. do 2 eexists. econstructor. by rewrite odd_plus1_negb Nat.negb_odd.
+  - intros. by rewrite !thread_AM_lr_exact.
+Qed.    
