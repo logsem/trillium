@@ -20,16 +20,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1717786204,
-        "narHash": "sha256-4q0s6m0GUcN7q+Y2DqD27iLvbcd1G50T2lv08kKxkSI=",
-        "owner": "nixos",
+        "lastModified": 1721140838,
+        "narHash": "sha256-Z7j/p3n9TCzJxwWXRQAS3Xy8xLbX43sLFwjw4IRrxeY=",
+        "owner": "ineol",
         "repo": "nixpkgs",
-        "rev": "051f920625ab5aabe37c920346e3e69d7d34400e",
+        "rev": "6453e0e7a6757cba6e676af69daf7cda672d6879",
         "type": "github"
       },
       "original": {
-        "owner": "nixos",
-        "ref": "nixos-unstable",
+        "owner": "ineol",
+        "ref": "update-vscoq-lsp",
         "repo": "nixpkgs",
         "type": "github"
       }

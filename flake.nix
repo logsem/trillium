@@ -2,7 +2,7 @@
   description = "A devShell for Fairneris";
 
   inputs = {
-    nixpkgs.url      = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url      = "github:ineol/nixpkgs/update-vscoq-lsp";
     flake-utils.url  = "github:numtide/flake-utils";
   };
 
@@ -19,6 +19,7 @@
         devShell = mkShell rec {
           buildInputs = with coqPackages_8_19; [
             coq
+            vscoq-language-server
           ];
         };
       }

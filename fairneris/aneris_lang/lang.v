@@ -746,10 +746,6 @@ Inductive aneris_action :=
 | Recv : socket_address → option message → aneris_action
 .
 
-#[global] Instance aneris_action_eqdec : EqDecision aneris_action.
-Proof. solve_decision. Defined.
-#[global] Instance aneris_action_countable : Countable aneris_action.
-Proof. admit. Admitted.
 #[global] Instance message_inhabited : Inhabited message.
 Proof.
   constructor.
@@ -757,6 +753,24 @@ Proof.
 Defined.
 #[global] Instance aneris_action_inhabited : Inhabited aneris_action.
 Proof. constructor. exact (Send (inhabitant)). Defined.
+
+#[global] Instance aneris_action_eqdec : EqDecision aneris_action.
+Proof. solve_decision. Defined.
+#[global] Instance aneris_action_countable : Countable aneris_action.
+Proof.
+  set (enc ae :=
+         match ae with
+         | Send msg => GenLeaf (inl msg)
+         | Recv sa omsg => GenLeaf (inr (sa, omsg))
+         end).
+  set (dec t :=
+         match t with
+         | GenLeaf (inl msg) => Send msg
+         | GenLeaf (inr (sa, omsg)) => Recv sa omsg
+         | _ => inhabitant
+         end).
+ refine (inj_countable' enc dec _). by intros [|]; cbn.
+Qed.
 
 (* The network-aware reduction step relation for a given node *)
 Inductive socket_step ip :
@@ -1044,10 +1058,25 @@ Inductive aneris_config_label : Type :=
 
 #[global] Instance aneris_config_label_eqdec : EqDecision aneris_config_label.
 Proof. solve_decision. Defined.
-#[global] Instance aneris_config_label_countable : Countable aneris_config_label.
-Proof. Admitted.
 #[global] Instance aneris_config_label_inhabited : Inhabited aneris_config_label :=
   populate (Deliver inhabitant).
+#[global] Instance aneris_config_label_countable : Countable aneris_config_label.
+Proof.
+  set (enc ae :=
+         match ae with
+         | Deliver msg => GenLeaf (inl msg)
+         | Duplicate msg => GenLeaf (inr $ inl msg)
+         | Drop msg => GenLeaf (inr $ inr msg)
+         end).
+  set (dec t :=
+         match t with
+         | GenLeaf (inl msg) => Deliver msg
+         | GenLeaf (inr (inl msg)) => Duplicate msg
+         | GenLeaf (inr (inr msg)) => Drop msg
+         | _ => inhabitant
+         end).
+ refine (inj_countable' enc dec _). by intros [| |]; cbn.
+Qed.
 
 Inductive config_step :
   state → aneris_config_label → state → Prop :=
