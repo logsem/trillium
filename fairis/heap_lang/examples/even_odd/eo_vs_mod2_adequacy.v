@@ -6,7 +6,7 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness trace_utils.
 From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
-From trillium.fairness.heap_lang.examples.even_odd Require Import eo_vs_mod2 interface utils action_model.
+From trillium.fairness.heap_lang.examples.even_odd Require Import eo_vs_mod2 interface utils action_model thread_progs.
 From stdpp Require Import finite.
 
 (** Helper lemmas for working with even and odd *)
@@ -24,6 +24,13 @@ Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
 
 Lemma odd_not_even n : Nat.odd n → ¬ Nat.even n.
 Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
+
+Lemma even_or_odd n: Nat.even n \/ Nat.odd n.
+Proof. 
+  destruct (decide (Nat.even n)) as [| O]; auto.
+  apply negb_prop_intro in O. rewrite Nat.negb_even in O. tauto.
+Qed.
+  
 
 Section ModelMono.
 (** Proof that any fair execution of model visits all natural numbers *)
@@ -117,20 +124,20 @@ Section ModelMono.
   (*   - by destruct mtr'. *)
   (* Qed. *)
 
-  Lemma even_steppable (n: nat) st (EVEN: Nat.even n) (CUR: cur_even _ st n):
-    exists st' ρ, amTrans even_AM st (inl (step_sync n), Some ρ) st' /\ cur_even _ st' (n + 1).
-  Proof. Admitted.
+  (* Lemma even_steppable (n: nat) st (EVEN: Nat.even n) (CUR: cur_even _ st n): *)
+  (*   exists st' ρ, amTrans even_AM st (inl (step_sync n), Some ρ) st' /\ cur_even _ st' (n + 1). *)
+  (* Proof. Admitted. *)
 
-  Lemma even_sync_inner_pres st ρ st' ρ' (pa: ePriv even_impl):
-    let syncs := fun s ρ => exists n s', amTrans even_AM s (inl $ step_sync n, Some ρ) s' in
-    syncs st ρ -> amTrans even_AM st (inr pa, ρ') st' -> syncs st' ρ.
-  Proof. Admitted. 
+  (* Lemma even_sync_inner_pres st ρ st' ρ' (pa: ePriv even_impl): *)
+  (*   let syncs := fun s ρ => exists n s', amTrans even_AM s (inl $ step_sync n, Some ρ) s' in *)
+  (*   syncs st ρ -> amTrans even_AM st (inr pa, ρ') st' -> syncs st' ρ. *)
+  (* Proof. Admitted.  *)
 
   (* TODO: proof in another branch *)
   Lemma pred_at_state_trfirst:
   ∀ {St L : Type} (tr : trace St L) (P : St → Prop),
     pred_at tr 0 (λ (st : St) (_ : option L), P st) ↔ P (trfirst tr).
-  Proof. Admitted.
+  Proof using. Admitted.
 
   (* TODO: look for general version regarding trace length *)
   Lemma pred_at_S_singl:
@@ -138,6 +145,46 @@ Section ModelMono.
     pred_at (⟨ s ⟩: trace St L) (S m) P <-> False.
   Proof. done. Qed. 
 
+  Let ρEven: fmrole M := inl (ρ__e even_impl).
+  Let ρOdd: fmrole M := inr (ρ__o odd_impl).
+
+  (* TODO: move to interface file *)
+  Lemma ρ__e_always_live st__e:
+    ρ__e even_impl ∈ AM_live_roles (@ame_strong _ even_impl) st__e.
+  Proof.
+    apply AM_live_roles_spec. 
+    destruct (even_or_odd (cur_even _ st__e)) as [E | O]. 
+    - eexists. eapply @even_steppable. intuition.
+    - forward eapply @even_stutterable; eauto.
+      intros (?&?&?). eauto.
+  Qed.
+
+  (* TODO: move to prod model file *)
+  Lemma ρEven_always_live (st: fmstate M) n
+    (CUR: st2nat st n):
+    ρEven ∈ live_roles _ st.
+  Proof.
+    simpl. destruct st. setoid_rewrite prod_AM_live_roles; [| eauto].
+    apply elem_of_union_l. apply elem_of_map.
+    eexists. split; eauto.
+    apply ρ__e_always_live. 
+  Qed. 
+
+
+  (* (* TODO: reuse trace_lookup definitions here *) *)
+  (* Lemma prod_trace_valid (mtr: mtrace M) n *)
+  (*   (VALID: mtrace_valid mtr) *)
+  (*   (CUR0: st2nat (trfirst mtr) n): *)
+  (*   forall i, exists m, pred_at mtr .m (λ s _, st2nat s (S i)). *)
+
+
+  (* (* TODO: replace with "private actions don't preempt the sync one forever" condition *) *)
+  (* Local Lemma TMP_role_pub_priv_disj (st__e: amSt even_AM) ρ: *)
+  (*   (exists k st__e', amTrans _ st__e (inl $ step_sync k, Some ρ) st__e') -> *)
+  (*   (exists a st__e', amTrans _ st__e (inr a, Some ρ) st__e') -> *)
+  (*   False. *)
+  (* Proof. Admitted.  *)
+  
   (* TODO: reuse trace_lookup definitions here *)
   Theorem evenodd_mdl_progresses_Even i (mtr : evenodd_mtrace) :
     infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
@@ -145,33 +192,57 @@ Section ModelMono.
     ∃ m, pred_at mtr m (λ s _, st2nat s (S i)).
   Proof.
     intros Hinf Hvalid Hfair Hfirst Heven.
-    destruct (trfirst mtr) as [st__e st__o] eqn:TR0.
-    destruct Hfirst as [CUR__e CUR__o]. simpl in CUR__e, CUR__o.
-    edestruct even_steppable as (st__e' & ρ__e & STEP__e & CUR__e'); eauto. 
-    specialize (Hfair (inl ρ__e)).
 
-    assert (@role_enabled_model M (inl ρ__e) (trfirst mtr)) as EN__e0. 
-    { apply (AM_live_roles_spec (@prod_AM_strong_lr even_impl odd_impl)).
-      forward eapply odd_syncable as (st__o' & STEP__O & CUR__o'); eauto.
-      eexists _, (_, _). rewrite TR0. simpl. eapply @pt_sync1; eauto.
-      Unshelve. 2: exact (inl $ step_sync i). done. }
+    (* destruct (trfirst mtr) as [st__e st__o] eqn:TR0. *)
+    (* destruct Hfirst as [CUR__e CUR__o]. simpl in CUR__e, CUR__o. *)
 
-    red in Hfair. ospecialize (Hfair 0 _).
+    (* edestruct even_steppable as (st__e' & ρ__e & STEP__e & CUR__e'); eauto.  *)
+    (* specialize (Hfair (inl ρ__e)). *)
+
+    (* assert (@role_enabled_model M ρEven (trfirst mtr)) as EN__e0.  *)
+    (* { red. simpl. rewrite TR0. setoid_rewrite prod_AM_live_roles; [| by split]. *)
+    (*   apply elem_of_union_l. apply elem_of_map. *)
+    (*   eexists. split; eauto.  *)
+    (*   apply (AM_live_roles_spec (@prod_AM_strong_lr even_impl odd_impl)). *)
+    (*   eexists _, (_, _). simpl. rewrite TR0. eapply @pt_sync1.  *)
+    (*   forward eapply odd_syncable as (st__o' & STEP__O & CUR__o'); eauto. *)
+    (*   eexists _, (_, _).  simpl. eapply @pt_sync1; eauto. *)
+    (*   Unshelve. 2: exact (inl $ step_sync i). done. } *)
+    opose proof (ρEven_always_live (trfirst mtr) _ _); [done| ]. 
+
+    red in Hfair. ospecialize (Hfair ρEven 0 _).
     { by apply pred_at_state_trfirst. }
     
     destruct Hfair as [m FAIR]. rewrite plus_O_n in FAIR.
+    destruct FAIR as [DIS | STEP]. 
+    { rewrite -(plus_O_n m) in DIS. apply pred_at_sum' in DIS.
+      destruct (after m mtr); [| done]. apply pred_at_state_trfirst in DIS.
+      destruct DIS. eapply ρEven_always_live; eauto.
+      (* TODO: prove the lemma above *)
+      Unshelve. 2: exact 0. admit. }
 
-    clear dependent st__e st__o st__e'.
-    generalize dependent ρ__e. generalize dependent mtr.
-    induction m.
-
-    { intros. destruct FAIR as [DIS | STEP].
-      { by apply pred_at_state_trfirst in DIS. }
-      exists 1. punfold Hvalid. inversion Hvalid; subst. 
+    clear -STEP Hvalid Heven Hfirst. generalize dependent mtr. induction m.
+    { intros. 
+      exists 1. punfold Hvalid. inversion Hvalid as [| ? ? ? TRANS]; subst. 
       { done. }
-      rewrite pred_at_S.
       rewrite /pred_at in STEP. simpl in STEP. inversion STEP. subst.
-      apply pred_at_state_trfirst. remember (trfirst tr) as st'. 
+      rewrite pred_at_S. apply pred_at_state_trfirst.
+      simpl in TRANS. inversion TRANS; subst.
+      simpl in Hfirst.
+      admit.
+    (*   destruct a *) }    
+
+    (* clear dependent st__e st__o st__e'. *)
+    (* generalize dependent ρ__e. generalize dependent mtr. *)
+    (* induction m. *)
+
+    (* { intros. destruct FAIR as [DIS | STEP]. *)
+    (*   { by apply pred_at_state_trfirst in DIS. } *)
+    (*   exists 1. punfold Hvalid. inversion Hvalid; subst.  *)
+    (*   { done. } *)
+    (*   rewrite pred_at_S. *)
+    (*   rewrite /pred_at in STEP. simpl in STEP. inversion STEP. subst. *)
+    (*   apply pred_at_state_trfirst. remember (trfirst tr) as st'.  *)
 
   (*   intros. *)
   (*   destruct mtr. *)
@@ -188,11 +259,12 @@ Section ModelMono.
   (* Qed. *)
   Admitted. 
   
-  (* Theorem evenodd_mdl_progresses_Odd i (mtr : evenodd_mtrace) : *)
-  (*   infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) → *)
-  (*   (trfirst mtr) = i → Nat.odd i → *)
-  (*   ∃ m, pred_at mtr m (λ s _, s = S i). *)
-  (* Proof. *)
+  (* TODO: reuse trace_lookup definitions here *)
+  Theorem evenodd_mdl_progresses_Odd i (mtr : evenodd_mtrace) :
+    infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
+    st2nat (trfirst mtr) i → Nat.odd i →
+    ∃ m, pred_at mtr m (λ s _, st2nat s (S i)).
+  Proof.
   (*   intros Hinf Hvalid Hfair Hfirst Hodd. *)
   (*   specialize (Hfair ρOdd). *)
   (*   pose proof (evenodd_mdl_always_eventually_scheduled ρOdd mtr Hinf Hfair 0) as Hsched. *)
@@ -212,7 +284,7 @@ Section ModelMono.
   (*     rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl. *)
   (*     destruct mtr'; simpl in *; simplify_eq; done. *)
   (*   - by apply odd_not_even in Hodd. *)
-  (* Qed. *)
+  Admitted.
   
   Theorem evenodd_mdl_progresses (mtr : evenodd_mtrace) :
     infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
@@ -237,16 +309,15 @@ Section ModelMono.
         as [m Hpred']; [by eauto|].
       exists (n + m).
       rewrite pred_at_sum. rewrite Hafter. done.
-  (*   - assert (∀ ρ : fmrole M, fair_model_trace ρ mtr') as Hfair'. *)
-  (*     { intros. by eapply fair_model_trace_after. } *)
-  (*     assert (trfirst mtr' = i) as Hfirst'. *)
-  (*     { rewrite /trfirst. destruct mtr'; done. } *)
-  (*     pose proof (evenodd_mdl_progresses_Odd i mtr' Hinf Hvalid Hfair' Hfirst') *)
-  (*       as [m Hpred']; [by rewrite -Nat.negb_even Heqn|]. *)
-  (*     exists (n + m). *)
-  (*     rewrite pred_at_sum. rewrite Hafter. done. *)
-  (* Qed. *)
-  Admitted. 
+    - assert (∀ ρ : fmrole M, fair_model_trace ρ mtr') as Hfair'.
+      { intros. by eapply fair_model_trace_after. }
+      assert (st2nat (trfirst mtr') i) as Hfirst'.
+      { rewrite /trfirst. destruct mtr'; done. }
+      pose proof (evenodd_mdl_progresses_Odd i mtr' Hinf Hvalid Hfair' Hfirst')
+        as [m Hpred']; [by rewrite -Nat.negb_even Heqn|].
+      exists (n + m).
+      rewrite pred_at_sum. rewrite Hafter. done.
+  Qed.
   
   Theorem evenodd_mdl_is_mono (mtr : evenodd_mtrace) :
     infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
@@ -254,12 +325,12 @@ Section ModelMono.
     st2nat (trfirst mtr) 0 ->
     evenodd_mdl_mono mtr.
   Proof.
-    (* intros Hinf Hvalid Hfair Hfirst n. *)
-    (* pose proof (Hinf n) as [mtr' Hafter]. *)
-    (* destruct mtr' as [|s l mtr']. *)
-    (* { pose proof (Hinf (S n)) as [mtr'' Hafter']. *)
-    (*   replace (S n) with (n + 1) in Hafter' by lia. *)
-    (*   rewrite after_sum' in Hafter'. rewrite Hafter in Hafter'. done. } *)
+    intros Hinf Hvalid Hfair Hfirst n.
+    pose proof (Hinf n) as [mtr' Hafter].
+    destruct mtr' as [|s l mtr'].
+    { pose proof (Hinf (S n)) as [mtr'' Hafter'].
+      replace (S n) with (n + 1) in Hafter' by lia.
+      rewrite after_sum' in Hafter'. rewrite Hafter in Hafter'. done. }
     (* exists s. *)
     (* rewrite /pred_at. rewrite Hafter. *)
     (* split; [done|]. *)
@@ -401,6 +472,13 @@ Section ExAuxPropsPreserved.
     (mtr : finite_trace M (option (fmrole M))) :=
     ξ_evenodd l (trace_last extr) (trace_last mtr).
   
+  Lemma st2nat_uniq st n1 n2 
+    (CUR1: @st2nat even_impl odd_impl st n1) (CUR2: st2nat st n2):
+    n1 = n2.
+  Proof.
+    destruct st as [??], CUR1, CUR2. congruence.
+  Qed. 
+
   Lemma evenodd_aux_ex_progress_preserved l (extr: heap_lang_extrace) (auxtr : auxtrace LM):
     traces_match labels_match (λ c (δ: LM), ξ_evenodd l c δ) locale_step
       (lm_ls_trans LM) extr auxtr →
@@ -415,11 +493,11 @@ Section ExAuxPropsPreserved.
     inversion Hextr' as [?? Hξ|??????? Hξ]; simplify_eq.
     - destruct Hξ as (?&k&?&?).
       rewrite Heqn in Hauxtr.
-      assert (k = n) as -> by (eapply st2nat_inj; eauto). 
+      assert (k = n) as -> by (eapply st2nat_uniq; eauto). 
       by simplify_eq.
     - destruct Hξ as (?&k&?&?).
       rewrite Heqn in Hauxtr.
-      assert (k = n) as -> by (eapply st2nat_inj; eauto). 
+      assert (k = n) as -> by (eapply st2nat_uniq; eauto). 
       by simplify_eq.
   Qed.
   
@@ -441,11 +519,11 @@ Section ExAuxPropsPreserved.
       inversion Hextr' as [?? Hξ|??????? Hξ]; simplify_eq.
       + destruct Hξ as (?&k&?&?).
         rewrite Heqn in Hauxtr.
-        assert (k = i) as -> by (eapply st2nat_inj; eauto).
+        assert (k = i) as -> by (eapply st2nat_uniq; eauto).
         by simplify_eq.
       + destruct Hξ as (?&k&?&?).
         rewrite Heqn in Hauxtr.
-        assert (k = i) as -> by (eapply st2nat_inj; eauto).
+        assert (k = i) as -> by (eapply st2nat_uniq; eauto).
         by simplify_eq.
     - destruct Hauxtr as [_ Hauxtr].
       rewrite /pred_at in Hauxtr.
@@ -458,12 +536,12 @@ Section ExAuxPropsPreserved.
       + destruct Hauxtr as [j [ST2 Hle]].
         destruct Hξ as (?&k&?&?). 
         exists j. split; auto.
-        assert (k = j) as -> by (eapply st2nat_inj; eauto).
+        assert (k = j) as -> by (eapply st2nat_uniq; eauto).
         by simplify_eq.
       + destruct Hauxtr as [j [ST2 Hle]].
         destruct Hξ as (?&k&?&?).
         exists j. split; auto.
-        assert (k = j) as -> by (eapply st2nat_inj; eauto).
+        assert (k = j) as -> by (eapply st2nat_uniq; eauto).
         by simplify_eq.
   Qed.
 
@@ -480,14 +558,18 @@ Section Adequacy.
 
   Lemma init_roles_live0 st (CUR__0: st2nat st 0):
     AM_live_roles prod_AM_strong_lr st = init_roles.
-  Proof. Admitted. 
+  Proof.
+    
+  Admitted. 
 
   (* TODO: move *)
   Lemma gset_to_gmap_singleton `{Countable A} {B : Type} (v: B) (a: A):
     gset_to_gmap v {[ a ]} = {[ a := v ]}.
   Proof using.
     rewrite /gset_to_gmap. simpl. by rewrite map_fmap_singleton.
-  Qed. 
+  Qed.
+
+  Let start_prog := @start incr_loop_even_prog incr_loop_odd_prog. 
 
   Lemma start_spec_use Σ
     (l : loc)
@@ -500,7 +582,7 @@ Section Adequacy.
         own even_name (◯E 0) ∗
         own odd_name (◯E 1) ∗
         frag_free_roles_are ∅ }}}
-      (@start even_impl odd_impl) #l @0
+      start_prog #l @0
       {{{ x, RET x; 0 ↦M ∅ }}}.
   Proof.  
     simpl. rewrite /init_roles.
@@ -680,7 +762,7 @@ Section Adequacy.
     st (CUR__0: st2nat st 0):
     continued_simulation
       (sim_rel_with_user LM (ξ_evenodd_trace l))
-      (trace_singleton ([(@start even_impl odd_impl) #l], {| heap := {[l:=#0]};  used_proph_id := ∅ |}))
+      (trace_singleton ([start_prog #l], {| heap := {[l:=#0]};  used_proph_id := ∅ |}))
       (trace_singleton (initial_ls (LM := LM) st 0)).
   Proof.
     assert (evenoddPreG wholeΣ) as HPreG'.
@@ -839,18 +921,22 @@ Section Adequacy.
       by eapply evenodd_mtr_aux_mono_preserved.
   Qed. 
   
+
+  Lemma init_st_exists:
+    exists st, @st2nat even_impl odd_impl st 0. 
+  Proof. Admitted.   
   
   (** Proof that the execution trace satisfies the liveness properties *)
-  Theorem evenodd_ex_liveness (l:loc) (extr : heap_lang_extrace) (st: fmstate M):
+  Theorem evenodd_ex_liveness (l:loc) (extr : heap_lang_extrace):
     extrace_maximal extr →
     (∀ tid, fair_ex tid extr) →
-    trfirst extr = ([(@start even_impl odd_impl) #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
-    st2nat st 0 ->
+    trfirst extr = ([start_prog #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
     evenodd_ex_progress l extr ∧ evenodd_ex_mono l extr.
   Proof.
-    intros Hmaximal Hfair Hfirst CUR__0.
+    intros Hmaximal Hfair Hfirst.
     pose proof Hmaximal as Hvalid%extrace_maximal_valid.
-    pose proof (evenodd_sim l _ CUR__0) as Hsim.
+    pose proof init_st_exists as [st CUR0].        
+    pose proof (evenodd_sim l _ CUR0) as Hsim.
     
     assert (∃ iatr,
                valid_inf_system_trace
@@ -885,7 +971,4 @@ Section Adequacy.
     eapply extr_props; eauto. 
   Qed.
 
-  Lemma ensure_init_st_exists: False.
-  Proof. Admitted. 
-  
 End Adequacy.
