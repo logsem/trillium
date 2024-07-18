@@ -6,11 +6,10 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness trace_utils.
 From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
-From trillium.fairness.heap_lang.examples.even_odd Require Import eo_vs_mod2 interface utils action_model thread_progs.
+From trillium.fairness.heap_lang.examples.even_odd Require Import eo_vs_mod interface utils action_model thread_progs.
 From stdpp Require Import finite.
 
 (** Helper lemmas for working with even and odd *)
-  
 
 Section ModelMono.
 (** Proof that any fair execution of model visits all natural numbers *)
@@ -681,7 +680,7 @@ Section Adequacy.
     Finite
       {'(s2, ℓ) | fmtrans M s1 ℓ s2}. 
   Proof.
-    pose proof (@eo_vs_mod2.prod_AM_fin_branch' even_impl odd_impl) as [ns NEXTS].
+    pose proof (@eo_vs_mod.prod_AM_fin_branch' even_impl odd_impl) as [ns NEXTS].
     apply (in_list_finite ((fun '(x, y, z) => (x, z)) <$> ns s1)).
     intros [st oρ] STEP. apply am_fmtrans_action in STEP as [? STEP].
     eapply elem_of_list_fmap. eexists. split; eauto. done.
