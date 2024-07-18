@@ -114,7 +114,7 @@ End ThreadModel.
 Definition thread_0_even: EvenModel.
   unshelve refine {| cur_even := cur_n 0 |}.
   4: apply (thread_extra 0).
-  all: cycle 1; simpl in *; unfold cur_n in *. 
+  all: cycle 2; simpl in *; unfold cur_n in *. 
   - intros. inversion STEP; subst; auto.
     rewrite Nat.add_0_r in H3. repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
@@ -124,12 +124,14 @@ Definition thread_0_even: EvenModel.
   - intros. eexists. econstructor. by rewrite Nat.add_0_r.
   - intros. do 2 eexists. econstructor. by rewrite Nat.add_0_r.
   - intros. by rewrite !thread_AM_lr_exact.
+  - reflexivity.
+  - by rewrite !thread_AM_lr_exact.
 Qed. 
 
 Definition thread_1_odd: OddModel.
   unshelve refine {| cur_odd := cur_n 1 |}.
   4: apply (thread_extra 1).
-  all: cycle 1; simpl in *; unfold cur_n in *. 
+  all: cycle 2; simpl in *; unfold cur_n in *. 
   - intros. inversion STEP; subst; auto.
     rewrite even_plus1_negb Nat.negb_even in H3. repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
@@ -139,4 +141,6 @@ Definition thread_1_odd: OddModel.
   - intros. eexists. econstructor. by rewrite odd_plus1_negb Nat.negb_odd.
   - intros. do 2 eexists. econstructor. by rewrite odd_plus1_negb Nat.negb_odd.
   - intros. by rewrite !thread_AM_lr_exact.
+  - reflexivity.
+  - by rewrite !thread_AM_lr_exact.
 Qed.    

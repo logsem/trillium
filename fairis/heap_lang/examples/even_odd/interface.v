@@ -66,6 +66,10 @@ Record EvenModel := {
     even_step_lr_nonincr st st' a oρ
       (STEP: amTrans even_AM st (a, oρ) st'):
       AM_live_roles ame_strong st' ⊆ AM_live_roles ame_strong st;
+
+    even_init: amSt even_AM;
+    even_init_0: cur_even even_init = 0;
+    even_init_lr: AM_live_roles ame_strong even_init = {[ ρ__e ]};
 }.
 
 
@@ -101,4 +105,8 @@ Record OddModel := {
     odd_step_lr_nonincr st st' a oρ
       (STEP: amTrans odd_AM st (a, oρ) st'):
       AM_live_roles ame_strong st' ⊆ AM_live_roles ame_strong st;
+
+    odd_init: amSt odd_AM;
+    odd_init_0: cur_odd odd_init = 0;
+    odd_init_lr: AM_live_roles ame_strong odd_init = {[ ρ__o ]};
 }.
