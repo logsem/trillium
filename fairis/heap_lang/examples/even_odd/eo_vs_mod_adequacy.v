@@ -36,8 +36,8 @@ Section ModelMono.
     pred_at (⟨ s ⟩: trace St L) (S m) P <-> False.
   Proof. done. Qed. 
 
-  Let ρEven: fmrole M := inl (ρ__e even_impl).
-  Let ρOdd: fmrole M := inr (ρ__o odd_impl).
+  Let ρEven: fmrole M := even_role (ρ__e even_impl).
+  Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
 
   (* TODO: move to prod model file *)
   Lemma ρEven_always_live (st: fmstate M) n
@@ -473,7 +473,8 @@ Section Adequacy.
   Let M := @the_fair_model even_impl odd_impl.
   Let LM := @the_model even_impl odd_impl.
 
-  Let init_roles: gset (fmrole M) := {[ inl (ρ__e even_impl); inr (ρ__o odd_impl) ]}.
+  Let init_roles: gset (fmrole M) := 
+        {[ even_role (ρ__e even_impl); odd_role (ρ__o odd_impl) ]}.
 
   (* TODO: move *)
   Lemma gset_to_gmap_singleton `{Countable A} {B : Type} (v: B) (a: A):

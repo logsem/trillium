@@ -30,9 +30,15 @@ Section Models.
     | inl s => (Some $ inl s, Some $ inl s)
     | inr (inl p) => (Some $ inr p, None)
     | inr (inr p) => (None, Some $ inr p)
-    end. 
+    end.
 
   Definition prod_model := ProdAM (fact_act := fact_TA).
+
+  Definition even_role: amRole even_AM -> amRole prod_model := inl. 
+  Definition odd_role: amRole odd_AM -> amRole prod_model := inr.
+  Definition pub_act: PubA -> amA prod_model := inl. 
+  Definition even_priv_act: ePriv even_impl -> amA prod_model := inr ∘ inl. 
+  Definition odd_priv_act: oPriv odd_impl -> amA prod_model := inr ∘ inr. 
 
   Existing Instance even_AME. 
   Existing Instance odd_AME.
@@ -124,7 +130,8 @@ Section proof.
     (CUR: st2nat (st__e, st__o) n)
     :
     AM_live_roles (@prod_AM_strong_lr even_impl odd_impl) (st__e, st__o) = 
-    set_map inl (AM_live_roles ame_strong st__e) ∪ set_map inr (AM_live_roles ame_strong st__o).
+    set_map even_role (AM_live_roles ame_strong st__e) ∪ 
+    set_map odd_role (AM_live_roles ame_strong st__o).
   Proof.
     apply set_eq. intros ρ.
     rewrite elem_of_union !elem_of_map.
@@ -136,7 +143,7 @@ Section proof.
     intros [(ρ__e & -> & (a__e & st__e' & STEP__e))| (ρ__o & -> & (a__o & st__o' & STEP__o))].
     - destruct a__e as [[k] | a__e].
       2: { eexists _, (_, _). eapply @pt_inner1; eauto.
-           Unshelve. 2: exact (inr $ inl a__e). done. }
+           Unshelve. 2: exact (even_priv_act a__e). done. }
       forward eapply even_step_inv; eauto.
       { apply STEP__e. }
       intros (X & CUR__e' & E). assert (n = k) as -> by congruence. clear X. 
@@ -144,10 +151,10 @@ Section proof.
       { erewrite @f_equal; [apply E| ]. by f_equal. }
       intros [st__o' STEP__o]. 
       eexists _, (_, _). eapply @pt_sync1; eauto.  
-      Unshelve. 2: exact (inl $ step_sync k). simpl. congruence. 
+      Unshelve. 2: exact (pub_act $ step_sync k). simpl. congruence. 
     - destruct a__o as [[k] | a__o].
       2: { eexists _, (_, _). eapply @pt_inner2; eauto.
-           Unshelve. 2: exact (inr $ inr a__o). done. }
+           Unshelve. 2: exact (odd_priv_act a__o). done. }
       forward eapply odd_step_inv; eauto.
       { apply STEP__o. }
       intros (X & CUR__o' & O). assert (n = k) as -> by congruence. clear X. 
@@ -155,7 +162,7 @@ Section proof.
       { erewrite @f_equal; [apply O| ]. by f_equal. }
       intros [st__e' STEP__e]. 
       eexists _, (_, _). eapply @pt_sync2; eauto.  
-      Unshelve. 2: exact (inl $ step_sync k). simpl. congruence. 
+      Unshelve. 2: exact (pub_act $ step_sync k). simpl. congruence. 
   Qed. 
 
   Lemma st2nat_step_ex st st' a oρ n
@@ -215,8 +222,8 @@ Section proof.
       (try apply odd_step_lr_nonincr in STEP2); set_solver.
   Qed. 
 
-  Let ρEven: fmrole M := inl (ρ__e even_impl).
-  Let ρOdd: fmrole M := inr (ρ__o odd_impl).
+  Let ρEven: fmrole M := even_role (ρ__e even_impl).
+  Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
 
   Lemma even_spec_use tid l (N : nat) f (Hf: f > 40) (ep: EvenProg):
     {{{ evenodd_inv l ∗ tid ↦M {[ ρEven := f ]} ∗ even_at N }}}
@@ -273,7 +280,7 @@ Section proof.
       rewrite CUR__E in STEP__e. rewrite CUR__O in STEP__o. 
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_sync1; eauto.
-        Unshelve. 2: exact (inl (step_sync m)). done. 
+        Unshelve. 2: exact (pub_act $ step_sync m). done. 
       + simpl. eapply even_step_inv; eauto.
       + simpl. eapply odd_sync_inv; eauto.
     - pose proof E as O. rewrite -negb_true_iff Nat.negb_even in O. 
@@ -281,7 +288,7 @@ Section proof.
       { rewrite CUR__E. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner1; eauto.
-        Unshelve. 2: exact (inr $ inl a__e). done.
+        Unshelve. 2: exact (even_priv_act a__e). done.
       + simpl. symmetry. rewrite -CUR__E. eapply even_stutter_inv; eauto.
       + done. 
   Qed.
@@ -342,7 +349,7 @@ Section proof.
       rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e. 
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_sync2; eauto.
-        Unshelve. 2: exact (inl (step_sync m)). done.
+        Unshelve. 2: exact (pub_act $ step_sync m). done.
       + simpl. eapply even_sync_inv; eauto.
       + simpl. eapply odd_step_inv; eauto.
     - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E. 
@@ -350,7 +357,7 @@ Section proof.
       { rewrite CUR__O. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner2; eauto.
-        Unshelve. 2: exact (inr $ inr a__o). done.
+        Unshelve. 2: exact (odd_priv_act a__o). done.
       + done. 
       + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
   Qed.
@@ -380,8 +387,8 @@ Section proof_start.
     rewrite -own_op. by rewrite -auth_frag_op.
   Qed. 
 
-  Let ρEven: fmrole M := inl (ρ__e even_impl).
-  Let ρOdd: fmrole M := inr (ρ__o odd_impl).
+  Let ρEven: fmrole M := even_role (ρ__e even_impl).
+  Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
 
   Definition start : val :=
     λ: "l",
