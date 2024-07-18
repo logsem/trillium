@@ -126,6 +126,8 @@ Definition thread_0_even: EvenModel.
   - intros. by rewrite !thread_AM_lr_exact.
   - reflexivity.
   - by rewrite !thread_AM_lr_exact.
+  - intros ? (?&?&T1) (?&?&T2).
+    inversion T1. inversion T2. subst. edestruct even_odd_False; eauto.
 Qed. 
 
 Definition thread_1_odd: OddModel.
@@ -143,4 +145,6 @@ Definition thread_1_odd: OddModel.
   - intros. by rewrite !thread_AM_lr_exact.
   - reflexivity.
   - by rewrite !thread_AM_lr_exact.
-Qed.    
+  - intros ? (?&?&T1) (?&?&T2).
+    inversion T1. inversion T2. subst. edestruct even_odd_False; eauto.
+Qed.

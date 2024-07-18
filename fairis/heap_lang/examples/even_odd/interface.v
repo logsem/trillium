@@ -70,6 +70,12 @@ Record EvenModel := {
     even_init: amSt even_AM;
     even_init_0: cur_even even_init = 0;
     even_init_lr: AM_live_roles ame_strong even_init = {[ ρ__e ]};
+
+  (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
+  even_pub_priv_disj (st__e: amSt even_AM):
+    (exists k st__e', amTrans _ st__e (inl $ step_sync k, Some ρ__e) st__e') ->
+    (exists a st__e', amTrans _ st__e (inr a, Some ρ__e) st__e') ->
+    False;
 }.
 
 
@@ -109,4 +115,10 @@ Record OddModel := {
     odd_init: amSt odd_AM;
     odd_init_0: cur_odd odd_init = 0;
     odd_init_lr: AM_live_roles ame_strong odd_init = {[ ρ__o ]};
+
+  (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
+    odd_pub_priv_disj (st__o: amSt odd_AM):
+    (exists k st__o', amTrans _ st__o (inl $ step_sync k, Some ρ__o) st__o') ->
+    (exists a st__o', amTrans _ st__o (inr a, Some ρ__o) st__o') ->
+    False;
 }.

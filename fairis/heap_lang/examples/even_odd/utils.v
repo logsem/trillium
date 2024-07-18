@@ -653,6 +653,26 @@ Section Arithmetic.
   Lemma odd_plus1_negb n: Nat.odd (n + 1) = negb $ Nat.odd n.
   Proof. by rewrite Nat.add_1_r odd_succ_negb. Qed.
 
+  Lemma even_odd_False n : Nat.even n → Nat.odd n → False.
+  Proof.
+    intros Heven Hodd. rewrite -Nat.negb_odd in Heven.
+    apply Is_true_true_1 in Heven.
+    apply Is_true_true_1 in Hodd.
+    by rewrite Hodd in Heven.
+  Qed.
+  
+  Lemma even_not_odd n : Nat.even n → ¬ Nat.odd n.
+  Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
+  
+  Lemma odd_not_even n : Nat.odd n → ¬ Nat.even n.
+  Proof. intros Heven Hodd. by eapply even_odd_False. Qed.
+  
+  Lemma even_or_odd n: Nat.even n \/ Nat.odd n.
+  Proof. 
+    destruct (decide (Nat.even n)) as [| O]; auto.
+    apply negb_prop_intro in O. rewrite Nat.negb_even in O. tauto.
+  Qed.
+
 End Arithmetic.
 
 
