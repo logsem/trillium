@@ -888,3 +888,13 @@ Section Adequacy.
   Qed.
 
 End Adequacy.
+
+
+Section AdequacyConcrete.
+
+  From trillium.fairness.heap_lang.examples.even_odd Require Import submodels.
+
+  Definition evenodd_ex_liveness_concrete := 
+    evenodd_ex_liveness thread_0_even thread_1_odd. 
+
+End AdequacyConcrete.
