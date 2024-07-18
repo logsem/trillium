@@ -36,9 +36,8 @@ Section Models.
 
   Definition even_role: amRole even_AM -> amRole prod_model := inl. 
   Definition odd_role: amRole odd_AM -> amRole prod_model := inr.
-  Definition pub_act: PubA -> amA prod_model := inl. 
-  Definition even_priv_act: ePriv even_impl -> amA prod_model := inr ∘ inl. 
-  Definition odd_priv_act: oPriv odd_impl -> amA prod_model := inr ∘ inr. 
+  Definition even_priv_act: ePriv even_impl -> amA prod_model := priv_act ∘ inl. 
+  Definition odd_priv_act: oPriv odd_impl -> amA prod_model := priv_act ∘ inr. 
 
   Existing Instance even_AME. 
   Existing Instance odd_AME.
@@ -151,7 +150,7 @@ Section proof.
       { erewrite @f_equal; [apply E| ]. by f_equal. }
       intros [st__o' STEP__o]. 
       eexists _, (_, _). eapply @pt_sync1; eauto.  
-      Unshelve. 2: exact (pub_act $ step_sync k). simpl. congruence. 
+      Unshelve. 2: exact (pub_act $ step_sync k). simpl. set_solver. 
     - destruct a__o as [[k] | a__o].
       2: { eexists _, (_, _). eapply @pt_inner2; eauto.
            Unshelve. 2: exact (odd_priv_act a__o). done. }
@@ -162,7 +161,7 @@ Section proof.
       { erewrite @f_equal; [apply O| ]. by f_equal. }
       intros [st__e' STEP__e]. 
       eexists _, (_, _). eapply @pt_sync2; eauto.  
-      Unshelve. 2: exact (pub_act $ step_sync k). simpl. congruence. 
+      Unshelve. 2: exact (pub_act $ step_sync k). simpl. by repeat f_equal.
   Qed. 
 
   Lemma st2nat_step_ex st st' a oρ n
