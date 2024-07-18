@@ -133,11 +133,10 @@ Section ModelMono.
   (*   syncs st ρ -> amTrans even_AM st (inr pa, ρ') st' -> syncs st' ρ. *)
   (* Proof. Admitted.  *)
 
-  (* TODO: proof in another branch *)
   Lemma pred_at_state_trfirst:
   ∀ {St L : Type} (tr : trace St L) (P : St → Prop),
     pred_at tr 0 (λ (st : St) (_ : option L), P st) ↔ P (trfirst tr).
-  Proof using. Admitted.
+  Proof using. by destruct tr. Qed. 
 
   (* TODO: look for general version regarding trace length *)
   Lemma pred_at_S_singl:
@@ -170,21 +169,71 @@ Section ModelMono.
     apply ρ__e_always_live. 
   Qed. 
 
-
   (* (* TODO: reuse trace_lookup definitions here *) *)
-  (* Lemma prod_trace_valid (mtr: mtrace M) n *)
+  (* Lemma prod_trace_valid (mtr mtr': mtrace M) n i *)
   (*   (VALID: mtrace_valid mtr) *)
+  (*   (AFTER: after i mtr = Some mtr') *)
   (*   (CUR0: st2nat (trfirst mtr) n): *)
-  (*   forall i, exists m, pred_at mtr .m (λ s _, st2nat s (S i)). *)
+  (*   exists m, st2nat (trfirst mtr') m.  *)
+  (* Proof.  *)
 
+  Lemma st2nat_next st aoρ (st': fmstate M) i
+    (TRANS: amTrans prod_model st aoρ st')
+    (CUR: st2nat st i):
+    st2nat st' (S i) \/ st2nat st' i.
+  Proof.
+    destruct aoρ as [a oρ]. 
+    simpl in TRANS. inversion TRANS; subst. 
+    all: destruct a as [[]|[|]]; try done; simpl in LBL; inversion LBL; subst.
+    - right. destruct CUR. split; auto.
+      simpl. eapply even_stutter_inv in STEP1. simpl in *. congruence.
+    - right. destruct CUR. split; auto.
+      simpl. eapply odd_stutter_inv in STEP2. simpl in *. congruence.
+    - left. destruct CUR.
+      eapply even_step_inv in STEP1. eapply odd_sync_inv in STEP2.
+      red. simpl in *. lia.
+    - left. destruct CUR.
+      eapply even_sync_inv in STEP1. eapply odd_step_inv in STEP2.
+      red. simpl in *. lia.
+  Qed. 
 
-  (* (* TODO: replace with "private actions don't preempt the sync one forever" condition *) *)
-  (* Local Lemma TMP_role_pub_priv_disj (st__e: amSt even_AM) ρ: *)
-  (*   (exists k st__e', amTrans _ st__e (inl $ step_sync k, Some ρ) st__e') -> *)
-  (*   (exists a st__e', amTrans _ st__e (inr a, Some ρ) st__e') -> *)
-  (*   False. *)
-  (* Proof. Admitted.  *)
+  Lemma prod_trace_st2nat (mtr mtr': mtrace M) n i
+    (VALID: mtrace_valid mtr)
+    (AFTER: after i mtr = Some mtr')
+    (CUR0: st2nat (trfirst mtr) n):
+    exists m, st2nat (trfirst mtr') m. 
+  Proof.
+    generalize dependent mtr'. induction i.
+    { simpl. intros ? [=->]. eauto. }
+    intros.
+    forward eapply after_is_Some_le.
+    { apply (Nat.le_succ_diag_r i). }
+    { eauto. }
+    intros [mtr'' AFTER''].
+    ospecialize * IHi; eauto. destruct IHi as [m CUR'].
+    forward eapply (mtrace_valid_after _ _ i) as VALID'; eauto. 
+    rewrite -Nat.add_1_r after_sum' AFTER'' in AFTER.
+    destruct mtr'' eqn:T; [done| ]. simpl in AFTER, CUR'. 
+    inversion AFTER. subst t.
+    punfold VALID'. inversion VALID'. subst. 
+    simpl in H1. apply am_fmtrans_action in H1 as [? TRANS].
+    eapply st2nat_next in TRANS; eauto.
+    destruct TRANS; eauto.
+  Qed. 
+
+  (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
+  Local Lemma TMP_role_pub_priv_disj (st__e: amSt even_AM):
+    (exists k st__e', amTrans _ st__e (inl $ step_sync k, Some (ρ__e _)) st__e') ->
+    (exists a st__e', amTrans _ st__e (inr a, Some (ρ__e _)) st__e') ->
+    False.
+  Proof using. Admitted.
   
+  (* TODO: move? *)
+  Ltac add_case C name :=
+    match goal with
+    | |- ?G => assert (C -> G) as name
+    end.
+
   (* TODO: reuse trace_lookup definitions here *)
   Theorem evenodd_mdl_progresses_Even i (mtr : evenodd_mtrace) :
     infinite_trace mtr → mtrace_valid mtr → (∀ ρ, fair_model_trace ρ mtr) →
@@ -193,21 +242,6 @@ Section ModelMono.
   Proof.
     intros Hinf Hvalid Hfair Hfirst Heven.
 
-    (* destruct (trfirst mtr) as [st__e st__o] eqn:TR0. *)
-    (* destruct Hfirst as [CUR__e CUR__o]. simpl in CUR__e, CUR__o. *)
-
-    (* edestruct even_steppable as (st__e' & ρ__e & STEP__e & CUR__e'); eauto.  *)
-    (* specialize (Hfair (inl ρ__e)). *)
-
-    (* assert (@role_enabled_model M ρEven (trfirst mtr)) as EN__e0.  *)
-    (* { red. simpl. rewrite TR0. setoid_rewrite prod_AM_live_roles; [| by split]. *)
-    (*   apply elem_of_union_l. apply elem_of_map. *)
-    (*   eexists. split; eauto.  *)
-    (*   apply (AM_live_roles_spec (@prod_AM_strong_lr even_impl odd_impl)). *)
-    (*   eexists _, (_, _). simpl. rewrite TR0. eapply @pt_sync1.  *)
-    (*   forward eapply odd_syncable as (st__o' & STEP__O & CUR__o'); eauto. *)
-    (*   eexists _, (_, _).  simpl. eapply @pt_sync1; eauto. *)
-    (*   Unshelve. 2: exact (inl $ step_sync i). done. } *)
     opose proof (ρEven_always_live (trfirst mtr) _ _); [done| ]. 
 
     red in Hfair. ospecialize (Hfair ρEven 0 _).
@@ -216,48 +250,47 @@ Section ModelMono.
     destruct Hfair as [m FAIR]. rewrite plus_O_n in FAIR.
     destruct FAIR as [DIS | STEP]. 
     { rewrite -(plus_O_n m) in DIS. apply pred_at_sum' in DIS.
-      destruct (after m mtr); [| done]. apply pred_at_state_trfirst in DIS.
-      destruct DIS. eapply ρEven_always_live; eauto.
-      (* TODO: prove the lemma above *)
-      Unshelve. 2: exact 0. admit. }
+      destruct (after m mtr) eqn:A; [| done]. apply pred_at_state_trfirst in DIS.
+      forward eapply prod_trace_st2nat; eauto. intros [??].       
+      destruct DIS. eapply ρEven_always_live; eauto. }
 
-    clear -STEP Hvalid Heven Hfirst. generalize dependent mtr. induction m.
+    assert (forall st__e a st__e', amTrans prod_model st__e (a, Some ρEven) st__e' ->
+                          st2nat st__e i -> Nat.even i ->
+                          st2nat st__e' (S i)) as INCR. 
+    { clear -even_AM. intros ??? STEP **. inversion STEP; subst.
+      - destruct a as [[]|[|]]; try done; simpl in LBL; inversion LBL; subst.
+        edestruct TMP_role_pub_priv_disj; eauto.
+        eexists. eapply even_steppable.
+        apply proj1 in H. set_solver.
+      - destruct a as [[]|[|]]; try done; simpl in LBL; inversion LBL; subst.
+        eapply even_step_inv in STEP1. eapply odd_sync_inv in STEP2.
+        red. simpl in *. destruct H. simpl in *. lia. }
+
+    clear -STEP Hvalid Heven Hfirst INCR. generalize dependent mtr. induction m.
     { intros. 
-      exists 1. punfold Hvalid. inversion Hvalid as [| ? ? ? TRANS]; subst. 
+      punfold Hvalid. inversion Hvalid as [| ? ? ? TRANS]; subst. 
       { done. }
       rewrite /pred_at in STEP. simpl in STEP. inversion STEP. subst.
-      rewrite pred_at_S. apply pred_at_state_trfirst.
+      exists 1. rewrite pred_at_S. apply pred_at_state_trfirst.
       simpl in TRANS. inversion TRANS; subst.
-      simpl in Hfirst.
-      admit.
-    (*   destruct a *) }    
+      simpl in Hfirst. eauto. }
 
-    (* clear dependent st__e st__o st__e'. *)
-    (* generalize dependent ρ__e. generalize dependent mtr. *)
-    (* induction m. *)
+    intros.
+    destruct mtr.
+    { by apply pred_at_S_singl in STEP. }
+    pose proof Hvalid as VALID'. eapply mtrace_valid_after with (k := 1) in VALID'.
+    2: { simpl. reflexivity. }
+    punfold Hvalid. inversion Hvalid as [| ??? TRANS VALID]; subst.
+    simpl in TRANS. apply am_fmtrans_action in TRANS as [a TRANS].
+    simpl in Hfirst. 
 
-    (* { intros. destruct FAIR as [DIS | STEP]. *)
-    (*   { by apply pred_at_state_trfirst in DIS. } *)
-    (*   exists 1. punfold Hvalid. inversion Hvalid; subst.  *)
-    (*   { done. } *)
-    (*   rewrite pred_at_S. *)
-    (*   rewrite /pred_at in STEP. simpl in STEP. inversion STEP. subst. *)
-    (*   apply pred_at_state_trfirst. remember (trfirst tr) as st'.  *)
-
-  (*   intros. *)
-  (*   destruct mtr. *)
-  (*   { rewrite !pred_at_S_singl in FAIR. tauto. } *)
-  (*   specialize (IHm mtr). specialize_full IHm. *)
-  (*   { eapply infinite_cons; eauto. } *)
-  (*   { admit. } *)
-  (*   {  *)
-  (*     (* TODO: show that non-incrementing step keeps _the same_ role enabled. *)
-  (*        Is it possible? *) *)
-  (*     admit. } *)
-  (*   { by rewrite !pred_at_S in FAIR. } *)
-  (*   destruct IHm as [? ?]. eexists. apply pred_at_S. eauto.   *)
-  (* Qed. *)
-  Admitted. 
+    forward eapply st2nat_next; eauto. intros [? | CUR']. 
+    { exists 1. rewrite pred_at_S. by apply pred_at_state_trfirst. }
+    
+    apply pred_at_S in STEP.
+    specialize (IHm mtr). ospecialize * IHm; eauto. 
+    destruct IHm as [k NEXT]. exists (S k). by rewrite pred_at_S.  
+  Qed. 
   
   (* TODO: reuse trace_lookup definitions here *)
   Theorem evenodd_mdl_progresses_Odd i (mtr : evenodd_mtrace) :
@@ -331,28 +364,17 @@ Section ModelMono.
     { pose proof (Hinf (S n)) as [mtr'' Hafter'].
       replace (S n) with (n + 1) in Hafter' by lia.
       rewrite after_sum' in Hafter'. rewrite Hafter in Hafter'. done. }
-    (* exists s. *)
-    (* rewrite /pred_at. rewrite Hafter. *)
-    (* split; [done|]. *)
-    (* replace (S n) with (n + 1) by lia. *)
-    (* rewrite after_sum'. rewrite Hafter. simpl. *)
-    (* eapply mtrace_valid_after in Hvalid; [|done]. *)
-    (* punfold Hvalid. inversion Hvalid as [|??? Htrans]. simplify_eq. *)
-    (* inversion Htrans; simplify_eq. *)
-    (* - destruct mtr'. *)
-    (*   + exists (S s); split; [done|lia]. *)
-    (*   + exists (S s); split; [done|lia]. *)
-    (* - destruct mtr'. *)
-    (*   + exists s; done. *)
-    (*   + exists s; done. *)
-    (* - destruct mtr'. *)
-    (*   + exists (S s); split; [done|lia]. *)
-    (*   + exists (S s); split; [done|lia]. *)
-    (* - destruct mtr'. *)
-    (*   + exists s; done. *)
-    (*   + exists s; done. *)
-  (* Qed. *)
-  Admitted. 
+
+    forward eapply prod_trace_st2nat; eauto. intros [m CUR__n]. simpl in CUR__n.
+    exists m. rewrite -{1}(Nat.add_0_r n) pred_at_sum Hafter. split; auto.
+    forward eapply mtrace_valid_after; eauto. intros VALID__n.
+    punfold VALID__n. inversion VALID__n. subst.
+    simpl in H1. apply am_fmtrans_action in H1 as [? TRANS].
+    eapply st2nat_next in TRANS; eauto.
+    rewrite -Nat.add_1_r. rewrite pred_at_sum Hafter.
+    apply pred_at_S. apply pred_at_state_trfirst.
+    destruct TRANS; eauto; lia.
+  Qed. 
   
 End ModelMono.
 
