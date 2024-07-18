@@ -90,12 +90,12 @@ Section ModelMono.
     generalize dependent mtr'. induction i.
     { simpl. intros ? [=->]. eauto. }
     intros.
-    forward eapply after_is_Some_le.
+    ogeneralize * after_is_Some_le.
     { apply (Nat.le_succ_diag_r i). }
     { eauto. }
     intros [mtr'' AFTER''].
     ospecialize * IHi; eauto. destruct IHi as [m CUR'].
-    forward eapply (mtrace_valid_after _ _ i) as VALID'; eauto. 
+    opose proof * (mtrace_valid_after _ _ i) as VALID'; eauto. 
     rewrite -Nat.add_1_r after_sum' AFTER'' in AFTER.
     destruct mtr'' eqn:T; [done| ]. simpl in AFTER, CUR'. 
     inversion AFTER. subst t.
@@ -136,7 +136,7 @@ Section ModelMono.
     simpl in TRANS. apply am_fmtrans_action in TRANS as [a TRANS].
     simpl in Hfirst. 
 
-    forward eapply st2nat_next; eauto. intros [? | CUR']. 
+    ogeneralize * st2nat_next; eauto. intros [? | CUR']. 
     { exists 1. rewrite pred_at_S. by apply pred_at_state_trfirst. }
     
     apply pred_at_S in STEP.
@@ -162,7 +162,7 @@ Section ModelMono.
     destruct FAIR as [DIS | STEP]. 
     { rewrite -(plus_O_n m) in DIS. apply pred_at_sum' in DIS.
       destruct (after m mtr) eqn:A; [| done]. apply pred_at_state_trfirst in DIS.
-      forward eapply prod_trace_st2nat; eauto. intros [??].       
+      ogeneralize * prod_trace_st2nat; eauto. intros [??].       
       destruct DIS. eapply ρEven_always_live; eauto. }
 
     assert (forall st__e a st__e', amTrans prod_model st__e (a, Some ρEven) st__e' ->
@@ -198,7 +198,7 @@ Section ModelMono.
     destruct FAIR as [DIS | STEP]. 
     { rewrite -(plus_O_n m) in DIS. apply pred_at_sum' in DIS.
       destruct (after m mtr) eqn:A; [| done]. apply pred_at_state_trfirst in DIS.
-      forward eapply prod_trace_st2nat; eauto. intros [??].       
+      ogeneralize * prod_trace_st2nat; eauto. intros [??].
       destruct DIS. eapply ρOdd_always_live; eauto. }
 
     assert (forall st__e a st__e', amTrans prod_model st__e (a, Some ρOdd) st__e' ->
@@ -262,9 +262,9 @@ Section ModelMono.
       replace (S n) with (n + 1) in Hafter' by lia.
       rewrite after_sum' in Hafter'. rewrite Hafter in Hafter'. done. }
 
-    forward eapply prod_trace_st2nat; eauto. intros [m CUR__n]. simpl in CUR__n.
+    ogeneralize * prod_trace_st2nat; eauto. intros [m CUR__n]. simpl in CUR__n.
     exists m. rewrite -{1}(Nat.add_0_r n) pred_at_sum Hafter. split; auto.
-    forward eapply mtrace_valid_after; eauto. intros VALID__n.
+    ogeneralize * mtrace_valid_after; eauto. intros VALID__n.
     punfold VALID__n. inversion VALID__n. subst.
     simpl in H1. apply am_fmtrans_action in H1 as [? TRANS].
     eapply st2nat_next in TRANS; eauto.
@@ -626,7 +626,7 @@ Section Adequacy.
     - iIntros "%Hall". subst c.
       iPoseProof (not_all_val with "[$] [$]") as "%LR0"; eauto.
       rewrite Hn' in LR0.
-      forward eapply (ρEven_always_live (_, _)) as LR.
+      opose proof * (ρEven_always_live (_, _)) as LR.
       { split; eauto. }
       clear -LR LR0. set_solver. 
     - iPureIntro.

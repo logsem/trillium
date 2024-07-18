@@ -143,10 +143,10 @@ Section proof.
     - destruct a__e as [[k] | a__e].
       2: { eexists _, (_, _). eapply @pt_inner1; eauto.
            Unshelve. 2: exact (even_priv_act a__e). done. }
-      forward eapply even_step_inv; eauto.
+      ogeneralize * even_step_inv; eauto.
       { apply STEP__e. }
       intros (X & CUR__e' & E). assert (n = k) as -> by congruence. clear X. 
-      forward eapply odd_syncable; eauto.
+      ogeneralize * odd_syncable; eauto.
       { erewrite @f_equal; [apply E| ]. by f_equal. }
       intros [st__o' STEP__o]. 
       eexists _, (_, _). eapply @pt_sync1; eauto.  
@@ -154,10 +154,10 @@ Section proof.
     - destruct a__o as [[k] | a__o].
       2: { eexists _, (_, _). eapply @pt_inner2; eauto.
            Unshelve. 2: exact (odd_priv_act a__o). done. }
-      forward eapply odd_step_inv; eauto.
+      ogeneralize * odd_step_inv; eauto.
       { apply STEP__o. }
       intros (X & CUR__o' & O). assert (n = k) as -> by congruence. clear X. 
-      forward eapply even_syncable; eauto.
+      ogeneralize * even_syncable; eauto.
       { erewrite @f_equal; [apply O| ]. by f_equal. }
       intros [st__e' STEP__e]. 
       eexists _, (_, _). eapply @pt_sync2; eauto.  
@@ -209,7 +209,7 @@ Section proof.
       AM_live_roles prod_AM_strong_lr st' ⊆ AM_live_roles prod_AM_strong_lr st.
   Proof.
     destruct st as [st__e st__o], st' as [st__e' st__o'].
-    forward eapply st2nat_step_ex as [n' CUR']; eauto. 
+    opose proof * st2nat_step_ex as [n' CUR']; eauto. 
     erewrite !prod_AM_live_roles; eauto.
     apply union_subseteq. eapply Morphisms_Prop.and_impl_morphism.
     { red. eapply impl_transitive; [| apply union_subseteq_l'].
@@ -272,9 +272,9 @@ Section proof.
         destruct CUR' as [??]. simpl in *. set_solver. }
  
     destruct (Nat.even m) eqn:E.
-    - forward eapply (even_steppable _ st__e) as (st__e' & STEP__e); eauto.
+    - opose proof (even_steppable _ st__e) as (st__e' & STEP__e); eauto.
       { set_solver. }
-      forward eapply odd_syncable as (st__o' & STEP__o); eauto.
+      opose proof * odd_syncable as (st__o' & STEP__o); eauto.
       { erewrite (f_equal Nat.even); eauto. }
       rewrite CUR__E in STEP__e. rewrite CUR__O in STEP__o. 
       eexists (_, _). split; [| split].
@@ -283,7 +283,7 @@ Section proof.
       + simpl. eapply even_step_inv; eauto.
       + simpl. eapply odd_sync_inv; eauto.
     - pose proof E as O. rewrite -negb_true_iff Nat.negb_even in O. 
-      forward eapply (even_stutterable _ st__e) as (st__e' & a__e & STEP__e); eauto.
+      opose proof (even_stutterable _ st__e) as (st__e' & a__e & STEP__e); eauto.
       { rewrite CUR__E. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner1; eauto.
@@ -341,9 +341,9 @@ Section proof.
         destruct CUR' as [??]. simpl in *. set_solver. }
  
     destruct (Nat.odd m) eqn:O.
-    - forward eapply (odd_steppable _ st__o) as (st__o' & STEP__o); eauto.
+    - opose proof (odd_steppable _ st__o) as (st__o' & STEP__o); eauto.
       { rewrite CUR__O. set_solver. }
-      forward eapply even_syncable as (st__e' & STEP__e); eauto.
+      opose proof * even_syncable as (st__e' & STEP__e); eauto.
       { erewrite (f_equal Nat.odd); eauto. }
       rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e. 
       eexists (_, _). split; [| split].
@@ -352,7 +352,7 @@ Section proof.
       + simpl. eapply even_sync_inv; eauto.
       + simpl. eapply odd_step_inv; eauto.
     - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E. 
-      forward eapply (odd_stutterable _ st__o) as (st__o' & a__o & STEP__o); eauto.
+      opose proof (odd_stutterable _ st__o) as (st__o' & a__o & STEP__o); eauto.
       { rewrite CUR__O. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner2; eauto.

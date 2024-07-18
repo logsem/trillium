@@ -136,7 +136,7 @@ Proof.
   apply AM_live_roles_spec. 
   destruct (even_or_odd (cur_even _ st__e)) as [E | O]. 
   - eexists. eapply @even_steppable. intuition.
-  - forward eapply @even_stutterable; eauto.
+  - ogeneralize * even_stutterable; eauto.
     intros (?&?&?). eauto.
 Qed.
 
@@ -145,7 +145,7 @@ Lemma ρ__o_always_live `{om: OddModel} st__o:
 Proof.
   apply AM_live_roles_spec. 
   destruct (even_or_odd (cur_odd _ st__o)) as [E | O]. 
-  - forward eapply @odd_stutterable; eauto.
+  - ogeneralize * odd_stutterable; eauto.
     intros (?&?&?). eauto.
   - eexists. eapply @odd_steppable. intuition.
 Qed.
