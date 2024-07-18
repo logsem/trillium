@@ -9,8 +9,6 @@ From trillium.fairness.heap_lang Require Export lang lifting tactics notation ad
 From trillium.fairness.heap_lang.examples.even_odd Require Import eo_vs_mod interface utils action_model thread_progs.
 From stdpp Require Import finite.
 
-(** Helper lemmas for working with even and odd *)
-
 Section ModelMono.
 (** Proof that any fair execution of model visits all natural numbers *)
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
@@ -41,17 +39,6 @@ Section ModelMono.
   Let ρEven: fmrole M := inl (ρ__e even_impl).
   Let ρOdd: fmrole M := inr (ρ__o odd_impl).
 
-  (* TODO: move to interface file *)
-  Lemma ρ__e_always_live st__e:
-    ρ__e even_impl ∈ AM_live_roles (@ame_strong _ even_impl) st__e.
-  Proof.
-    apply AM_live_roles_spec. 
-    destruct (even_or_odd (cur_even _ st__e)) as [E | O]. 
-    - eexists. eapply @even_steppable. intuition.
-    - forward eapply @even_stutterable; eauto.
-      intros (?&?&?). eauto.
-  Qed.
-
   (* TODO: move to prod model file *)
   Lemma ρEven_always_live (st: fmstate M) n
     (CUR: st2nat st n):
@@ -62,17 +49,6 @@ Section ModelMono.
     eexists. split; eauto.
     apply ρ__e_always_live. 
   Qed. 
-
-  (* TODO: move to interface file *)
-  Lemma ρ__o_always_live st:
-    ρ__o odd_impl ∈ AM_live_roles (@ame_strong _ odd_impl) st.
-  Proof.
-    apply AM_live_roles_spec. 
-    destruct (even_or_odd (cur_odd _ st)) as [E | O]. 
-    - forward eapply @odd_stutterable; eauto.
-      intros (?&?&?). eauto.
-    - eexists. eapply @odd_steppable. intuition.
-  Qed.
 
   (* TODO: move to prod model file *)
   Lemma ρOdd_always_live (st: fmstate M) n
@@ -633,7 +609,7 @@ Section Adequacy.
     iIntros "#Hinv".
     iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck %Hequiv [_ [Hσ Hδ]] Hposts".
     
-    iInv "Hinv" as (st__e st__o N) "(>Hmod & >%CUR__E & >%CUR__O & >Hn & Hauths)" "Hclose".
+    iInv "Hinv" as ([st__e st__o] N) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)" "Hclose".
     iApply fupd_mask_intro; [set_solver|].
     iIntros "Hclose'".
     iDestruct (gen_heap_valid with "Hσ Hn") as %Hn.
@@ -734,7 +710,7 @@ Section Adequacy.
     iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner l) with "[Hσ Hs Heven_at_auth Hodd_at_auth]") as "#Hinv".
     { iNext. unfold evenodd_inv_inner.
       rewrite /st0. 
-      do 2 iExists _. iExists 0.
+      iExists _, 0.
       simpl. rewrite big_sepM_singleton. iFrame.
       iPureIntro. apply st0_zero. }
     iModIntro.

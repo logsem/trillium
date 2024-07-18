@@ -3,22 +3,6 @@ From trillium.fairness.heap_lang.examples.even_odd Require Import utils.
 
 Section ActionModel.
 
-  (* Class PreModel := { *)
-  (*     pmState: Type; *)
-  (*     pmPubA: Type; *)
-  (*     pmPrivA: Type; *)
-  (*     pmA: Type := pmPubA + pmPrivA; *)
-  (*     pmTrans: pmState -> option pmA -> pmState -> Prop; *)
-  (* }. *)
-    
-  (* Class PreModel (pmPubA: Type) := { *)
-  (*     pmState: Type; *)
-  (*     pmPrivA: Type; *)
-  (*     pmRole: Type; *)
-  (*     pmA: Type := option pmPubA + pmPrivA; *)
-  (*     pmTrans: pmState -> pmA * pmRole -> pmState -> Prop; *)
-  (* }. *)
-
   Record ActionModel := {
       amSt: Type;
       (* amPubA: Type; *)
@@ -31,10 +15,17 @@ Section ActionModel.
 
   Arguments amTrans {_}. 
 
+  (* similar to "live roles" of FairModel, but the roles are optional, 
+     and the list cannot contain anything non-stepping *)
   Definition AM_strong_lr (AM: ActionModel) `{Countable (amRole AM)} :=
     {lr: amSt AM -> gset (option (amRole AM)) |
       forall st oρ, oρ ∈ lr st <-> exists a st', amTrans st (a, oρ) st'}.
 
+  Definition AM_fin_branch (AM: ActionModel) := 
+    {next_steps: amSt AM -> list (amSt AM * amA AM * option (amRole AM)) 
+     | forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 <-> (s2, a, oρ) ∈ next_steps s1}.
+
+  (* a weaker version of AM_fin_branch that is easier to show *)
   Definition AM_fin_branch' (AM: ActionModel) := 
     {next_steps': amSt AM -> list (amSt AM * amA AM * option (amRole AM)) 
      | forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 -> (s2, a, oρ) ∈ next_steps' s1}.
@@ -42,10 +33,8 @@ Section ActionModel.
   Definition AM_step_dec (AM: ActionModel) :=
     forall s1 a oρ s2, Decision (@amTrans AM s1 (a, oρ) s2).
 
-  Definition AM_fin_branch (AM: ActionModel) := 
-    {next_steps: amSt AM -> list (amSt AM * amA AM * option (amRole AM)) 
-     | forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 <-> (s2, a, oρ) ∈ next_steps s1}.
-
+  (* derive the strong finite branching from weaker one
+     by filtering possible transitions *)
   Lemma AM_fin_branch_dec (AM: ActionModel)
     (FIN: AM_fin_branch' AM) (DEC: AM_step_dec AM):
     AM_fin_branch AM.
@@ -56,6 +45,8 @@ Section ActionModel.
     symmetry. apply iff_and_impl_helper. intuition.
   Qed.
 
+  (* (optional) live roles can be obtained by checking all possible transitions,
+     given that there is a finite number of them *)
   Lemma fin_branch_strong (AM: ActionModel) `{Countable (amRole AM)}
     (FIN: AM_fin_branch' AM) (DEC: AM_step_dec AM):
     AM_strong_lr AM.
@@ -69,8 +60,8 @@ Section ActionModel.
     rewrite FIN. tauto.
   Qed. 
 
-  (* TODO: move *)
-  (* useful for defining live_roles of AM *)
+  (* useful for defining the set of _non-optional_ live_roles of AM *)
+  (* TODO: move *)  
   Definition extract_Somes {A: Type} (l: list (option A)): list A :=
     flat_map (from_option (fun a => [a]) []) l.
 
@@ -99,6 +90,7 @@ Section ActionModel.
     done. 
   Qed.
 
+  (* the counterpart of FairModel's "live_roles" *)
   Definition AM_live_roles {AM: ActionModel} `{Countable (amRole AM)} (AM_S: AM_strong_lr AM):
     amSt AM -> gset (amRole AM) :=
     extract_Somes_gset ∘ proj1_sig AM_S.
@@ -145,12 +137,6 @@ Section ActionModel.
     .
     
     Definition ProdAM: ActionModel := {| amTrans := ProdTrans; |}.
-
-    (* Lemma ProdAM_strong_lr `{Countable (amRole AM1), Countable (amRole AM2)} *)
-    (*   {S1: AM_strong_lr AM1} {S2: AM_strong_lr AM1}:  *)
-    (*   AM_strong_lr ProdAM. *)
-    (* Proof.  *)
-    (*   destruct S1 as [lr1 S1], S2 as [lr2 S2].  *)
 
     Lemma prod_AM_step_dec {EQ1: EqDecision (amSt AM1)} {EQ2: EqDecision (amSt AM2)}
       (D1: AM_step_dec AM1) (D2: AM_step_dec AM2):      
@@ -270,9 +256,6 @@ Section ActionModel.
 
     (* this requirement is not necessary, but allows to reuse the AM_strong_lr machinery *)
     Context (AM_S: AM_strong_lr AM). 
-
-    (* Context (am_lr: amSt AM -> gset (amRole AM)).  *)
-    (* Hypothesis (AM_LIVE_ROLES: forall s1 a ρ s2, amTrans s1 (a, Some ρ) s2 → ρ ∈ am_lr s1). *)
 
     Inductive am_fmtrans: amSt AM → option (amRole AM) → amSt AM → Prop :=
     | amfm_role_step s1 s2 a r (STEP: amTrans s1 (a, Some r) s2):

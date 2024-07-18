@@ -104,9 +104,12 @@ Section proof.
   Definition auth_even_at := (@auth_th_at _ evenThreadG). 
   Definition auth_odd_at := (@auth_th_at _ oddThreadG).  
 
+  Definition st2nat (st: fmstate the_fair_model) N :=
+    cur_even even_impl st.1 = N /\ cur_odd odd_impl st.2 = N.
+
   Definition evenodd_inv_inner l : iProp Σ :=
-    ∃ st__e st__o N,
-      frag_model_is (st__e, st__o) ∗ ⌜ cur_even _ st__e = N ⌝ ∗ ⌜ cur_odd _ st__o = N ⌝ ∗ 
+    ∃ st N,
+      frag_model_is st ∗ ⌜ st2nat st N ⌝ ∗ 
       l ↦ #N ∗
       if Nat.even N
       then auth_even_at N ∗ auth_odd_at (N+1)
@@ -116,9 +119,6 @@ Section proof.
 
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
-
-  Definition st2nat (st: fmstate the_fair_model) N :=
-    cur_even even_impl st.1 = N /\ cur_odd odd_impl st.2 = N.
 
   Lemma prod_AM_live_roles st__e st__o n
     (CUR: st2nat (st__e, st__o) n)
@@ -231,7 +231,7 @@ Section proof.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
   
-    iDestruct "OPEN" as (st__e st__o m) "(>Hmod & >%CUR__E & >%CUR__O & >Hn & Hauths)".
+    iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
     rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
     iModIntro. iExists _. iSplitL "Hn E".
     { rewrite /eo_corr. simpl. iFrame.
@@ -299,7 +299,7 @@ Section proof.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
   
-    iDestruct "OPEN" as (st__e st__o m) "(>Hmod & >%CUR__E & >%CUR__O & >Hn & Hauths)".
+    iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
     rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
     iModIntro. iExists _. iSplitL "Hn O".
     { rewrite /eo_corr. simpl. iFrame.
@@ -402,11 +402,10 @@ Section proof_start.
   Proof using All.
     iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". unfold start.
     rewrite <- (union_empty_l_L ∅). 
-    (* iDestruct (frag_free_roles_are_sep with "HFR") as "[HFR1 HFR2]"; [set_solver| ]. *)
     wp_pures.
     wp_bind (Load _).
     iApply wp_atomic.
-    iInv Ns as (st__e st__o m) "(>Hmod & >%CUR__E & >%CUR__O & >Hn & Hauths)" "Hclose".
+    iInv Ns as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)" "Hclose".
     iIntros "!>". wp_load. iIntros "!>".
     
     rewrite if_arg2_comm !if_arg_comm.

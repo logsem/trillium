@@ -143,6 +143,7 @@ Section ProofsGen.
     
 End ProofsGen.
 
+(* TODO: define these interfaces separately? *)
 
 Record EvenProg := {
     e_prog: val;

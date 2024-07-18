@@ -13,6 +13,7 @@ Proof.
   intros [x] [y]. destruct (decide (x = y)); [left | right]; set_solver.
 Qed. 
 
+(* constructs an ActionModel with pre-defined set of public roles *)
 Definition BuildSubModel (St Priv Role: Type) Trans := {|
    amSt := St;
    amA := PubA + Priv;
@@ -122,3 +123,23 @@ Record OddModel := {
     (exists a st__o', amTrans _ st__o (inr a, Some ρ__o) st__o') ->
     False;
 }.
+
+Lemma ρ__e_always_live `{em: EvenModel} st__e:
+  ρ__e em ∈ AM_live_roles (@ame_strong _ (even_AME em)) st__e.
+Proof.
+  apply AM_live_roles_spec. 
+  destruct (even_or_odd (cur_even _ st__e)) as [E | O]. 
+  - eexists. eapply @even_steppable. intuition.
+  - forward eapply @even_stutterable; eauto.
+    intros (?&?&?). eauto.
+Qed.
+
+Lemma ρ__o_always_live `{om: OddModel} st__o:
+  ρ__o om ∈ AM_live_roles (@ame_strong _ (odd_AME om)) st__o.
+Proof.
+  apply AM_live_roles_spec. 
+  destruct (even_or_odd (cur_odd _ st__o)) as [E | O]. 
+  - forward eapply @odd_stutterable; eauto.
+    intros (?&?&?). eauto.
+  - eexists. eapply @odd_steppable. intuition.
+Qed.
