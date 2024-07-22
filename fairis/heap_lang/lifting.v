@@ -260,6 +260,23 @@ Qed.
       HL_LM_trace_interp' extr atr ζ ={E}=∗
       ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) ∗ P.
 
+    (* TODO: unify with existing locales_of_list_from_locale_from, 
+       remove restriction for Λ *)
+    Lemma locales_of_list_from_locale_from' {Λ: language} `{EqDecision (locale Λ)}
+      tp0 tp1 ζ:
+      ζ ∈ locales_of_list_from tp0 tp1 (Λ := Λ) ->
+      is_Some (from_locale_from tp0 tp1 ζ).
+    Proof.
+      clear -tp0 tp1 ζ.
+      revert tp0; induction tp1 as [|e1 tp1 IH]; intros tp0.
+      { simpl. intros H. inversion H. }
+      simpl.
+      rewrite /locales_of_list_from /=. intros.
+      destruct (decide (language.locale_of tp0 e1 = ζ)); simplify_eq; first set_solver.
+      apply elem_of_cons in H as [?| ?]; [done| ].
+      set_solver.
+    Qed.
+
     (* TODO: have similar proof in other repo *)
     Lemma MSI_tids_smaller (σ: list expr) δ:
       ⊢ model_state_interp σ δ -∗ ⌜tids_smaller σ δ⌝.
@@ -267,9 +284,12 @@ Qed.
       rewrite /model_state_interp.
       iIntros "(%fm & %LE & %DEAD & %TP & X)".
       iPureIntro. red. intros.
-      red in TP.
-    Admitted. 
-
+      apply locales_of_list_from_locale_from'.
+      destruct (decide (ζ ∈ locales_of_list σ)); [done| ].
+      red in TP. specialize (TP _ n).
+      red in LE. apply proj2 in LE. rewrite -LE in H.
+      by apply not_elem_of_dom in TP. 
+    Qed. 
 
     (* TODO: move *)
     Lemma locale_fill' e K t1: locale_of t1 (fill K e) = locale_of t1 e.
