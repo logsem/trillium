@@ -1,5 +1,5 @@
 From trillium.fairness Require Import fairness.
-From trillium.fairness.heap_lang.examples.even_odd Require Import utils.
+From trillium.fairness Require Import utils.
 From stdpp Require Import namespaces coPset. 
 From iris.proofmode Require Import proofmode.
 
@@ -75,9 +75,9 @@ Section Actions.
 
   (* Lemma pub_priv_inv `{Countable T} (a: Action): *)
   (*   (exists (t: T), pub_act t = a) \/ a ∉ pub_actions. *)
-  (* Proof.  *)
+  (* Proof. *)
   (*   destruct (decide (a ∈ pub_actions)) as [PUB| ]; auto. left. *)
-  (*   rewrite /pub_actions in PUB.  *)
+  (*   rewrite /pub_actions in PUB. *)
 
 End Actions.
 

@@ -150,6 +150,11 @@ Section LogicHelpers.
     A /\ B <-> A /\ C.
   Proof using. tauto. Qed.
 
+  Lemma and_iff_pre {A B C: Prop}
+    (BC: A -> (B <-> C)):
+    (A -> B) <-> (A -> C).
+  Proof using. tauto. Qed.
+
   Lemma curry_uncurry_prop {A B C: Prop}:
     (A -> B -> C) <-> (A /\ B -> C).
   Proof. tauto. Qed. 

@@ -4,9 +4,9 @@ From iris.algebra Require Import excl_auth.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination fairness_finiteness trace_utils.
+From trillium.fairness Require Import fairness fair_termination fairness_finiteness trace_utils utils.
 From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
-From trillium.fairness.heap_lang.examples.even_odd Require Import eo_vs_mod interface utils action_model thread_progs.
+From trillium.fairness.heap_lang.examples.even_odd Require Import eo_vs_mod interface action_model thread_progs.
 From stdpp Require Import finite.
 
 Section ModelMono.
@@ -90,32 +90,7 @@ Section ModelMono.
   Qed.
 
   Definition prod_states_wf (mtr: mtrace M) :=
-    forall (mtr': mtrace M) i (AFTER: after i mtr = Some mtr'),
-    exists m, st2nat (trfirst mtr') m.
-
-  (* TODO: move *)
-  Lemma after_after {St L: Type} (tr1 tr2 tr3: trace St L) i j
-    (AFTERi: after i tr1 = Some tr2)
-    (AFTERj: after j tr2 = Some tr3):
-    after (i + j) tr1 = Some tr3.
-  Proof. 
-    generalize dependent tr3. induction j.
-    { simpl. rewrite Nat.add_0_r. congruence. }
-    intros. 
-    rewrite -Nat.add_1_r in AFTERj. rewrite after_sum' in AFTERj.
-    destruct (after j tr2) eqn:Aj; [| done].
-    specialize (IHj _ eq_refl).
-    rewrite Nat.add_succ_r -Nat.add_1_r. by rewrite after_sum' IHj.
-  Qed. 
-
-  Lemma prod_states_wf_after mtr mtr' i
-    (WF: prod_states_wf mtr)
-    (AFTER: after i mtr = Some mtr'):
-    prod_states_wf mtr'.
-  Proof. 
-    red. intros atr j AFTER'.
-    eapply WF. eapply after_after; eauto.
-  Qed. 
+    trace_always' mtr (fun s _ => exists m, st2nat s m). 
 
   (* TODO: reuse trace_lookup definitions here *)
   Lemma progress_helper i ρ P
@@ -175,7 +150,7 @@ Section ModelMono.
     destruct FAIR as [DIS | STEP]. 
     { rewrite -(plus_O_n m) in DIS. apply pred_at_sum' in DIS.
       destruct (after m mtr) eqn:A; [| done]. apply pred_at_state_trfirst in DIS.
-      specialize (WF _ _ A) as [??].
+      eapply trace_always'_state_after in WF as [??]; eauto.  
       destruct DIS. eapply ρEven_always_live; eauto. }
 
     assert (forall st__e a st__e', amTrans prod_model st__e (a, Some ρEven) st__e' ->
@@ -211,7 +186,7 @@ Section ModelMono.
     destruct FAIR as [DIS | STEP]. 
     { rewrite -(plus_O_n m) in DIS. apply pred_at_sum' in DIS.
       destruct (after m mtr) eqn:A; [| done]. apply pred_at_state_trfirst in DIS.
-      specialize (WF _ _ A) as [??].       
+      eapply trace_always'_state_after in WF as [??]; eauto.  
       destruct DIS. eapply ρOdd_always_live; eauto. }
 
     assert (forall st__e a st__e', amTrans prod_model st__e (a, Some ρOdd) st__e' ->
@@ -250,7 +225,7 @@ Section ModelMono.
       assert (st2nat (trfirst mtr') i) as Hfirst'.
       { rewrite /trfirst. destruct mtr'; done. }
       opose proof * evenodd_mdl_progresses_Even as [m Hpred']; eauto. 
-      { eapply prod_states_wf_after; eauto. }
+      { eapply trace_always'_after; eauto. }
       exists (n + m).
       rewrite pred_at_sum. rewrite Hafter. done.
     - assert (∀ ρ : fmrole M, fair_model_trace ρ mtr') as Hfair'.
@@ -258,7 +233,7 @@ Section ModelMono.
       assert (st2nat (trfirst mtr') i) as Hfirst'.
       { rewrite /trfirst. destruct mtr'; done. }
       opose proof * evenodd_mdl_progresses_Odd as [m Hpred']; eauto. 
-      { eapply prod_states_wf_after; eauto. }
+      { eapply trace_always'_after; eauto. }
       { by rewrite -Nat.negb_even Heqn. } 
       exists (n + m).
       rewrite pred_at_sum. rewrite Hafter. done.
@@ -277,7 +252,7 @@ Section ModelMono.
       replace (S n) with (n + 1) in Hafter' by lia.
       rewrite after_sum' in Hafter'. rewrite Hafter in Hafter'. done. }
 
-    specialize (WF _ _ Hafter) as [m CUR__n]. simpl in CUR__n.
+    eapply trace_always'_state_after in WF as [m CUR__n]; eauto. simpl in CUR__n.
     exists m. rewrite -{1}(Nat.add_0_r n) pred_at_sum Hafter. split; auto.
     ogeneralize * mtrace_valid_after; eauto. intros VALID__n.
     punfold VALID__n. inversion VALID__n. subst.
@@ -799,29 +774,39 @@ Section Adequacy.
     by f_equiv.
   Qed.
   
-  Lemma prod_valid_states_wf mtr n
-    (VALID: mtrace_valid mtr)
-    (CUR0: st2nat (trfirst mtr) n):
-    @prod_states_wf even_impl odd_impl mtr.
-  Proof using.
-    red. intros mtr' i AFTER.
-    generalize dependent mtr'. induction i.
-    { simpl. intros ? [=->]. eauto. }
-    intros.
-    ogeneralize * after_is_Some_le.
-    { apply (Nat.le_succ_diag_r i). }
-    { eauto. }
-    intros [mtr'' AFTER''].
-    ospecialize * IHi; eauto. destruct IHi as [m CUR'].
-    opose proof * (mtrace_valid_after _ _ i) as VALID'; eauto.
-    rewrite -Nat.add_1_r after_sum' AFTER'' in AFTER.
-    destruct mtr'' eqn:T; [done| ]. simpl in AFTER, CUR'.
-    inversion AFTER. subst t.
-    punfold VALID'. inversion VALID'. subst.
-    simpl in H1. apply am_fmtrans_action in H1 as [? TRANS].
-    eapply st2nat_next in TRANS; eauto.
-    destruct TRANS; eauto.
-  Qed.
+  (* Lemma prod_valid_states_wf mtr n *)
+  (*   (VALID: mtrace_valid mtr) *)
+  (*   (CUR0: st2nat (trfirst mtr) n): *)
+  (*   @prod_states_wf even_impl odd_impl mtr. *)
+  (* Proof using. *)
+  (*   red. intros mtr' i AFTER. *)
+  (*   generalize dependent mtr'. induction i. *)
+  (*   { simpl. intros ? [=->]. eauto. } *)
+  (*   intros. *)
+  (*   ogeneralize * after_is_Some_le. *)
+  (*   { apply (Nat.le_succ_diag_r i). } *)
+  (*   { eauto. } *)
+  (*   intros [mtr'' AFTER'']. *)
+  (*   ospecialize * IHi; eauto. destruct IHi as [m CUR']. *)
+  (*   opose proof * (mtrace_valid_after _ _ i) as VALID'; eauto. *)
+  (*   rewrite -Nat.add_1_r after_sum' AFTER'' in AFTER. *)
+  (*   destruct mtr'' eqn:T; [done| ]. simpl in AFTER, CUR'. *)
+  (*   inversion AFTER. subst t. *)
+  (*   punfold VALID'. inversion VALID'. subst. *)
+  (*   simpl in H1. apply am_fmtrans_action in H1 as [? TRANS]. *)
+  (*   eapply st2nat_next in TRANS; eauto. *)
+  (*   destruct TRANS; eauto. *)
+  (* Qed. *)
+
+  (* (* TODO: can weaken all requirements except state relation *) *)
+  (* Lemma match_evenodd_prod_wf l (etr : heap_lang_extrace) (lmtr : auxtrace LM) *)
+  (*   (Hmatch_strong : traces_match labels_match *)
+  (*                      (λ (x0 : cfg heap_lang) (x1 : lm_ls LM), *)
+  (*                        live_tids x0 x1 ∧ ξ_evenodd l x0 x1) *)
+  (*                      locale_step *)
+  (*                      (lm_ls_trans LM) *)
+  (*                      etr lmtr): *)
+  (*   prod_states_wf lmtr.  *)
 
   Lemma extr_props (l: loc) e
     (extr : heap_lang_extrace)
@@ -852,7 +837,7 @@ Section Adequacy.
     have Hfairm := upto_stutter_fairness auxtr mtr Hupto Hfairaux.
     have Hmtrvalid := upto_preserves_validity auxtr mtr Hupto Hvalaux.
     pose proof (fairness_preserved extr auxtr Hinf Hmatch Hfair) as Hfair'.
-    pose proof (upto_stutter_fairness auxtr mtr Hupto Hfair') as Hfair''.
+    pose proof (upto_stutter_fairness auxtr mtr Hupto Hfair') as Hfair''.    
     assert (infinite_trace mtr) as Hinf''.
     { eapply upto_stutter_infinite_trace; [done|].
       by eapply traces_match_infinite_trace. }
@@ -868,14 +853,25 @@ Section Adequacy.
       (* assert (0 = ls_under (trfirst auxtr)) as Hσ' by lia. *)
       destruct n; [| lia]. clear Hσ.
       inversion Hupto; simplify_eq; simpl in *; congruence. }
+    (* trace_always *)      
+
+    (* opose proof (prod_valid_states_wf _ _ _ _) as WF; eauto.   *)
+    assert (prod_states_wf mtr) as WF.
+    { clear -Hmatch_strong Hupto. 
+      eapply upto_preserves_trace_always'_state; eauto. 
+      eapply traces_match_trace_always'_state_2. 
+      { apply Hmatch_strong. }
+      simpl. intros ?? [_ EO]. red in EO.
+      apply proj2 in EO. red in EO.
+      eapply Morphisms_Prop.ex_impl_morphism; [| apply EO].
+      red. intros. red. tauto. }
+
     split.
-    - pose proof (evenodd_mdl_progresses mtr Hinf'' Hvalid'' Hfair''
-                    ltac:(eapply prod_valid_states_wf; eauto) Hfirst'') as Hprogress.
+    - pose proof (evenodd_mdl_progresses mtr Hinf'' Hvalid'' Hfair'' WF Hfirst'') as Hprogress.
       eapply (evenodd_aux_ex_progress_preserved l _ auxtr).
       { eapply traces_match_impl; [done| |apply Hmatch_strong]. by intros ??[??]. }
       by eapply evenodd_mtr_aux_progress_preserved. 
-    - pose proof (evenodd_mdl_is_mono mtr Hinf'' Hvalid'' Hfair''
-                    ltac:(eapply prod_valid_states_wf; eauto) Hfirst'')
+    - pose proof (evenodd_mdl_is_mono mtr Hinf'' Hvalid'' Hfair'' WF Hfirst'')
         as Hmono.
       eapply (evenodd_aux_ex_mono_preserved l _ auxtr).
       { eapply traces_match_impl; [done| |apply Hmatch_strong]. by intros ??[??]. }
