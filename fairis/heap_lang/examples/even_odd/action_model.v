@@ -1,16 +1,93 @@
 From trillium.fairness Require Import fairness.
 From trillium.fairness.heap_lang.examples.even_odd Require Import utils.
+From stdpp Require Import namespaces coPset. 
+From iris.proofmode Require Import proofmode.
+
+Import derived_laws_later.bi.
+
+Section Actions.
+  (* Definition to_action `{Countable T}: T -> Action := encode.  *)
+  (* Definition from_action `{Countable T}: Action -> option T := decode. *)
+  Definition Action := positive. 
+
+  (* Set Default Proof Using "Type". *)
+  Definition pub_prefix: namespace := nroot .@ "pub". 
+  Definition pub_actions: coPset := ↑pub_prefix. 
+  Definition pub_act `{Countable T} (t: T): Action := 
+    coPpick $ ↑ (pub_prefix .@ encode t). 
+
+  Definition priv_prefix: namespace := nroot .@ "priv". 
+  Definition priv_actions: coPset := ↑priv_prefix. 
+  Definition priv_act `{Countable T} (t: T): Action := 
+    coPpick $ ↑ (priv_prefix .@ encode t). 
+
+  Lemma pub_act_public `{Countable T} (t: T):
+    pub_act t ∈ pub_actions.
+  Proof.
+    rewrite /pub_act /pub_actions.
+    eapply elem_of_weaken; [apply coPpick_elem_of| ].
+    { apply nclose_infinite. }
+    apply nclose_subseteq.
+  Qed. 
+    
+  Lemma priv_act_private `{Countable T} (t: T):
+    priv_act t ∈ priv_actions.
+  Proof.
+    rewrite /priv_act /priv_actions.
+    eapply elem_of_weaken; [apply coPpick_elem_of| ].
+    { apply nclose_infinite. }
+    apply nclose_subseteq.
+  Qed.
+
+  Lemma pub_act_inj `{CNT: Countable T}: Inj eq eq (@pub_act _ _ CNT).
+  Proof.
+    red. rewrite /pub_act. intros ?? EQ.
+    destruct (decide (x = y)) as [| NEQ]; auto. 
+    assert ((↑pub_prefix.@encode x: coPset) ## (↑pub_prefix.@encode y)) as D.
+    { assert (encode x ≠ encode y); [| solve_ndisj].
+      intros ?. destruct NEQ. eapply encode_inj; eauto. }
+    opose proof * (coPpick_elem_of (↑pub_prefix.@encode x)) as IN1. 
+    { eapply nclose_infinite. }
+    opose proof * (coPpick_elem_of (↑pub_prefix.@encode y)) as IN2. 
+    { eapply nclose_infinite. }
+    rewrite EQ in IN1. set_solver. 
+  Qed.
+    
+  Lemma pub_priv_actions_disjoint: pub_actions ## priv_actions.
+  Proof. solve_ndisj. Qed.
+
+  Lemma pub_priv_actions_neq `{Countable T1} `{Countable T2}: 
+    forall (a: T1) (b: T2), pub_act a ≠ priv_act b.
+  Proof. 
+    intros. 
+    pose proof (pub_act_public a). pose proof (priv_act_private b) as PRIV.
+    intros EQ. rewrite -EQ in PRIV. 
+    pose proof pub_priv_actions_disjoint. set_solver. 
+  Qed.
+
+  Lemma priv_notin_pub_actions `{Countable T}: forall (t: T), priv_act t ∉ pub_actions.
+  Proof. 
+    intros. apply disjoint_singleton_l.
+    symmetry. eapply disjoint_subseteq; [| reflexivity | | apply pub_priv_actions_disjoint].
+    { apply _. }
+    apply elem_of_subseteq_singleton, priv_act_private. 
+  Qed. 
+
+  (* Lemma pub_priv_inv `{Countable T} (a: Action): *)
+  (*   (exists (t: T), pub_act t = a) \/ a ∉ pub_actions. *)
+  (* Proof.  *)
+  (*   destruct (decide (a ∈ pub_actions)) as [PUB| ]; auto. left. *)
+  (*   rewrite /pub_actions in PUB.  *)
+
+End Actions.
 
 Section ActionModel.
 
   Record ActionModel := {
       amSt: Type;
-      (* amPubA: Type; *)
-      (* amPrivA: Type; *)
-      (* amA: Type := amPubA + amPrivA; *)
-      amA: Type;
+      (* amA: Type; *)
       amRole: Type;
-      amTrans: amSt -> amA * option amRole -> amSt -> Prop;
+      amTrans: amSt -> Action * option amRole -> amSt -> Prop;
   }.
 
   Arguments amTrans {_}. 
@@ -22,12 +99,12 @@ Section ActionModel.
       forall st oρ, oρ ∈ lr st <-> exists a st', amTrans st (a, oρ) st'}.
 
   Definition AM_fin_branch (AM: ActionModel) := 
-    {next_steps: amSt AM -> list (amSt AM * amA AM * option (amRole AM)) 
+    {next_steps: amSt AM -> list (amSt AM * Action * option (amRole AM)) 
      | forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 <-> (s2, a, oρ) ∈ next_steps s1}.
 
   (* a weaker version of AM_fin_branch that is easier to show *)
   Definition AM_fin_branch' (AM: ActionModel) := 
-    {next_steps': amSt AM -> list (amSt AM * amA AM * option (amRole AM)) 
+    {next_steps': amSt AM -> list (amSt AM * Action * option (amRole AM)) 
      | forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 -> (s2, a, oρ) ∈ next_steps' s1}.
 
   Definition AM_step_dec (AM: ActionModel) :=
@@ -106,34 +183,30 @@ Section ActionModel.
   Qed. 
 
   Section AMProduct.
-    Context {AM1 AM2: ActionModel}.
-    Context {PA: Type}. 
-
-    (* TODO: should these types be isomorphic? *)
-    Context {fact_act: PA -> option (@amA AM1) * option (@amA AM2)}.
-
+    Context (AM1 AM2: ActionModel).
+    
     Let PS: Type := @amSt AM1 * @amSt AM2.
     Let PR: Type := @amRole AM1 + @amRole AM2.
 
-    Inductive ProdTrans: PS -> PA * option PR -> PS -> Prop :=
-    | pt_inner1 s1 s1' s2 a1 r1 pa
-        (LBL: fact_act pa = (Some a1, None))
-        (STEP1: amTrans s1 (a1, Some r1) s1'):
-      ProdTrans (s1, s2) (pa, Some (inl r1)) (s1', s2)
-    | pt_inner2 s2 s2' s1 a2 r2 pa
-        (LBL: fact_act pa = (None, Some a2))
-        (STEP2: amTrans s2 (a2, Some r2) s2'):
-      ProdTrans (s1, s2) (pa, Some (inr r2)) (s1, s2')
-    | pt_sync1 s1 s1' s2 s2' a1 a2 r1 pa
-        (LBL: fact_act pa = (Some a1, Some a2))
-        (STEP1: amTrans s1 (a1, Some r1) s1')
-        (STEP2: amTrans s2 (a2, None) s2'):
-      ProdTrans (s1, s2) (pa, Some (inl r1)) (s1', s2')
-    | pt_sync2 s1 s1' s2 s2' a1 a2 r2 pa
-        (LBL: fact_act pa = (Some a1, Some a2))
-        (STEP1: amTrans s1 (a1, None) s1')
-        (STEP2: amTrans s2 (a2, Some r2) s2'):
-      ProdTrans (s1, s2) (pa, Some (inr r2)) (s1', s2')
+    Inductive ProdTrans: PS -> Action * option PR -> PS -> Prop :=
+    | pt_inner1 s1 s1' s2 a r1 
+        (PRIV: a ∉ pub_actions)
+        (STEP1: amTrans s1 (a, Some r1) s1'):
+      ProdTrans (s1, s2) (a, Some (inl r1)) (s1', s2)
+    | pt_inner2 s2 s2' s1 a r2
+        (PRIV: a ∉ pub_actions)
+        (STEP2: amTrans s2 (a, Some r2) s2'):
+      ProdTrans (s1, s2) (a, Some (inr r2)) (s1, s2')
+    | pt_sync1 s1 s1' s2 s2' a r1
+        (PUB: a ∈ pub_actions)
+        (STEP1: amTrans s1 (a, Some r1) s1')
+        (STEP2: amTrans s2 (a, None) s2'):
+      ProdTrans (s1, s2) (a, Some (inl r1)) (s1', s2')
+    | pt_sync2 s1 s1' s2 s2' a r2
+        (PUB: a ∈ pub_actions)
+        (STEP1: amTrans s1 (a, None) s1')
+        (STEP2: amTrans s2 (a, Some r2) s2'):
+      ProdTrans (s1, s2) (a, Some (inr r2)) (s1', s2')
     .
     
     Definition ProdAM: ActionModel := {| amTrans := ProdTrans; |}.
@@ -145,105 +218,65 @@ Section ActionModel.
       red. intros [s1 s2] a oρ [s1' s2'].
       Ltac inv_step := right; intros S; inversion S; subst; congruence.
       destruct oρ as [ρ| ]; [| inv_step]. 
-      destruct (fact_act a) as [oa1 oa2] eqn:F.
-      destruct oa1 as [a1| ], oa2 as [a2| ]; revgoals. 
-      { inv_step. }
+      destruct (decide (a ∈ pub_actions)) as [PUB | PRIV].
       - destruct ρ as [ρ1 | ρ2]. 
-        { inv_step. }
-        destruct (decide (s1' = s1)) as [-> | ?]; [| inv_step]. 
-        destruct (D2 s2 a2 (Some ρ2) s2'); [| inv_step]. 
-        left. econstructor; eauto.
-      - destruct ρ as [ρ1 | ρ2]. 
-        2: { inv_step. }
-        destruct (decide (s2' = s2)) as [-> | ?]; [| inv_step]. 
-        destruct (D1 s1 a1 (Some ρ1) s1'); [| inv_step]. 
-        left. econstructor; eauto.
-      - destruct ρ as [ρ1 | ρ2].
-        + destruct (D1 s1 a1 (Some ρ1) s1'), (D2 s2 a2 None s2').
+        + destruct (D1 s1 a (Some ρ1) s1'), (D2 s2 a None s2').
           2-4: inv_step.
           left. econstructor; eauto.
-        + destruct (D1 s1 a1 None s1'), (D2 s2 a2 (Some ρ2) s2').
+        + destruct (D1 s1 a None s1'), (D2 s2 a (Some ρ2) s2').
           2-4: inv_step.
+          left. econstructor; eauto.
+      - destruct ρ as [ρ1 | ρ2]. 
+        + destruct (decide (s2' = s2)) as [-> | ?]; [| inv_step].  
+          destruct (D1 s1 a (Some ρ1) s1'); [| inv_step].
+          left. econstructor; eauto.
+        + destruct (decide (s1' = s1)) as [-> | ?]; [| inv_step].  
+          destruct (D2 s2 a (Some ρ2) s2'); [| inv_step].
           left. econstructor; eauto.
     Qed.
 
     Lemma prod_AM_fin_branch' (FIN1: AM_fin_branch' AM1) (FIN2: AM_fin_branch' AM2)
-      inv_fact (INV: Cancel eq inv_fact fact_act)
+      (* inv_fact (INV: Cancel eq inv_fact fact_act) *)
       :
       AM_fin_branch' ProdAM.
     Proof. 
-      destruct FIN1 as [ns1 FIN1], FIN2 as [ns2 FIN2].      
+      destruct FIN1 as [ns1 FIN1], FIN2 as [ns2 FIN2].
+      set (dummy := pub_act "0"). 
       exists (fun '(s1, s2) =>
-           let l1 := (fun '(x, y, z) => (x, Some y, z)) <$> ns1 s1 in
-           let l2 := (fun '(x, y, z) => (x, Some y, z)) <$> ns2 s2 in 
-           '(s1', a1, oρ1) ← (s1, None, None) :: l1;
-           '(s2', a2, oρ2) ← (s2, None, None) :: l2;
-           let a' := inv_fact (a1, a2) in
+           '(s1', a1, oρ1) ← (s1, dummy, None) :: ns1 s1;
+           '(s2', a2, oρ2) ← (s2, dummy, None) :: ns2 s2;
+           a ← [a1; a2];
            ρ' ← [from_option (Some ∘ inl) None oρ1; from_option (Some ∘ inr) None oρ2];
-           mret ((s1', s2'), a', ρ')).
-      
+           mret ((s1', s2'), a, ρ')). 
+           
       intros [s1 s2] [s1' s2'] a oρ STEP.
-      pose proof (cancel_surj a) as [[oa1 oa2] EQ].
       rewrite elem_of_list_bind.
       rewrite !ex_prod.
 
       (* TODO: shorten the following proof, rewrite under binders? *)
-      (* setoid_rewrite elem_of_list_bind. *)      
+      (* setoid_rewrite elem_of_list_bind.       *)
 
       (* do 3 (eapply exist_proper; intros). *)
       (* { pattern x1. match goal with |- ((fun y => ?F y <-> _) x1) => idtac "foo" end.  *)      
 
       inversion STEP; subst.
-      { exists s1', (Some a1), (Some r1).
-        split.
-        2: { apply elem_of_cons. right. rewrite elem_of_list_fmap.
-             eexists. split; eauto. simpl. reflexivity. }
+      { exists s1', a, (Some r1).
+        split; [| set_solver]. 
         rewrite elem_of_list_bind.
-        exists (s2', None, None). 
-        rewrite elem_of_list_bind. split.
-        2: { apply elem_of_cons. tauto. }
-        exists (Some (inl r1)). simpl.
-        rewrite elem_of_list_ret. split; [| set_solver].
-        do 2 f_equal.
-        apply (@f_equal _ _ inv_fact) in LBL. by rewrite INV in LBL. }
-      { exists s1', None, None.
-        split.
-        2: { apply elem_of_cons. tauto. }
-        rewrite elem_of_list_bind.        
-        exists (s2', (Some a2), (Some r2)).
-        rewrite elem_of_list_bind. split.
-        2: { apply elem_of_cons. right. rewrite elem_of_list_fmap.
-             eexists. split; eauto. simpl. reflexivity. }
-        exists (Some (inr r2)). simpl.
-        rewrite elem_of_list_ret. split; [| set_solver].
-        do 2 f_equal.
-        apply (@f_equal _ _ inv_fact) in LBL. by rewrite INV in LBL. }  
-      { exists s1', (Some a1), (Some r1).
-        split.
-        2: { apply elem_of_cons. right. rewrite elem_of_list_fmap.
-             eexists. split; eauto. simpl. reflexivity. }
+        exists (s2', dummy, None). set_solver. }
+      { exists s1', dummy, None. 
+        split; [| set_solver]. 
         rewrite elem_of_list_bind.
-        exists (s2', Some a2, None). 
-        rewrite elem_of_list_bind. split.
-        2: { apply elem_of_cons. right. rewrite elem_of_list_fmap.
-             eexists. split; eauto. simpl. reflexivity. }
-        exists (Some (inl r1)). simpl.
-        rewrite elem_of_list_ret. split; [| set_solver].
-        do 2 f_equal.
-        apply (@f_equal _ _ inv_fact) in LBL. by rewrite INV in LBL. }
-      { exists s1', (Some a1), None.
-        split.
-        2: { apply elem_of_cons. right. rewrite elem_of_list_fmap.
-             eexists. split; eauto. simpl. reflexivity. }
+        exists (s2', a, Some r2). set_solver. }
+      { exists s1', a, (Some r1).
+        split; [| set_solver]. 
         rewrite elem_of_list_bind.
-        exists (s2', Some a2, Some r2). 
-        rewrite elem_of_list_bind. split.
-        2: { apply elem_of_cons. right. rewrite elem_of_list_fmap.
-             eexists. split; eauto. simpl. reflexivity. }
-        exists (Some (inr r2)). simpl.
-        rewrite elem_of_list_ret. split; [| set_solver].
-        do 2 f_equal.
-        apply (@f_equal _ _ inv_fact) in LBL. by rewrite INV in LBL. }
+        exists (s2', a, None). 
+        rewrite elem_of_list_bind. set_solver. }
+      { exists s1', a, None.
+        split; [| set_solver]. 
+        rewrite elem_of_list_bind.
+        exists (s2', a, Some r2). set_solver. }
     Qed. 
 
   End AMProduct.

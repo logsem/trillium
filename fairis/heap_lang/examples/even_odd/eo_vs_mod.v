@@ -24,20 +24,20 @@ Section Models.
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
 
-  Definition prodA: Type := PubA + (@ePriv even_impl + @oPriv odd_impl). 
-  Definition fact_TA (pa: prodA): option (amA even_AM) * option (amA odd_AM) := 
-    match pa with
-    | inl s => (Some $ inl s, Some $ inl s)
-    | inr (inl p) => (Some $ inr p, None)
-    | inr (inr p) => (None, Some $ inr p)
-    end.
+  (* Definition prodA: Type := PubA + (@ePriv even_impl + @oPriv odd_impl).  *)
+  (* Definition fact_TA (pa: prodA): option (amA even_AM) * option (amA odd_AM) :=  *)
+  (*   match pa with *)
+  (*   | inl s => (Some $ inl s, Some $ inl s) *)
+  (*   | inr (inl p) => (Some $ inr p, None) *)
+  (*   | inr (inr p) => (None, Some $ inr p) *)
+  (*   end. *)
 
-  Definition prod_model := ProdAM (fact_act := fact_TA).
+  Definition prod_model := ProdAM even_AM odd_AM.
 
   Definition even_role: amRole even_AM -> amRole prod_model := inl. 
   Definition odd_role: amRole odd_AM -> amRole prod_model := inr.
-  Definition even_priv_act: ePriv even_impl -> amA prod_model := priv_act ∘ inl. 
-  Definition odd_priv_act: oPriv odd_impl -> amA prod_model := priv_act ∘ inr. 
+  (* Definition even_priv_act: ePriv even_impl -> amA prod_model := priv_act ∘ inl.  *)
+  (* Definition odd_priv_act: oPriv odd_impl -> amA prod_model := priv_act ∘ inr.  *)
 
   Existing Instance even_AME. 
   Existing Instance odd_AME.
@@ -45,16 +45,8 @@ Section Models.
   Lemma prod_AM_fin_branch': AM_fin_branch' prod_model.
   Proof. 
     unshelve eapply prod_AM_fin_branch'.
-    3: apply odd_AME. 
-    2: apply even_AME. 
-    { exact (fun '(oa1, oa2) => 
-               match oa1, oa2 with
-               | Some (inl pa1), Some _ => inl pa1
-               | Some (inr pa1), None => inr (inl pa1)
-               | None, Some (inr pa2) => inr (inr pa2)
-               | _, _ => inl (step_sync 0)
-               end). }
-    red. intros [?|[?|?]]; reflexivity.
+    - apply even_AME. 
+    - apply odd_AME. 
   Qed.
 
   Lemma prod_AM_strong_lr: AM_strong_lr prod_model.
@@ -62,8 +54,7 @@ Section Models.
     apply fin_branch_strong.
     - apply prod_AM_fin_branch'. 
     - unshelve eapply prod_AM_step_dec.
-      + apply even_AME.
-      + apply odd_AME. 
+      all: apply even_AME || apply odd_AME. 
   Qed.
 
   Definition the_fair_model: FairModel.
@@ -124,6 +115,16 @@ Section proof.
 
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
+  
+  Lemma even_trans_inv (st__e: amSt even_AM) l st__e'
+    (STEP__e: amTrans _ st__e l st__e'):
+    (exists k, l.1 = pub_act (step_sync k)) \/ (l.1 ∉ pub_actions).
+  Proof. Admitted. 
+
+  Lemma odd_trans_inv (st__o: amSt odd_AM) l st__o'
+    (STEP__e: amTrans _ st__o l st__o'):
+    (exists k, l.1 = pub_act (step_sync k)) \/ (l.1 ∉ pub_actions).
+  Proof. Admitted. 
 
   Lemma prod_AM_live_roles st__e st__o n
     (CUR: st2nat (st__e, st__o) n)
@@ -140,29 +141,29 @@ Section proof.
     { intros (a & st' & STEP). inversion STEP; subst.
       all: set_solver. } 
     intros [(ρ__e & -> & (a__e & st__e' & STEP__e))| (ρ__o & -> & (a__o & st__o' & STEP__o))].
-    - destruct a__e as [[k] | a__e].
-      2: { eexists _, (_, _). eapply @pt_inner1; eauto.
-           Unshelve. 2: exact (even_priv_act a__e). done. }
+    - pose proof (even_trans_inv _ _ _ STEP__e) as ACT. simpl in ACT.  
+      destruct ACT as [[k ->] | PRIV]. 
+      2: { eexists _, (_, _). eapply @pt_inner1; eauto. }
       ogeneralize * even_step_inv; eauto.
-      { apply STEP__e. }
       intros (X & CUR__e' & E). assert (n = k) as -> by congruence. clear X. 
       ogeneralize * odd_syncable; eauto.
       { erewrite @f_equal; [apply E| ]. by f_equal. }
       intros [st__o' STEP__o]. 
-      eexists _, (_, _). eapply @pt_sync1; eauto.  
-      Unshelve. 2: exact (pub_act $ step_sync k). simpl. set_solver. 
-    - destruct a__o as [[k] | a__o].
-      2: { eexists _, (_, _). eapply @pt_inner2; eauto.
-           Unshelve. 2: exact (odd_priv_act a__o). done. }
+      eexists _, (_, _). eapply @pt_sync1; eauto.
+      { apply pub_act_public. }
+      by rewrite CUR__o in STEP__o. 
+    - pose proof (odd_trans_inv _ _ _ STEP__o) as ACT. simpl in ACT.
+      destruct ACT as [[k ->] | PRIV]. 
+      2: { eexists _, (_, _). eapply @pt_inner2; eauto. }
       ogeneralize * odd_step_inv; eauto.
-      { apply STEP__o. }
       intros (X & CUR__o' & O). assert (n = k) as -> by congruence. clear X. 
       ogeneralize * even_syncable; eauto.
       { erewrite @f_equal; [apply O| ]. by f_equal. }
       intros [st__e' STEP__e]. 
-      eexists _, (_, _). eapply @pt_sync2; eauto.  
-      Unshelve. 2: exact (pub_act $ step_sync k). simpl. by repeat f_equal.
-  Qed. 
+      eexists _, (_, _). eapply @pt_sync2; eauto.
+      { apply pub_act_public. }
+      by rewrite CUR__e.
+  Qed.
 
   Lemma st2nat_step_ex st st' a oρ n
     (STEP: amTrans prod_model st (a, oρ) st')
@@ -172,35 +173,31 @@ Section proof.
     destruct st as [st__e st__o], st' as [st__e' st__o'].
     destruct CUR as [CUR__e CUR__o]. simpl in *.
     inversion STEP; subst.
-    - destruct a1.
-      { by destruct a as [|[|]]. }
-      destruct a; try done. 
-      eapply even_stutter_inv in STEP1. 
+    - eapply even_stutter_inv in STEP1; eauto.  
       eexists. split; simpl. 
       + by rewrite -STEP1.
       + congruence.
-    - destruct a2.
-      { by destruct a as [|[|]]. }
-      destruct a; try done. 
-      eapply odd_stutter_inv in STEP2. 
+    - eapply odd_stutter_inv in STEP2; eauto. 
       eexists. split; simpl; 
         revgoals. 
       + by rewrite -STEP2.
       + congruence.
-    - destruct a1 as [[]|], a2 as [[]|]; try by destruct a as [|[|]].
+    - pose proof (even_trans_inv _ _ _ STEP1) as ACT. simpl in ACT.  
+      destruct ACT as [[k ->] | ?]; [| done]. 
       eapply even_step_inv in STEP1.
       eapply odd_sync_inv in STEP2.
       eexists. split; simpl. 
       + apply STEP1. 
       + lia.
-    - destruct a1 as [[]|], a2 as [[]|]; try by destruct a as [|[|]].
+    - pose proof (odd_trans_inv _ _ _ STEP2) as ACT. simpl in ACT.
+      destruct ACT as [[k ->] | ?]; [| done]. 
       eapply even_sync_inv in STEP1.
       eapply odd_step_inv in STEP2.
       eexists. split; simpl;
         revgoals. 
       + apply STEP2. 
       + lia.
-  Qed. 
+  Qed.
     
 
   Lemma prod_step_lr_nonincr st st' a oρ n
@@ -279,15 +276,14 @@ Section proof.
       rewrite CUR__E in STEP__e. rewrite CUR__O in STEP__o. 
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_sync1; eauto.
-        Unshelve. 2: exact (pub_act $ step_sync m). done. 
+        apply pub_act_public.
       + simpl. eapply even_step_inv; eauto.
       + simpl. eapply odd_sync_inv; eauto.
     - pose proof E as O. rewrite -negb_true_iff Nat.negb_even in O. 
-      opose proof (even_stutterable _ st__e) as (st__e' & a__e & STEP__e); eauto.
+      opose proof (even_stutterable _ st__e) as (st__e' & a__e & PRIV & STEP__e); eauto.
       { rewrite CUR__E. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner1; eauto.
-        Unshelve. 2: exact (even_priv_act a__e). done.
       + simpl. symmetry. rewrite -CUR__E. eapply even_stutter_inv; eauto.
       + done. 
   Qed.
@@ -348,15 +344,14 @@ Section proof.
       rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e. 
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_sync2; eauto.
-        Unshelve. 2: exact (pub_act $ step_sync m). done.
+        apply pub_act_public. 
       + simpl. eapply even_sync_inv; eauto.
       + simpl. eapply odd_step_inv; eauto.
     - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E. 
-      opose proof (odd_stutterable _ st__o) as (st__o' & a__o & STEP__o); eauto.
+      opose proof (odd_stutterable _ st__o) as (st__o' & a__o & PRIV & STEP__o); eauto.
       { rewrite CUR__O. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner2; eauto.
-        Unshelve. 2: exact (odd_priv_act a__o). done.
       + done. 
       + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
   Qed.

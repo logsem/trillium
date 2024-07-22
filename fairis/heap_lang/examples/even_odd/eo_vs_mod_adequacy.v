@@ -68,18 +68,26 @@ Section ModelMono.
   Proof.
     destruct aoρ as [a oρ]. 
     simpl in TRANS. inversion TRANS; subst. 
-    all: destruct a as [[]|[|]]; try done; simpl in LBL; inversion LBL; subst.
     - right. destruct CUR. split; auto.
-      simpl. eapply even_stutter_inv in STEP1. simpl in *. congruence.
+      simpl. eapply even_stutter_inv in STEP1; set_solver. 
     - right. destruct CUR. split; auto.
-      simpl. eapply odd_stutter_inv in STEP2. simpl in *. congruence.
+      simpl. eapply odd_stutter_inv in STEP2; auto.
+      simpl in *. congruence.
     - left. destruct CUR.
-      eapply even_step_inv in STEP1. eapply odd_sync_inv in STEP2.
-      red. simpl in *. lia.
+      opose proof * even_trans_inv as [[? ?] | ?]; [done| | done]. 
+      opose proof * odd_trans_inv as [[? ?] | ?]; [done| | done]. 
+      red. simpl in *. subst.
+      apply pub_act_inj in H2. inversion H2. subst. 
+      apply even_step_inv in STEP1. apply odd_sync_inv in STEP2.
+      lia. 
     - left. destruct CUR.
-      eapply even_sync_inv in STEP1. eapply odd_step_inv in STEP2.
-      red. simpl in *. lia.
-  Qed. 
+      opose proof * even_trans_inv as [[? ?] | ?]; [done| | done]. 
+      opose proof * odd_trans_inv as [[? ?] | ?]; [done| | done]. 
+      red. simpl in *. subst.
+      apply pub_act_inj in H2. inversion H2. subst. 
+      apply even_sync_inv in STEP1. apply odd_step_inv in STEP2.
+      lia. 
+  Qed.
 
   Lemma prod_trace_st2nat (mtr mtr': mtrace M) n i
     (VALID: mtrace_valid mtr)
@@ -169,12 +177,11 @@ Section ModelMono.
                           st2nat st__e i -> Nat.even i ->
                           st2nat st__e' (S i)) as INCR. 
     { clear -even_AM. intros ??? STEP **. inversion STEP; subst.
-      - destruct a as [[]|[|]]; try done; simpl in LBL; inversion LBL; subst.
-        edestruct even_pub_priv_disj; eauto.
-        2: { do 2 eexists. eapply STEP1. }  
+      - edestruct even_pub_priv_disj; eauto.
         eexists. eapply even_steppable.
         apply proj1 in H. set_solver.
-      - destruct a as [[]|[|]]; try done; simpl in LBL; inversion LBL; subst.
+      - opose proof * even_trans_inv as [[? ?] | ?]; [done| | done].
+        simpl in H1. subst. 
         eapply even_step_inv in STEP1. eapply odd_sync_inv in STEP2.
         red. simpl in *. destruct H. simpl in *. lia. }
 
@@ -205,12 +212,11 @@ Section ModelMono.
                           st2nat st__e i -> Nat.odd i ->
                           st2nat st__e' (S i)) as INCR. 
     { clear -odd_AM. intros ??? STEP **. inversion STEP; subst.
-      - destruct a as [[]|[|]]; try done; simpl in LBL; inversion LBL; subst.
-        edestruct odd_pub_priv_disj; eauto.
-        2: { do 2 eexists. eapply STEP2. }
+      - edestruct odd_pub_priv_disj; eauto.
         eexists. eapply odd_steppable.
         apply proj2 in H. set_solver.
-      - destruct a as [[]|[|]]; try done; simpl in LBL; inversion LBL; subst.
+      - opose proof * odd_trans_inv as [[? ?] | ?]; [done| | done].
+        simpl in H1. subst. 
         eapply odd_step_inv in STEP2. eapply even_sync_inv in STEP1.
         red. simpl in *. destruct H. simpl in *. lia. }
 

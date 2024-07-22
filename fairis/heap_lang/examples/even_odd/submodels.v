@@ -19,16 +19,19 @@ Section ThreadModel.
   Definition PrivA := unit.
   Let step_loop: PrivA := (). 
   
-  Definition TA: Type := PubA + PrivA. 
+  (* Definition TA: Type := PubA + PrivA.  *)
   Definition TR := unit.
   Definition ρT: TR := ().
   
   Definition TS := nat. 
   
-  Inductive thread_trans: TS -> TA * option TR -> TS -> Prop :=
-  | thread_step n : Nat.even (n + d) → thread_trans n (inl (step_sync n), Some ρT) (S n)
-  | thread_loop n : Nat.odd (n + d) → thread_trans n (inr step_loop, Some ρT) n
-  | thread_env n : Nat.odd (n + d) → thread_trans n (inl (step_sync n), None) (S n)
+  Inductive thread_trans: TS -> Action * option TR -> TS -> Prop :=
+  | thread_step n : Nat.even (n + d) → 
+                    thread_trans n (pub_act (step_sync n), Some ρT) (S n)
+  | thread_loop n : Nat.odd (n + d) → 
+                    thread_trans n (priv_act step_loop, Some ρT) n
+  | thread_env n : Nat.odd (n + d) → 
+                   thread_trans n (pub_act (step_sync n), None) (S n)
   .
   
   Definition thread_model: ActionModel := {| amTrans := thread_trans |}.
@@ -40,7 +43,7 @@ Section ThreadModel.
   Lemma thread_AM_fin_branch': AM_fin_branch' thread_model.
   Proof.
     red. exists (fun n => n' ← [n; S n]; 
-                  a ← [inl $ step_sync n; inr step_loop];
+                  a ← [pub_act $ step_sync n; priv_act step_loop];
                   ρ ← [Some ρT; None]; mret (n', a, ρ)).
     intros * STEP.
     repeat (setoid_rewrite elem_of_list_bind).
@@ -57,14 +60,14 @@ Section ThreadModel.
     red. intros.
     Local Ltac contra := right; intros TRANS; inversion TRANS; subst; try tauto; try lia.
     destruct (decide (Nat.even (s1 + d))).
-    - destruct (decide (s2 = S s1 /\ oρ = Some ρT /\ a = inl (step_sync s1))) as [(-> & -> & ->)|?].
+    - destruct (decide (s2 = S s1 /\ oρ = Some ρT /\ a = pub_act (step_sync s1))) as [(-> & -> & ->)|?].
       + left. by econstructor.
       + contra; rewrite -Nat.negb_even in H3; by apply negb_prop_elim in H3.
     - pose proof n as n'. 
       apply negb_prop_intro in n. rewrite Nat.negb_even in n.
-      destruct (decide (s2 = s1 /\ oρ = Some ρT /\ a = inr step_loop)) as [(-> & -> & ->)|?].
+      destruct (decide (s2 = s1 /\ oρ = Some ρT /\ a = priv_act step_loop)) as [(-> & -> & ->)|?].
       + left. by econstructor.
-      + destruct (decide (s2 = S s1 /\ oρ = None /\ a = inl (step_sync s1))) as [(-> & -> & ->)|?].
+      + destruct (decide (s2 = S s1 /\ oρ = None /\ a = pub_act (step_sync s1))) as [(-> & -> & ->)|?].
         * left. by econstructor.
         * contra.
   Qed.
@@ -94,17 +97,19 @@ Section ThreadModel.
   Qed. 
 
   Lemma thread_syncable n (EVEN: Nat.odd (n + d)):
-    amTrans thread_model n (inl (step_sync n), None) (n + 1).
+    amTrans thread_model n (pub_act (step_sync n), None) (n + 1).
   Proof.
     rewrite Nat.add_1_r. by econstructor.
   Qed. 
 
   Lemma thread_sync_step_inv n n' k ρ
-      (STEP: amTrans thread_model n (inl (step_sync k), Some ρ) n'):
+      (STEP: amTrans thread_model n (pub_act (step_sync k), Some ρ) n'):
       k = n /\ Nat.even (n + d).
   Proof. 
-    inversion STEP; subst; eauto.
-  Qed.
+    inversion STEP; subst. 
+    - split; auto. symmetry. apply pub_act_inj in H. congruence.
+    - symmetry in H. by apply pub_priv_actions_neq in H.
+  Qed. 
 
   Definition cur_n (st: amSt thread_model) := st. 
 
@@ -113,38 +118,62 @@ End ThreadModel.
 
 Definition thread_0_even: EvenModel.
   unshelve refine {| cur_even := cur_n 0 |}.
-  4: apply (thread_extra 0).
+  1: apply (thread_extra 0).
   all: cycle 2; simpl in *; unfold cur_n in *. 
   - intros. inversion STEP; subst; auto.
+    2: { symmetry in H. by apply pub_priv_actions_neq in H. }
+    apply pub_act_inj in H. inversion H. subst.  
     rewrite Nat.add_0_r in H3. repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
+    apply pub_act_inj in H. inversion H. subst.  
     rewrite Nat.add_0_r in H1. repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
+    destruct PRIV. apply pub_act_public. 
   - intros. eexists. econstructor. by rewrite Nat.add_0_r.
   - intros. eexists. econstructor. by rewrite Nat.add_0_r.
-  - intros. do 2 eexists. econstructor. by rewrite Nat.add_0_r.
+  - intros. do 2 eexists. split; [| apply thread_loop].
+    { apply priv_notin_pub_actions. }
+    by rewrite Nat.add_0_r.
   - intros. by rewrite !thread_AM_lr_exact.
   - reflexivity.
   - by rewrite !thread_AM_lr_exact.
-  - intros ? (?&?&T1) (?&?&T2).
-    inversion T1. inversion T2. subst. edestruct even_odd_False; eauto.
+  - intros ? (?&?&T1) (?&?&?&T2).
+    inversion T1.
+    2: { symmetry in H0. by apply pub_priv_actions_neq in H0. }
+    inversion T2; subst. 
+    1: { destruct H. apply pub_act_public. }
+    subst. edestruct even_odd_False; eauto.
 Qed. 
 
 Definition thread_1_odd: OddModel.
   unshelve refine {| cur_odd := cur_n 1 |}.
-  4: apply (thread_extra 1).
+  1: apply (thread_extra 1).
   all: cycle 2; simpl in *; unfold cur_n in *. 
   - intros. inversion STEP; subst; auto.
-    rewrite even_plus1_negb Nat.negb_even in H3. repeat split; lia || auto.
+    2: { symmetry in H. by apply pub_priv_actions_neq in H. }
+    apply pub_act_inj in H. inversion H. subst.
+    rewrite even_plus1_negb Nat.negb_even in H3. 
+    repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
-    rewrite odd_plus1_negb Nat.negb_odd in H1. repeat split; lia || auto.
+    apply pub_act_inj in H. inversion H. subst.
+    rewrite odd_plus1_negb Nat.negb_odd in H1. 
+    repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
-  - intros. eexists. econstructor. by rewrite even_plus1_negb Nat.negb_even.
-  - intros. eexists. econstructor. by rewrite odd_plus1_negb Nat.negb_odd.
-  - intros. do 2 eexists. econstructor. by rewrite odd_plus1_negb Nat.negb_odd.
+    destruct PRIV. apply pub_act_public. 
+  - intros. eexists. econstructor.
+    by rewrite even_plus1_negb Nat.negb_even.
+  - intros. eexists. econstructor.
+    by rewrite odd_plus1_negb Nat.negb_odd.
+  - intros. do 2 eexists. split; [| apply thread_loop].
+    { apply priv_notin_pub_actions. }
+    by rewrite odd_plus1_negb Nat.negb_odd.
   - intros. by rewrite !thread_AM_lr_exact.
   - reflexivity.
   - by rewrite !thread_AM_lr_exact.
-  - intros ? (?&?&T1) (?&?&T2).
-    inversion T1. inversion T2. subst. edestruct even_odd_False; eauto.
-Qed.
+  - intros ? (?&?&T1) (?&?&?&T2).
+    inversion T1.
+    2: { symmetry in H0. by apply pub_priv_actions_neq in H0. }
+    inversion T2; subst.
+    1: { destruct H. apply pub_act_public. }
+    subst. edestruct even_odd_False; eauto.
+Qed. 
