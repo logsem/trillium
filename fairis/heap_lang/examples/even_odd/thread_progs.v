@@ -47,6 +47,11 @@ Section ThreadGLemmas.
 End ThreadGLemmas.
 
 
+(* exposing the new fuel amount, since lm_fl depends on the new M state which is not available *)
+Definition MU__r `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} ρ f' E τ P: iProp Σ :=  
+  ∀ f R, τ ↦M ({[ ρ := f ]} ∪ (S <$> R)) ∗ ⌜ ρ ∉ dom R ⌝ -∗
+          MU E τ (∃ f__new, τ ↦M ({[ ρ := f__new ]} ∪ R) ∗ ⌜ f__new >= f' ⌝ ∗ P). 
+
 Section ProofsGen.  
   Context `{LM__p: LiveModel heap_lang M__p}.
   Context `{!heapGS Σ LM__p}.
@@ -67,16 +72,16 @@ Section ProofsGen.
     
   Definition eo_vs l ι (ρ: fmrole M__p) tid : iProp Σ :=
     □ |={⊤, ⊤ ∖ ↑ι}=> ∃ N,
-    (▷ eo_corr l N) ∗
-      (∀ f, tid ↦M {[ ρ := f ]} -∗ MU (⊤ ∖ ↑ι) tid (
-                ∃ f', tid ↦M {[ ρ := f' ]}  ∗ ⌜ f' > 43 ⌝ ∗ (▷ (eo_corr l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True))).
+      (▷ eo_corr l N) ∗
+      (MU__r ρ 44 (⊤ ∖ ↑ι) tid
+         (▷ (eo_corr l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True)
+      ).
 
   Definition eo_spec (prog: val) :=
     forall (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
     (FL: forall st, lm_fl LM__p st >= 61),
-    ⊢ {{{  eo_vs n ι ρ tid ∗
-         has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) }}}
-      prog #n #N @ tid
+    ⊢ {{{ eo_vs n ι ρ tid ∗ has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) }}}
+        prog #n #N @ tid
       {{{ RET #(); has_fuels tid ∅ }}}.
   
   Lemma eo_spec_incr_loop: eo_spec incr_loop.
@@ -91,15 +96,22 @@ Section ProofsGen.
     wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic.
     iPoseProof "VS" as "-#V". iMod "V" as "(%M & (>Hn & >Hauths) & CLOS)".
 
+    iSpecialize ("CLOS" with "[Hf]").
+    { iSplitL.
+      { iApply has_fuels_proper; [reflexivity| | by iFrame].
+        rewrite insert_union_singleton_l. f_equiv; [reflexivity| ].
+        apply leibniz_equiv_iff. apply fmap_empty. }
+      set_solver. }
+    
     destruct (cond M) eqn:Heqn.
     - iDestruct (th_agree with "Heven Hauths") as "->".
       iModIntro.
-      iSpecialize ("CLOS" with "[$]"). 
+
       iApply sswp_MU_wp; [done| ].
       iApply (wp_cmpxchg_suc with "[$]"); try done.  
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
-      iIntros "(%f' & (Hf& %FUEL' & CLOS))".
+      iIntros "(%f' & (Hf& %FUEL' & CLOS))". rewrite map_union_empty. 
 
       iMod (th_update _ _ _ (N + 2) with "[$]") as "[Hay Heven]".
       wp_pures.
@@ -120,13 +132,12 @@ Section ProofsGen.
       iModIntro.
       subst.
 
-      iSpecialize ("CLOS" with "[$]"). 
       iApply sswp_MU_wp; [done| ].
       iApply (wp_cmpxchg_fail with "[$]"); [| done| ].
       { assert (M ≠ M + 1) by lia. set_solver. }
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
-      iIntros "(%f' & (Hf & %FUEL' & CLOS))".
+      iIntros "(%f' & (Hf & %FUEL' & CLOS))". rewrite map_union_empty. 
 
       iMod (th_update _ _ _ (M + 1) with "[$]") as "[Hay Heven]".
       wp_pures.

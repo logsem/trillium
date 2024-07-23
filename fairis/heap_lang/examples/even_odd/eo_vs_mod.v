@@ -241,25 +241,16 @@ Section proof.
       simpl. iFrame. destruct (Nat.even m); auto. }
     simpl.
 
-    iIntros (f') "MAP".
+    rewrite /MU__r. iIntros (f' R) "[MAP %DISJ__R]".
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρEven) st' /\
                    st2nat st' (if Nat.even m then (m + 1) else m)) as (st' & TRANS & CUR'). 
-    { 
-
-      iApply (MU_wand with "[O CLOS]").
+    { iApply (MU_wand with "[O CLOS]").
       2: { iApply (model_step_MU with "[$] [MAP]"); eauto.
-           2: { eapply am_fmtrans_action in TRANS as (?&?). 
-                eapply prod_step_lr_nonincr; done. }
-           2: { iApply (has_fuels_proper with "[$]"); auto.
-                rewrite -(insert_empty _ f').
-                rewrite insert_union_singleton_l.
-                apply fin_maps.union_proper; [reflexivity| ].
-                by setoid_rewrite fmap_empty. }
-           done. }
+           eapply am_fmtrans_action in TRANS as (?&?). 
+           eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
-      rewrite -insert_union_singleton_l.
-      iFrame. iSplitR; [iPureIntro; simpl; lia| ].
+      iExists _. iFrame. iSplitR; [iPureIntro; simpl; lia| ].
       iIntros "(?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       rewrite /evenodd_inv_inner. iNext. iFrame.
       destruct (Nat.even m) eqn:E.
@@ -308,7 +299,7 @@ Section proof.
       rewrite -Nat.negb_odd. destruct (Nat.odd m); iFrame. }
     simpl.
 
-    iIntros (f') "MAP".
+    rewrite /MU__r. iIntros (f' R) "[MAP %DISJ__R]".
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρOdd) st' /\
                    st2nat st' (if Nat.odd m then (m + 1) else m)) as (st' & TRANS & CUR'). 
@@ -316,17 +307,10 @@ Section proof.
 
       iApply (MU_wand with "[E CLOS]").
       2: { iApply (model_step_MU with "[$] [MAP]"); eauto.
-           2: { eapply am_fmtrans_action in TRANS as (?&?). 
-                eapply prod_step_lr_nonincr; done. }
-           2: { iApply (has_fuels_proper with "[$]"); auto.
-                rewrite -(insert_empty _ f').
-                rewrite insert_union_singleton_l.
-                apply fin_maps.union_proper; [reflexivity| ].
-                by setoid_rewrite fmap_empty. }
-           done. }
+           eapply am_fmtrans_action in TRANS as (?&?). 
+           eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
-      rewrite -insert_union_singleton_l.
-      iFrame. iSplitR; [iPureIntro; simpl; lia| ].
+      iExists _. iFrame. iSplitR; [iPureIntro; simpl; lia| ].
       iIntros "(?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       rewrite /evenodd_inv_inner. iNext. iFrame.
       rewrite -!Nat.negb_odd. 
