@@ -61,26 +61,28 @@ Record EvenModel := {
     even_AM: ActionModel; 
     even_AME :> ActionModelExtra even_AM;
 
-    cur_even: amSt even_AM -> nat;
+    even_pub_act := pick_act (nroot .@ "pub");
+    even_pub_actions := acts_at (nroot .@ "pub");
 
+    cur_even: amSt even_AM -> nat;
     even_step_inv st st' k ρ
-      (STEP: amTrans even_AM st (pub_act (step_sync k), Some ρ) st'):
+      (STEP: amTrans even_AM st (even_pub_act (step_sync k), Some ρ) st'):
       cur_even st = k /\ cur_even st' = k + 1 /\ Nat.even k;
     even_sync_inv st st' k
-      (STEP: amTrans even_AM st (pub_act (step_sync k), None) st'):
+      (STEP: amTrans even_AM st (even_pub_act (step_sync k), None) st'):
       cur_even st = k /\ cur_even st' = k + 1 /\ Nat.odd k;
     even_stutter_inv st st' a ρ
-      (PRIV: a ∉ pub_actions)
+      (PRIV: a ∉ even_pub_actions)
       (STEP: amTrans even_AM st (a, Some ρ) st'):
       cur_even st = cur_even st' (* /\ Nat.odd (cur_even st) *);
 
     ρ__e: amRole even_AM;
     even_steppable st (EVEN: Nat.even (cur_even st)):
-      exists st', amTrans even_AM st (pub_act (step_sync (cur_even st)), Some ρ__e) st';
+      exists st', amTrans even_AM st (even_pub_act (step_sync (cur_even st)), Some ρ__e) st';
     even_syncable st (ODD: Nat.odd (cur_even st)):
-      exists st', amTrans even_AM st (pub_act (step_sync (cur_even st)), None) st';
+      exists st', amTrans even_AM st (even_pub_act (step_sync (cur_even st)), None) st';
     even_stutterable st (ODD: Nat.odd (cur_even st)):
-      exists st' a, a ∉ pub_actions /\ amTrans even_AM st (a, Some ρ__e) st';
+      exists st' a, a ∉ even_pub_actions /\ amTrans even_AM st (a, Some ρ__e) st';
 
     even_step_lr_nonincr st st' a oρ
       (STEP: amTrans even_AM st (a, oρ) st'):
@@ -92,8 +94,8 @@ Record EvenModel := {
 
   (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
   even_pub_priv_disj (st__e: amSt even_AM):
-    (exists k st__e', amTrans _ st__e (pub_act $ step_sync k, Some ρ__e) st__e') ->
-    (exists a st__e', a ∉ pub_actions /\ amTrans _ st__e (a, Some ρ__e) st__e') ->
+    (exists k st__e', amTrans _ st__e (even_pub_act $ step_sync k, Some ρ__e) st__e') ->
+    (exists a st__e', a ∉ even_pub_actions /\ amTrans _ st__e (a, Some ρ__e) st__e') ->
     False;
 }.
 
@@ -103,26 +105,29 @@ Record OddModel := {
     odd_AM: ActionModel;
     odd_AME :> ActionModelExtra odd_AM;
 
+    odd_pub_act := pick_act (nroot .@ "pub");
+    odd_pub_actions := acts_at (nroot .@ "pub");
+
     cur_odd: amSt odd_AM -> nat;
 
     odd_step_inv st st' k ρ
-      (STEP: amTrans odd_AM st (pub_act (step_sync k), Some ρ) st'):
+      (STEP: amTrans odd_AM st (odd_pub_act (step_sync k), Some ρ) st'):
       cur_odd st = k /\ cur_odd st' = k + 1 /\ Nat.odd k;
     odd_sync_inv st st' k
-      (STEP: amTrans odd_AM st (pub_act (step_sync k), None) st'):
+      (STEP: amTrans odd_AM st (odd_pub_act (step_sync k), None) st'):
       cur_odd st = k /\ cur_odd st' = k + 1 /\ Nat.even k;
     odd_stutter_inv st st' a ρ
-      (PRIV: a ∉ pub_actions)
+      (PRIV: a ∉ odd_pub_actions)
       (STEP: amTrans odd_AM st (a, Some ρ) st'):
       cur_odd st = cur_odd st' (* /\ Nat.even (cur_odd st) *);
 
     ρ__o: amRole odd_AM;
     odd_steppable st (ODD: Nat.odd (cur_odd st)):
-      exists st', amTrans odd_AM st (pub_act (step_sync (cur_odd st)), Some ρ__o) st';
+      exists st', amTrans odd_AM st (odd_pub_act (step_sync (cur_odd st)), Some ρ__o) st';
     odd_syncable st (ODD: Nat.even (cur_odd st)):
-      exists st', amTrans odd_AM st (pub_act (step_sync (cur_odd st)), None) st';
+      exists st', amTrans odd_AM st (odd_pub_act (step_sync (cur_odd st)), None) st';
     odd_stutterable st (ODD: Nat.even (cur_odd st))    :
-      exists st' a, a ∉ pub_actions /\ amTrans odd_AM st (a, Some ρ__o) st';
+      exists st' a, a ∉ odd_pub_actions /\ amTrans odd_AM st (a, Some ρ__o) st';
 
     odd_step_lr_nonincr st st' a oρ
       (STEP: amTrans odd_AM st (a, oρ) st'):
@@ -134,8 +139,8 @@ Record OddModel := {
 
   (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
     odd_pub_priv_disj (st__o: amSt odd_AM):
-    (exists k st__o', amTrans _ st__o (pub_act $ step_sync k, Some ρ__o) st__o') ->
-    (exists a st__o', a ∉ pub_actions /\ amTrans _ st__o (a, Some ρ__o) st__o') ->
+    (exists k st__o', amTrans _ st__o (odd_pub_act $ step_sync k, Some ρ__o) st__o') ->
+    (exists a st__o', a ∉ odd_pub_actions /\ amTrans _ st__o (a, Some ρ__o) st__o') ->
     False;
 }.
 

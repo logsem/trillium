@@ -8,70 +8,72 @@ Import derived_laws_later.bi.
 Section Actions.
   (* Definition to_action `{Countable T}: T -> Action := encode.  *)
   (* Definition from_action `{Countable T}: Action -> option T := decode. *)
-  Definition Action := positive. 
+  Definition Action := positive.
 
-  (* Set Default Proof Using "Type". *)
-  Definition pub_prefix: namespace := nroot .@ "pub". 
-  Definition pub_actions: coPset := ↑pub_prefix. 
-  Definition pub_act `{Countable T} (t: T): Action := 
-    coPpick $ ↑ (pub_prefix .@ encode t). 
+  Definition pick_act `{Countable T} (pref: namespace) (t: T) :=
+    coPpick $ ↑ (pref .@ encode t).
+  Definition acts_at (pref: namespace): coPset := ↑ pref. 
 
-  Definition priv_prefix: namespace := nroot .@ "priv". 
-  Definition priv_actions: coPset := ↑priv_prefix. 
-  Definition priv_act `{Countable T} (t: T): Action := 
-    coPpick $ ↑ (priv_prefix .@ encode t). 
+  (* (* Set Default Proof Using "Type". *) *)
+  (* Definition pub_prefix: namespace := nroot .@ "pub".  *)
+  (* Definition pub_actions: coPset := ↑pub_prefix.  *)
+  (* Definition pub_act `{Countable T} (t: T): Action := pick_act pub_prefix t. *)
 
-  Lemma pub_act_public `{Countable T} (t: T):
-    pub_act t ∈ pub_actions.
-  Proof.
-    rewrite /pub_act /pub_actions.
-    eapply elem_of_weaken; [apply coPpick_elem_of| ].
-    { apply nclose_infinite. }
-    apply nclose_subseteq.
-  Qed. 
+  (* Definition priv_prefix: namespace := nroot .@ "priv".  *)
+  (* Definition priv_actions: coPset := ↑priv_prefix.  *)
+  (* Definition priv_act `{Countable T} (t: T): Action := pick_act priv_prefix t. *)
+
+  (* Lemma pub_act_public `{Countable T} (t: T): *)
+  (*   pub_act t ∈ pub_actions. *)
+  (* Proof. *)
+  (*   rewrite /pub_act /pub_actions. *)
+  (*   eapply elem_of_weaken; [apply coPpick_elem_of| ]. *)
+  (*   { apply nclose_infinite. } *)
+  (*   apply nclose_subseteq. *)
+  (* Qed.  *)
     
-  Lemma priv_act_private `{Countable T} (t: T):
-    priv_act t ∈ priv_actions.
-  Proof.
-    rewrite /priv_act /priv_actions.
-    eapply elem_of_weaken; [apply coPpick_elem_of| ].
-    { apply nclose_infinite. }
-    apply nclose_subseteq.
-  Qed.
+  (* Lemma priv_act_private `{Countable T} (t: T): *)
+  (*   priv_act t ∈ priv_actions. *)
+  (* Proof. *)
+  (*   rewrite /priv_act /priv_actions. *)
+  (*   eapply elem_of_weaken; [apply coPpick_elem_of| ]. *)
+  (*   { apply nclose_infinite. } *)
+  (*   apply nclose_subseteq. *)
+  (* Qed. *)
 
-  Lemma pub_act_inj `{CNT: Countable T}: Inj eq eq (@pub_act _ _ CNT).
-  Proof.
-    red. rewrite /pub_act. intros ?? EQ.
-    destruct (decide (x = y)) as [| NEQ]; auto. 
-    assert ((↑pub_prefix.@encode x: coPset) ## (↑pub_prefix.@encode y)) as D.
-    { assert (encode x ≠ encode y); [| solve_ndisj].
-      intros ?. destruct NEQ. eapply encode_inj; eauto. }
-    opose proof * (coPpick_elem_of (↑pub_prefix.@encode x)) as IN1. 
-    { eapply nclose_infinite. }
-    opose proof * (coPpick_elem_of (↑pub_prefix.@encode y)) as IN2. 
-    { eapply nclose_infinite. }
-    rewrite EQ in IN1. set_solver. 
-  Qed.
+  (* Lemma pick_act_inj `{CNT: Countable T} pref: Inj eq eq (@pick_act _ _ CNT pref). *)
+  (* Proof. *)
+  (*   red. rewrite /pick_act. intros ?? EQ. *)
+  (*   destruct (decide (x = y)) as [| NEQ]; auto.  *)
+  (*   assert ((↑pref.@encode x: coPset) ## (↑pref.@encode y)) as D. *)
+  (*   { assert (encode x ≠ encode y); [| solve_ndisj]. *)
+  (*     intros ?. destruct NEQ. eapply encode_inj; eauto. } *)
+  (*   opose proof * (coPpick_elem_of (↑pref.@encode x)) as IN1.  *)
+  (*   { eapply nclose_infinite. } *)
+  (*   opose proof * (coPpick_elem_of (↑pref.@encode y)) as IN2.  *)
+  (*   { eapply nclose_infinite. } *)
+  (*   rewrite EQ in IN1. set_solver.  *)
+  (* Qed. *)
     
-  Lemma pub_priv_actions_disjoint: pub_actions ## priv_actions.
-  Proof. solve_ndisj. Qed.
+  (* Lemma pub_priv_actions_disjoint: pub_actions ## priv_actions. *)
+  (* Proof. solve_ndisj. Qed. *)
 
-  Lemma pub_priv_actions_neq `{Countable T1} `{Countable T2}: 
-    forall (a: T1) (b: T2), pub_act a ≠ priv_act b.
-  Proof. 
-    intros. 
-    pose proof (pub_act_public a). pose proof (priv_act_private b) as PRIV.
-    intros EQ. rewrite -EQ in PRIV. 
-    pose proof pub_priv_actions_disjoint. set_solver. 
-  Qed.
+  (* Lemma pub_priv_actions_neq `{Countable T1} `{Countable T2}:  *)
+  (*   forall (a: T1) (b: T2), pub_act a ≠ priv_act b. *)
+  (* Proof.  *)
+  (*   intros.  *)
+  (*   pose proof (pub_act_public a). pose proof (priv_act_private b) as PRIV. *)
+  (*   intros EQ. rewrite -EQ in PRIV.  *)
+  (*   pose proof pub_priv_actions_disjoint. set_solver.  *)
+  (* Qed. *)
 
-  Lemma priv_notin_pub_actions `{Countable T}: forall (t: T), priv_act t ∉ pub_actions.
-  Proof. 
-    intros. apply disjoint_singleton_l.
-    symmetry. eapply disjoint_subseteq; [| reflexivity | | apply pub_priv_actions_disjoint].
-    { apply _. }
-    apply elem_of_subseteq_singleton, priv_act_private. 
-  Qed. 
+  (* Lemma priv_notin_pub_actions `{Countable T}: forall (t: T), priv_act t ∉ pub_actions. *)
+  (* Proof.  *)
+  (*   intros. apply disjoint_singleton_l. *)
+  (*   symmetry. eapply disjoint_subseteq; [| reflexivity | | apply pub_priv_actions_disjoint]. *)
+  (*   { apply _. } *)
+  (*   apply elem_of_subseteq_singleton, priv_act_private.  *)
+  (* Qed.  *)
 
   (* Lemma pub_priv_inv `{Countable T} (a: Action): *)
   (*   (exists (t: T), pub_act t = a) \/ a ∉ pub_actions. *)
@@ -188,22 +190,32 @@ Section ActionModel.
     Let PS: Type := @amSt AM1 * @amSt AM2.
     Let PR: Type := @amRole AM1 + @amRole AM2.
 
+    (* Definition is_sync_action (a: Action) :=  *)
+    (*   exists st1 st1' oρ1 st2 st2' oρ2, *)
+    (*     @amTrans AM1 st1 (a, oρ1) st1' /\ @amTrans AM2 st2 (a, oρ2) st2'.  *)
+    Definition is_action_of (AM: ActionModel) (a: Action) := 
+      exists st oρ st', @amTrans AM st (a, oρ) st'. 
+
+    Context
+      {is_act1_dec: forall a, Decision (is_action_of AM1 a)}
+      {is_act2_dec: forall a, Decision (is_action_of AM2 a)}.
+
     Inductive ProdTrans: PS -> Action * option PR -> PS -> Prop :=
     | pt_inner1 s1 s1' s2 a r1 
-        (PRIV: a ∉ pub_actions)
+        (* (PRIV: a ∉ pub_actions) *)
+        (NO2: ¬ is_action_of AM2 a)
         (STEP1: amTrans s1 (a, Some r1) s1'):
       ProdTrans (s1, s2) (a, Some (inl r1)) (s1', s2)
     | pt_inner2 s2 s2' s1 a r2
-        (PRIV: a ∉ pub_actions)
+        (* (PRIV: a ∉ pub_actions) *)
+        (NO1: ¬ is_action_of AM1 a)
         (STEP2: amTrans s2 (a, Some r2) s2'):
       ProdTrans (s1, s2) (a, Some (inr r2)) (s1, s2')
     | pt_sync1 s1 s1' s2 s2' a r1
-        (PUB: a ∈ pub_actions)
         (STEP1: amTrans s1 (a, Some r1) s1')
         (STEP2: amTrans s2 (a, None) s2'):
       ProdTrans (s1, s2) (a, Some (inl r1)) (s1', s2')
     | pt_sync2 s1 s1' s2 s2' a r2
-        (PUB: a ∈ pub_actions)
         (STEP1: amTrans s1 (a, None) s1')
         (STEP2: amTrans s2 (a, Some r2) s2'):
       ProdTrans (s1, s2) (a, Some (inr r2)) (s1', s2')
@@ -217,31 +229,28 @@ Section ActionModel.
     Proof.
       red. intros [s1 s2] a oρ [s1' s2'].
       Ltac inv_step := right; intros S; inversion S; subst; congruence.
-      destruct oρ as [ρ| ]; [| inv_step]. 
-      destruct (decide (a ∈ pub_actions)) as [PUB | PRIV].
-      - destruct ρ as [ρ1 | ρ2]. 
-        + destruct (D1 s1 a (Some ρ1) s1'), (D2 s2 a None s2').
-          2-4: inv_step.
-          left. econstructor; eauto.
-        + destruct (D1 s1 a None s1'), (D2 s2 a (Some ρ2) s2').
-          2-4: inv_step.
-          left. econstructor; eauto.
-      - destruct ρ as [ρ1 | ρ2]. 
-        + destruct (decide (s2' = s2)) as [-> | ?]; [| inv_step].  
-          destruct (D1 s1 a (Some ρ1) s1'); [| inv_step].
-          left. econstructor; eauto.
-        + destruct (decide (s1' = s1)) as [-> | ?]; [| inv_step].  
-          destruct (D2 s2 a (Some ρ2) s2'); [| inv_step].
-          left. econstructor; eauto.
+      destruct oρ as [ρ| ]; [| inv_step].
+      destruct ρ as [ρ1 | ρ2]. 
+      - destruct (D1 s1 a (Some ρ1) s1'), (D2 s2 a None s2').
+        all: try inv_step.
+        + left. econstructor; eauto.
+        + destruct (is_act2_dec a), (decide (s2' = s2)) as [-> | ?].
+          all: try inv_step.
+          repeat econstructor; eauto.
+      - destruct (D1 s1 a None s1'), (D2 s2 a (Some ρ2) s2').
+        all: try inv_step.
+        + left. econstructor; eauto.
+        + destruct (is_act1_dec a), (decide (s1' = s1)) as [-> | ?].
+          all: try inv_step.
+          repeat econstructor; eauto.
     Qed.
 
     Lemma prod_AM_fin_branch' (FIN1: AM_fin_branch' AM1) (FIN2: AM_fin_branch' AM2)
-      (* inv_fact (INV: Cancel eq inv_fact fact_act) *)
       :
       AM_fin_branch' ProdAM.
     Proof. 
       destruct FIN1 as [ns1 FIN1], FIN2 as [ns2 FIN2].
-      set (dummy := pub_act "0"). 
+      set (dummy := xH). 
       exists (fun '(s1, s2) =>
            '(s1', a1, oρ1) ← (s1, dummy, None) :: ns1 s1;
            '(s2', a2, oρ2) ← (s2, dummy, None) :: ns2 s2;
@@ -312,6 +321,46 @@ Section ActionModel.
       inversion H; eauto.
     Defined. 
 
-  End AM2FM.  
+  End AM2FM.
+
+
+  Section Wrap.
+    Context (AM: ActionModel).
+    Context (exp_ns hid_ns: namespace).
+
+    Inductive wrapped_steps: amSt AM -> Action * option (amRole AM) -> amSt AM -> Prop :=
+    | am_wrap_exposed st1 a oρ st2 (EXP: a ∈ (↑exp_ns: coPset)) (STEP: amTrans st1 (a, oρ) st2):
+      wrapped_steps st1 (a, oρ) st2
+    | am_wrap_wrapped st1 a oρ st2 (HID: a ∉ (↑exp_ns: coPset)) (STEP: amTrans st1 (a, oρ) st2):
+      wrapped_steps st1 (pick_act hid_ns a, oρ) st2
+    .
+
+    Definition WrappedAM: ActionModel := {| amTrans := wrapped_steps |}. 
+
+  End Wrap.
+
+  Section WrappedProduct.
+    Context (AM1 AM2: ActionModel).
+    Context (exp_ns hid_ns1 hid_ns2: namespace).
+
+    Let exp_acts: coPset := ↑exp_ns: coPset. 
+
+    Definition WrapProdAM := 
+      ProdAM (WrappedAM AM1 exp_ns hid_ns1) (WrappedAM AM2 exp_ns hid_ns2).
+
+(*     Lemma wrap_prod_trans st1 st2 a oρ st1' st2': *)
+(*       amTrans ((st1, st2): amSt WrapProdAM) (a, oρ) (st1', st2') <-> *)
+(*       (exists ρ1, oρ = Some (inl ρ1) /\ a ∈ exp_acts /\ amTrans st1 (a, Some ρ1 *)
+(* ) st1' /\ amTrans st2 (a, None) st2') \/ *)
+(*       (exists ρ2, oρ = Some (inr ρ2) /\ a ∈ exp_acts /\ amTrans st1 (a, None) st1' /\ amTrans st2 (a, Some ρ2) st2') \/ *)
+(*       (exists ρ1 a1, oρ = Some (inl ρ1) /\ a = pick_act hid_ns1 a1 /\ amTrans st1 (a1, Some ρ1) st1' /\ st2' = st2) \/ *)
+(*       (exists ρ2 a2, oρ = Some (inr ρ2) /\ a = pick_act hid_ns2 a2 /\ amTrans st2 (a2, Some ρ2) st2' /\ st1' = st1). *)
+(*     Proof.  *)
+(*       split. *)
+(*       - simpl. intros TRANS. inversion TRANS; subst. *)
+(*         + simpl in STEP1.  *)
+    
+    
+  End WrappedProduct.
 
 End ActionModel.

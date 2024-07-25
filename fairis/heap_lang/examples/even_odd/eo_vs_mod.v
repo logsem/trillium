@@ -49,11 +49,16 @@ Section Models.
     - apply odd_AME. 
   Qed.
 
+  Global Instance is_action_of_even_dec: forall a, Decision (is_action_of even_AM a).
+  Proof. Admitted.
+  Global Instance is_action_of_odd_dec: forall a, Decision (is_action_of odd_AM a).
+  Proof. Admitted.
+  
   Lemma prod_AM_strong_lr: AM_strong_lr prod_model.
   Proof. 
     apply fin_branch_strong.
     - apply prod_AM_fin_branch'. 
-    - unshelve eapply prod_AM_step_dec.
+    - unshelve eapply prod_AM_step_dec; try apply _. 
       all: apply even_AME || apply odd_AME. 
   Qed.
 
@@ -118,12 +123,25 @@ Section proof.
   
   Lemma even_trans_inv (st__e: amSt even_AM) l st__e'
     (STEP__e: amTrans _ st__e l st__e'):
-    (exists k, l.1 = pub_act (step_sync k)) \/ (l.1 ∉ pub_actions).
+    (exists k, l.1 = even_pub_act even_impl (step_sync k)) \/ 
+    (l.1 ∉ even_pub_actions even_impl).
   Proof. Admitted. 
 
   Lemma odd_trans_inv (st__o: amSt odd_AM) l st__o'
     (STEP__e: amTrans _ st__o l st__o'):
-    (exists k, l.1 = pub_act (step_sync k)) \/ (l.1 ∉ pub_actions).
+    (exists k, l.1 = odd_pub_act odd_impl (step_sync k)) \/ (l.1 ∉ odd_pub_actions odd_impl).
+  Proof. Admitted. 
+
+  (* TODO: derive from an appropriate "wrapped product" construction *)
+  Lemma even_priv_odd_noact st__e a__e oρ__e st__e'
+    (STEP__e: amTrans even_AM st__e (a__e, oρ__e) st__e')
+    (PRIV: a__e ∉ even_pub_actions even_impl):
+    ¬ is_action_of odd_AM a__e.
+  Proof. Admitted. 
+  Lemma odd_priv_even_noact st__o a__o oρ__o st__o'
+    (STEP__o: amTrans odd_AM st__o (a__o, oρ__o) st__o')
+    (PRIV: a__o ∉ odd_pub_actions odd_impl):
+    ¬ is_action_of even_AM a__o.
   Proof. Admitted. 
 
   Lemma prod_AM_live_roles st__e st__o n
@@ -143,80 +161,45 @@ Section proof.
     intros [(ρ__e & -> & (a__e & st__e' & STEP__e))| (ρ__o & -> & (a__o & st__o' & STEP__o))].
     - pose proof (even_trans_inv _ _ _ STEP__e) as ACT. simpl in ACT.  
       destruct ACT as [[k ->] | PRIV]. 
-      2: { eexists _, (_, _). eapply @pt_inner1; eauto. }
+      2: { eexists _, (_, _). eapply @pt_inner1; eauto.
+           eapply even_priv_odd_noact; eauto. }        
       ogeneralize * even_step_inv; eauto.
       intros (X & CUR__e' & E). assert (n = k) as -> by congruence. clear X. 
       ogeneralize * odd_syncable; eauto.
       { erewrite @f_equal; [apply E| ]. by f_equal. }
       intros [st__o' STEP__o]. 
       eexists _, (_, _). eapply @pt_sync1; eauto.
-      { apply pub_act_public. }
       by rewrite CUR__o in STEP__o. 
     - pose proof (odd_trans_inv _ _ _ STEP__o) as ACT. simpl in ACT.
       destruct ACT as [[k ->] | PRIV]. 
-      2: { eexists _, (_, _). eapply @pt_inner2; eauto. }
+      2: { eexists _, (_, _). eapply @pt_inner2; eauto.
+           eapply odd_priv_even_noact; eauto. }
       ogeneralize * odd_step_inv; eauto.
       intros (X & CUR__o' & O). assert (n = k) as -> by congruence. clear X. 
       ogeneralize * even_syncable; eauto.
       { erewrite @f_equal; [apply O| ]. by f_equal. }
       intros [st__e' STEP__e]. 
       eexists _, (_, _). eapply @pt_sync2; eauto.
-      { apply pub_act_public. }
       by rewrite CUR__e.
   Qed.
 
-  Lemma st2nat_step_ex st st' a oρ n
+  Lemma prod_step_lr_nonincr st st' a oρ n n'
     (STEP: amTrans prod_model st (a, oρ) st')
-    (CUR: st2nat st n):
-    exists n', st2nat st' n'.
-  Proof.
-    destruct st as [st__e st__o], st' as [st__e' st__o'].
-    destruct CUR as [CUR__e CUR__o]. simpl in *.
-    inversion STEP; subst.
-    - eapply even_stutter_inv in STEP1; eauto.  
-      eexists. split; simpl. 
-      + by rewrite -STEP1.
-      + congruence.
-    - eapply odd_stutter_inv in STEP2; eauto. 
-      eexists. split; simpl; 
-        revgoals. 
-      + by rewrite -STEP2.
-      + congruence.
-    - pose proof (even_trans_inv _ _ _ STEP1) as ACT. simpl in ACT.  
-      destruct ACT as [[k ->] | ?]; [| done]. 
-      eapply even_step_inv in STEP1.
-      eapply odd_sync_inv in STEP2.
-      eexists. split; simpl. 
-      + apply STEP1. 
-      + lia.
-    - pose proof (odd_trans_inv _ _ _ STEP2) as ACT. simpl in ACT.
-      destruct ACT as [[k ->] | ?]; [| done]. 
-      eapply even_sync_inv in STEP1.
-      eapply odd_step_inv in STEP2.
-      eexists. split; simpl;
-        revgoals. 
-      + apply STEP2. 
-      + lia.
-  Qed.
-    
-
-  Lemma prod_step_lr_nonincr st st' a oρ n
-    (STEP: amTrans prod_model st (a, oρ) st')
-    (CUR: st2nat st n):
+    (CUR: st2nat st n) (NEXT: st2nat st' n'):
       AM_live_roles prod_AM_strong_lr st' ⊆ AM_live_roles prod_AM_strong_lr st.
   Proof.
     destruct st as [st__e st__o], st' as [st__e' st__o'].
-    opose proof * st2nat_step_ex as [n' CUR']; eauto. 
+    (* opose proof * st2nat_step_ex as [n' CUR']; eauto. *)
     erewrite !prod_AM_live_roles; eauto.
     apply union_subseteq. eapply Morphisms_Prop.and_impl_morphism.
     { red. eapply impl_transitive; [| apply union_subseteq_l'].
-      by apply set_map_mono. } 
+      by apply set_map_mono. }
     { red. eapply impl_transitive; [| apply union_subseteq_r'].
       by apply set_map_mono. }
     inversion STEP; subst.
     all: (try apply even_step_lr_nonincr in STEP1);
       (try apply odd_step_lr_nonincr in STEP2); set_solver.
-  Qed. 
+  Qed.
 
   Let ρEven: fmrole M := even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
@@ -267,7 +250,6 @@ Section proof.
       rewrite CUR__E in STEP__e. rewrite CUR__O in STEP__o. 
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_sync1; eauto.
-        apply pub_act_public.
       + simpl. eapply even_step_inv; eauto.
       + simpl. eapply odd_sync_inv; eauto.
     - pose proof E as O. rewrite -negb_true_iff Nat.negb_even in O. 
@@ -275,6 +257,7 @@ Section proof.
       { rewrite CUR__E. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner1; eauto.
+        eapply even_priv_odd_noact; eauto.
       + simpl. symmetry. rewrite -CUR__E. eapply even_stutter_inv; eauto.
       + done. 
   Qed.
@@ -303,9 +286,7 @@ Section proof.
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρOdd) st' /\
                    st2nat st' (if Nat.odd m then (m + 1) else m)) as (st' & TRANS & CUR'). 
-    { 
-
-      iApply (MU_wand with "[E CLOS]").
+    { iApply (MU_wand with "[E CLOS]").
       2: { iApply (model_step_MU with "[$] [MAP]"); eauto.
            eapply am_fmtrans_action in TRANS as (?&?). 
            eapply prod_step_lr_nonincr; done. }
@@ -328,7 +309,6 @@ Section proof.
       rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e. 
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_sync2; eauto.
-        apply pub_act_public. 
       + simpl. eapply even_sync_inv; eauto.
       + simpl. eapply odd_step_inv; eauto.
     - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E. 
@@ -336,6 +316,7 @@ Section proof.
       { rewrite CUR__O. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner2; eauto.
+        eapply odd_priv_even_noact; eauto. 
       + done. 
       + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
   Qed.
