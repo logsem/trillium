@@ -23,14 +23,14 @@ Section Actions.
   (* Definition priv_actions: coPset := ↑priv_prefix.  *)
   (* Definition priv_act `{Countable T} (t: T): Action := pick_act priv_prefix t. *)
 
-  (* Lemma pub_act_public `{Countable T} (t: T): *)
-  (*   pub_act t ∈ pub_actions. *)
-  (* Proof. *)
-  (*   rewrite /pub_act /pub_actions. *)
-  (*   eapply elem_of_weaken; [apply coPpick_elem_of| ]. *)
-  (*   { apply nclose_infinite. } *)
-  (*   apply nclose_subseteq. *)
-  (* Qed.  *)
+  Lemma pick_act_dom `{Countable T} ns (t: T):
+    pick_act ns t ∈ (↑ns: coPset). 
+  Proof.
+    rewrite /pick_act.
+    eapply elem_of_weaken; [apply coPpick_elem_of| ].
+    { apply nclose_infinite. }
+    apply nclose_subseteq.
+  Qed.
     
   (* Lemma priv_act_private `{Countable T} (t: T): *)
   (*   priv_act t ∈ priv_actions. *)
@@ -41,45 +41,45 @@ Section Actions.
   (*   apply nclose_subseteq. *)
   (* Qed. *)
 
-  (* Lemma pick_act_inj `{CNT: Countable T} pref: Inj eq eq (@pick_act _ _ CNT pref). *)
-  (* Proof. *)
-  (*   red. rewrite /pick_act. intros ?? EQ. *)
-  (*   destruct (decide (x = y)) as [| NEQ]; auto.  *)
-  (*   assert ((↑pref.@encode x: coPset) ## (↑pref.@encode y)) as D. *)
-  (*   { assert (encode x ≠ encode y); [| solve_ndisj]. *)
-  (*     intros ?. destruct NEQ. eapply encode_inj; eauto. } *)
-  (*   opose proof * (coPpick_elem_of (↑pref.@encode x)) as IN1.  *)
-  (*   { eapply nclose_infinite. } *)
-  (*   opose proof * (coPpick_elem_of (↑pref.@encode y)) as IN2.  *)
-  (*   { eapply nclose_infinite. } *)
-  (*   rewrite EQ in IN1. set_solver.  *)
-  (* Qed. *)
+  Lemma pick_act_inj `{CNT: Countable T} pref: Inj eq eq (@pick_act _ _ CNT pref).
+  Proof.
+    red. rewrite /pick_act. intros ?? EQ.
+    destruct (decide (x = y)) as [| NEQ]; auto.
+    assert ((↑pref.@encode x: coPset) ## (↑pref.@encode y)) as D.
+    { assert (encode x ≠ encode y); [| solve_ndisj].
+      intros ?. destruct NEQ. eapply encode_inj; eauto. }
+    opose proof * (coPpick_elem_of (↑pref.@encode x)) as IN1.
+    { eapply nclose_infinite. }
+    opose proof * (coPpick_elem_of (↑pref.@encode y)) as IN2.
+    { eapply nclose_infinite. }
+    rewrite EQ in IN1. set_solver.
+  Qed.
     
   (* Lemma pub_priv_actions_disjoint: pub_actions ## priv_actions. *)
   (* Proof. solve_ndisj. Qed. *)
 
-  (* Lemma pub_priv_actions_neq `{Countable T1} `{Countable T2}:  *)
-  (*   forall (a: T1) (b: T2), pub_act a ≠ priv_act b. *)
-  (* Proof.  *)
-  (*   intros.  *)
-  (*   pose proof (pub_act_public a). pose proof (priv_act_private b) as PRIV. *)
-  (*   intros EQ. rewrite -EQ in PRIV.  *)
-  (*   pose proof pub_priv_actions_disjoint. set_solver.  *)
-  (* Qed. *)
+  Lemma pick_act_disj_neq `{Countable T1} `{Countable T2}
+    ns1 ns2 (DISJ: ns1 ## ns2):
+    forall (a: T1) (b: T2), 
+      pick_act ns1 a ≠ pick_act ns2 b.
+  Proof.
+    intros.
+    pose proof (pick_act_dom ns1 a). pose proof (pick_act_dom ns2 b) as DOM2.
+    intros EQ. rewrite -EQ in DOM2.
+    edestruct DISJ; eauto. 
+  Qed. 
 
-  (* Lemma priv_notin_pub_actions `{Countable T}: forall (t: T), priv_act t ∉ pub_actions. *)
-  (* Proof.  *)
-  (*   intros. apply disjoint_singleton_l. *)
-  (*   symmetry. eapply disjoint_subseteq; [| reflexivity | | apply pub_priv_actions_disjoint]. *)
-  (*   { apply _. } *)
-  (*   apply elem_of_subseteq_singleton, priv_act_private.  *)
-  (* Qed.  *)
-
-  (* Lemma pub_priv_inv `{Countable T} (a: Action): *)
-  (*   (exists (t: T), pub_act t = a) \/ a ∉ pub_actions. *)
-  (* Proof. *)
-  (*   destruct (decide (a ∈ pub_actions)) as [PUB| ]; auto. left. *)
-  (*   rewrite /pub_actions in PUB. *)
+  Lemma pick_act_notin_disj_ns `{Countable T}
+      ns ns' (DISJ: ns ## ns'):
+    forall (t: T), pick_act ns t ∉ (↑ ns': coPset).
+  Proof.
+    intros. apply disjoint_singleton_l.
+    symmetry. eapply disjoint_subseteq.
+    - apply _.
+    - reflexivity.
+    - apply elem_of_subseteq_singleton, pick_act_dom.
+    - done. 
+  Qed.
 
 End Actions.
 
@@ -182,7 +182,20 @@ Section ActionModel.
     rewrite -extract_Somes_gset_spec.
     destruct AM_S as [f SPEC]. simpl. rewrite SPEC.
     done.
-  Qed. 
+  Qed.
+
+  Section ActionsOf.
+    Context (AM: ActionModel). 
+
+    Definition is_action_of (a: Action) := 
+      exists st oρ st', @amTrans AM st (a, oρ) st'.
+
+    Lemma action_of_step st a oρ st'
+      (STEP: @amTrans AM st (a, oρ) st'):
+      is_action_of a.
+    Proof. red. eauto. Qed.  
+
+  End ActionsOf.
 
   Section AMProduct.
     Context (AM1 AM2: ActionModel).
@@ -193,9 +206,6 @@ Section ActionModel.
     (* Definition is_sync_action (a: Action) :=  *)
     (*   exists st1 st1' oρ1 st2 st2' oρ2, *)
     (*     @amTrans AM1 st1 (a, oρ1) st1' /\ @amTrans AM2 st2 (a, oρ2) st2'.  *)
-    Definition is_action_of (AM: ActionModel) (a: Action) := 
-      exists st oρ st', @amTrans AM st (a, oρ) st'. 
-
     Context
       {is_act1_dec: forall a, Decision (is_action_of AM1 a)}
       {is_act2_dec: forall a, Decision (is_action_of AM2 a)}.

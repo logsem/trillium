@@ -20,7 +20,7 @@ Proof.
   intros. destruct x; reflexivity. 
 Qed.
 
-
+Definition pub_ns := nroot .@ "pub". 
 (* (* constructs an ActionModel with pre-defined set of public roles *) *)
 (* Definition BuildSubModel (St Priv Role: Type) Trans := {| *)
 (*    amSt := St; *)
@@ -50,6 +50,9 @@ Class ActionModelExtra (AM: ActionModel) := {
 }.
 
 
+Definition pub_act (a: PubA) := pick_act pub_ns a. 
+(* Definition pub_actions := acts_at pub_ns.  *)
+
 Record EvenModel := {
     (* eSt: Type; *)
     (* ePriv: Type; *)
@@ -61,28 +64,33 @@ Record EvenModel := {
     even_AM: ActionModel; 
     even_AME :> ActionModelExtra even_AM;
 
-    even_pub_act := pick_act (nroot .@ "pub");
-    even_pub_actions := acts_at (nroot .@ "pub");
+    even_is_priv_act: Action -> Prop;
+    even_acts: forall a, is_action_of even_AM a <-> ((exists k, a = pub_act (step_sync k)) \/ even_is_priv_act a);
+    even_pub_priv_disj: forall k, ¬ even_is_priv_act (pub_act $ step_sync k);
+    (* Used to expose the disjointness of even and odd private actions *)
+    (* TODO: get rid of this and wrap models before taking product *)
+    even_is_priv_ns: forall a, even_is_priv_act a -> a ∈ (↑ nroot .@ "priv_even": coPset);
 
     cur_even: amSt even_AM -> nat;
+
     even_step_inv st st' k ρ
-      (STEP: amTrans even_AM st (even_pub_act (step_sync k), Some ρ) st'):
+      (STEP: amTrans even_AM st (pub_act (step_sync k), Some ρ) st'):
       cur_even st = k /\ cur_even st' = k + 1 /\ Nat.even k;
     even_sync_inv st st' k
-      (STEP: amTrans even_AM st (even_pub_act (step_sync k), None) st'):
+      (STEP: amTrans even_AM st (pub_act (step_sync k), None) st'):
       cur_even st = k /\ cur_even st' = k + 1 /\ Nat.odd k;
     even_stutter_inv st st' a ρ
-      (PRIV: a ∉ even_pub_actions)
+      (PRIV: even_is_priv_act a)
       (STEP: amTrans even_AM st (a, Some ρ) st'):
       cur_even st = cur_even st' (* /\ Nat.odd (cur_even st) *);
 
     ρ__e: amRole even_AM;
     even_steppable st (EVEN: Nat.even (cur_even st)):
-      exists st', amTrans even_AM st (even_pub_act (step_sync (cur_even st)), Some ρ__e) st';
+      exists st', amTrans even_AM st (pub_act (step_sync (cur_even st)), Some ρ__e) st';
     even_syncable st (ODD: Nat.odd (cur_even st)):
-      exists st', amTrans even_AM st (even_pub_act (step_sync (cur_even st)), None) st';
+      exists st', amTrans even_AM st (pub_act (step_sync (cur_even st)), None) st';
     even_stutterable st (ODD: Nat.odd (cur_even st)):
-      exists st' a, a ∉ even_pub_actions /\ amTrans even_AM st (a, Some ρ__e) st';
+      exists st' a, even_is_priv_act a /\ amTrans even_AM st (a, Some ρ__e) st';
 
     even_step_lr_nonincr st st' a oρ
       (STEP: amTrans even_AM st (a, oρ) st'):
@@ -93,10 +101,11 @@ Record EvenModel := {
     even_init_lr: AM_live_roles ame_strong even_init = {[ ρ__e ]};
 
   (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
-  even_pub_priv_disj (st__e: amSt even_AM):
-    (exists k st__e', amTrans _ st__e (even_pub_act $ step_sync k, Some ρ__e) st__e') ->
-    (exists a st__e', a ∉ even_pub_actions /\ amTrans _ st__e (a, Some ρ__e) st__e') ->
+  even_role_pub_priv_disj (st__e: amSt even_AM):
+    (exists k st__e', amTrans _ st__e (pub_act $ step_sync k, Some ρ__e) st__e') ->
+    (exists a st__e', even_is_priv_act a /\ amTrans _ st__e (a, Some ρ__e) st__e') ->
     False;
+
 }.
 
 
@@ -105,29 +114,33 @@ Record OddModel := {
     odd_AM: ActionModel;
     odd_AME :> ActionModelExtra odd_AM;
 
-    odd_pub_act := pick_act (nroot .@ "pub");
-    odd_pub_actions := acts_at (nroot .@ "pub");
+    odd_is_priv_act: Action -> Prop;
+    odd_acts: forall a, is_action_of odd_AM a <-> ((exists k, a = pub_act (step_sync k)) \/ odd_is_priv_act a);
+    odd_pub_priv_disj: forall k, ¬ odd_is_priv_act (pub_act $ step_sync k);
+  (* Used to expose the disjointness of even and odd private actions *)
+  (* TODO: get rid of this and wrap models before taking product *)
+    odd_is_priv_ns: forall a, odd_is_priv_act a -> a ∈ (↑ nroot .@ "priv_odd": coPset);
 
     cur_odd: amSt odd_AM -> nat;
 
     odd_step_inv st st' k ρ
-      (STEP: amTrans odd_AM st (odd_pub_act (step_sync k), Some ρ) st'):
+      (STEP: amTrans odd_AM st (pub_act (step_sync k), Some ρ) st'):
       cur_odd st = k /\ cur_odd st' = k + 1 /\ Nat.odd k;
     odd_sync_inv st st' k
-      (STEP: amTrans odd_AM st (odd_pub_act (step_sync k), None) st'):
+      (STEP: amTrans odd_AM st (pub_act (step_sync k), None) st'):
       cur_odd st = k /\ cur_odd st' = k + 1 /\ Nat.even k;
     odd_stutter_inv st st' a ρ
-      (PRIV: a ∉ odd_pub_actions)
+      (PRIV: odd_is_priv_act a)
       (STEP: amTrans odd_AM st (a, Some ρ) st'):
       cur_odd st = cur_odd st' (* /\ Nat.even (cur_odd st) *);
 
     ρ__o: amRole odd_AM;
     odd_steppable st (ODD: Nat.odd (cur_odd st)):
-      exists st', amTrans odd_AM st (odd_pub_act (step_sync (cur_odd st)), Some ρ__o) st';
+      exists st', amTrans odd_AM st (pub_act (step_sync (cur_odd st)), Some ρ__o) st';
     odd_syncable st (ODD: Nat.even (cur_odd st)):
-      exists st', amTrans odd_AM st (odd_pub_act (step_sync (cur_odd st)), None) st';
+      exists st', amTrans odd_AM st (pub_act (step_sync (cur_odd st)), None) st';
     odd_stutterable st (ODD: Nat.even (cur_odd st))    :
-      exists st' a, a ∉ odd_pub_actions /\ amTrans odd_AM st (a, Some ρ__o) st';
+      exists st' a, odd_is_priv_act a /\ amTrans odd_AM st (a, Some ρ__o) st';
 
     odd_step_lr_nonincr st st' a oρ
       (STEP: amTrans odd_AM st (a, oρ) st'):
@@ -138,9 +151,9 @@ Record OddModel := {
     odd_init_lr: AM_live_roles ame_strong odd_init = {[ ρ__o ]};
 
   (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
-    odd_pub_priv_disj (st__o: amSt odd_AM):
-    (exists k st__o', amTrans _ st__o (odd_pub_act $ step_sync k, Some ρ__o) st__o') ->
-    (exists a st__o', a ∉ odd_pub_actions /\ amTrans _ st__o (a, Some ρ__o) st__o') ->
+    odd_role_pub_priv_disj (st__o: amSt odd_AM):
+    (exists k st__o', amTrans _ st__o (pub_act $ step_sync k, Some ρ__o) st__o') ->
+    (exists a st__o', odd_is_priv_act a /\ amTrans _ st__o (a, Some ρ__o) st__o') ->
     False;
 }.
 
@@ -163,3 +176,12 @@ Proof.
     intros (?&?&?&?). eauto.
   - eexists. eapply @odd_steppable. intuition.
 Qed.
+
+Lemma even_odd_priv_disj `{em: EvenModel} `{om: OddModel} a
+  (PRIV__e: even_is_priv_act em a) (PRIV__o: odd_is_priv_act om a):
+  False.
+Proof.
+  apply even_is_priv_ns in PRIV__e. apply odd_is_priv_ns in PRIV__o.
+  assert (nroot.@"priv_even" ## nroot.@"priv_odd") by solve_ndisj.
+  set_solver.
+Qed. 

@@ -61,36 +61,34 @@ Section ModelMono.
     apply ρ__o_always_live. 
   Qed. 
 
-  Lemma st2nat_next st aoρ (st': fmstate M) i
+  Lemma st2nat_next st aoρ (st': fmstate M) i j
     (TRANS: amTrans prod_model st aoρ st')
-    (CUR: st2nat st i):
-    st2nat st' (S i) \/ st2nat st' i.
+    (CUR: st2nat st i)
+    (NEXT: st2nat st' j)
+    :
+    (* st2nat st' (S i) \/ st2nat st' i. *)
+    j = S i \/ j = i.
   Proof.
-    destruct aoρ as [a oρ]. 
-    simpl in TRANS. inversion TRANS; subst. 
-    - right. destruct CUR. split; auto.
-      simpl. eapply even_stutter_inv in STEP1; set_solver. 
-    - right. destruct CUR. split; auto.
-      simpl. eapply odd_stutter_inv in STEP2; auto.
-      simpl in *. congruence.
-    - left. destruct CUR.
-      opose proof * even_trans_inv as [[? ?] | ?]; [done| | done]. 
-      opose proof * odd_trans_inv as [[? ?] | ?]; [done| | done]. 
-      red. simpl in *. subst.
-      apply pub_act_inj in H2. inversion H2. subst. 
-      apply even_step_inv in STEP1. apply odd_sync_inv in STEP2.
-      lia. 
-    - left. destruct CUR.
-      opose proof * even_trans_inv as [[? ?] | ?]; [done| | done]. 
-      opose proof * odd_trans_inv as [[? ?] | ?]; [done| | done]. 
-      red. simpl in *. subst.
-      apply pub_act_inj in H2. inversion H2. subst. 
-      apply even_sync_inv in STEP1. apply odd_step_inv in STEP2.
-      lia. 
+    destruct aoρ as [a oρ]. destruct NEXT, CUR. 
+    simpl in TRANS. inversion TRANS; subst.
+    - right. simpl in *. lia.
+    - right. simpl in *. lia.
+    - left. simpl in *.
+      pose proof STEP1 as [[? ->] | PRIV__e]%action_of_step%even_acts.
+      { apply even_step_inv in STEP1. lia. }
+      pose proof STEP2 as [[? ->] | PRIV__o]%action_of_step%odd_acts.
+      { edestruct even_pub_priv_disj; eauto. }
+      edestruct @even_odd_priv_disj; eauto.  
+    - left. simpl in *.
+      pose proof STEP2 as [[? ->] | PRIV__o]%action_of_step%odd_acts.
+      { apply odd_step_inv in STEP2. lia. }
+      pose proof STEP1 as [[? ->] | PRIV__e]%action_of_step%even_acts.
+      { edestruct odd_pub_priv_disj; eauto. }
+      edestruct @even_odd_priv_disj; eauto.  
   Qed.
 
   Definition prod_states_wf (mtr: mtrace M) :=
-    trace_always' mtr (fun s _ => exists m, st2nat s m). 
+    trace_always' mtr (fun s _ => exists m, st2nat s m).
 
   (* TODO: reuse trace_lookup definitions here *)
   Lemma progress_helper i ρ P
@@ -102,6 +100,7 @@ Section ModelMono.
   (STEP : pred_at mtr m (λ _ ℓ, ℓ = Some (Some ρ)))
   (INCR : ∀ st__e a st__e', amTrans prod_model st__e (a, Some ρ) st__e' →
                          st2nat st__e i → P i → st2nat st__e' (S i))
+  (WF: prod_states_wf mtr)
   :
   ∃ m0, pred_at mtr m0 (λ s _, st2nat s (S i)).
   Proof.
@@ -123,12 +122,19 @@ Section ModelMono.
     simpl in TRANS. apply am_fmtrans_action in TRANS as [a TRANS].
     simpl in Hfirst. 
 
-    ogeneralize * st2nat_next; eauto. intros [? | CUR']. 
+    opose proof * (WF 1) as NEXT. 
+    { simpl. apply pred_at_S in STEP. red in STEP.
+      destruct after; done. }
+
+    apply pred_at_state_trfirst in NEXT as [m' NEXT].
+    ogeneralize * st2nat_next; eauto.
+    intros [-> | ->]. 
     { exists 1. rewrite pred_at_S. by apply pred_at_state_trfirst. }
     
     apply pred_at_S in STEP.
-    specialize (IHm mtr). ospecialize * IHm; eauto. 
-    destruct IHm as [k NEXT]. exists (S k). by rewrite pred_at_S.
+    specialize (IHm mtr). ospecialize * IHm; eauto.
+    { eapply (trace_always'_after _ _ 1); eauto. done. }  
+    destruct IHm as [k ?]. exists (S k). by rewrite pred_at_S.
   Qed.
     
 
@@ -157,13 +163,17 @@ Section ModelMono.
                           st2nat st__e i -> Nat.even i ->
                           st2nat st__e' (S i)) as INCR. 
     { clear -even_AM. intros ??? STEP **. inversion STEP; subst.
-      - edestruct even_pub_priv_disj; eauto.
-        eexists. eapply even_steppable.
-        apply proj1 in H. set_solver.
-      - opose proof * even_trans_inv as [[? ?] | ?]; [done| | done].
-        simpl in H1. subst. 
-        eapply even_step_inv in STEP1. eapply odd_sync_inv in STEP2.
-        red. simpl in *. destruct H. simpl in *. lia. }
+      - pose proof STEP1 as [[? ->] | ?]%action_of_step%even_acts.
+        + destruct NO2. apply odd_acts. eauto.
+        + edestruct even_role_pub_priv_disj; eauto.
+          do 1 eexists. eapply even_steppable.
+          erewrite (f_equal Nat.even); [| apply H]. 
+          done. 
+      - pose proof STEP1 as [[? ->] | ?]%action_of_step%even_acts.
+        + apply even_step_inv in STEP1. eapply odd_sync_inv in STEP2.
+          destruct H. red. simpl in *. lia.
+        + eapply even_priv_odd_noact in H1. destruct H1.
+          eapply action_of_step; eauto. } 
 
     eapply progress_helper; eauto.
   Qed. 
@@ -193,13 +203,17 @@ Section ModelMono.
                           st2nat st__e i -> Nat.odd i ->
                           st2nat st__e' (S i)) as INCR. 
     { clear -odd_AM. intros ??? STEP **. inversion STEP; subst.
-      - edestruct odd_pub_priv_disj; eauto.
-        eexists. eapply odd_steppable.
-        apply proj2 in H. set_solver.
-      - opose proof * odd_trans_inv as [[? ?] | ?]; [done| | done].
-        simpl in H1. subst. 
-        eapply odd_step_inv in STEP2. eapply even_sync_inv in STEP1.
-        red. simpl in *. destruct H. simpl in *. lia. }
+      - pose proof STEP2 as [[? ->] | ?]%action_of_step%odd_acts.
+        + destruct NO1. apply even_acts. eauto.
+        + edestruct odd_role_pub_priv_disj; eauto.
+          do 1 eexists. eapply odd_steppable.
+          erewrite (f_equal Nat.odd); [| apply H]. 
+          done. 
+      - pose proof STEP2 as [[? ->] | ?]%action_of_step%odd_acts.
+        + apply even_sync_inv in STEP1. eapply odd_step_inv in STEP2.
+          destruct H. red. simpl in *. lia.
+        + eapply odd_priv_even_noact in H1. destruct H1.
+          eapply action_of_step; eauto. } 
 
     eapply progress_helper; eauto.  
   Qed. 
@@ -252,15 +266,21 @@ Section ModelMono.
       replace (S n) with (n + 1) in Hafter' by lia.
       rewrite after_sum' in Hafter'. rewrite Hafter in Hafter'. done. }
 
-    eapply trace_always'_state_after in WF as [m CUR__n]; eauto. simpl in CUR__n.
+    pose proof WF as WF_. 
+    eapply trace_always'_state_after in WF_ as [m CUR__n]; eauto. simpl in CUR__n.
     exists m. rewrite -{1}(Nat.add_0_r n) pred_at_sum Hafter. split; auto.
     ogeneralize * mtrace_valid_after; eauto. intros VALID__n.
     punfold VALID__n. inversion VALID__n. subst.
     simpl in H1. apply am_fmtrans_action in H1 as [? TRANS].
+    eapply trace_always'_after in WF; eauto.
+    
+    (* opose proof * (WF n); [done| ]. apply pred_at_state_trfirst in H as [??].  *)
+    ospecialize * (WF 1); [done| ]. apply pred_at_state_trfirst in WF as [??].  
+
     eapply st2nat_next in TRANS; eauto.
     rewrite -Nat.add_1_r. rewrite pred_at_sum Hafter.
     apply pred_at_S. apply pred_at_state_trfirst.
-    destruct TRANS; eauto; lia.
+    eexists. split; eauto. lia. 
   Qed. 
   
 End ModelMono.

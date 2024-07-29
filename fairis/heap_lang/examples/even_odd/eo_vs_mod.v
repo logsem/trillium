@@ -121,28 +121,35 @@ Section proof.
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
   
-  Lemma even_trans_inv (st__e: amSt even_AM) l st__e'
-    (STEP__e: amTrans _ st__e l st__e'):
-    (exists k, l.1 = even_pub_act even_impl (step_sync k)) \/ 
-    (l.1 ∉ even_pub_actions even_impl).
-  Proof. Admitted. 
+  (* Lemma even_trans_inv (st__e: amSt even_AM) l st__e' *)
+  (*   (STEP__e: amTrans _ st__e l st__e'): *)
+  (*   (exists k, l.1 = even_pub_act even_impl (step_sync k)) \/  *)
+  (*   (l.1 ∉ even_pub_actions even_impl). *)
+  (* Proof. Admitted.  *)
 
-  Lemma odd_trans_inv (st__o: amSt odd_AM) l st__o'
-    (STEP__e: amTrans _ st__o l st__o'):
-    (exists k, l.1 = odd_pub_act odd_impl (step_sync k)) \/ (l.1 ∉ odd_pub_actions odd_impl).
-  Proof. Admitted. 
+  (* Lemma odd_trans_inv (st__o: amSt odd_AM) l st__o' *)
+  (*   (STEP__e: amTrans _ st__o l st__o'): *)
+  (*   (exists k, l.1 = odd_pub_act odd_impl (step_sync k)) \/ (l.1 ∉ odd_pub_actions odd_impl). *)
+  (* Proof. Admitted.  *)
 
   (* TODO: derive from an appropriate "wrapped product" construction *)
-  Lemma even_priv_odd_noact st__e a__e oρ__e st__e'
-    (STEP__e: amTrans even_AM st__e (a__e, oρ__e) st__e')
-    (PRIV: a__e ∉ even_pub_actions even_impl):
-    ¬ is_action_of odd_AM a__e.
-  Proof. Admitted. 
-  Lemma odd_priv_even_noact st__o a__o oρ__o st__o'
-    (STEP__o: amTrans odd_AM st__o (a__o, oρ__o) st__o')
-    (PRIV: a__o ∉ odd_pub_actions odd_impl):
-    ¬ is_action_of even_AM a__o.
-  Proof. Admitted. 
+  Lemma even_priv_odd_noact a
+    (PRIV: even_is_priv_act even_impl a):
+    ¬ is_action_of odd_AM a.
+  Proof.
+    intros ACT__O%odd_acts. destruct ACT__O as [[k ->] | ?].
+    + eapply even_pub_priv_disj; eauto. 
+    + eapply even_odd_priv_disj; eauto.
+  Qed. 
+
+  Lemma odd_priv_even_noact a
+    (PRIV: odd_is_priv_act odd_impl a):
+    ¬ is_action_of even_AM a.
+  Proof.
+    intros ACT__E%even_acts. destruct ACT__E as [[k ->] | ?].
+    + eapply odd_pub_priv_disj; eauto. 
+    + eapply even_odd_priv_disj; eauto.
+  Qed. 
 
   Lemma prod_AM_live_roles st__e st__o n
     (CUR: st2nat (st__e, st__o) n)
@@ -159,7 +166,7 @@ Section proof.
     { intros (a & st' & STEP). inversion STEP; subst.
       all: set_solver. } 
     intros [(ρ__e & -> & (a__e & st__e' & STEP__e))| (ρ__o & -> & (a__o & st__o' & STEP__o))].
-    - pose proof (even_trans_inv _ _ _ STEP__e) as ACT. simpl in ACT.  
+    - pose proof STEP__e as ACT%action_of_step%even_acts.
       destruct ACT as [[k ->] | PRIV]. 
       2: { eexists _, (_, _). eapply @pt_inner1; eauto.
            eapply even_priv_odd_noact; eauto. }        
@@ -170,7 +177,7 @@ Section proof.
       intros [st__o' STEP__o]. 
       eexists _, (_, _). eapply @pt_sync1; eauto.
       by rewrite CUR__o in STEP__o. 
-    - pose proof (odd_trans_inv _ _ _ STEP__o) as ACT. simpl in ACT.
+    - pose proof STEP__o as ACT%action_of_step%odd_acts.
       destruct ACT as [[k ->] | PRIV]. 
       2: { eexists _, (_, _). eapply @pt_inner2; eauto.
            eapply odd_priv_even_noact; eauto. }
@@ -316,7 +323,7 @@ Section proof.
       { rewrite CUR__O. intuition. }
       eexists (_, _). split; [| split].
       + simpl. econstructor. eapply @pt_inner2; eauto.
-        eapply odd_priv_even_noact; eauto. 
+        eapply odd_priv_even_noact; eauto.
       + done. 
       + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
   Qed.
