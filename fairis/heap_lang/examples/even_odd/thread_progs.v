@@ -48,9 +48,9 @@ End ThreadGLemmas.
 
 
 (* exposing the new fuel amount, since lm_fl depends on the new M state which is not available *)
-Definition MU__r `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} ρ f' E τ P: iProp Σ :=  
+Definition MU__r `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} ρ E τ P: iProp Σ :=  
   ∀ f R, τ ↦M ({[ ρ := f ]} ∪ (S <$> R)) ∗ ⌜ ρ ∉ dom R ⌝ -∗
-          MU E τ (∃ f__new, τ ↦M ({[ ρ := f__new ]} ∪ R) ∗ ⌜ f__new >= f' ⌝ ∗ P). 
+          MU E τ (τ ↦M ({[ ρ := lm_flm LM ]} ∪ R) ∗ P). 
 
 Section ProofsGen.  
   Context `{LM__p: LiveModel heap_lang M__p}.
@@ -73,13 +73,13 @@ Section ProofsGen.
   Definition eo_vs l ι (ρ: fmrole M__p) tid : iProp Σ :=
     □ |={⊤, ⊤ ∖ ↑ι}=> ∃ N,
       (▷ eo_corr l N) ∗
-      (MU__r ρ 44 (⊤ ∖ ↑ι) tid
+      (MU__r ρ (⊤ ∖ ↑ι) tid
          (▷ (eo_corr l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True)
       ).
 
   Definition eo_spec (prog: val) :=
     forall (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
-    (FL: forall st, lm_fl LM__p st >= 61),
+    (FL: lm_flm LM__p >= 61),
     ⊢ {{{ eo_vs n ι ρ tid ∗ has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) }}}
         prog #n #N @ tid
       {{{ RET #(); has_fuels tid ∅ }}}.
@@ -111,7 +111,7 @@ Section ProofsGen.
       iApply (wp_cmpxchg_suc with "[$]"); try done.  
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
-      iIntros "(%f' & (Hf& %FUEL' & CLOS))". rewrite map_union_empty. 
+      iIntros "(Hf & CLOS)". rewrite map_union_empty. 
 
       iMod (th_update _ _ _ (N + 2) with "[$]") as "[Hay Heven]".
       wp_pures.
@@ -121,7 +121,7 @@ Section ProofsGen.
         iFrame.
         rewrite Nat.add_1_r COND_S_NEG Heqn. simpl.
         by rewrite Nat.add_succ_r. }
-      iModIntro. simpl.
+      iModIntro. simpl. 
 
       do 3 wp_pure _.
       replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
@@ -137,7 +137,7 @@ Section ProofsGen.
       { assert (M ≠ M + 1) by lia. set_solver. }
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
-      iIntros "(%f' & (Hf & %FUEL' & CLOS))". rewrite map_union_empty. 
+      iIntros "(Hf & CLOS)". rewrite map_union_empty. 
 
       iMod (th_update _ _ _ (M + 1) with "[$]") as "[Hay Heven]".
       wp_pures.

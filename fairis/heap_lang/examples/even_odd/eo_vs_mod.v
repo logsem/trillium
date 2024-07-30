@@ -214,7 +214,7 @@ Section proof.
            eapply am_fmtrans_action in TRANS as (?&?). 
            eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
-      iExists _. iFrame. iSplitR; [iPureIntro; simpl; lia| ].
+      iFrame. 
       iIntros "(?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       rewrite /evenodd_inv_inner. iNext. iFrame.
       destruct (Nat.even m) eqn:E.
@@ -272,7 +272,7 @@ Section proof.
            eapply am_fmtrans_action in TRANS as (?&?). 
            eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
-      iExists _. iFrame. iSplitR; [iPureIntro; simpl; lia| ].
+      iFrame. 
       iIntros "(?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
       rewrite /evenodd_inv_inner. iNext. iFrame.
       rewrite -!Nat.negb_odd. 
