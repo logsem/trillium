@@ -24,20 +24,10 @@ Section Models.
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
 
-  (* Definition prodA: Type := PubA + (@ePriv even_impl + @oPriv odd_impl).  *)
-  (* Definition fact_TA (pa: prodA): option (amA even_AM) * option (amA odd_AM) :=  *)
-  (*   match pa with *)
-  (*   | inl s => (Some $ inl s, Some $ inl s) *)
-  (*   | inr (inl p) => (Some $ inr p, None) *)
-  (*   | inr (inr p) => (None, Some $ inr p) *)
-  (*   end. *)
-
   Definition prod_model := ProdAM even_AM odd_AM.
 
   Definition even_role: amRole even_AM -> amRole prod_model := inl. 
   Definition odd_role: amRole odd_AM -> amRole prod_model := inr.
-  (* Definition even_priv_act: ePriv even_impl -> amA prod_model := priv_act ∘ inl.  *)
-  (* Definition odd_priv_act: oPriv odd_impl -> amA prod_model := priv_act ∘ inr.  *)
 
   Existing Instance even_AME. 
   Existing Instance odd_AME.
@@ -49,11 +39,6 @@ Section Models.
     - apply odd_AME. 
   Qed.
 
-  Global Instance is_action_of_even_dec: forall a, Decision (is_action_of even_AM a).
-  Proof. Admitted.
-  Global Instance is_action_of_odd_dec: forall a, Decision (is_action_of odd_AM a).
-  Proof. Admitted.
-  
   Lemma prod_AM_strong_lr: AM_strong_lr prod_model.
   Proof. 
     apply fin_branch_strong.
@@ -69,7 +54,7 @@ Section Models.
   Defined.
 
   Definition the_model: LiveModel heap_lang the_fair_model :=
-    {| lm_fl (x: fmstate the_fair_model) := 61%nat; |}.
+    {| lm_flm := 61%nat; |}.
 
 End Models.  
 
@@ -121,17 +106,6 @@ Section proof.
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
   
-  (* Lemma even_trans_inv (st__e: amSt even_AM) l st__e' *)
-  (*   (STEP__e: amTrans _ st__e l st__e'): *)
-  (*   (exists k, l.1 = even_pub_act even_impl (step_sync k)) \/  *)
-  (*   (l.1 ∉ even_pub_actions even_impl). *)
-  (* Proof. Admitted.  *)
-
-  (* Lemma odd_trans_inv (st__o: amSt odd_AM) l st__o' *)
-  (*   (STEP__e: amTrans _ st__o l st__o'): *)
-  (*   (exists k, l.1 = odd_pub_act odd_impl (step_sync k)) \/ (l.1 ∉ odd_pub_actions odd_impl). *)
-  (* Proof. Admitted.  *)
-
   (* TODO: derive from an appropriate "wrapped product" construction *)
   Lemma even_priv_odd_noact a
     (PRIV: even_is_priv_act even_impl a):
@@ -332,8 +306,7 @@ End proof.
 
 Section proof_start.
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
-  (* Let even_impl := thread_0_even.  *)
-  (* Let odd_impl := thread_1_odd. *)
+
   Let M := @the_fair_model even_impl odd_impl.
   Let LM := @the_model even_impl odd_impl.
 
@@ -431,3 +404,4 @@ Section proof_start.
   Qed. 
 
 End proof_start.
+o

@@ -81,6 +81,16 @@ Section Actions.
     - done. 
   Qed.
 
+  Lemma pick_act_ns_nth_disj_neq `{Countable T}
+    ns C INF (DISJ: ↑ ns ## C):
+    forall (a: T) n, pick_act ns a ≠ coPset_nth C INF n. 
+  Proof.
+    intros.
+    pose proof (pick_act_dom ns a). pose proof (coPset_nth_in C INF n) as DOM2.
+    intros EQ. rewrite -EQ in DOM2.
+    edestruct DISJ; eauto. 
+  Qed.  
+
 End Actions.
 
 Section ActionModel.
@@ -203,9 +213,6 @@ Section ActionModel.
     Let PS: Type := @amSt AM1 * @amSt AM2.
     Let PR: Type := @amRole AM1 + @amRole AM2.
 
-    (* Definition is_sync_action (a: Action) :=  *)
-    (*   exists st1 st1' oρ1 st2 st2' oρ2, *)
-    (*     @amTrans AM1 st1 (a, oρ1) st1' /\ @amTrans AM2 st2 (a, oρ2) st2'.  *)
     Context
       {is_act1_dec: forall a, Decision (is_action_of AM1 a)}
       {is_act2_dec: forall a, Decision (is_action_of AM2 a)}.
@@ -234,7 +241,8 @@ Section ActionModel.
     Definition ProdAM: ActionModel := {| amTrans := ProdTrans; |}.
 
     Lemma prod_AM_step_dec {EQ1: EqDecision (amSt AM1)} {EQ2: EqDecision (amSt AM2)}
-      (D1: AM_step_dec AM1) (D2: AM_step_dec AM2):      
+      (D1: AM_step_dec AM1) (D2: AM_step_dec AM2)
+      :
       AM_step_dec ProdAM.
     Proof.
       red. intros [s1 s2] a oρ [s1' s2'].

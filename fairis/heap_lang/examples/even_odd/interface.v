@@ -50,8 +50,8 @@ Class ActionModelExtra (AM: ActionModel) := {
 }.
 
 
-Definition pub_act (a: PubA) := pick_act pub_ns a. 
-(* Definition pub_actions := acts_at pub_ns.  *)
+Definition pub_act '(step_sync k) := ns_nth pub_ns k. 
+
 
 Record EvenModel := {
     (* eSt: Type; *)
@@ -70,6 +70,7 @@ Record EvenModel := {
     (* Used to expose the disjointness of even and odd private actions *)
     (* TODO: get rid of this and wrap models before taking product *)
     even_is_priv_ns: forall a, even_is_priv_act a -> a ∈ (↑ nroot .@ "priv_even": coPset);
+    even_priv_dec :> forall a, Decision (even_is_priv_act a);
 
     cur_even: amSt even_AM -> nat;
 
@@ -120,6 +121,7 @@ Record OddModel := {
   (* Used to expose the disjointness of even and odd private actions *)
   (* TODO: get rid of this and wrap models before taking product *)
     odd_is_priv_ns: forall a, odd_is_priv_act a -> a ∈ (↑ nroot .@ "priv_odd": coPset);
+    odd_priv_dec :> forall a, Decision (odd_is_priv_act a);
 
     cur_odd: amSt odd_AM -> nat;
 
@@ -184,4 +186,30 @@ Proof.
   apply even_is_priv_ns in PRIV__e. apply odd_is_priv_ns in PRIV__o.
   assert (nroot.@"priv_even" ## nroot.@"priv_odd") by solve_ndisj.
   set_solver.
+Qed. 
+
+Global Instance even_acts_dec (em: EvenModel):
+  forall a, Decision (is_action_of (even_AM em) a).
+Proof.
+  intros. eapply Decision_iff_impl.
+  { symmetry. apply even_acts. }
+  destruct (decide (a ∈ (↑ pub_ns: coPset))).
+  { left. left. by apply coPset_nth_surj. }
+  destruct (even_priv_dec em a).
+  { by left; right. }
+  right. intros [[? ->] | ?]; [| done].
+  destruct n. apply coPset_nth_in.
+Qed. 
+
+Global Instance odd_acts_dec (om: OddModel):
+  forall a, Decision (is_action_of (odd_AM om) a).
+Proof.
+  intros. eapply Decision_iff_impl.
+  { symmetry. apply odd_acts. }
+  destruct (decide (a ∈ (↑ pub_ns: coPset))).
+  { left. left. by apply coPset_nth_surj. }
+  destruct (odd_priv_dec om a).
+  { by left; right. }
+  right. intros [[? ->] | ?]; [| done].
+  destruct n. apply coPset_nth_in.
 Qed. 

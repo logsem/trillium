@@ -27,7 +27,8 @@ Section ThreadModel.
 
   (* Let priv_ns := nroot .@ "priv". *)
   Context (priv_ns: namespace).
-  Let pub_act (s: PubA) := pick_act pub_ns s.
+  (* Let pub_act (s: PubA) := pick_act pub_ns s. *)
+  Let pub_act '(step_sync k) := ns_nth pub_ns k. 
   Let priv_act (s: PrivA) := pick_act priv_ns s.
   
   Inductive thread_trans: TS -> Action * option TR -> TS -> Prop :=
@@ -113,8 +114,8 @@ Section ThreadModel.
       k = n /\ Nat.even (n + d).
   Proof. 
     inversion STEP; subst. 
-    - split; auto. symmetry. apply pick_act_inj in H. congruence.
-    - apply pick_act_disj_neq in H; [done| ]. solve_ndisj.  
+    - split; auto. symmetry. apply coPset_nth_inj in H. congruence.
+    - apply pick_act_ns_nth_disj_neq in H; [done| ]. solve_ndisj.  
   Qed. 
 
   Definition cur_n (st: amSt thread_model) := st.
@@ -139,23 +140,27 @@ End ThreadModel.
 
 
 Definition thread_0_even: EvenModel.
-  unshelve refine {| cur_even := cur_n 0 (nroot .@ "priv_even") |}.
+  unshelve refine {| 
+               cur_even := cur_n 0 (nroot .@ "priv_even");
+               even_is_priv_act := thread_is_priv (nroot .@ "priv_even");
+             |}.
   1: apply (thread_extra 0).
-  1: exact (thread_is_priv (nroot .@ "priv_even")).
   1, 2: apply _. 
   all: cycle 2; simpl in *; unfold cur_n in *.
   - apply thread_is_action_of.
-  - intros ??%pick_act_disj_neq; solve_ndisj.
-  - intros ?->. apply pick_act_dom.  
+  - intros ??%eq_sym%pick_act_ns_nth_disj_neq; solve_ndisj.
+  - intros ?->. apply pick_act_dom.
+  - rewrite /thread_is_priv. solve_decision. 
   - intros. inversion STEP; subst; auto.
-    2: { symmetry in H. apply pick_act_disj_neq in H; [done| ]. solve_ndisj. }
-    apply pick_act_inj in H. inversion H. subst.  
+    2: { apply pick_act_ns_nth_disj_neq in H; [done| ].
+         solve_ndisj. }
+    apply coPset_nth_inj in H. inversion H. subst.  
     rewrite Nat.add_0_r in H3. repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
-    apply pick_act_inj in H. inversion H. subst.  
+    apply coPset_nth_inj in H. inversion H. subst.  
     rewrite Nat.add_0_r in H1. repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
-    edestruct @pick_act_disj_neq; eauto. solve_ndisj.  
+    edestruct @pick_act_ns_nth_disj_neq; eauto. solve_ndisj.  
   - intros. eexists. econstructor. by rewrite Nat.add_0_r.
   - intros. eexists. econstructor. by rewrite Nat.add_0_r.
   - intros. do 2 eexists. split; [| apply thread_loop].
@@ -166,32 +171,37 @@ Definition thread_0_even: EvenModel.
   - by rewrite !thread_AM_lr_exact.
   - intros ? (?&?&T1) (?&?&?&T2).
     inversion T1.
-    2: { symmetry in H0. apply pick_act_disj_neq in H0; [done | solve_ndisj]. }
+    2: { symmetry in H0. apply eq_sym, pick_act_ns_nth_disj_neq in H0; [done | solve_ndisj]. }
     inversion T2; subst. 
-    1: { edestruct @pick_act_disj_neq; [| apply H]. solve_ndisj. }
+    { red in H. symmetry in H. 
+      edestruct @pick_act_ns_nth_disj_neq; [| apply H]. solve_ndisj. }
     subst. edestruct even_odd_False; eauto.
 Qed. 
 
 Definition thread_1_odd: OddModel.
-  unshelve refine {| cur_odd := cur_n 1 (nroot .@ "priv_odd") |}.
+  unshelve refine {| 
+               cur_odd := cur_n 1 (nroot .@ "priv_odd");
+               odd_is_priv_act := thread_is_priv (nroot .@ "priv_odd");
+             |}.
   1: apply (thread_extra 1).
-  1: exact (thread_is_priv (nroot .@ "priv_odd")).
   1, 2: apply _. 
   all: cycle 2; simpl in *; unfold cur_n in *.
   - apply thread_is_action_of.
-  - intros ??%pick_act_disj_neq; solve_ndisj.
-  - intros ?->. apply pick_act_dom.   
+  - intros ??%eq_sym%pick_act_ns_nth_disj_neq; solve_ndisj.
+  - intros ?->. apply pick_act_dom.
+  - rewrite /thread_is_priv. solve_decision. 
   - intros. inversion STEP; subst; auto.
-    2: { symmetry in H. apply pick_act_disj_neq in H; [done| solve_ndisj]. }
-    apply pick_act_inj in H. inversion H. subst.
+    2: { apply pick_act_ns_nth_disj_neq in H; [done| solve_ndisj]. }
+    apply coPset_nth_inj in H. inversion H. subst.
     rewrite even_plus1_negb Nat.negb_even in H3. 
     repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
-    apply pick_act_inj in H. inversion H. subst.
+    apply coPset_nth_inj in H. inversion H. subst.
     rewrite odd_plus1_negb Nat.negb_odd in H1. 
     repeat split; lia || auto.
   - intros. inversion STEP; subst; auto.
-    apply pick_act_disj_neq in PRIV; try solve_ndisj. done.  
+    red in PRIV. symmetry in PRIV.
+    apply pick_act_ns_nth_disj_neq in PRIV; try solve_ndisj. done.  
   - intros. eexists. econstructor.
     by rewrite even_plus1_negb Nat.negb_even.
   - intros. eexists. econstructor.
@@ -204,8 +214,9 @@ Definition thread_1_odd: OddModel.
   - by rewrite !thread_AM_lr_exact.
   - intros ? (?&?&T1) (?&?&?&T2).
     inversion T1.
-    2: { symmetry in H0. apply pick_act_disj_neq in H0; [done| solve_ndisj]. }
-    inversion T2; subst.
-    1: { apply pick_act_disj_neq in H; solve_ndisj. }
+    2: { symmetry in H0. apply eq_sym, pick_act_ns_nth_disj_neq in H0; [done | solve_ndisj]. }
+    inversion T2; subst. 
+    { red in H. symmetry in H. 
+      edestruct @pick_act_ns_nth_disj_neq; [| apply H]. solve_ndisj. }
     subst. edestruct even_odd_False; eauto.
 Qed. 
