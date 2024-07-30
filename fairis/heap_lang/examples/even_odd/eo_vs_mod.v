@@ -404,4 +404,3 @@ Section proof_start.
   Qed. 
 
 End proof_start.
-o

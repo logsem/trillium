@@ -563,7 +563,8 @@ Section fairness.
   Qed.
 
   Record LiveModel := {
-      lm_fl : M → nat;
+      lm_flm: nat;
+      lm_fl := fun _ => lm_flm;
       lm_ls := LiveState;
       lm_lbl := FairLabel M.(fmrole);
       lm_ls_trans (δ: LiveState) (ℓ: FairLabel (fmrole M)) := ls_trans lm_fl δ ℓ;

@@ -86,7 +86,7 @@ Proof.
 Defined.
 
 Definition the_model: LiveModel heap_lang the_fair_model :=
-  {| lm_fl (x: fmstate the_fair_model) := 61%nat; |}.
+  {| lm_flm := 61%nat; |}.
 
 (** The CMRAs we need. *)
 Class yesnoG Σ := YesnoG {

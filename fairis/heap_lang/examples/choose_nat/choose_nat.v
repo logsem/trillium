@@ -131,7 +131,7 @@ Next Obligation.
 Qed.
 
 Definition cn_model : LiveModel heap_lang cn_fair_model :=
-  {| lm_fl _ := 40%nat |}.
+  {| lm_flm := 40%nat |}.
 
 (** Determine additional restriction on relation to obtain finite branching *)
 Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
