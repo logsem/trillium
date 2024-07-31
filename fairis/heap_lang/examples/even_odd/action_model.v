@@ -236,6 +236,10 @@ Section ActionModel.
         (STEP1: amTrans s1 (a, None) s1')
         (STEP2: amTrans s2 (a, Some r2) s2'):
       ProdTrans (s1, s2) (a, Some (inr r2)) (s1', s2')
+    | pt_sync_ext s1 s1' s2 s2' a
+        (STEP1: amTrans s1 (a, None) s1')
+        (STEP2: amTrans s2 (a, None) s2'):
+      ProdTrans (s1, s2) (a, None) (s1', s2')
     .
     
     Definition ProdAM: ActionModel := {| amTrans := ProdTrans; |}.
@@ -247,7 +251,10 @@ Section ActionModel.
     Proof.
       red. intros [s1 s2] a oρ [s1' s2'].
       Ltac inv_step := right; intros S; inversion S; subst; congruence.
-      destruct oρ as [ρ| ]; [| inv_step].
+      destruct oρ as [ρ| ].
+      2: { destruct (D1 s1 a None s1'), (D2 s2 a None s2').
+           all: try inv_step.
+           left. econstructor; eauto. }
       destruct ρ as [ρ1 | ρ2]. 
       - destruct (D1 s1 a (Some ρ1) s1'), (D2 s2 a None s2').
         all: try inv_step.
@@ -304,6 +311,10 @@ Section ActionModel.
         split; [| set_solver]. 
         rewrite elem_of_list_bind.
         exists (s2', a, Some r2). set_solver. }
+      { exists s1', a, None.
+        split; [| set_solver].
+        rewrite elem_of_list_bind.
+        exists (s2', a, None). set_solver. }
     Qed. 
 
   End AMProduct.

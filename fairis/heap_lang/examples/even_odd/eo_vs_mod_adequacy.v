@@ -84,7 +84,12 @@ Section ModelMono.
       { apply odd_step_inv in STEP2. lia. }
       pose proof STEP1 as [[? ->] | PRIV__e]%action_of_step%even_acts.
       { edestruct odd_pub_priv_disj; eauto. }
-      edestruct @even_odd_priv_disj; eauto.  
+      edestruct @even_odd_priv_disj; eauto.
+    - pose proof STEP1 as [[? ->] | PRIV__e]%action_of_step%even_acts.
+      { apply even_sync_inv in STEP1. apply odd_sync_inv in STEP2.
+        edestruct (even_odd_False x); set_solver. }
+      edestruct @even_priv_odd_noact; eauto.
+      eapply action_of_step; eauto.  
   Qed.
 
   Definition prod_states_wf (mtr: mtrace M) :=
