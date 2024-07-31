@@ -352,44 +352,4 @@ Section ActionModel.
 
   End AM2FM.
 
-
-  Section Wrap.
-    Context (AM: ActionModel).
-    Context (exp_ns hid_ns: namespace).
-
-    Inductive wrapped_steps: amSt AM -> Action * option (amRole AM) -> amSt AM -> Prop :=
-    | am_wrap_exposed st1 a oρ st2 (EXP: a ∈ (↑exp_ns: coPset)) (STEP: amTrans st1 (a, oρ) st2):
-      wrapped_steps st1 (a, oρ) st2
-    | am_wrap_wrapped st1 a oρ st2 (HID: a ∉ (↑exp_ns: coPset)) (STEP: amTrans st1 (a, oρ) st2):
-      wrapped_steps st1 (pick_act hid_ns a, oρ) st2
-    .
-
-    Definition WrappedAM: ActionModel := {| amTrans := wrapped_steps |}. 
-
-  End Wrap.
-
-  Section WrappedProduct.
-    Context (AM1 AM2: ActionModel).
-    Context (exp_ns hid_ns1 hid_ns2: namespace).
-
-    Let exp_acts: coPset := ↑exp_ns: coPset. 
-
-    Definition WrapProdAM := 
-      ProdAM (WrappedAM AM1 exp_ns hid_ns1) (WrappedAM AM2 exp_ns hid_ns2).
-
-(*     Lemma wrap_prod_trans st1 st2 a oρ st1' st2': *)
-(*       amTrans ((st1, st2): amSt WrapProdAM) (a, oρ) (st1', st2') <-> *)
-(*       (exists ρ1, oρ = Some (inl ρ1) /\ a ∈ exp_acts /\ amTrans st1 (a, Some ρ1 *)
-(* ) st1' /\ amTrans st2 (a, None) st2') \/ *)
-(*       (exists ρ2, oρ = Some (inr ρ2) /\ a ∈ exp_acts /\ amTrans st1 (a, None) st1' /\ amTrans st2 (a, Some ρ2) st2') \/ *)
-(*       (exists ρ1 a1, oρ = Some (inl ρ1) /\ a = pick_act hid_ns1 a1 /\ amTrans st1 (a1, Some ρ1) st1' /\ st2' = st2) \/ *)
-(*       (exists ρ2 a2, oρ = Some (inr ρ2) /\ a = pick_act hid_ns2 a2 /\ amTrans st2 (a2, Some ρ2) st2' /\ st1' = st1). *)
-(*     Proof.  *)
-(*       split. *)
-(*       - simpl. intros TRANS. inversion TRANS; subst. *)
-(*         + simpl in STEP1.  *)
-    
-    
-  End WrappedProduct.
-
 End ActionModel.
