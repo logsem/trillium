@@ -243,6 +243,21 @@ Section proof.
       + done. 
   Qed.
   
+  Definition state_res n__e n__o: iProp Σ :=
+    ∃ st,
+      frag_model_is st ∗ ⌜ cur_even even_impl st.1 = n__e ⌝ ∗ ⌜ cur_odd odd_impl st.2 = n__o ⌝ ∗
+      auth_even_at (if Nat.even n__e then n__e else n__e + 1) ∗
+      auth_odd_at (if Nat.odd n__o then n__o else n__o + 1)
+  .
+
+  (* Lemma state_res_MU tid N: *)
+  (*   let M := if Nat.even N then N + 1 else N in *)
+  (*   ⊢ state_res N N -∗ MU__r ρEven (⊤ ∖ ↑Ns) tid (state_res M M). *)
+  (* Proof.  *)
+  (*   intros. iIntros "RES". *)
+  (* Admitted.  *)
+
+
   Lemma odd_spec_use tid l (N : nat) f (Hf: f > 40) (op: OddProg):
     {{{ evenodd_inv l ∗ tid ↦M {[ ρOdd := f ]} ∗ odd_at N }}}
       (o_prog op) #l #N @ tid
