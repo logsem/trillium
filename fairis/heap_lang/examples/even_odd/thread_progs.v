@@ -50,7 +50,19 @@ End ThreadGLemmas.
 (* exposing the new fuel amount, since lm_fl depends on the new M state which is not available *)
 Definition MU__r `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} ρ E τ P: iProp Σ :=  
   ∀ f R, τ ↦M ({[ ρ := f ]} ∪ (S <$> R)) ∗ ⌜ ρ ∉ dom R ⌝ -∗
-          MU E τ (τ ↦M ({[ ρ := lm_flm LM ]} ∪ R) ∗ P). 
+          MU E τ (τ ↦M ({[ ρ := lm_flm LM ]} ∪ R) ∗ P).
+
+
+Record StateRes `{!threadG Σ} (cond: nat -> bool) := {
+    sr: nat -> iProp Σ;
+    sr_th_agree: ∀ n m, th_at n -∗ sr m -∗ 
+                         ⌜ n = (if cond m then m else m + 1)%nat ⌝;
+    sr_th_upd: ∀ n, th_at n -∗ sr n ==∗
+                                 th_at (if cond n then n + 2 else n) ∗
+                                 sr (if cond n then n + 1 else n);
+}.
+Arguments sr {_ _ _}. 
+
 
 Section ProofsGen.  
   Context `{LM__p: LiveModel heap_lang M__p}.
@@ -65,28 +77,29 @@ Section ProofsGen.
       (if: CAS "l" "n" ("n"+ #1)
        then "incr_loop" "l" ("n" + #2)
        else "incr_loop" "l" "n").
-  
-  Definition eo_corr l (N: nat): iProp Σ :=
+
+  Definition eo_corr (SR: StateRes cond) l (N: nat): iProp Σ :=
     l ↦ #N ∗
-    own th_name (●E (if cond N then N else (N + 1))).
-    
-  Definition eo_vs l ι (ρ: fmrole M__p) tid : iProp Σ :=
+    sr SR N.
+    (* own th_name (●E (if cond N then N else (N + 1))). *)
+  
+  Definition eo_vs SR l ι (ρ: fmrole M__p) tid : iProp Σ :=
     □ |={⊤, ⊤ ∖ ↑ι}=> ∃ N,
-      (▷ eo_corr l N) ∗
+      (▷ eo_corr SR l N) ∗
       (MU__r ρ (⊤ ∖ ↑ι) tid
-         (▷ (eo_corr l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True)
+         (▷ (eo_corr SR l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True)
       ).
 
   Definition eo_spec (prog: val) :=
-    forall (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
+    forall SR (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
     (FL: lm_flm LM__p >= 61),
-    ⊢ {{{ eo_vs n ι ρ tid ∗ has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) }}}
+    ⊢ {{{ eo_vs SR n ι ρ tid ∗ has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) }}}
         prog #n #N @ tid
-      {{{ RET #(); has_fuels tid ∅ }}}.
+      {{{ RET #(); has_fuels tid ∅ }}}.    
   
   Lemma eo_spec_incr_loop: eo_spec incr_loop.
   Proof using COND_S_NEG.
-    red. intros tid n ρ N f Hf ι FL.
+    red. intros SR tid n ρ N f Hf ι FL.
     iIntros "!>". 
     iLöb as "Hg" forall (N f Hf).
     iIntros (Φ). iIntros "(#VS & Hf & Heven) Hk".
@@ -94,7 +107,7 @@ Section ProofsGen.
     rewrite /incr_loop.
     wp_lam.
     wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic.
-    iPoseProof "VS" as "-#V". iMod "V" as "(%M & (>Hn & >Hauths) & CLOS)".
+    iPoseProof "VS" as "-#V". iMod "V" as "(%M & (>Hn & SR) & CLOS)".
 
     iSpecialize ("CLOS" with "[Hf]").
     { iSplitL.
@@ -102,34 +115,34 @@ Section ProofsGen.
         rewrite insert_union_singleton_l. f_equiv; [reflexivity| ].
         apply leibniz_equiv_iff. apply fmap_empty. }
       set_solver. }
-    
-    destruct (cond M) eqn:Heqn.
-    - iDestruct (th_agree with "Heven Hauths") as "->".
-      iModIntro.
+    rewrite map_union_empty.
 
+    iAssert (▷ ⌜ _ ⌝)%I with "[Heven SR]" as "#EQ".
+    { iNext. iApply (sr_th_agree with "[$] [$]"). }
+    iMod "EQ" as "%".
+            
+    destruct (cond M) eqn:Heqn.
+    - iModIntro. subst. 
       iApply sswp_MU_wp; [done| ].
       iApply (wp_cmpxchg_suc with "[$]"); try done.  
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
-      iIntros "(Hf & CLOS)". rewrite map_union_empty. 
+      iIntros "(Hf & CLOS)". 
 
-      iMod (th_update _ _ _ (N + 2) with "[$]") as "[Hay Heven]".
+      iMod (sr_th_upd _ with "[$] [$]") as "[Heven Hay]". rewrite Heqn. 
       wp_pures.
       iModIntro. 
       iMod ("CLOS" with "[Hay Hb]") as "_". 
-      { replace (Z.of_nat N + 1)%Z with (Z.of_nat (N + 1)) by lia.
-        iFrame.
-        rewrite Nat.add_1_r COND_S_NEG Heqn. simpl.
-        by rewrite Nat.add_succ_r. }
+      { replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
+        iFrame. }
       iModIntro. simpl. 
 
       do 3 wp_pure _.
-      replace (Z.of_nat N + 2)%Z with (Z.of_nat (N + 2)) by lia.
+      replace (Z.of_nat M + 2)%Z with (Z.of_nat (M + 2)) by lia.
       iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
-    - iDestruct (th_agree with "Heven Hauths") as "%Heq". rewrite -> Heq in *.
-      iModIntro.
+    - iModIntro.
       subst.
 
       iApply sswp_MU_wp; [done| ].
@@ -137,13 +150,12 @@ Section ProofsGen.
       { assert (M ≠ M + 1) by lia. set_solver. }
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
-      iIntros "(Hf & CLOS)". rewrite map_union_empty. 
+      iIntros "(Hf & CLOS)". 
 
-      iMod (th_update _ _ _ (M + 1) with "[$]") as "[Hay Heven]".
       wp_pures.
       iModIntro. 
-      iMod ("CLOS" with "[Hay Hb]") as "_". 
-      { iFrame. by rewrite Heqn. }
+      iMod ("CLOS" with "[SR Hb]") as "_". 
+      { iFrame. }
       iModIntro. simpl.
 
       do 2 wp_pure _.
