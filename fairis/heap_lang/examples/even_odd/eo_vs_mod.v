@@ -190,43 +190,24 @@ Section proof.
   Let ρEven: fmrole M := even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
 
-  Lemma even_spec_use tid l (N : nat) f (Hf: f > 40) (ep: EvenProg):
-    {{{ evenodd_inv l ∗ tid ↦M {[ ρEven := f ]} ∗ even_at N }}}
-      (e_prog ep) #l #N @ tid
-    {{{ RET #(); tid ↦M ∅ }}}.
-  Proof using st_res_SR_even.
-    clear st_res_SR_odd.
-    clear evenoddG0.
-    clear odd_at. 
-    iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
-    
-    iApply (@e_spec ep the_fair_model _ _ _ _ _ st_res_SR_even
-             with "[$Hf $Heo]"); [lia| simpl; lia | |done].
-    rewrite /eo_vs. iModIntro.
-    iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
-    { apply top_subseteq. }
-  
-    iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
-    iModIntro.
-    iExists _. iSplitL "Hn Hauths".
-    { iFrame. }
-    simpl.
-
-    rewrite /MU__r. iIntros (f' R) "[MAP %DISJ__R]".
+  Lemma mu_even tid st n (CUR: st2nat st n):
+    ⊢ frag_model_is st -∗ MU__r ρEven ∅ tid
+        (∃ st', frag_model_is st' ∗ ⌜ st2nat st' (if Nat.even n then (n + 1)%nat else n) ⌝).
+  Proof using.
+    clear st_res_SR_odd st_res_SR_even st_res odd_at evenoddG0 even_at. 
+    rewrite /MU__r. iIntros "ST "(f' R) "[MAP %DISJ__R]".
+    destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρEven) st' /\
-                   st2nat st' (if Nat.even m then (m + 1) else m)) as (st' & TRANS & CUR'). 
-    { iApply (MU_wand with "[CLOS]").
+                   st2nat st' (if Nat.even n then (n + 1) else n)) as (st' & TRANS & CUR'). 
+    { iApply (MU_wand with "[]").
       2: { iApply (model_step_MU with "[$] [MAP]"); eauto.
            eapply am_fmtrans_action in TRANS as (?&?). 
            eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
-      iFrame. 
-      iIntros "(?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
-      rewrite /evenodd_inv_inner. iNext. iFrame.
-      destruct (Nat.even m) eqn:E; try done. }
+      iFrame. done. }
  
-    destruct (Nat.even m) eqn:E.
+    destruct (Nat.even n) eqn:E.
     - opose proof (even_steppable _ st__e) as (st__e' & STEP__e); eauto.
       { set_solver. }
       opose proof * odd_syncable as (st__o' & STEP__o); eauto.
@@ -243,8 +224,38 @@ Section proof.
       + simpl. econstructor. eapply @pt_inner1; eauto.
         eapply even_priv_odd_noact; eauto.
       + simpl. symmetry. rewrite -CUR__E. eapply even_stutter_inv; eauto.
-      + done. 
+      + done.
+  Qed. 
+
+  Lemma even_spec_use tid l (N : nat) f (Hf: f > 40) (ep: EvenProg):
+    {{{ evenodd_inv l ∗ tid ↦M {[ ρEven := f ]} ∗ even_at N }}}
+      (e_prog ep) #l #N @ tid
+    {{{ RET #(); tid ↦M ∅ }}}.
+  Proof using st_res_SR_even.
+    clear st_res_SR_odd evenoddG0 odd_at. 
+    iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
+    
+    iApply (@e_spec ep the_fair_model _ _ _ _ _ st_res_SR_even
+             with "[$Hf $Heo]"); [lia| simpl; lia | |done].
+    rewrite /eo_vs. iModIntro.
+    iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
+    { apply top_subseteq. }
+  
+    iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
+    iModIntro.
+    iExists _. iSplitL "Hn Hauths".
+    { iFrame. }
+
+    iApply (MU__r_mask_weaken with "[-]"); [apply empty_subseteq| ]. 
+    iApply (MU__r_wand with "[-Hmod]").
+    2: by iApply mu_even.
+
+    rewrite /eo_corr. iIntros "[%st' (MAP & %ST)] (?&?)".
+    iMod ("CLOS" with "[-]") as "_"; [| done].
+    rewrite /evenodd_inv_inner. iNext. iFrame.
+    destruct (Nat.even m) eqn:E; try done.
   Qed.
+    
 
   Lemma odd_spec_use tid l (N : nat) f (Hf: f > 40) (op: OddProg):
     {{{ evenodd_inv l ∗ tid ↦M {[ ρOdd := f ]} ∗ odd_at N }}}

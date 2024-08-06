@@ -352,6 +352,16 @@ Qed.
     iExists _, _. iFrame. by iApply "HPQ".
   Qed.
 
+  Lemma MU_mask_weaken E1 E2 ζ (P: iProp Σ)
+    (SUB: E1 ⊆ E2):
+    MU E1 ζ P -∗ MU E2 ζ P.
+  Proof.
+    rewrite /MU. iIntros "MU".
+    iIntros "**".
+    iApply fupd_mask_mono; eauto.
+    by iApply "MU". 
+  Qed.
+
   Lemma sswp_MU_wp s E ζ e (Φ : val → iProp Σ)
     (NVAL: language.to_val e = None):
     sswp s E e (λ e', MU E ζ (WP e' @ s; ζ;  E {{ Φ }})) -∗
