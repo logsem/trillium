@@ -53,15 +53,13 @@ Definition MU__r `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} ρ E τ P: iProp 
           MU E τ (τ ↦M ({[ ρ := lm_flm LM ]} ∪ R) ∗ P).
 
 
-Record StateRes `{!threadG Σ} (cond: nat -> bool) := {
-    sr: nat -> iProp Σ;
+Record StateRes `{!threadG Σ} (cond: nat -> bool) (sr: nat -> iProp Σ) := {    
     sr_th_agree: ∀ n m, th_at n -∗ sr m -∗ 
                          ⌜ n = (if cond m then m else m + 1)%nat ⌝;
     sr_th_upd: ∀ n, th_at n -∗ sr n ==∗
                                  th_at (if cond n then n + 2 else n) ∗
                                  sr (if cond n then n + 1 else n);
 }.
-Arguments sr {_ _ _}. 
 
 
 Section ProofsGen.  
@@ -78,12 +76,12 @@ Section ProofsGen.
        then "incr_loop" "l" ("n" + #2)
        else "incr_loop" "l" "n").
 
-  Definition eo_corr (SR: StateRes cond) l (N: nat): iProp Σ :=
+  Definition eo_corr `(SR: StateRes cond sr) l (N: nat): iProp Σ :=
     l ↦ #N ∗
-    sr SR N.
+    sr N.
     (* own th_name (●E (if cond N then N else (N + 1))). *)
   
-  Definition eo_vs SR l ι (ρ: fmrole M__p) tid : iProp Σ :=
+  Definition eo_vs `(SR: StateRes cond sr) l ι (ρ: fmrole M__p) tid : iProp Σ :=
     □ |={⊤, ⊤ ∖ ↑ι}=> ∃ N,
       (▷ eo_corr SR l N) ∗
       (MU__r ρ (⊤ ∖ ↑ι) tid
@@ -91,7 +89,7 @@ Section ProofsGen.
       ).
 
   Definition eo_spec (prog: val) :=
-    forall SR (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
+    forall `(SR: StateRes cond sr) (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
     (FL: lm_flm LM__p >= 61),
     ⊢ {{{ eo_vs SR n ι ρ tid ∗ has_fuels tid {[ ρ := f ]} ∗ own th_name (◯E N) }}}
         prog #n #N @ tid
@@ -99,7 +97,7 @@ Section ProofsGen.
   
   Lemma eo_spec_incr_loop: eo_spec incr_loop.
   Proof using COND_S_NEG.
-    red. intros SR tid n ρ N f Hf ι FL.
+    red. intros sr SR tid n ρ N f Hf ι FL.
     iIntros "!>". 
     iLöb as "Hg" forall (N f Hf).
     iIntros (Φ). iIntros "(#VS & Hf & Heven) Hk".
@@ -118,7 +116,8 @@ Section ProofsGen.
     rewrite map_union_empty.
 
     iAssert (▷ ⌜ _ ⌝)%I with "[Heven SR]" as "#EQ".
-    { iNext. iApply (sr_th_agree with "[$] [$]"). }
+    { iNext.
+      iApply (sr_th_agree _ _ SR with "[$] [$]"). }
     iMod "EQ" as "%".
             
     destruct (cond M) eqn:Heqn.
@@ -129,7 +128,7 @@ Section ProofsGen.
       iApply (MU_wand with "[-CLOS] [$]"). 
       iIntros "(Hf & CLOS)". 
 
-      iMod (sr_th_upd _ with "[$] [$]") as "[Heven Hay]". rewrite Heqn. 
+      iMod (sr_th_upd _ _ SR with "[$] [$]") as "[Heven Hay]". rewrite Heqn. 
       wp_pures.
       iModIntro. 
       iMod ("CLOS" with "[Hay Hb]") as "_". 

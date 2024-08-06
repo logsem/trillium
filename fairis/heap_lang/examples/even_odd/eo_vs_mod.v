@@ -97,38 +97,35 @@ Section proof.
       if Nat.even N
       then (auth_even_at N ∗ auth_odd_at (N+1))%I
       else (auth_even_at (N+1) ∗ auth_odd_at N)%I.
-
-  Program Definition st_res_SR_even: @StateRes _ evenThreadG Nat.even := {| sr := st_res |}.
-  Next Obligation.
-    rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (??) "TH [EVEN ODD]".
-    rewrite !if_arg_comm.
-    by iDestruct (th_agree with "[$] [$]") as %->.
-  Qed. 
-  Next Obligation.
-    rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (?) "TH [EVEN ODD]".
-    rewrite !if_arg_comm.
-    destruct (Nat.even n) eqn:E.
-    2: { rewrite E. by iFrame. }
-    rewrite even_plus1_negb E -Nat.add_assoc. simpl. 
-    iMod (th_update with "[EVEN TH]") as "[??]"; by iFrame.
-  Qed.      
+ 
+  Lemma st_res_SR_even: @StateRes _ evenThreadG Nat.even st_res. 
+    split. 
+    - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (??) "TH [EVEN ODD]".
+      rewrite !if_arg_comm.
+      by iDestruct (th_agree with "[$] [$]") as %->.
+    - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (?) "TH [EVEN ODD]".
+      rewrite !if_arg_comm.
+      destruct (Nat.even n) eqn:E.
+      2: { rewrite E. by iFrame. }
+      rewrite even_plus1_negb E -Nat.add_assoc. simpl. 
+      iMod (th_update with "[EVEN TH]") as "[??]"; by iFrame.
+  Qed.
   
-  Program Definition st_res_SR_odd: @StateRes _ oddThreadG Nat.odd := {| sr := st_res |}.
-  Next Obligation.
-    rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (??) "TH [EVEN ODD]".
-    rewrite !if_arg_comm.
-    rewrite -(negb_if _ _ _ (Nat.odd m)) Nat.negb_odd. 
-    by iDestruct (th_agree with "[$] [$]") as %->.
-  Qed. 
-  Next Obligation.
-    rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (?) "TH [EVEN ODD]".
-    rewrite if_arg_comm.
-    rewrite -!(negb_if _ _ _ (Nat.odd n)) Nat.negb_odd. 
-    destruct (Nat.even n) eqn:E.
-    { rewrite E. by iFrame. }
-    rewrite even_plus1_negb E -Nat.add_assoc. simpl. 
-    iMod (th_update with "[ODD TH]") as "[??]"; by iFrame.
-  Qed.      
+  Lemma st_res_SR_odd: @StateRes _ oddThreadG Nat.odd st_res.
+  Proof.
+    split. 
+    - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (??) "TH [EVEN ODD]".
+      rewrite !if_arg_comm.
+      rewrite -(negb_if _ _ _ (Nat.odd m)) Nat.negb_odd. 
+      by iDestruct (th_agree with "[$] [$]") as %->.
+    - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (?) "TH [EVEN ODD]".
+      rewrite if_arg_comm.
+      rewrite -!(negb_if _ _ _ (Nat.odd n)) Nat.negb_odd. 
+      destruct (Nat.even n) eqn:E.
+      { rewrite E. by iFrame. }
+      rewrite even_plus1_negb E -Nat.add_assoc. simpl. 
+      iMod (th_update with "[ODD TH]") as "[??]"; by iFrame.
+  Qed.
 
   Definition evenodd_inv_inner l : iProp Σ :=
     ∃ st N,
@@ -235,7 +232,7 @@ Section proof.
   
     iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
     rewrite /st_res. rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
-    iModIntro. Unshelve. 2: exact st_res_SR_even.
+    iModIntro. Unshelve. 3: exact st_res_SR_even.
     iExists _. iSplitL "Hn E O".
     { rewrite /eo_corr. simpl. rewrite /st_res. rewrite if_arg2_comm. iFrame. }
     simpl.
@@ -289,7 +286,7 @@ Section proof.
   
     iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
     rewrite /st_res. rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
-    iModIntro. Unshelve. 2: exact st_res_SR_odd. iExists _. iSplitL "Hn E O".
+    iModIntro. Unshelve. 3: exact st_res_SR_odd. iExists _. iSplitL "Hn E O".
     { rewrite /eo_corr. simpl. rewrite /st_res. rewrite if_arg2_comm. iFrame. }
     simpl.
 
