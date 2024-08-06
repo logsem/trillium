@@ -255,8 +255,44 @@ Section proof.
     rewrite /evenodd_inv_inner. iNext. iFrame.
     destruct (Nat.even m) eqn:E; try done.
   Qed.
-    
 
+  Lemma mu_odd tid st n (CUR: st2nat st n):
+    ⊢ frag_model_is st -∗ MU__r ρOdd ∅ tid
+        (∃ st', frag_model_is st' ∗ ⌜ st2nat st' (if Nat.odd n then (n + 1)%nat else n) ⌝).
+  Proof using st_res_SR_odd.
+    clear st_res_SR_even evenoddG0 even_at.
+    rewrite /MU__r. iIntros "ST" (f' R) "[MAP %DISJ__R]".
+    destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
+
+    enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρOdd) st' /\
+                   st2nat st' (if Nat.odd n then (n + 1) else n)) as (st' & TRANS & CUR'). 
+    { iApply (MU_wand with "[]").
+      2: { iApply (model_step_MU with "[$] [MAP]"); eauto.
+           eapply am_fmtrans_action in TRANS as (?&?). 
+           eapply prod_step_lr_nonincr; done. }
+      iIntros "(MAP & ST)".
+      iFrame. done. }
+ 
+    destruct (Nat.odd n) eqn:O.
+    - opose proof (odd_steppable _ st__o) as (st__o' & STEP__o); eauto.
+      { rewrite CUR__O. set_solver. }
+      opose proof * even_syncable as (st__e' & STEP__e); eauto.
+      { erewrite (f_equal Nat.odd); eauto. }
+      rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e. 
+      eexists (_, _). split; [| split].
+      + simpl. econstructor. eapply @pt_sync2; eauto.
+      + simpl. eapply even_sync_inv; eauto.
+      + simpl. eapply odd_step_inv; eauto.
+    - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E. 
+      opose proof (odd_stutterable _ st__o) as (st__o' & a__o & PRIV & STEP__o); eauto.
+      { rewrite CUR__O. intuition. }
+      eexists (_, _). split; [| split].
+      + simpl. econstructor. eapply @pt_inner2; eauto.
+        eapply odd_priv_even_noact; eauto.
+      + done. 
+      + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
+  Qed. 
+    
   Lemma odd_spec_use tid l (N : nat) f (Hf: f > 40) (op: OddProg):
     {{{ evenodd_inv l ∗ tid ↦M {[ ρOdd := f ]} ∗ odd_at N }}}
       (o_prog op) #l #N @ tid
@@ -278,38 +314,14 @@ Section proof.
     { iFrame. }
     simpl.
 
-    rewrite /MU__r. iIntros (f' R) "[MAP %DISJ__R]".
+    iApply (MU__r_mask_weaken with "[-]"); [apply empty_subseteq| ]. 
+    iApply (MU__r_wand with "[-Hmod]").
+    2: by iApply mu_odd.
 
-    enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρOdd) st' /\
-                   st2nat st' (if Nat.odd m then (m + 1) else m)) as (st' & TRANS & CUR'). 
-    { iApply (MU_wand with "[CLOS]").
-      2: { iApply (model_step_MU with "[$] [MAP]"); eauto.
-           eapply am_fmtrans_action in TRANS as (?&?). 
-           eapply prod_step_lr_nonincr; done. }
-      iIntros "(MAP & ST)".
-      iFrame. 
-      iIntros "(?&?)". iMod ("CLOS" with "[-]") as "_"; [| done].
-      rewrite /evenodd_inv_inner. iNext. iFrame.
-      done. }
- 
-    destruct (Nat.odd m) eqn:O.
-    - opose proof (odd_steppable _ st__o) as (st__o' & STEP__o); eauto.
-      { rewrite CUR__O. set_solver. }
-      opose proof * even_syncable as (st__e' & STEP__e); eauto.
-      { erewrite (f_equal Nat.odd); eauto. }
-      rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e. 
-      eexists (_, _). split; [| split].
-      + simpl. econstructor. eapply @pt_sync2; eauto.
-      + simpl. eapply even_sync_inv; eauto.
-      + simpl. eapply odd_step_inv; eauto.
-    - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E. 
-      opose proof (odd_stutterable _ st__o) as (st__o' & a__o & PRIV & STEP__o); eauto.
-      { rewrite CUR__O. intuition. }
-      eexists (_, _). split; [| split].
-      + simpl. econstructor. eapply @pt_inner2; eauto.
-        eapply odd_priv_even_noact; eauto.
-      + done. 
-      + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
+    rewrite /eo_corr. iIntros "[%st' (MAP & %ST)] (?&?)".
+    iMod ("CLOS" with "[-]") as "_"; [| done].
+    rewrite /evenodd_inv_inner. iNext. iFrame.
+    destruct (Nat.odd m) eqn:O; try done.
   Qed.
 
 End proof.
