@@ -14,47 +14,6 @@ From trillium.fairness.heap_lang.examples.even_odd Require Import action_model.
 Close Scope Z. 
 
 
-Section ThreadGLemmas.
-  Class threadG Σ := ThreadG {
-    th_name: gname;
-    th_n_G :> inG Σ (excl_authR natO);
-  }.
-
-  Class threadPreG Σ := {
-    thread_PreG :> inG Σ (excl_authR natO);
-  }.
-
-  Lemma th_alloc `{threadPreG Σ} (M: nat):
-    ⊢ |==> ∃ γ, own γ (◯E M) ∗ own γ (●E M).
-  Proof.
-    iStartProof.
-    iMod (own_alloc (●E M  ⋅ ◯E _))%nat as (γ) "[AUTH FRAG]".
-    { apply auth_both_valid_2; eauto. by compute. }
-    by iFrame.
-  Qed. 
-  
-  Context `{!threadG Σ}.
-
-  Definition th_at (n: nat) := own th_name (◯E n).
-  Definition auth_th_at (n: nat) := own th_name (●E n).
-
-  Lemma th_agree γ (N M: nat) :
-    own γ (◯E N) -∗ own γ (●E M) -∗ ⌜ M = N ⌝.
-  Proof.
-    iIntros "HA HB". iCombine "HB HA" as "H".
-    iDestruct (own_valid with "H") as "%Hval".
-    iPureIntro. by apply excl_auth_agree_L.
-  Qed.
-  
-  Lemma th_update γ (N M P: nat) :
-    own γ (●E N) ∗ own γ (◯E M) ==∗ own γ (●E P) ∗ own γ (◯E P).
-  Proof.
-    rewrite -!own_op. iApply own_update. apply excl_auth_update.
-  Qed.
-
-End ThreadGLemmas.
-
-
 Record StateRes {Σ: gFunctors} (cond: nat -> bool) (sr_auth sr_frag: nat -> iProp Σ) := {    
     sr_agree: ∀ n m, sr_frag n -∗ sr_auth m -∗ 
                       ⌜ n = (if cond m then m else m + 1)%nat ⌝;
@@ -65,8 +24,48 @@ Record StateRes {Σ: gFunctors} (cond: nat -> bool) (sr_auth sr_frag: nat -> iPr
 
 
 Section StResImpl.
+  Class threadG Σ := ThreadG {
+    th_name: gname;
+    th_n_G :> inG Σ (excl_authR natO);
+  }.
+
+  Section OneImpl.
+    Class threadPreG Σ := {
+        thread_PreG :> inG Σ (excl_authR natO);
+    }.
+
+    Context `{!threadG Σ}.
+    
+    Definition th_at (n: nat) := own th_name (◯E n).
+    Definition auth_th_at (n: nat) := own th_name (●E n).
+    
+    Lemma th_agree γ (N M: nat) :
+      own γ (◯E N) -∗ own γ (●E M) -∗ ⌜ M = N ⌝.
+    Proof.
+      iIntros "HA HB". iCombine "HB HA" as "H".
+      iDestruct (own_valid with "H") as "%Hval".
+      iPureIntro. by apply excl_auth_agree_L.
+    Qed.
+    
+    Lemma th_update γ (N M P: nat) :
+      own γ (●E N) ∗ own γ (◯E M) ==∗ own γ (●E P) ∗ own γ (◯E P).
+    Proof.
+      rewrite -!own_op. iApply own_update. apply excl_auth_update.
+    Qed.
+
+  End OneImpl.
+  
   Context `{!threadPreG Σ}.
 
+  Lemma th_alloc (M: nat):
+    ⊢ |==> ∃ γ, own γ (◯E M) ∗ own γ (●E M).
+  Proof.
+    iStartProof.
+    iMod (own_alloc (●E M  ⋅ ◯E _))%nat as (γ) "[AUTH FRAG]".
+    { apply auth_both_valid_2; eauto. by compute. }
+    by iFrame.
+  Qed. 
+  
   Section Impl.
     Context (even_name odd_name: gname).
     
