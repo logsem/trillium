@@ -44,8 +44,8 @@ Section proof.
     (st_res_SR_odd: @StateRes _ Nat.odd st_res odd_at). 
 
   Definition evenodd_inv_inner l : iProp Σ :=
-    ∃ st N,
-      frag_model_is st ∗ ⌜ st2nat st N ⌝ ∗ 
+    ∃ N,
+      cur_st N ∗ 
       l ↦ #N ∗
       st_res N.
 
@@ -65,19 +65,19 @@ Section proof.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
   
-    iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
+    rewrite {1}/evenodd_inv_inner.
+    iDestruct "OPEN" as (m) "(>CUR & >Hn & Hauths)".
     iModIntro.
     iExists _. iSplitL "Hn Hauths".
     { iFrame. }
 
     iApply (MU__r_mask_weaken with "[-]"); [apply empty_subseteq| ]. 
-    iApply (MU__r_wand with "[-Hmod]").
+    iApply (MU__r_wand with "[-CUR]").
     2: by iApply mu_even.
 
-    rewrite /eo_corr. iIntros "[%st' (MAP & %ST)] (?&?)".
+    rewrite /eo_corr. iIntros "CUR (?&?)".
     iMod ("CLOS" with "[-]") as "_"; [| done].
     rewrite /evenodd_inv_inner. iNext. iFrame.
-    destruct (Nat.even m) eqn:E; try done.
   Qed.
 
   Lemma odd_spec_use tid l (N : nat) f (Hf: f > 40) (op: OddProg):
@@ -96,19 +96,18 @@ Section proof.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
   
-    iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
+    iDestruct "OPEN" as (m) "(>CUR & >Hn & Hauths)".
     iModIntro. iExists _. iSplitL "Hn Hauths".
     { iFrame. }
     simpl.
 
     iApply (MU__r_mask_weaken with "[-]"); [apply empty_subseteq| ]. 
-    iApply (MU__r_wand with "[-Hmod]").
+    iApply (MU__r_wand with "[-CUR]").
     2: by iApply mu_odd.
 
-    rewrite /eo_corr. iIntros "[%st' (MAP & %ST)] (?&?)".
+    rewrite /eo_corr. iIntros "? (?&?)".
     iMod ("CLOS" with "[-]") as "_"; [| done].
     rewrite /evenodd_inv_inner. iNext. iFrame.
-    destruct (Nat.odd m) eqn:O; try done.
   Qed.
 
 End proof.
@@ -164,7 +163,7 @@ Section proof_start.
     wp_pures.
     wp_bind (Load _).
     iApply wp_atomic.
-    iInv Ns as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)" "Hclose".
+    iInv Ns as (m) "(>CUR & >Hn & Hauths)" "Hclose".
     iIntros "!>". wp_load. iIntros "!>".
     
     iDestruct (sr_agree _ _ _ st_res_SR_even with "[$] [$]") as %->.
@@ -172,7 +171,7 @@ Section proof_start.
     rewrite -Nat.negb_even in EVEN. destruct (Nat.even m) eqn:E; simpl in EVEN; [| lia].
 
     iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ]") as "_".
-    { iIntros "!>". iExists _. iFrame. done. }
+    { iIntros "!>". iExists _. iFrame. }
     iIntros "!>". wp_pures. wp_bind (Fork _).
     iApply (wp_role_fork _ tid _ _ _ {[ρOdd := _]} {[ρEven := _]}
              with "[Hf ] [Heven_at]"). 

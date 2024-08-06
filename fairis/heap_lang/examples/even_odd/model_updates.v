@@ -100,7 +100,6 @@ Section proof.
     set_map even_role (AM_live_roles ame_strong st__e) ∪ 
     set_map odd_role (AM_live_roles ame_strong st__o).
   Proof using.
-    (* clear dependent st_res. *)
     apply set_eq. intros ρ.
     rewrite elem_of_union !elem_of_map.
     setoid_rewrite <- AM_live_roles_spec.
@@ -138,10 +137,7 @@ Section proof.
     (CUR: st2nat st n) (NEXT: st2nat st' n'):
       AM_live_roles prod_AM_strong_lr st' ⊆ AM_live_roles prod_AM_strong_lr st.
   Proof.
-    (* clear dependent st_res. *)
-    (* clear odd_at even_at.  *)
     destruct st as [st__e st__o], st' as [st__e' st__o'].
-    (* opose proof * st2nat_step_ex as [n' CUR']; eauto. *)
     erewrite !prod_AM_live_roles; eauto.
     apply union_subseteq. eapply Morphisms_Prop.and_impl_morphism.
     { red. eapply impl_transitive; [| apply union_subseteq_l'].
@@ -156,12 +152,14 @@ Section proof.
   Let ρEven: fmrole M := even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
 
-  Lemma mu_even `{!heapGS Σ LM} tid st n (CUR: st2nat st n):
-    ⊢ frag_model_is st -∗ MU__r ρEven ∅ tid
-        (∃ st', frag_model_is st' ∗ ⌜ st2nat st' (if Nat.even n then (n + 1)%nat else n) ⌝).
+  Definition cur_st `{!heapGS Σ LM} n: iProp Σ :=
+    ∃ st, frag_model_is st ∗ ⌜ st2nat st n ⌝. 
+
+  Lemma mu_even `{!heapGS Σ LM} tid n:
+    ⊢ cur_st n -∗ MU__r ρEven ∅ tid
+        (cur_st (if Nat.even n then (n + 1)%nat else n)).
   Proof using.
-    (* clear st_res_SR_odd st_res_SR_even st_res odd_at even_at.  *)
-    rewrite /MU__r. iIntros "ST "(f' R) "[MAP %DISJ__R]".
+    rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (f' R) "[MAP %DISJ__R]".
     destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρEven) st' /\
@@ -191,13 +189,13 @@ Section proof.
         eapply even_priv_odd_noact; eauto.
       + simpl. symmetry. rewrite -CUR__E. eapply even_stutter_inv; eauto.
       + done.
-  Qed. 
+  Qed.
 
-  Lemma mu_odd `{!heapGS Σ LM} tid st n (CUR: st2nat st n):
-    ⊢ frag_model_is st -∗ MU__r ρOdd ∅ tid
-        (∃ st', frag_model_is st' ∗ ⌜ st2nat st' (if Nat.odd n then (n + 1)%nat else n) ⌝).
+  Lemma mu_odd `{!heapGS Σ LM} tid n:
+    ⊢ cur_st n -∗ MU__r ρOdd ∅ tid
+        (cur_st (if Nat.odd n then (n + 1)%nat else n)).
   Proof using.
-    rewrite /MU__r. iIntros "ST" (f' R) "[MAP %DISJ__R]".
+    rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (f' R) "[MAP %DISJ__R]".
     destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρOdd) st' /\
