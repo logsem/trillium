@@ -63,8 +63,6 @@ Class evenoddPreG (Σ: gFunctors) := {
 }.
 
 Class evenoddG (Σ: gFunctors) := EvenoddG {
-  even_name: gname;
-  odd_name: gname;
   eoPreG :> evenoddPreG Σ;
  }.
 
@@ -81,51 +79,22 @@ Section proof.
 
   Let Ns := nroot .@ "even_odd".
 
-  Local Instance evenThreadG: threadG Σ := {| th_name := even_name |}. 
-  Local Instance oddThreadG: threadG Σ := {| th_name := odd_name |}. 
+  (* Local Instance evenThreadG: threadG Σ := {| th_name := even_name |}.  *)
+  (* Local Instance oddThreadG: threadG Σ := {| th_name := odd_name |}.  *)
 
-  Definition even_at := (@th_at _ evenThreadG). 
-  Definition odd_at := (@th_at _ oddThreadG). 
+  (* Definition even_at := (@th_at _ evenThreadG).  *)
+  (* Definition odd_at := (@th_at _ oddThreadG).  *)
 
-  Definition auth_even_at := (@auth_th_at _ evenThreadG). 
-  Definition auth_odd_at := (@auth_th_at _ oddThreadG).  
+  (* Definition auth_even_at := (@auth_th_at _ evenThreadG).  *)
+  (* Definition auth_odd_at := (@auth_th_at _ oddThreadG).   *)
 
   Definition st2nat (st: fmstate the_fair_model) N :=
     cur_even even_impl st.1 = N /\ cur_odd odd_impl st.2 = N.
 
-  Definition st_res N: iProp Σ := 
-      if Nat.even N
-      then (auth_even_at N ∗ auth_odd_at (N+1))%I
-      else (auth_even_at (N+1) ∗ auth_odd_at N)%I.
- 
-  Lemma st_res_SR_even: @StateRes _ evenThreadG Nat.even st_res. 
-    split. 
-    - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (??) "TH [EVEN ODD]".
-      rewrite !if_arg_comm.
-      by iDestruct (th_agree with "[$] [$]") as %->.
-    - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (?) "TH [EVEN ODD]".
-      rewrite !if_arg_comm.
-      destruct (Nat.even n) eqn:E.
-      2: { rewrite E. by iFrame. }
-      rewrite even_plus1_negb E -Nat.add_assoc. simpl. 
-      iMod (th_update with "[EVEN TH]") as "[??]"; by iFrame.
-  Qed.
-  
-  Lemma st_res_SR_odd: @StateRes _ oddThreadG Nat.odd st_res.
-  Proof.
-    split. 
-    - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (??) "TH [EVEN ODD]".
-      rewrite !if_arg_comm.
-      rewrite -(negb_if _ _ _ (Nat.odd m)) Nat.negb_odd. 
-      by iDestruct (th_agree with "[$] [$]") as %->.
-    - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (?) "TH [EVEN ODD]".
-      rewrite if_arg_comm.
-      rewrite -!(negb_if _ _ _ (Nat.odd n)) Nat.negb_odd. 
-      destruct (Nat.even n) eqn:E.
-      { rewrite E. by iFrame. }
-      rewrite even_plus1_negb E -Nat.add_assoc. simpl. 
-      iMod (th_update with "[ODD TH]") as "[??]"; by iFrame.
-  Qed.
+  Context (st_res even_at odd_at: nat -> iProp Σ). 
+  Context
+    (st_res_SR_even: @StateRes _ Nat.even st_res even_at)
+    (st_res_SR_odd: @StateRes _ Nat.odd st_res odd_at). 
 
   Definition evenodd_inv_inner l : iProp Σ :=
     ∃ st N,
@@ -142,7 +111,7 @@ Section proof.
   Lemma even_priv_odd_noact a
     (PRIV: even_is_priv_act even_impl a):
     ¬ is_action_of odd_AM a.
-  Proof.
+  Proof using.
     intros ACT__O%odd_acts. destruct ACT__O as [[k ->] | ?].
     + eapply even_pub_priv_disj; eauto. 
     + eapply even_odd_priv_disj; eauto.
@@ -151,11 +120,11 @@ Section proof.
   Lemma odd_priv_even_noact a
     (PRIV: odd_is_priv_act odd_impl a):
     ¬ is_action_of even_AM a.
-  Proof.
+  Proof using.
     intros ACT__E%even_acts. destruct ACT__E as [[k ->] | ?].
     + eapply odd_pub_priv_disj; eauto. 
     + eapply even_odd_priv_disj; eauto.
-  Qed. 
+  Qed.
 
   Lemma prod_AM_live_roles st__e st__o n
     (CUR: st2nat (st__e, st__o) n)
@@ -163,7 +132,9 @@ Section proof.
     AM_live_roles (@prod_AM_strong_lr even_impl odd_impl) (st__e, st__o) = 
     set_map even_role (AM_live_roles ame_strong st__e) ∪ 
     set_map odd_role (AM_live_roles ame_strong st__o).
-  Proof.
+  Proof using.
+    clear dependent st_res.
+    clear evenoddG0. 
     apply set_eq. intros ρ.
     rewrite elem_of_union !elem_of_map.
     setoid_rewrite <- AM_live_roles_spec.
@@ -201,6 +172,8 @@ Section proof.
     (CUR: st2nat st n) (NEXT: st2nat st' n'):
       AM_live_roles prod_AM_strong_lr st' ⊆ AM_live_roles prod_AM_strong_lr st.
   Proof.
+    clear dependent st_res.
+    clear evenoddG0 odd_at even_at. 
     destruct st as [st__e st__o], st' as [st__e' st__o'].
     (* opose proof * st2nat_step_ex as [n' CUR']; eauto. *)
     erewrite !prod_AM_live_roles; eauto.
@@ -212,7 +185,7 @@ Section proof.
     inversion STEP; subst.
     all: (try apply even_step_lr_nonincr in STEP1);
       (try apply odd_step_lr_nonincr in STEP2); set_solver.
-  Qed.
+   Qed.
 
   Let ρEven: fmrole M := even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
@@ -221,20 +194,22 @@ Section proof.
     {{{ evenodd_inv l ∗ tid ↦M {[ ρEven := f ]} ∗ even_at N }}}
       (e_prog ep) #l #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof.
+  Proof using st_res_SR_even.
+    clear st_res_SR_odd.
+    clear evenoddG0.
+    clear odd_at. 
     iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
     
-    iApply (@e_spec ep the_fair_model _ _ _ evenThreadG 
+    iApply (@e_spec ep the_fair_model _ _ _ _ _ st_res_SR_even
              with "[$Hf $Heo]"); [lia| simpl; lia | |done].
     rewrite /eo_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
   
     iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
-    rewrite /st_res. rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
-    iModIntro. Unshelve. 3: exact st_res_SR_even.
-    iExists _. iSplitL "Hn E O".
-    { rewrite /eo_corr. simpl. rewrite /st_res. rewrite if_arg2_comm. iFrame. }
+    iModIntro.
+    iExists _. iSplitL "Hn Hauths".
+    { iFrame. }
     simpl.
 
     rewrite /MU__r. iIntros (f' R) "[MAP %DISJ__R]".
@@ -269,25 +244,27 @@ Section proof.
         eapply even_priv_odd_noact; eauto.
       + simpl. symmetry. rewrite -CUR__E. eapply even_stutter_inv; eauto.
       + done. 
-  Qed.  
+  Qed.
 
   Lemma odd_spec_use tid l (N : nat) f (Hf: f > 40) (op: OddProg):
     {{{ evenodd_inv l ∗ tid ↦M {[ ρOdd := f ]} ∗ odd_at N }}}
       (o_prog op) #l #N @ tid
     {{{ RET #(); tid ↦M ∅ }}}.
-  Proof.
+  Proof using st_res_SR_odd.
+    clear st_res_SR_even.
+    clear evenoddG0.
+    clear even_at. 
     iIntros (Φ) "(#Hinv & Hf & Heo) Hk".
     
-    iApply (@o_spec op the_fair_model _ _ _ oddThreadG 
+    iApply (@o_spec op the_fair_model _ _ _ _ _ st_res_SR_odd
              with "[$Hf $Heo]"); [lia| simpl; lia | |done].
     rewrite /eo_vs. iModIntro.
     iMod (inv_acc with "Hinv") as "[OPEN CLOS]".
     { apply top_subseteq. }
   
     iDestruct "OPEN" as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)".
-    rewrite /st_res. rewrite if_arg2_comm. iDestruct "Hauths" as "[E O]".
-    iModIntro. Unshelve. 3: exact st_res_SR_odd. iExists _. iSplitL "Hn E O".
-    { rewrite /eo_corr. simpl. rewrite /st_res. rewrite if_arg2_comm. iFrame. }
+    iModIntro. iExists _. iSplitL "Hn Hauths".
+    { iFrame. }
     simpl.
 
     rewrite /MU__r. iIntros (f' R) "[MAP %DISJ__R]".
@@ -360,9 +337,14 @@ Section proof_start.
   Existing Instance even_AME. 
   Existing Instance odd_AME.
 
+  Context (st_res even_at odd_at: nat -> iProp Σ). 
+  Context
+    (st_res_SR_even: @StateRes _ Nat.even st_res even_at)
+    (st_res_SR_odd: @StateRes _ Nat.odd st_res odd_at). 
+
   Lemma start_spec tid n N1 N2 f (Hf: f > 60) (EVEN: N1 < N2)
     :
-    {{{ evenodd_inv n ∗ 
+    {{{ evenodd_inv st_res n ∗ 
         tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
         even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
       start #n @ tid
@@ -376,15 +358,16 @@ Section proof_start.
     iInv Ns as ([st__e st__o] m) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)" "Hclose".
     iIntros "!>". wp_load. iIntros "!>".
     
-    rewrite /st_res. rewrite if_arg2_comm !if_arg_comm.
-    iDestruct "Hauths" as "[Heven Hodd]".
-    iDestruct (th_agree with "Heven_at Heven") as %<-.
-    iDestruct (th_agree with "Hodd_at Hodd") as %<-.
-    destruct (Nat.even m) eqn:E; [| lia].
+    (* rewrite /st_res. rewrite if_arg2_comm !if_arg_comm. *)
+    (* iDestruct "Hauths" as "[Heven Hodd]". *)
+    (* iDestruct (th_agree with "Heven_at Heven") as %<-. *)
+    (* iDestruct (th_agree with "Hodd_at Hodd") as %<-. *)
+    iDestruct (sr_agree _ _ _ st_res_SR_even with "[$] [$]") as %->.
+    iDestruct (sr_agree _ _ _ st_res_SR_odd with "[$] [$]") as %->.
+    rewrite -Nat.negb_even in EVEN. destruct (Nat.even m) eqn:E; simpl in EVEN; [| lia].
 
     iMod ("Hclose" with "[-Hf Heven_at Hodd_at HΦ]") as "_".
-    { iIntros "!>". iExists _. rewrite /st_res. iFrame.
-      rewrite E. iFrame; done. }
+    { iIntros "!>". iExists _. iFrame. done. }
     iIntros "!>". wp_pures. wp_bind (Fork _).
     iApply (wp_role_fork _ tid _ _ _ {[ρOdd := _]} {[ρEven := _]}
              with "[Hf ] [Heven_at]"). 
@@ -398,7 +381,7 @@ Section proof_start.
       rewrite map_union_comm; [reflexivity| ].
       rewrite map_disjoint_dom. set_solver. }
     { iIntros (tid') "!> Hf".
-      iApply (even_spec_use with "[-]").
+      iApply (even_spec_use _ _ st_res_SR_even with "[-]").
       2: { iFrame "#∗". }
       { lia. }
       intuition. }
@@ -417,8 +400,8 @@ Section proof_start.
     { iIntros (tid') "!> Hf".
       wp_pures.
       replace (Z.of_nat m + 1)%Z with (Z.of_nat (m + 1)) by lia.
-      iApply (odd_spec_use with "[-]").
-      2: { iFrame "#∗". }
+      iApply (odd_spec_use _ _ st_res_SR_odd with "[-]").
+      2: { rewrite -Nat.negb_even E. iFrame "#∗". }
       { lia. }
       intuition. }
 

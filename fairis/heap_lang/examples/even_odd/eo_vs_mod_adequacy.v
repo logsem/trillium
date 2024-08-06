@@ -505,22 +505,22 @@ Section Adequacy.
     (Hinv : heapGS Σ LM)
     (eoΣ: evenoddG Σ)
     (th_preG: threadPreG Σ)
+    `(SR__e: StateRes Nat.even sr even_at)
+    `(SR__o: StateRes Nat.odd sr odd_at)
     :
-    {{{ inv (nroot.@"even_odd") (evenodd_inv_inner l) ∗
+    {{{ inv (nroot.@"even_odd") (evenodd_inv_inner sr l) ∗
         0 ↦M gset_to_gmap 61 init_roles ∗
-        own even_name (◯E 0) ∗
-        own odd_name (◯E 1) ∗
+        even_at 0 ∗
+        odd_at 1 ∗
         frag_free_roles_are ∅ }}}
       start_prog #l @0
       {{{ x, RET x; 0 ↦M ∅ }}}.
   Proof.  
     simpl. rewrite /init_roles.
     rewrite !gset_to_gmap_union_singleton. rewrite gset_to_gmap_singleton. 
-    iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at) HΦ".
-    iApply (start_spec with "[$Hf Heven_at Hodd_at $Hinv]"); [lia| ..].
-    2: { by iFrame. }
-    { lia. }
-    iIntros "!>?". by iApply "HΦ".
+    iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & FR) HΦ".
+    iApply (start_spec with "[$Hf Heven_at Hodd_at $Hinv $FR]"); eauto.
+    iFrame. 
   Qed.
   
   Lemma dom_locales
@@ -611,11 +611,11 @@ Section Adequacy.
     trace_last (map_underlying_trace auxtr) = ls_under $ ls_data $ trace_last auxtr.
   Proof. by destruct auxtr. Qed. 
 
-  Lemma eo_rah l `(!heapGS Σ LM) (eoΣ: evenoddG Σ) `(threadPreG Σ)
+  Lemma eo_rah l `(!heapGS Σ LM) sr (eoΣ: evenoddG Σ) `(threadPreG Σ)
     st e h
     (CUR__0: st2nat st 0)
     :
-    inv (nroot.@"even_odd") (evenodd_inv_inner l) -∗
+    inv (nroot.@"even_odd") (evenodd_inv_inner sr l) -∗
       rel_always_holds NotStuck [λ _ : language.val heap_lang, 0 ↦M ∅]
       (λ (extr : execution_trace heap_lang) (atr : auxiliary_trace LM),
         ξ_evenodd_trace l extr (map_underlying_trace atr))
@@ -715,15 +715,10 @@ Section Adequacy.
       eapply valid_state_evolution_finitary_fairness_simple.
       intros ?. simpl. apply prod_model_finitary. }
     iIntros (?) "!> Hσ Hs Hr Hf".
-    iMod (own_alloc (●E 0  ⋅ ◯E 0))%nat as (γ_even_at) "[Heven_at_auth Heven_at]".
-    { apply auth_both_valid_2; eauto. by compute. }
-    iMod (own_alloc (●E 1  ⋅ ◯E 1))%nat as (γ_odd_at) "[Hodd_at_auth Hodd_at]".
-    { apply auth_both_valid_2; eauto. by compute. }
-    pose (the_names := {|
-                        even_name := γ_even_at;
-                        odd_name := γ_odd_at;
-                      |}).
-    iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner l) with "[Hσ Hs Heven_at_auth Hodd_at_auth]") as "#Hinv".
+
+    iMod (st_res_init 0) as "(%st_res & %even_at & %odd_at & SR & E & O & %SR__e & %SR__o)"; [done| ].
+    
+    iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner st_res l) with "[Hσ Hs SR]") as "#Hinv".
     { iNext. unfold evenodd_inv_inner.
       rewrite /st0. 
       iExists _, 0.
@@ -731,10 +726,8 @@ Section Adequacy.
       iPureIntro. apply st0_zero. }
     iModIntro.
     iSplitL.
-    2: { iApply eo_rah; [| done]. apply st0_zero. } 
-    iApply (start_spec_use with "[-]").
-    Unshelve.
-    3, 4: by apply _.
+    2: { iApply eo_rah; try done. apply st0_zero. } 
+    iApply (start_spec_use with "[-]"); try done. 
     2: { iNext. by iIntros "**". }
     rewrite subseteq_empty_difference_L; [| done]. 
     rewrite -st0_lr. iFrame "#∗".
