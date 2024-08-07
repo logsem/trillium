@@ -625,7 +625,8 @@ Section Adequacy.
     iIntros "#Hinv".
     iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck %Hequiv [_ [Hσ Hδ]] Hposts".
     
-    iInv "Hinv" as ([st__e st__o] N) "(>Hmod & [>%CUR__E >%CUR__O] & >Hn & Hauths)" "Hclose".
+    iInv "Hinv" as (N) "(>CUR & >Hn & Hauths)" "Hclose".
+    rewrite /cur_st. iDestruct "CUR" as ([st__e st__o]) "[Hmod %CUR]". 
     iApply fupd_mask_intro; [set_solver|].
     iIntros "Hclose'".
     iDestruct (gen_heap_valid with "Hσ Hn") as %Hn.
@@ -642,7 +643,7 @@ Section Adequacy.
       iPoseProof (not_all_val with "[$] [$]") as "%LR0"; eauto.
       rewrite Hn' in LR0.
       opose proof * (ρEven_always_live (_, _)) as LR.
-      { split; eauto. }
+      { apply CUR. }
       clear -LR LR0. set_solver. 
     - iPureIntro.
       apply Forall_forall.
@@ -721,7 +722,7 @@ Section Adequacy.
     iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner st_res l) with "[Hσ Hs SR]") as "#Hinv".
     { iNext. unfold evenodd_inv_inner.
       rewrite /st0. 
-      iExists _, 0.
+      iExists 0.
       simpl. rewrite big_sepM_singleton. iFrame.
       iPureIntro. apply st0_zero. }
     iModIntro.
