@@ -226,5 +226,61 @@ Section proof.
       + done. 
       + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
   Qed. 
+
+  Section Viewshifts.
+    Context `{!heapGS Σ LM}.
+    
+    Context (st_res even_at odd_at: nat -> iProp Σ). 
+    Context
+      (st_res_SR_even: @StateRes _ Nat.even st_res even_at)
+      (st_res_SR_odd: @StateRes _ Nat.odd st_res odd_at). 
+    
+    Definition evenodd_inv_inner l : iProp Σ :=
+      ∃ N, cur_st N ∗ l ↦ #N ∗ st_res N.
+    
+    Lemma even_vs tid l ns:
+      inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.even st_res_SR_even l ns ρEven tid. 
+    Proof using st_res_SR_even.
+      rewrite /eo_vs. iIntros "#INV". iModIntro.
+      iMod (inv_acc with "INV") as "[OPEN CLOS]".
+      { apply top_subseteq. }
+      
+      rewrite {1}/evenodd_inv_inner.
+      iDestruct "OPEN" as (m) "(>CUR & >Hn & Hauths)".
+      iModIntro.
+      iExists _. iSplitL "Hn Hauths".
+      { iFrame. }
+      
+      iApply (MU__r_mask_weaken with "[-]"); [apply empty_subseteq| ]. 
+      iApply (MU__r_wand with "[-CUR]").
+      2: by iApply mu_even.
+      
+      rewrite /eo_corr. iIntros "CUR (?&?)".
+      iMod ("CLOS" with "[-]") as "_"; [| done].
+      rewrite /evenodd_inv_inner. iNext. iFrame.
+    Qed.
+    
+    Lemma odd_vs tid l ns:
+      inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.odd st_res_SR_odd l ns ρOdd tid. 
+    Proof using st_res_SR_odd.
+      rewrite /eo_vs. iIntros "#INV". iModIntro. 
+      iMod (inv_acc with "INV") as "[OPEN CLOS]".
+      { apply top_subseteq. }
+      
+      iDestruct "OPEN" as (m) "(>CUR & >Hn & Hauths)".
+      iModIntro. iExists _. iSplitL "Hn Hauths".
+      { iFrame. }
+      simpl.
+      
+      iApply (MU__r_mask_weaken with "[-]"); [apply empty_subseteq| ]. 
+      iApply (MU__r_wand with "[-CUR]").
+      2: by iApply mu_odd.
+      
+      rewrite /eo_corr. iIntros "? (?&?)".
+      iMod ("CLOS" with "[-]") as "_"; [| done].
+      rewrite /evenodd_inv_inner. iNext. iFrame.
+    Qed.
+
+  End Viewshifts.
     
 End proof.
