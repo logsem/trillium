@@ -41,7 +41,7 @@ Section proof_start.
     (st_res_SR_even: @StateRes _ Nat.even st_res even_at)
     (st_res_SR_odd: @StateRes _ Nat.odd st_res odd_at). 
 
-  Let Ns := nroot .@ "even_odd".
+  Definition Ns := nroot .@ "even_odd".
   Definition evenodd_inv n := inv Ns (evenodd_inv_inner st_res n).
 
   (* TODO: move *)
@@ -130,3 +130,108 @@ Section proof_start.
   Qed. 
 
 End proof_start.
+
+
+Section short_prog.
+  Context {even_impl: EvenModel} {odd_impl: OddModel}.
+
+  Let M := @the_fair_model even_impl odd_impl.
+  Let LM := @the_model even_impl odd_impl.
+
+  Context (ep: EvenProg) (op: OddProg). 
+
+  Context `{!heapGS Σ LM, !evenoddG Σ}.
+
+  Context (st_res even_at odd_at: nat -> iProp Σ). 
+  Context
+    (st_res_SR_even: @StateRes _ Nat.even st_res even_at)
+    (st_res_SR_odd: @StateRes _ Nat.odd st_res odd_at). 
+
+  Definition short: val :=
+    rec: "short" "l" :=
+      "l" <- !"l" + #1 ;;
+      "short" "l"
+  .
+  
+  Let ρEven: fmrole M := even_role (ρ__e even_impl).
+  Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
+
+  Lemma short_spec tid n N1 N2 f (Hf: f > 60)
+    (ev := Nat.ltb N1 N2)
+    (* (EVEN: N1 < N2) *)
+    :
+    {{{ evenodd_inv st_res n ∗ 
+        tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
+        even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅
+    }}}
+      short #n @ tid
+    {{{ RET #(); tid ↦M ∅ }}}.
+  Proof using All.
+    iLöb as "Hg" forall (N1 N2 f Hf).
+    iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". 
+    rewrite /short.
+
+    wp_lam.
+    wp_bind (!_)%E. iApply wp_atomic.
+    iInv Ns as (m) "(>CUR & >Hn & Hauths)" "Hclose".
+    iIntros "!>". wp_load. iIntros "!>".
+    iDestruct (sr_agree _ _ _ st_res_SR_even with "[$] [$]") as %->.
+    iDestruct (sr_agree _ _ _ st_res_SR_odd with "[$] [$]") as %->.
+    rewrite -Nat.negb_even.
+    iMod ("Hclose" with "[Hauths CUR Hn]") as "_".
+    { iFrame. }
+    iModIntro.  
+
+    wp_pures.
+    wp_bind (_ <- _)%E. iApply wp_atomic.
+
+    destruct (Nat.even m) eqn:E. 
+    - iPoseProof (even_vs _ _ st_res_SR_even with "Hinv") as "#VS".
+      rewrite /eo_vs. iMod "VS".
+      iDestruct "VS" as (m') "[CORR MU]".
+      rewrite {1}/eo_corr. iDestruct "CORR" as "[CNT ST]".
+      iModIntro. 
+      iSpecialize ("MU" with "[Hf]").
+      { iSplitL.
+        { iApply has_fuels_proper; [reflexivity| | by iFrame].
+          rewrite insert_union_singleton_l. f_equiv.
+          erewrite map_fmap_singleton. rewrite insert_empty.
+          f_equiv. Unshelve. 2: exact (f - 4). apply leibniz_equiv_iff. lia. }
+        set_solver. }
+      iApply sswp_MU_wp; [done| ]. 
+      iApply (wp_store with "[$]"). iIntros "!> CNT".
+      iApply (MU_wand with "[-MU] MU").
+      iIntros "[MAP CLOS]". iApply wp_value.
+
+      iAssert (⌜ m' = m ⌝)%I as %->.
+      { iDestruct (sr_agree _ _ _ st_res_SR_even with "[$] [$]") as %EQ1.
+        iDestruct (sr_agree _ _ _ st_res_SR_odd with "[$] [$]") as %EQ2.
+        rewrite -Nat.negb_even in EQ2.
+        destruct (Nat.even m') eqn:E'. 
+        all: simpl in EQ2; done || lia. }
+      rewrite E.
+
+      iMod (sr_upd _ _ _ with "Heven_at ST") as "[EVEN ST]"; eauto.
+      rewrite E. iMod ("CLOS" with "[ST CNT]") as "_".
+      { iFrame. by rewrite Nat2Z.inj_add. }
+      iModIntro. 
+
+      simpl. rewrite -insert_union_singleton_l.
+      simpl_has_fuels. 
+      (* wp_pure _. --- TODO: why does it break? *)
+      fold ρEven.
+      do 2 wp_pure _. 
+
+      iApply ("Hg" with "[] [-HΦ]"); [..| done]. 
+      2: { iFrame. iSplitR; [iApply "Hinv"| ].
+           iApply has_fuels_proper; [reflexivity| | iFrame].
+           rewrite insert_empty. 
+           admit. }
+
+      
+
+           reflexivity. 
+           { done. }
+
+
+End short_prog. 
