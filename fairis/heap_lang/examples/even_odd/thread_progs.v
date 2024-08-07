@@ -84,6 +84,7 @@ Section StResImpl.
       else (auth_even_at (N+1) ∗ auth_odd_at N)%I.
     
     Lemma st_res_SR_even: @StateRes _ Nat.even st_res even_at.
+    Proof. 
       split.
       - rewrite /st_res. setoid_rewrite if_arg2_comm. iIntros (??) "TH [EVEN ODD]".
         rewrite !if_arg_comm.
@@ -134,13 +135,13 @@ Section StResImpl.
 End StResImpl. 
 
 
-Definition MU__r `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} ρ E τ P: iProp Σ :=  
-  ∀ f R, τ ↦M ({[ ρ := f ]} ∪ (S <$> R)) ∗ ⌜ ρ ∉ dom R ⌝ -∗
+Definition MU__r `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} ρ E P: iProp Σ :=  
+  ∀ τ f R, τ ↦M ({[ ρ := f ]} ∪ (S <$> R)) ∗ ⌜ ρ ∉ dom R ⌝ -∗
           MU E τ (τ ↦M ({[ ρ := lm_flm LM ]} ∪ R) ∗ P).
 
 
-Lemma MU__r_wand `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} E ζ ρ (P Q : iProp Σ) :
-  (P -∗ Q) -∗ MU__r ρ E ζ P -∗ MU__r ρ E ζ Q.
+Lemma MU__r_wand `{LM: LiveModel heap_lang M} `{!heapGS Σ LM} E ρ (P Q : iProp Σ) :
+  (P -∗ Q) -∗ MU__r ρ E P -∗ MU__r ρ E Q.
 Proof.
   iIntros "HPQ HMU". rewrite /MU__r. iIntros "**".
   iSpecialize ("HMU" with "[$]"). 
@@ -150,9 +151,9 @@ Qed.
 
 
 Lemma MU__r_mask_weaken `{LM: LiveModel heap_lang M} `{!heapGS Σ LM}
-  E1 E2 ζ ρ (P: iProp Σ)
+  E1 E2 ρ (P: iProp Σ)
   (SUB: E1 ⊆ E2):
-  MU__r ρ E1 ζ P -∗ MU__r ρ E2 ζ P.
+  MU__r ρ E1 P -∗ MU__r ρ E2 P.
 Proof.
   iIntros "MU". rewrite /MU__r. iIntros "**".
   iApply MU_mask_weaken; eauto.
@@ -165,7 +166,7 @@ Section ProofsGen.
   Context `{!heapGS Σ LM__p}.
   Context (cond: nat -> bool).
   Hypothesis (COND_S_NEG: forall n, cond (S n) = negb (cond n)). 
-    
+  
   Definition incr_loop : val :=
     rec: "incr_loop" "l" "n" :=
       (if: CAS "l" "n" ("n"+ #1)
@@ -177,17 +178,17 @@ Section ProofsGen.
     sr N.
     (* own th_name (●E (if cond N then N else (N + 1))). *)
   
-  Definition eo_vs `(SR: StateRes cond sr frag) l ι (ρ: fmrole M__p) tid : iProp Σ :=
+  Definition eo_vs `(SR: StateRes cond sr frag) l ι (ρ: fmrole M__p) : iProp Σ :=
     □ |={⊤, ⊤ ∖ ↑ι}=> ∃ N,
       (▷ eo_corr SR l N) ∗
-      (MU__r ρ (⊤ ∖ ↑ι) tid
+      (MU__r ρ (⊤ ∖ ↑ι)
          (▷ (eo_corr SR l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True)
       ).
 
   Definition eo_spec (prog: val) :=
     forall `(SR: StateRes cond sr frag) (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
     (FL: lm_flm LM__p >= 61),
-    ⊢ {{{ eo_vs SR n ι ρ tid ∗ has_fuels tid {[ ρ := f ]} ∗ frag N }}}
+    ⊢ {{{ eo_vs SR n ι ρ ∗ has_fuels tid {[ ρ := f ]} ∗ frag N }}}
         prog #n #N @ tid
       {{{ RET #(); has_fuels tid ∅ }}}.    
   

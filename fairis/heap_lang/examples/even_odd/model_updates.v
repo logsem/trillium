@@ -155,11 +155,10 @@ Section proof.
   Definition cur_st `{!heapGS Σ LM} n: iProp Σ :=
     ∃ st, frag_model_is st ∗ ⌜ st2nat st n ⌝. 
 
-  Lemma mu_even `{!heapGS Σ LM} tid n:
-    ⊢ cur_st n -∗ MU__r ρEven ∅ tid
-        (cur_st (if Nat.even n then (n + 1)%nat else n)).
+  Lemma mu_even `{!heapGS Σ LM} n:
+    ⊢ cur_st n -∗ MU__r ρEven ∅ (cur_st (if Nat.even n then (n + 1)%nat else n)).
   Proof using.
-    rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (f' R) "[MAP %DISJ__R]".
+    rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]".
     destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρEven) st' /\
@@ -191,11 +190,10 @@ Section proof.
       + done.
   Qed.
 
-  Lemma mu_odd `{!heapGS Σ LM} tid n:
-    ⊢ cur_st n -∗ MU__r ρOdd ∅ tid
-        (cur_st (if Nat.odd n then (n + 1)%nat else n)).
+  Lemma mu_odd `{!heapGS Σ LM} n:
+    ⊢ cur_st n -∗ MU__r ρOdd ∅ (cur_st (if Nat.odd n then (n + 1)%nat else n)).
   Proof using.
-    rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (f' R) "[MAP %DISJ__R]".
+    rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]".
     destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
 
     enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρOdd) st' /\
@@ -238,8 +236,8 @@ Section proof.
     Definition evenodd_inv_inner l : iProp Σ :=
       ∃ N, cur_st N ∗ l ↦ #N ∗ st_res N.
     
-    Lemma even_vs tid l ns:
-      inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.even st_res_SR_even l ns ρEven tid. 
+    Lemma even_vs l ns:
+      inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.even st_res_SR_even l ns ρEven. 
     Proof using st_res_SR_even.
       rewrite /eo_vs. iIntros "#INV". iModIntro.
       iMod (inv_acc with "INV") as "[OPEN CLOS]".
@@ -260,8 +258,8 @@ Section proof.
       rewrite /evenodd_inv_inner. iNext. iFrame.
     Qed.
     
-    Lemma odd_vs tid l ns:
-      inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.odd st_res_SR_odd l ns ρOdd tid. 
+    Lemma odd_vs l ns:
+      inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.odd st_res_SR_odd l ns ρOdd. 
     Proof using st_res_SR_odd.
       rewrite /eo_vs. iIntros "#INV". iModIntro. 
       iMod (inv_acc with "INV") as "[OPEN CLOS]".
