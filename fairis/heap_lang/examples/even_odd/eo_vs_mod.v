@@ -26,13 +26,13 @@ Class evenoddG (Σ: gFunctors) := EvenoddG {
  }.
 
 
+
+
 Section proof_start.
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
 
   Let M := @the_fair_model even_impl odd_impl.
   Let LM := @the_model even_impl odd_impl.
-
-  Context (ep: EvenProg) (op: OddProg). 
 
   Context `{!heapGS Σ LM, !evenoddG Σ}.
 
@@ -57,6 +57,16 @@ Section proof_start.
   Let ρEven: fmrole M := even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
 
+  Definition even_odd_spec (prog: val): Prop :=
+    forall tid n N1 N2 f (Hf: f > 60) (EVEN: N1 < N2), 
+    {{{ evenodd_inv n ∗ 
+        tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
+        even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
+      prog #n @ tid
+    {{{ RET #(); tid ↦M ∅ }}}.
+
+  Context (ep: EvenProg) (op: OddProg). 
+
   Definition start : val :=
     λ: "l",
       let: "x" := !"l" in
@@ -66,14 +76,9 @@ Section proof_start.
   Existing Instance even_AME. 
   Existing Instance odd_AME.
 
-  Lemma start_spec tid n N1 N2 f (Hf: f > 60) (EVEN: N1 < N2)
-    :
-    {{{ evenodd_inv n ∗ 
-        tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
-        even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
-      start #n @ tid
-    {{{ RET #(); tid ↦M ∅ }}}.
+  Lemma start_spec: even_odd_spec start. 
   Proof using All.
+    rewrite /even_odd_spec. iIntros (tid n N1 N2 f Hf EVEN). 
     iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". unfold start.
     rewrite <- (union_empty_l_L ∅). 
     wp_pures.
@@ -126,7 +131,7 @@ Section proof_start.
       2: { by iIntros "!> ?". }
       by iApply odd_vs. }
 
-    iIntros "!> Hf". by iApply "HΦ".
+    iIntros "!> Hf". by iApply "HΦ". 
   Qed. 
 
 End proof_start.
@@ -137,8 +142,6 @@ Section short_prog.
 
   Let M := @the_fair_model even_impl odd_impl.
   Let LM := @the_model even_impl odd_impl.
-
-  Context (ep: EvenProg) (op: OddProg). 
 
   Context `{!heapGS Σ LM, !evenoddG Σ}.
 
@@ -166,7 +169,7 @@ Section short_prog.
     (ev := Nat.ltb N1 N2)
     (d := 10)
     (b := 40)
-    f1 f2 (Hf1: f1 > 40) (Hf2: f2 > 40)
+    f1 f2 (Hf1: f1 > b) (Hf2: f2 > b)
     :
     {{{ evenodd_inv st_res n ∗ 
         tid ↦M {[ ρEven := f1 + (if ev then 0 else d); ρOdd := f2 + (if ev then d else 0) ]} ∗
@@ -288,15 +291,10 @@ Section short_prog.
       all: iPureIntro; lia.
   Qed. 
 
-  Lemma short_spec tid n N1 N2 f (Hf: f > 60) (EVEN: N1 < N2)
-    :
-    {{{ evenodd_inv st_res n ∗ 
-        tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
-        even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
-      short #n @ tid
-    {{{ RET #(); tid ↦M ∅ }}}.
-  Proof using All.
-    iIntros (Φ) "(#INV&MAP&EVEN&ODD&FR) HΦ".
+  Lemma short_spec: even_odd_spec st_res even_at odd_at short.
+  Proof using All. 
+    rewrite /even_odd_spec. iIntros (tid n N1 N2 f Hf EVEN). 
+    iIntros (Φ) "(#INV & Hf & EVEN & ODD & FR) HΦ". unfold short.
     iApply (short_spec_impl with "[-HΦ]"); [..| done]. 
     3: { iFrame "EVEN ODD FR INV". iApply has_fuels_proper; [reflexivity| | by iFrame].
          erewrite (proj2 (Nat.ltb_lt _ _)); [| lia].

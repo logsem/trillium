@@ -501,26 +501,28 @@ Section Adequacy.
   Let start_prog := @start incr_loop_even_prog incr_loop_odd_prog. 
 
   Lemma start_spec_use Σ
+    prog 
     (l : loc)
     (Hinv : heapGS Σ LM)
     (eoΣ: evenoddG Σ)
-    (th_preG: threadPreG Σ)
+    (th_preG: threadPreG Σ)    
     `(SR__e: StateRes Nat.even sr even_at)
     `(SR__o: StateRes Nat.odd sr odd_at)
+    (SPEC: even_odd_spec sr even_at odd_at prog)
     :
     {{{ inv (nroot.@"even_odd") (evenodd_inv_inner sr l) ∗
         0 ↦M gset_to_gmap 61 init_roles ∗
         even_at 0 ∗
         odd_at 1 ∗
         frag_free_roles_are ∅ }}}
-      start_prog #l @0
+      prog #l @0
       {{{ x, RET x; 0 ↦M ∅ }}}.
   Proof.  
     simpl. rewrite /init_roles.
     rewrite !gset_to_gmap_union_singleton. rewrite gset_to_gmap_singleton. 
     iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & FR) HΦ".
-    iApply (start_spec with "[$Hf Heven_at Hodd_at $Hinv $FR]"); eauto.
-    iFrame. 
+    iApply (SPEC with "[Hf Heven_at Hodd_at Hinv FR]"); eauto.
+    iFrame. done. 
   Qed.
   
   Lemma dom_locales
@@ -697,10 +699,15 @@ Section Adequacy.
     rewrite even_init_lr odd_init_lr. set_solver. 
   Qed. 
 
-  Lemma evenodd_sim l:
+  Lemma evenodd_sim prog l
+    (SPEC: forall `{!heapGS Σ LM, evenoddG Σ} st_res even_at odd_at
+             (SR__e: StateRes Nat.even st_res even_at)
+             (SR__o: StateRes Nat.odd st_res odd_at),
+        even_odd_spec st_res even_at odd_at prog)
+    :
     continued_simulation
       (sim_rel_with_user LM (ξ_evenodd_trace l))
-      (trace_singleton ([start_prog #l], {| heap := {[l:=#0]};  used_proph_id := ∅ |}))
+      (trace_singleton ([prog #l], {| heap := {[l:=#0]};  used_proph_id := ∅ |}))
       (trace_singleton (initial_ls (LM := LM) st0 0)).
   Proof.
     assert (evenoddPreG wholeΣ) as HPreG'.
@@ -718,7 +725,7 @@ Section Adequacy.
     iIntros (?) "!> Hσ Hs Hr Hf".
 
     iMod (st_res_init 0) as "(%st_res & %even_at & %odd_at & SR & E & O & %SR__e & %SR__o)"; [done| ].
-    
+
     iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner st_res l) with "[Hσ Hs SR]") as "#Hinv".
     { iNext. unfold evenodd_inv_inner.
       rewrite /st0. 
@@ -728,7 +735,8 @@ Section Adequacy.
     iModIntro.
     iSplitL.
     2: { iApply eo_rah; try done. apply st0_zero. } 
-    iApply (start_spec_use with "[-]"); try done. 
+    iApply (start_spec_use with "[-]"); try done.
+    { eapply SPEC; eauto. done. }
     2: { iNext. by iIntros "**". }
     rewrite subseteq_empty_difference_L; [| done]. 
     rewrite -st0_lr. iFrame "#∗".
@@ -899,15 +907,21 @@ Section Adequacy.
   
 
   (** Proof that the execution trace satisfies the liveness properties *)
-  Theorem evenodd_ex_liveness (l:loc) (extr : heap_lang_extrace):
+  Theorem evenodd_ex_liveness prog
+    (SPEC: forall `{!heapGS Σ LM, evenoddG Σ} st_res even_at odd_at
+             (SR__e: StateRes Nat.even st_res even_at)
+             (SR__o: StateRes Nat.odd st_res odd_at),
+        even_odd_spec st_res even_at odd_at prog)
+    (l:loc) (extr : heap_lang_extrace)
+    :
     extrace_maximal extr →
     (∀ tid, fair_ex tid extr) →
-    trfirst extr = ([start_prog #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
+    trfirst extr = ([prog #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
     evenodd_ex_progress l extr ∧ evenodd_ex_mono l extr.
   Proof.
     intros Hmaximal Hfair Hfirst.
     pose proof Hmaximal as Hvalid%extrace_maximal_valid.
-    pose proof (evenodd_sim l) as Hsim.
+    pose proof (evenodd_sim prog l) as Hsim.
     
     assert (∃ iatr,
                valid_inf_system_trace
@@ -918,7 +932,7 @@ Section Adequacy.
                  iatr) as [iatr Hiatr].
     { eexists _. eapply produced_inf_aux_trace_valid_inf. econstructor.
       Unshelve.
-      - rewrite Hfirst. apply Hsim.
+      - rewrite Hfirst. apply Hsim; auto. 
       - eapply from_trace_preserves_validity; eauto; first econstructor. }
     
     assert (∃ (auxtr : auxtrace LM),
@@ -949,7 +963,28 @@ Section AdequacyConcrete.
 
   From trillium.fairness.heap_lang.examples.even_odd Require Import submodels.
 
-  Definition evenodd_ex_liveness_concrete := 
-    evenodd_ex_liveness thread_0_even thread_1_odd. 
+  Lemma start_adequacy
+    (l:loc) (extr : heap_lang_extrace)
+    :
+    extrace_maximal extr →
+    (∀ tid, fair_ex tid extr) →
+    trfirst extr = ([(start incr_loop_even_prog incr_loop_odd_prog) #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
+    evenodd_ex_progress l extr ∧ evenodd_ex_mono l extr.
+  Proof.
+    apply (evenodd_ex_liveness thread_0_even thread_1_odd).
+    intros. apply start_spec; eauto.
+  Qed. 
+
+  Lemma short_adequacy
+    (l:loc) (extr : heap_lang_extrace)
+    :
+    extrace_maximal extr →
+    (∀ tid, fair_ex tid extr) →
+    trfirst extr = ([short #l], {| heap := {[l:=#0]}; used_proph_id := ∅ |}) →
+    evenodd_ex_progress l extr ∧ evenodd_ex_mono l extr.
+  Proof.
+    apply (evenodd_ex_liveness thread_0_even thread_1_odd).
+    intros. eapply short_spec; eauto.
+  Qed. 
 
 End AdequacyConcrete.
