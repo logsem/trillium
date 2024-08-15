@@ -1,7 +1,6 @@
 From iris.algebra Require Import gmap gset.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Import quantifiers finitary.
-(* From stdpp Require Import finitary. *)
 
 (* TODO: move these lemmas to appropriate places *)
 
@@ -75,15 +74,23 @@ Section SetMapProperties.
     set_solver. 
   Qed. 
   
-  Lemma elem_of_map_inj_gset {A B} 
-    `{EqDecision A} `{Countable A}
-    `{EqDecision B} `{Countable B}
-    (f: A -> B) (m: gset A) (a: A) (INJ: injective f):
+  Lemma elem_of_map_inj_gset `{Countable A} `{Countable B}
+    (f: A -> B) (m: gset A) (a: A) (INJ: Inj eq eq f):
     a ∈ m <-> f a ∈ set_map f m (D := gset _).
   Proof using.
     split; [apply elem_of_map_2| ].
     intros IN. apply elem_of_map_1 in IN as (a' & EQ & IN).
     apply INJ in EQ. congruence. 
+  Qed.
+    
+  Lemma subseteq_map_inj_gset `{Countable A} `{Countable B}
+    (f: A -> B) (m1 m2: gset A) (INJ: Inj eq eq f):
+    m1 ⊆ m2 <-> (set_map f m1: gset B) ⊆ set_map f m2. 
+  Proof using.
+    simpl. rewrite !elem_of_subseteq.
+    split; [set_solver| ].
+    intros. eapply elem_of_map_inj_gset; eauto.
+    apply H1. set_solver.
   Qed.
     
 End SetMapProperties.
@@ -195,8 +202,9 @@ Section Powerset.
     rewrite !set_map_union_L.
     rewrite !union_assoc_L. f_equal.
     { set_solver. }
-    rewrite -!set_map_compose_gset. apply leibniz_equiv.
-    f_equiv. red. simpl. set_solver.
+    rewrite -!set_map_compose_gset.
+    apply leibniz_equiv. apply set_map_proper; [| done].
+    red. simpl. set_solver. 
   Qed.
 
   Lemma powerset_spec s:
