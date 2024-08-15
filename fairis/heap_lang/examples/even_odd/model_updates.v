@@ -16,93 +16,91 @@ Open Scope nat.
 
 Set Default Proof Using "Type".
 
-
-(* TODO: move *)
 Section MatchedBy.
-  Context {M__s M__m: ActionModel}.
-  Context (R: amSt M__s -> amSt M__m -> Prop). 
 
-  Definition matched_by := 
+  Definition matched_by {M__s M__m} 
+    (R: amSt M__s -> amSt M__m -> Prop)
+    (L: amRole M__s -> option (amRole M__m))
+    (F: Action -> Prop)
+    := 
     forall st__s st__s' a ρ st__m,
-      R st__s st__m -> amTrans _ st__s (a, Some ρ) st__s' -> is_action_of M__m a ->
-    exists st__m', amTrans _ st__m (a, None) st__m' /\ R st__s' st__m'.
+      R st__s st__m -> F a ->
+      amTrans _ st__s (a, Some ρ) st__s' -> 
+    exists st__m', amTrans _ st__m (a, L ρ) st__m' /\ R st__s' st__m'.
 
-  Hypothesis (MATCH: matched_by). 
-
-  Lemma matched_by_prod_step_l st__s st__s' a ρ st__m
-    (R1: R st__s st__m) (STEP__s: amTrans _ st__s (a, Some ρ) st__s')
-    (PRIV_S_R: ¬ (is_action_of M__m a) -> R st__s' st__m)
-    {is_act_m_dec: forall a, Decision (is_action_of M__m a)}:
-    exists st__m', amTrans (ProdAM M__s M__m) (st__s, st__m) (a, Some (inl ρ)) (st__s', st__m') /\ R st__s' st__m'.
-  Proof using MATCH. 
+  Lemma matched_by_prod_l {M__s M__m} R
+    {is_act_m_dec: forall a, Decision (is_action_of M__m a)}
+    (MATCH: matched_by R (fun _ => None) (is_action_of M__m))
+    (PRIV_S_R: forall st__s st__s' a ρ st__m,
+        R st__s st__m -> amTrans _ st__s (a, Some ρ) st__s' -> ¬ (is_action_of M__m a) ->
+        R st__s' st__m)
+    :
+    @matched_by M__s (ProdAM M__s M__m)
+      (fun st__s '(st__s', st__m) => st__s' = st__s /\ R st__s st__m)
+      (Some ∘ inl)
+      (fun _ => True). 
+  Proof using.
+    red. intros st__s st__s' a ρ [? st__m]. intros [-> R1] ? STEP. 
     destruct (decide (is_action_of M__m a)).
     - opose proof * MATCH as (st__m' & STEP__m & R2); eauto.
-      eexists. split; eauto. econstructor; eauto.
-    - eexists. split; [| by apply PRIV_S_R]. econstructor; eauto.
+      eexists (_, _). split; eauto. econstructor; eauto.
+    - eexists (_, _). split; [| split]; [| reflexivity| eapply PRIV_S_R]; eauto.  
+      econstructor; eauto.
   Qed. 
-    
-  Lemma matched_by_prod_step_r st__s st__s' a ρ st__m
-    (R1: R st__s st__m) (STEP__s: amTrans _ st__s (a, Some ρ) st__s')
-    (PRIV_S_R: ¬ (is_action_of M__m a) -> R st__s' st__m)
-    {is_act_m_dec: forall a, Decision (is_action_of M__m a)}:
-    exists st__m', amTrans (ProdAM M__m M__s) (st__m, st__s) (a, Some (inr ρ)) (st__m', st__s') /\ R st__s' st__m'.
-  Proof using MATCH. 
+
+  Lemma matched_by_prod_r {M__s M__m} R
+    {is_act_m_dec: forall a, Decision (is_action_of M__m a)}
+    (MATCH: matched_by R (fun _ => None) (is_action_of M__m))
+    (PRIV_S_R: forall st__s st__s' a ρ st__m,
+        R st__s st__m -> amTrans _ st__s (a, Some ρ) st__s' -> ¬ (is_action_of M__m a) ->
+        R st__s' st__m):
+    @matched_by M__s (ProdAM M__m M__s)
+      (fun st__s '(st__m, st__s') => st__s' = st__s /\ R st__s st__m)
+      (Some ∘ inr)
+      (fun _ => True). 
+  Proof using.
+    red. intros st__s st__s' a ρ [? st__m]. intros [-> R1] ? STEP. 
     destruct (decide (is_action_of M__m a)).
     - opose proof * MATCH as (st__m' & STEP__m & R2); eauto.
-      eexists. split; eauto. econstructor; eauto.
-    - eexists. split; [| by apply PRIV_S_R]. econstructor; eauto.
+      eexists (_, _). split; eauto. econstructor; eauto.
+    - eexists (_, _). split; [| split]; [| reflexivity| eapply PRIV_S_R]; eauto.  
+      econstructor; eauto.
   Qed.
 
-  Lemma matched_prod_AM_live_roles_l
-    `{Countable (amRole M__s)} {STR__s: AM_strong_lr M__s}
-    `{forall a, Decision (is_action_of M__m a)}
-    `{Countable (amRole (ProdAM M__s M__m))} {STR__p: AM_strong_lr (ProdAM M__s M__m)}
-    st__e st__o
-    (R1: R st__e st__o)
-    (PRIV_S_R: forall st__e' a ρ, amTrans _ st__e (a, Some ρ) st__e' ->
-                           ¬ (is_action_of M__m a) -> R st__e' st__o):    
-      set_map inl (AM_live_roles STR__s st__e) ⊆ AM_live_roles STR__p (st__e, st__o).
-  Proof using MATCH.
-    apply elem_of_subseteq. intros ρ.
-    rewrite elem_of_map. setoid_rewrite <- AM_live_roles_spec.
-    intros (ρ__e & -> & (a__e & st__e' & STEP__e)).
-    ogeneralize * matched_by_prod_step_l; eauto. 
-    intros (?&?&?). eexists. eauto.
-  Qed. 
+End MatchedBy.
 
-  Lemma matched_prod_AM_live_roles_r
+
+Section MatchedByTrueFacts.
+  Context `(MATCH: @matched_by M__s M__m R L (fun _ => True)).
+
+  Lemma matched_AM_live_roles
     `{Countable (amRole M__s)} {STR__s: AM_strong_lr M__s}
-    `{forall a, Decision (is_action_of M__m a)}
-    `{Countable (amRole (ProdAM M__m M__s))} {STR__p: AM_strong_lr (ProdAM M__m M__s)}
+    `{Countable (amRole M__m)} {STR__m: AM_strong_lr M__m}
     st__e st__o
-    (R1: R st__e st__o)
-    (PRIV_S_R: forall st__e' a ρ, amTrans _ st__e (a, Some ρ) st__e' ->
-                           ¬ (is_action_of M__m a) -> R st__e' st__o):    
-      set_map inr (AM_live_roles STR__s st__e) ⊆ AM_live_roles STR__p (st__o, st__e).
+    (R1: R st__e st__o):
+      set_map L (AM_live_roles STR__s st__e) ⊆ proj1_sig STR__m st__o.
   Proof using MATCH.
     apply elem_of_subseteq. intros ρ.
     rewrite elem_of_map. setoid_rewrite <- AM_live_roles_spec.
     intros (ρ__e & -> & (a__e & st__e' & STEP__e)).
-    ogeneralize * matched_by_prod_step_r; eauto. 
-    intros (?&?&?). eexists. eauto.
-  Qed. 
+    destruct STR__m as [lr LR]. simpl in *. apply LR.
+    eapply MATCH in STEP__e; eauto. set_solver. 
+  Qed.
 
   Lemma always_live_lift_l
     `{Countable (amRole M__s)} `{STR__s: AM_strong_lr M__s}
-    `{Countable (amRole (ProdAM M__s M__m))} `{STR__p: AM_strong_lr (ProdAM M__s M__m)}
+    `{Countable (amRole M__m)} `{STR__m: AM_strong_lr M__m}
     `{forall a, Decision (is_action_of M__m a)}
     ρ
-    (LIVE: forall st__s, ρ ∈ AM_live_roles STR__s st__s)
-    (PRIV_S_R: forall st__e st__e' a ρ st__o, amTrans _ st__e (a, Some ρ) st__e' ->
-                           ¬ (is_action_of M__m a) -> R st__e' st__o):
-    forall st__s st__m, R st__s st__m -> inl ρ ∈ AM_live_roles STR__p (st__s, st__m).
+    (LIVE: forall st__s, ρ ∈ AM_live_roles STR__s st__s):
+    forall st__s st__m, R st__s st__m -> L ρ ∈ proj1_sig STR__m st__m.
   Proof using MATCH.
     intros. apply singleton_subseteq_l. etrans.
-    2: { eapply matched_prod_AM_live_roles_l; eauto. }
+    2: { eapply matched_AM_live_roles; eauto. }
     eapply singleton_subseteq_l. by apply elem_of_map_2.
   Qed.
  
-End MatchedBy.
+End MatchedByTrueFacts.
 
 
 (* Lemma matched_prod_AM_live_roles *)
@@ -201,9 +199,9 @@ Section Models.
     + eapply even_odd_priv_disj; eauto.
   Qed.
 
-  Lemma even_matched_by_odd: matched_by (fun st__e st__o => exists N, st2nat (st__e, st__o) N).
+  Lemma even_matched_by_odd: matched_by (fun st__e st__o => exists N, st2nat (st__e, st__o) N) (fun _ => None) (is_action_of odd_AM). 
   Proof. 
-    red. intros st__e st__e' a ρ st__o [n CORR] STEP__e ACT__o.
+    red. intros st__e st__e' a ρ st__o [n CORR] ACT__o STEP__e.
     pose proof STEP__e as ACT%action_of_step%even_acts.
     destruct ACT as [[k ->] | PRIV]. 
     2: { edestruct even_priv_odd_noact; eauto. }
@@ -217,7 +215,7 @@ Section Models.
     eexists. split; eauto.
   Qed.        
 
-  Lemma odd_matched_by_even: matched_by (fun st__o st__e => exists N, st2nat (st__e, st__o) N).
+  Lemma odd_matched_by_even: matched_by (fun st__o st__e => exists N, st2nat (st__e, st__o) N) (fun _ => None) (is_action_of even_AM).
   Proof. 
   Admitted. 
 
@@ -234,7 +232,24 @@ Section proof.
   Existing Instance odd_AME.
 
   Let even_AM := @even_AM even_impl. 
-  Let odd_AM := @odd_AM odd_impl. 
+  Let odd_AM := @odd_AM odd_impl.
+
+  Lemma prod_no_ext_sync st:
+    None ∉ proj1_sig (@prod_AM_strong_lr even_impl odd_impl) st.
+  Proof.
+    destruct prod_AM_strong_lr as [lr LR]. simpl in *.
+    intros IN%LR. destruct IN as (?&?&STEP).
+    inversion STEP; subst.
+    pose proof STEP1 as ACT1%action_of_step%even_acts.
+    pose proof STEP2 as ACT2%action_of_step%odd_acts.
+    destruct ACT1 as [[k ?] | PRIV1], ACT2 as [[? ?] | PRIV2]; subst; cycle 1. 
+    { by apply odd_pub_priv_disj in PRIV2. }
+    { by apply even_pub_priv_disj in PRIV1. }
+    { by edestruct @even_odd_priv_disj; eauto. }
+    apply coPset_nth_inj in H0. subst.
+    apply even_sync_inv in STEP1 as (?&?&?). apply odd_sync_inv in STEP2 as (?&?&?).
+    edestruct even_odd_False; eauto.
+  Qed. 
   
   Lemma prod_AM_live_roles st__e st__o n
     (CUR: st2nat (st__e, st__o) n)
@@ -251,27 +266,35 @@ Section proof.
       all: set_solver. }
     
     apply union_subseteq. split.
-    - unshelve eapply matched_prod_AM_live_roles_l; cycle 1. 
-      { apply even_matched_by_odd. }
-      { apply _. }
-      { simpl. eexists. eauto. }
-      simpl. intros st__e' a ρ STEP__e NACT__o. 
-      pose proof STEP__e as ACT%action_of_step%even_acts.
-      destruct ACT as [[k ->] | PRIV].
-      { destruct NACT__o. apply odd_acts. eauto. }
-      apply even_stutter_inv in STEP__e; eauto.
-      eexists. split; eauto. simpl. destruct CUR. simpl in *. congruence.
-    - unshelve eapply matched_prod_AM_live_roles_r; cycle 1.
-      { apply odd_matched_by_even. }
-      { apply _. }
-      { simpl. eexists. eauto. }
-      simpl. intros st__o' a ρ STEP__o NACT__e. 
-      pose proof STEP__o as ACT%action_of_step%odd_acts.
-      destruct ACT as [[k ->] | PRIV].
-      { destruct NACT__e. apply even_acts. eauto. }
-      apply odd_stutter_inv in STEP__o; eauto.
-      eexists. split; eauto. simpl. destruct CUR. simpl in *. congruence. 
-  Qed. 
+    - eapply subseteq_map_inj_gset.
+      { apply Some_inj. }
+      rewrite <- set_map_compose_gset.
+      etrans.
+      { erewrite @matched_AM_live_roles; [reflexivity|..]. 
+        { eapply @matched_by_prod_l.
+          2: { apply even_matched_by_odd. }
+          { apply _. }
+          simpl. clear. 
+          intros st__e st__e' a ρ st__o [? CUR] STEP__e NACT__o. 
+          pose proof STEP__e as ACT%action_of_step%even_acts.
+          destruct ACT as [[k ->] | PRIV].
+          { destruct NACT__o. apply odd_acts. eauto. }
+          apply even_stutter_inv in STEP__e; eauto.
+          eexists. split; eauto. simpl. destruct CUR. simpl in *. congruence. }
+        Unshelve.
+        2: { apply prod_AM_strong_lr. }
+        2: exact (st__e, st__o). 
+        simpl. eauto. }
+      (* TODO: simplify somehow *)
+      simpl.
+      pose proof (prod_no_ext_sync (st__e, st__o)) as NNONE. 
+      destruct prod_AM_strong_lr as [lr LR]. simpl in *.
+      rewrite /AM_live_roles. simpl.
+      rewrite extract_Somes_gset_inv.
+      apply subseteq_difference_r; auto.
+      by apply disjoint_singleton_r.
+    - admit. 
+  Admitted. 
 
   Lemma prod_step_lr_nonincr st st' a oρ n n'
     (STEP: amTrans (@prod_model even_impl odd_impl) st (a, oρ) st')

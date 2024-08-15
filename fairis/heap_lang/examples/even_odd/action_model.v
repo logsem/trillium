@@ -179,6 +179,17 @@ Section ActionModel.
     done. 
   Qed.
 
+  Lemma extract_Somes_gset_inv `{Countable A} (s: gset (option A)):
+    set_map Some (extract_Somes_gset s) = s ∖ {[ None ]}.
+  Proof. 
+    apply set_eq. intros ?. rewrite elem_of_map.
+    setoid_rewrite <- extract_Somes_gset_spec.
+    rewrite elem_of_difference not_elem_of_singleton.
+    split; [intros (?&->&?) | intros [??]]. 
+    - set_solver.
+    - destruct x; eauto. done.
+  Qed. 
+
   (* the counterpart of FairModel's "live_roles" *)
   Definition AM_live_roles {AM: ActionModel} `{Countable (amRole AM)} (AM_S: AM_strong_lr AM):
     amSt AM -> gset (amRole AM) :=
