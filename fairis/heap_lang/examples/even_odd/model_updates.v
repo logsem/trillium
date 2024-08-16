@@ -168,17 +168,54 @@ Section Models.
       all: apply even_AME || apply odd_AME. 
   Qed.
 
-  Definition the_fair_model: FairModel.
-    unshelve eapply (AM2FM prod_model). 
-  Proof using even_impl odd_impl.
-    apply prod_AM_strong_lr. 
-  Defined.
+  (* doesn't look like there is a way to prove it for arbitrary product *)
+  Instance prod_AM_act_dec: ∀ a : Action, Decision (is_action_of prod_model a).
+  Proof. Admitted.
 
-  Definition st2nat (st: fmstate the_fair_model) N :=
-    cur_even even_impl st.1 = N /\ cur_odd odd_impl st.2 = N.
+  Context (env_AM: ActionModel).
+  Context `{Countable (amRole env_AM)}. 
+  Context `{EqDecision (amSt env_AM)}. 
+  Context `{Inhabited (amSt env_AM)}. 
+  Context {ENV_FB: AM_fin_branch' env_AM}.
+  Context `{∀ a : Action, Decision (is_action_of env_AM a)}.
+  Context {ENV_STEP_DEC: AM_step_dec env_AM}.
+
+  Lemma env_AM_strong_lr: AM_strong_lr env_AM.
+  Proof using ENV_FB ENV_STEP_DEC. 
+    apply fin_branch_strong.
+    - apply ENV_FB.
+    - auto.
+  Qed. 
+
+  Definition full_model := ProdAM prod_model env_AM.
+
+  Lemma full_AM_fin_branch': AM_fin_branch' full_model.
+  Proof using ENV_FB. 
+    unshelve eapply action_model.prod_AM_fin_branch'.
+    - apply prod_AM_fin_branch'. 
+    - apply ENV_FB. 
+  Qed.
+
+  Lemma full_AM_strong_lr: AM_strong_lr full_model.
+  Proof using All. 
+    apply fin_branch_strong.
+    - apply full_AM_fin_branch'.
+    - unshelve eapply prod_AM_step_dec; try apply _ || auto. 
+      apply prod_AM_step_dec; try by apply _.
+      all: apply even_AME || apply odd_AME.
+  Qed.
+
+  Definition the_fair_model: FairModel.
+    unshelve eapply (AM2FM full_model).
+  Proof using All. 
+    apply full_AM_strong_lr. 
+  Defined.
 
   Definition the_model: LiveModel heap_lang the_fair_model :=
     {| lm_flm := 61%nat; |}.
+
+  Definition st2nat (st: amSt prod_model) (N: nat) :=
+    cur_even even_impl st.1 = N /\ cur_odd odd_impl st.2 = N.
 
   (* TODO: derive from an appropriate "wrapped product" construction *)
   Lemma even_priv_odd_noact a
@@ -219,23 +256,16 @@ Section Models.
   Proof. 
   Admitted. 
 
-End Models.  
-
-Section proof.
-  Context {even_impl: EvenModel} {odd_impl: OddModel}.
-
-  Let M := @the_fair_model even_impl odd_impl.
-  Let LM := @the_model even_impl odd_impl.
   Context {Σ: gFunctors}. 
 
-  Existing Instance even_AME. 
-  Existing Instance odd_AME.
+  (* Existing Instance even_AME.  *)
+  (* Existing Instance odd_AME. *)
 
-  Let even_AM := @even_AM even_impl. 
-  Let odd_AM := @odd_AM odd_impl.
+  (* Let even_AM := @even_AM even_impl.  *)
+  (* Let odd_AM := @odd_AM odd_impl. *)
 
   Lemma prod_no_ext_sync st:
-    None ∉ proj1_sig (@prod_AM_strong_lr even_impl odd_impl) st.
+    None ∉ proj1_sig prod_AM_strong_lr st.
   Proof.
     destruct prod_AM_strong_lr as [lr LR]. simpl in *.
     intros IN%LR. destruct IN as (?&?&STEP).
@@ -246,7 +276,7 @@ Section proof.
     { by apply odd_pub_priv_disj in PRIV2. }
     { by apply even_pub_priv_disj in PRIV1. }
     { by edestruct @even_odd_priv_disj; eauto. }
-    apply coPset_nth_inj in H0. subst.
+    apply coPset_nth_inj in H3. subst.
     apply even_sync_inv in STEP1 as (?&?&?). apply odd_sync_inv in STEP2 as (?&?&?).
     edestruct even_odd_False; eauto.
   Qed. 
@@ -254,7 +284,7 @@ Section proof.
   Lemma prod_AM_live_roles st__e st__o n
     (CUR: st2nat (st__e, st__o) n)
     :
-    AM_live_roles (@prod_AM_strong_lr even_impl odd_impl) (st__e, st__o) = 
+    AM_live_roles prod_AM_strong_lr (st__e, st__o) = 
     set_map even_role (AM_live_roles ame_strong st__e) ∪ 
     set_map odd_role (AM_live_roles ame_strong st__o).
   Proof using.
@@ -297,7 +327,7 @@ Section proof.
   Admitted. 
 
   Lemma prod_step_lr_nonincr st st' a oρ n n'
-    (STEP: amTrans (@prod_model even_impl odd_impl) st (a, oρ) st')
+    (STEP: amTrans prod_model st (a, oρ) st')
     (CUR: st2nat st n) (NEXT: st2nat st' n'):
       AM_live_roles prod_AM_strong_lr st' ⊆ AM_live_roles prod_AM_strong_lr st.
   Proof.
@@ -313,24 +343,38 @@ Section proof.
       (try apply odd_step_lr_nonincr in STEP2); set_solver.
    Qed.
 
-  Let ρEven: fmrole M := even_role (ρ__e even_impl).
-  Let ρOdd: fmrole M := odd_role (ρ__o odd_impl).
+  Let LM := the_model.
+  Let PM := prod_model.
+  Let M := the_fair_model. 
 
+  Let ρEven: fmrole M := inl $ even_role (ρ__e even_impl).
+  Let ρOdd: fmrole M := inl $ odd_role (ρ__o odd_impl).
+
+  (* since we use this resource to justify MU, it should include the whole state *)
   Definition cur_st `{!heapGS Σ LM} n: iProp Σ :=
-    ∃ st, frag_model_is st ∗ ⌜ st2nat st n ⌝. 
+    ∃ st, frag_model_is st ∗ ⌜ st2nat st.1 n ⌝.
+
+  Hypothesis PROD_ENV_INDEP: forall a, is_action_of PM a -> is_action_of env_AM a -> False.
 
   Lemma mu_even `{!heapGS Σ LM} n:
     ⊢ cur_st n -∗ MU__r ρEven ∅ (cur_st (if Nat.even n then (n + 1)%nat else n)).
-  Proof using.
+  Proof using PROD_ENV_INDEP.
     rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]".
-    destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
+    destruct st as [[st__e st__o] st__env]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
 
-    enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρEven) st' /\
-                   st2nat st' (if Nat.even n then (n + 1) else n)) as (st' & TRANS & CUR'). 
+    enough (exists a st', amTrans PM (st__e, st__o) (a, Some (even_role (ρ__e even_impl))) st' /\
+                   st2nat st' (if Nat.even n then (n + 1) else n)) as (a & st' & TRANS & CUR'). 
     { iApply (MU_wand with "[]").
-      2: { iApply (model_step_MU with "[$] [MAP]"); eauto.
-           eapply am_fmtrans_action in TRANS as (?&?). 
-           eapply prod_step_lr_nonincr; done. }
+      2: { iApply (model_step_MU with "[$] [MAP]").
+           1, 4: by eauto.
+           { simpl. eapply am_fmtrans_action. eexists. 
+             eapply pt_inner1; eauto.
+             intros ?. edestruct PROD_ENV_INDEP; eauto.
+             eapply action_of_step; eauto. }
+           simpl. setoid_rewrite @prod_indep_live_roles; eauto. 
+           apply union_mono; [| done]. apply set_map_mono; [done| ].
+           eapply prod_step_lr_nonincr; done.
+           Unshelve. apply env_AM_strong_lr. }
       iIntros "(MAP & ST)".
       iFrame. done. }
     
@@ -340,15 +384,15 @@ Section proof.
       opose proof * odd_syncable as (st__o' & STEP__o); eauto.
       { erewrite (f_equal Nat.even); eauto. }
       rewrite CUR__E in STEP__e. rewrite CUR__O in STEP__o. 
-      eexists (_, _). split; [| split].
-      + simpl. econstructor. eapply @pt_sync1; eauto.
+      eexists _, (_, _). split; [| split].
+      + simpl. eapply @pt_sync1; eauto.
       + simpl. eapply even_step_inv; eauto.
       + simpl. eapply odd_sync_inv; eauto.
     - pose proof E as O. rewrite -negb_true_iff Nat.negb_even in O. 
       opose proof (even_stutterable _ st__e) as (st__e' & a__e & PRIV & STEP__e); eauto.
       { rewrite CUR__E. intuition. }
-      eexists (_, _). split; [| split].
-      + simpl. econstructor. eapply @pt_inner1; eauto.
+      eexists _, (_, _). split; [| split].
+      + simpl. eapply @pt_inner1; eauto.
         eapply even_priv_odd_noact; eauto.
       + simpl. symmetry. rewrite -CUR__E. eapply even_stutter_inv; eauto.
       + done.
@@ -356,16 +400,24 @@ Section proof.
 
   Lemma mu_odd `{!heapGS Σ LM} n:
     ⊢ cur_st n -∗ MU__r ρOdd ∅ (cur_st (if Nat.odd n then (n + 1)%nat else n)).
-  Proof using.
+  Proof using PROD_ENV_INDEP.
     rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]".
-    destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
+    destruct st as [[st__e st__o] st__env]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
 
-    enough (exists st', fmtrans the_fair_model (st__e, st__o) (Some ρOdd) st' /\
-                   st2nat st' (if Nat.odd n then (n + 1) else n)) as (st' & TRANS & CUR'). 
+    enough (exists a st',
+               amTrans PM (st__e, st__o) (a, Some (odd_role (ρ__o odd_impl))) st' /\
+               st2nat st' (if Nat.odd n then (n + 1) else n)) as (a & st' & TRANS & CUR'). 
     { iApply (MU_wand with "[]").
-      2: { iApply (model_step_MU with "[$] [MAP]"); eauto.
-           eapply am_fmtrans_action in TRANS as (?&?). 
-           eapply prod_step_lr_nonincr; done. }
+      2: { iApply (model_step_MU with "[$] [MAP]").
+           1, 4: by eauto.
+           { simpl. eapply am_fmtrans_action. eexists. 
+             eapply pt_inner1; eauto.
+             intros ?. edestruct PROD_ENV_INDEP; eauto.
+             eapply action_of_step; eauto. }
+           simpl. setoid_rewrite @prod_indep_live_roles; eauto.  
+           apply union_mono; [| done]. apply set_map_mono; [done| ].
+           eapply prod_step_lr_nonincr; done.
+           Unshelve. apply env_AM_strong_lr. }
       iIntros "(MAP & ST)".
       iFrame. done. }
  
@@ -375,19 +427,19 @@ Section proof.
       opose proof * even_syncable as (st__e' & STEP__e); eauto.
       { erewrite (f_equal Nat.odd); eauto. }
       rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e. 
-      eexists (_, _). split; [| split].
-      + simpl. econstructor. eapply @pt_sync2; eauto.
+      eexists _, (_, _). split; [| split].
+      + simpl. eapply @pt_sync2; eauto.
       + simpl. eapply even_sync_inv; eauto.
       + simpl. eapply odd_step_inv; eauto.
     - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E. 
       opose proof (odd_stutterable _ st__o) as (st__o' & a__o & PRIV & STEP__o); eauto.
       { rewrite CUR__O. intuition. }
-      eexists (_, _). split; [| split].
-      + simpl. econstructor. eapply @pt_inner2; eauto.
+      eexists _, (_, _). split; [| split].
+      + simpl. eapply @pt_inner2; eauto.
         eapply odd_priv_even_noact; eauto.
       + done. 
       + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
-  Qed. 
+  Qed.
 
   Section Viewshifts.
     Context `{!heapGS Σ LM}.
@@ -402,7 +454,7 @@ Section proof.
     
     Lemma even_vs l ns:
       inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.even st_res_SR_even l ns ρEven. 
-    Proof using st_res_SR_even.
+    Proof using st_res_SR_even PROD_ENV_INDEP.
       rewrite /eo_vs. iIntros "#INV". iModIntro.
       iMod (inv_acc with "INV") as "[OPEN CLOS]".
       { apply top_subseteq. }
@@ -424,7 +476,7 @@ Section proof.
     
     Lemma odd_vs l ns:
       inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.odd st_res_SR_odd l ns ρOdd. 
-    Proof using st_res_SR_odd.
+    Proof using st_res_SR_odd PROD_ENV_INDEP.
       rewrite /eo_vs. iIntros "#INV". iModIntro. 
       iMod (inv_acc with "INV") as "[OPEN CLOS]".
       { apply top_subseteq. }
@@ -445,4 +497,4 @@ Section proof.
 
   End Viewshifts.
     
-End proof.
+End Models.

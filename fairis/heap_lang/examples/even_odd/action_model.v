@@ -255,6 +255,8 @@ Section ActionModel.
     
     Definition ProdAM: ActionModel := {| amTrans := ProdTrans; |}.
 
+    (* Global Instance prod_AM_act_of_dec: forall a, Decision (is_action_of ProdAM a). *)      
+
     Lemma prod_AM_step_dec {EQ1: EqDecision (amSt AM1)} {EQ2: EqDecision (amSt AM2)}
       (D1: AM_step_dec AM1) (D2: AM_step_dec AM2)
       :
@@ -326,7 +328,39 @@ Section ActionModel.
         split; [| set_solver].
         rewrite elem_of_list_bind.
         exists (s2', a, None). set_solver. }
-    Qed. 
+    Qed.
+
+    Section Independent.
+
+      Definition models_independent :=
+        forall a, is_action_of AM1 a -> is_action_of AM2 a -> False.
+
+      Context (INDEP: models_independent). 
+
+      Lemma prod_indep_live_roles
+        `{Countable (amRole AM1)} `{Countable (amRole AM2)}
+        {STR1 STR2 STR__p} (st1: amSt AM1) (st2: amSt AM2):
+        AM_live_roles STR__p ((st1, st2): amSt ProdAM) = 
+        set_map inl (AM_live_roles STR1 st1) ∪ 
+        set_map inr (AM_live_roles STR2 st2).
+      Proof using INDEP.
+        simpl. rewrite set_eq. intros ?.
+        rewrite elem_of_union !elem_of_map.
+        rewrite -(AM_live_roles_spec STR__p).
+        repeat setoid_rewrite <- AM_live_roles_spec.
+        split.
+        { intros (a & st' & STEP). inversion STEP; subst.
+          all: set_solver. }
+        intros [(?&->&?&?&STEP)|(?&->&?&?&STEP)].
+        - do 2 eexists. apply pt_inner1; eauto.
+          intros ?. eapply INDEP; eauto.
+          eapply action_of_step; eauto. 
+        - do 2 eexists. apply pt_inner2; eauto.
+          intros ?. eapply INDEP; eauto.
+          eapply action_of_step; eauto.
+      Qed. 
+        
+    End Independent.
 
   End AMProduct.
 
