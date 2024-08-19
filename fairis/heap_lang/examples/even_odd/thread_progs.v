@@ -34,6 +34,11 @@ Section StResImpl.
         thread_PreG :> inG Σ (excl_authR natO);
     }.
 
+    Definition threadΣ: gFunctors :=
+      #[GFunctor (excl_authR natO)].
+    Global Instance subG_threadΣ {Σ}: subG threadΣ Σ -> threadPreG Σ.
+    Proof. solve_inG. Qed.   
+    
     Context `{!threadG Σ}.
     
     Definition th_at (n: nat) := own th_name (◯E n).

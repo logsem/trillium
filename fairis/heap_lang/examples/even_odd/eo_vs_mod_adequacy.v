@@ -34,6 +34,18 @@ Proof.
   red in ACT. set_solver.
 Qed. 
 
+Lemma unit_indep AM:
+  models_independent AM UnitAM.
+Proof. 
+  red. intros ?? ACT. red in ACT. set_solver.
+Qed.
+
+Lemma unit_lr st:
+  AM_live_roles unit_AM_strong st = ∅.
+Proof.
+  apply set_eq. intros. by rewrite -AM_live_roles_spec.
+Qed. 
+
 
 Section ModelMono.
 (** Proof that any fair execution of model visits all natural numbers *)
@@ -70,7 +82,6 @@ Section ModelMono.
   Let ρEven: fmrole M := inl $ even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := inl $ odd_role (ρ__o odd_impl).
 
-  (* TODO: move? *)
   Lemma prod_matched_by_full: 
     @matched_by PM FM
       (fun st__s '(st__s', st__m) => st__s' = st__s /\ True)
@@ -80,22 +91,6 @@ Section ModelMono.
     apply matched_by_prod_l; try by apply _.
     { apply matched_by_unit. }
     done. 
-  Qed.
-
-  (* TODO: move to prod model file *)
-  Lemma ρEven_always_live' (st: amSt PM) n
-    (CUR: st2nat st n):
-    even_role (ρ__e even_impl) ∈ AM_live_roles prod_AM_strong_lr st.
-  Proof.
-    opose proof * live_lift as LIVE. 
-    { eapply (@even_matched_by_prod even_impl odd_impl). }
-    4: { apply prod_no_ext_sync. }
-    { apply prod_AM_act_dec. }
-    2: { apply ρ__e_always_live. }
-    { simpl. rewrite /st2nat_ex. 
-      Unshelve. 3: eapply pair.
-      { simpl. eauto. } }
-    by destruct st.
   Qed.
 
   Lemma full_no_ext_sync st:
@@ -124,7 +119,6 @@ Section ModelMono.
     simpl in H. done. 
   Qed. 
 
-  (* TODO: move to prod model file *)
   Lemma ρOdd_always_live (st: fmstate M) n
     (CUR: st2nat' st n):
     ρOdd ∈ live_roles _ st.
@@ -573,13 +567,6 @@ Section Adequacy.
   Let init_roles: gset (fmrole M) := 
         {[ inl $ even_role (ρ__e even_impl); inl $ odd_role (ρ__o odd_impl) ]}.
 
-  (* TODO: move *)
-  Lemma gset_to_gmap_singleton `{Countable A} {B : Type} (v: B) (a: A):
-    gset_to_gmap v {[ a ]} = {[ a := v ]}.
-  Proof using.
-    rewrite /gset_to_gmap. simpl. by rewrite map_fmap_singleton.
-  Qed.
-
   Let start_prog := @start incr_loop_even_prog incr_loop_odd_prog. 
 
   Lemma start_spec_use Σ
@@ -690,11 +677,6 @@ Section Adequacy.
   Existing Instance even_AME. 
   Existing Instance odd_AME.
 
-  (* TODO: move *)
-  Lemma trace_last_underlying (auxtr: auxiliary_trace LM):
-    trace_last (map_underlying_trace auxtr) = ls_under $ ls_data $ trace_last auxtr.
-  Proof. by destruct auxtr. Qed. 
-
   Lemma eo_rah l `(!heapGS Σ LM) sr (eoΣ: evenoddG Σ) `(threadPreG Σ)
     st e h
     (CUR__0: st2nat' st 0)
@@ -734,12 +716,6 @@ Section Adequacy.
       intros e' He. by apply Hnstuck.
   Qed.
 
-  (* TODO: move *)
-  Definition threadΣ: gFunctors :=
-    #[GFunctor (excl_authR natO)].
-  Global Instance subG_threadΣ {Σ}: subG threadΣ Σ -> threadPreG Σ.
-  Proof. solve_inG. Qed. 
-  
   Definition evenoddΣ : gFunctors :=
     #[ heapΣ M; GFunctor (excl_authR boolO) ].
 
@@ -784,20 +760,6 @@ Section Adequacy.
 
   Lemma st0'_zero: st2nat' st0' 0.
   Proof. split; auto using even_init_0, odd_init_0. Qed.
-
-  (* TODO: move *)
-  Lemma unit_indep AM:
-    models_independent AM UnitAM.
-  Proof. 
-    red. intros ?? ACT. red in ACT. set_solver.
-  Qed.
-
-  (* TODO: move *)
-  Lemma unit_lr st:
-    AM_live_roles unit_AM_strong st = ∅.
-  Proof.
-    apply set_eq. intros. by rewrite -AM_live_roles_spec.
-  Qed. 
 
   Lemma st0_lr: 
     AM_live_roles (@full_AM_strong_lr even_impl odd_impl _ EnvUnitAM) st0' = init_roles.

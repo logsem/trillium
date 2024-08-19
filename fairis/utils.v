@@ -92,6 +92,12 @@ Section SetMapProperties.
     intros. eapply elem_of_map_inj_gset; eauto.
     apply H1. set_solver.
   Qed.
+
+  Lemma gset_to_gmap_singleton `{Countable A} {B : Type} (v: B) (a: A):
+    gset_to_gmap v {[ a ]} = {[ a := v ]}.
+  Proof using.
+    rewrite /gset_to_gmap. simpl. by rewrite map_fmap_singleton.
+  Qed.
     
 End SetMapProperties.
 

@@ -388,7 +388,22 @@ Section Models.
     inversion STEP; subst.
     all: (try apply even_step_lr_nonincr in STEP1);
       (try apply odd_step_lr_nonincr in STEP2); set_solver.
-   Qed.
+  Qed.
+
+  Lemma ρEven_always_live' (st: amSt prod_model) n
+    (CUR: st2nat st n):
+    even_role (ρ__e even_impl) ∈ AM_live_roles prod_AM_strong_lr st.
+  Proof.
+    opose proof * live_lift as LIVE. 
+    { eapply even_matched_by_prod. }
+    4: { apply prod_no_ext_sync. }
+    { apply prod_AM_act_dec. }
+    2: { apply ρ__e_always_live. }
+    { simpl. rewrite /st2nat_ex. 
+      Unshelve. 3: eapply pair.
+      { simpl. eauto. } }
+    by destruct st.
+  Qed.
 
   Let LM := the_model.
   Let PM := prod_model.

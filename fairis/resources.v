@@ -345,6 +345,16 @@ Section model_state_lemmas.
   Context {Σ : gFunctors}.
   Context {fG: fairnessGS LM Σ}.
 
+  (* TODO: move *)
+  Lemma frag_free_roles_are_sep: forall fr1 fr2 (DISJ: fr1 ## fr2), 
+        frag_free_roles_are (fr1 ∪ fr2) ⊣⊢ frag_free_roles_are fr1 ∗ frag_free_roles_are fr2.
+  Proof.
+    intros. rewrite /frag_free_roles_are /frag_free_roles_are.    
+    rewrite -gset.gset_op.
+    rewrite -gset.gset_disj_union; auto. 
+    rewrite -own_op. by rewrite -auth_frag_op.
+  Qed. 
+
   Lemma update_model δ δ1 δ2:
     auth_model_is δ1 -∗ frag_model_is δ2 ==∗ auth_model_is δ ∗ frag_model_is δ.
   Proof.

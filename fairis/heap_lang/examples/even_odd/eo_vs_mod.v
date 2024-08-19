@@ -48,16 +48,6 @@ Section proof_start.
   Definition Ns := nroot .@ "even_odd".
   Definition evenodd_inv n := inv Ns (evenodd_inv_inner ENV_AM st_res n).
 
-  (* TODO: move *)
-  Lemma frag_free_roles_are_sep: forall fr1 fr2 (DISJ: fr1 ## fr2), 
-        frag_free_roles_are (fr1 ∪ fr2) ⊣⊢ frag_free_roles_are fr1 ∗ frag_free_roles_are fr2.
-  Proof.
-    intros. rewrite /frag_free_roles_are /frag_free_roles_are.    
-    rewrite -gset.gset_op.
-    rewrite -gset.gset_disj_union; auto. 
-    rewrite -own_op. by rewrite -auth_frag_op.
-  Qed. 
-
   Let ρEven: fmrole M := inl $ even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := inl $ odd_role (ρ__o odd_impl).
 

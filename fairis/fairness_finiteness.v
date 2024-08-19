@@ -78,6 +78,10 @@ Section finitary.
   Definition map_underlying_trace {M : FairModel} {LM: LiveModel Λ M} (aux : auxiliary_trace LM) :=
     (trace_map (λ s, ls_under $ ls_data s) (λ lab, get_role lab) aux).
 
+  Lemma trace_last_underlying (auxtr: auxiliary_trace LM):
+    trace_last (map_underlying_trace auxtr) = ls_under $ ls_data $ trace_last auxtr.
+  Proof. by destruct auxtr. Qed. 
+
   Program Definition enumerate_next extr (fmodtr: auxiliary_trace LM) c' oζ:
     list (LiveStateData Λ M * @mlabel LM) :=
     let δ1 := trace_last fmodtr in

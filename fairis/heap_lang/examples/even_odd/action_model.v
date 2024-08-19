@@ -150,7 +150,6 @@ Section ActionModel.
   Qed. 
 
   (* useful for defining the set of _non-optional_ live_roles of AM *)
-  (* TODO: move *)  
   Definition extract_Somes {A: Type} (l: list (option A)): list A :=
     flat_map (from_option (fun a => [a]) []) l.
 
