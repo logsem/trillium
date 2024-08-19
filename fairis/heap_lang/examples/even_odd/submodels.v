@@ -46,9 +46,9 @@ Section ThreadModel.
   apply _.
   Defined. 
 
-  Lemma thread_AM_fin_branch': AM_fin_branch' thread_model.
+  Global Instance thread_AM_fin_branch': AM_fin_branch' thread_model.
   Proof.
-    red. exists (fun n => n' ← [n; S n]; 
+    exists (fun n => n' ← [n; S n]; 
                   a ← [pub_act $ step_sync n; priv_act step_loop];
                   ρ ← [Some ρT; None]; mret (n', a, ρ)).
     intros * STEP.
@@ -61,7 +61,7 @@ Section ThreadModel.
     inversion STEP; subst; set_solver.
   Qed.
   
-  Lemma thread_AM_step_dec: AM_step_dec thread_model.
+  Global Instance thread_AM_step_dec: AM_step_dec thread_model.
   Proof.
     red. intros.
     Local Ltac contra := right; intros TRANS; inversion TRANS; subst; try tauto; try lia.
@@ -84,14 +84,10 @@ Section ThreadModel.
     by destruct ρ1, ρ2.
   Qed.
 
-  Instance thread_extra: ActionModelExtra thread_model.
-  Proof.
-    unshelve esplit; try by apply _.
-    - apply thread_AM_fin_branch'.
-    - apply thread_AM_step_dec. 
-  Qed. 
+  Global Instance thread_extra: ActionModelExtra thread_model.
+  Proof. unshelve esplit; by apply _. Defined. 
 
-  Lemma thread_AM_lr_exact n: AM_live_roles ame_strong n = {[ ρT ]}.
+  Lemma thread_AM_lr_exact n: AM_live_roles n = {[ ρT ]}.
   Proof.
     apply set_eq. intros ρ. rewrite elem_of_singleton. 
     rewrite -AM_live_roles_spec. pose proof (thread_roles_equal ρ ρT) as ->.
@@ -145,8 +141,8 @@ Definition thread_0_even: EvenModel.
                even_is_priv_act := thread_is_priv (nroot .@ "priv_even");
              |}.
   1: apply (thread_extra 0).
-  1, 2: apply _. 
-  all: cycle 2; simpl in *; unfold cur_n in *.
+  (* 1, 2: apply _.  *)
+  all: cycle 1; simpl in *; unfold cur_n in *.
   - apply thread_is_action_of.
   - intros ??%eq_sym%pick_act_ns_nth_disj_neq; solve_ndisj.
   - intros ?->. apply pick_act_dom.
@@ -184,8 +180,7 @@ Definition thread_1_odd: OddModel.
                odd_is_priv_act := thread_is_priv (nroot .@ "priv_odd");
              |}.
   1: apply (thread_extra 1).
-  1, 2: apply _. 
-  all: cycle 2; simpl in *; unfold cur_n in *.
+  all: cycle 1; simpl in *; unfold cur_n in *.
   - apply thread_is_action_of.
   - intros ??%eq_sym%pick_act_ns_nth_disj_neq; solve_ndisj.
   - intros ?->. apply pick_act_dom.

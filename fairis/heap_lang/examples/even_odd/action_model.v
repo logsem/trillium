@@ -100,31 +100,41 @@ Section ActionModel.
       (* amA: Type; *)
       amRole: Type;
       amTrans: amSt -> Action * option amRole -> amSt -> Prop;
+
+      am_role_eqdec :> EqDecision amRole;
+      am_role_cnt :> Countable amRole;
   }.
 
-  Arguments amTrans {_}. 
+  Arguments amTrans {_}.
+  Global Existing Instance am_role_eqdec. 
+  Global Existing Instance am_role_cnt. 
 
+  (* Defining the properites below as typeclasses to allow automatic inference *)
+  
   (* similar to "live roles" of FairModel, but the roles are optional, 
-     and the list cannot contain anything non-stepping *)
-  Definition AM_strong_lr (AM: ActionModel) `{Countable (amRole AM)} :=
-    {lr: amSt AM -> gset (option (amRole AM)) |
-      forall st oρ, oρ ∈ lr st <-> exists a st', amTrans st (a, oρ) st'}.
+     and the list cannot contain anything non-stepping. *)
+  Class AM_strong_lr (AM: ActionModel) := {
+      ams_lr: amSt AM -> gset (option (amRole AM));
+      ams_lr_spec: forall st oρ, oρ ∈ ams_lr st <-> exists a st', amTrans st (a, oρ) st'
+  }.
 
-  Definition AM_fin_branch (AM: ActionModel) := 
-    {next_steps: amSt AM -> list (amSt AM * Action * option (amRole AM)) 
-     | forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 <-> (s2, a, oρ) ∈ next_steps s1}.
+  Class AM_fin_branch (AM: ActionModel) := {
+      amfb_ns: amSt AM -> list (amSt AM * Action * option (amRole AM));
+      amfb_ns_spec: forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 <-> (s2, a, oρ) ∈ amfb_ns s1
+  }. 
 
   (* a weaker version of AM_fin_branch that is easier to show *)
-  Definition AM_fin_branch' (AM: ActionModel) := 
-    {next_steps': amSt AM -> list (amSt AM * Action * option (amRole AM)) 
-     | forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 -> (s2, a, oρ) ∈ next_steps' s1}.
+  Class AM_fin_branch' (AM: ActionModel) := {
+    amfb'_ns: amSt AM -> list (amSt AM * Action * option (amRole AM));
+    amfb'_ns_spec: forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 -> (s2, a, oρ) ∈ amfb'_ns s1
+  }.
 
-  Definition AM_step_dec (AM: ActionModel) :=
-    forall s1 a oρ s2, Decision (@amTrans AM s1 (a, oρ) s2).
+  Class AM_step_dec (AM: ActionModel) :=
+    amsd: forall s1 a oρ s2, Decision (@amTrans AM s1 (a, oρ) s2). 
 
   (* derive the strong finite branching from weaker one
      by filtering possible transitions *)
-  Lemma AM_fin_branch_dec (AM: ActionModel)
+  Global Instance AM_fin_branch_dec (AM: ActionModel)
     (FIN: AM_fin_branch' AM) (DEC: AM_step_dec AM):
     AM_fin_branch AM.
   Proof. 
@@ -136,7 +146,7 @@ Section ActionModel.
 
   (* (optional) live roles can be obtained by checking all possible transitions,
      given that there is a finite number of them *)
-  Lemma fin_branch_strong (AM: ActionModel) `{Countable (amRole AM)}
+  Global Instance fin_branch_strong (AM: ActionModel)
     (FIN: AM_fin_branch' AM) (DEC: AM_step_dec AM):
     AM_strong_lr AM.
   Proof.
@@ -190,18 +200,17 @@ Section ActionModel.
   Qed. 
 
   (* the counterpart of FairModel's "live_roles" *)
-  Definition AM_live_roles {AM: ActionModel} `{Countable (amRole AM)} (AM_S: AM_strong_lr AM):
+  Definition AM_live_roles `{AM_strong_lr AM}:
     amSt AM -> gset (amRole AM) :=
-    extract_Somes_gset ∘ proj1_sig AM_S.
+    extract_Somes_gset ∘ ams_lr. 
 
-  Lemma AM_live_roles_spec {AM: ActionModel} `{Countable (amRole AM)} (AM_S: AM_strong_lr AM):
+  Lemma AM_live_roles_spec `{AM_strong_lr AM}:
     forall st ρ,
-    (exists a st', amTrans st (a, Some ρ) st') <-> ρ ∈ AM_live_roles AM_S st.
+    (exists a st', amTrans st (a, Some ρ) st') <-> ρ ∈ AM_live_roles st.
   Proof. 
     intros. rewrite /AM_live_roles /compose.
     rewrite -extract_Somes_gset_spec.
-    destruct AM_S as [f SPEC]. simpl. rewrite SPEC.
-    done.
+    by rewrite ams_lr_spec. 
   Qed.
 
   Section ActionsOf.
@@ -256,7 +265,7 @@ Section ActionModel.
 
     (* Global Instance prod_AM_act_of_dec: forall a, Decision (is_action_of ProdAM a). *)      
 
-    Lemma prod_AM_step_dec {EQ1: EqDecision (amSt AM1)} {EQ2: EqDecision (amSt AM2)}
+    Global Instance prod_AM_step_dec {EQ1: EqDecision (amSt AM1)} {EQ2: EqDecision (amSt AM2)}
       (D1: AM_step_dec AM1) (D2: AM_step_dec AM2)
       :
       AM_step_dec ProdAM.
@@ -282,7 +291,7 @@ Section ActionModel.
           repeat econstructor; eauto.
     Qed.
 
-    Lemma prod_AM_fin_branch' (FIN1: AM_fin_branch' AM1) (FIN2: AM_fin_branch' AM2)
+    Global Instance prod_AM_fin_branch' (FIN1: AM_fin_branch' AM1) (FIN2: AM_fin_branch' AM2)
       :
       AM_fin_branch' ProdAM.
     Proof. 
@@ -334,18 +343,19 @@ Section ActionModel.
       Definition models_independent :=
         forall a, is_action_of AM1 a -> is_action_of AM2 a -> False.
 
-      Context (INDEP: models_independent). 
+      Context (INDEP: models_independent).
 
       Lemma prod_indep_live_roles
-        `{Countable (amRole AM1)} `{Countable (amRole AM2)}
-        {STR1 STR2 STR__p} (st1: amSt AM1) (st2: amSt AM2):
-        AM_live_roles STR__p ((st1, st2): amSt ProdAM) = 
-        set_map inl (AM_live_roles STR1 st1) ∪ 
-        set_map inr (AM_live_roles STR2 st2).
+        `{AM_fin_branch' AM1} `{AM_step_dec AM1} `{EqDecision (amSt AM1)}
+        `{AM_fin_branch' AM2} `{AM_step_dec AM2} `{EqDecision (amSt AM2)}
+        (st1: amSt AM1) (st2: amSt AM2):
+        AM_live_roles ((st1, st2): amSt ProdAM) = 
+        set_map inl (AM_live_roles st1) ∪ 
+        set_map inr (AM_live_roles st2).
       Proof using INDEP.
         simpl. rewrite set_eq. intros ?.
         rewrite elem_of_union !elem_of_map.
-        rewrite -(AM_live_roles_spec STR__p).
+        rewrite -(@AM_live_roles_spec ProdAM).
         repeat setoid_rewrite <- AM_live_roles_spec.
         split.
         { intros (a & st' & STEP). inversion STEP; subst.
@@ -365,7 +375,6 @@ Section ActionModel.
 
   Section AM2FM.
     Context (AM: ActionModel).
-    Context `{CNT_R: Countable (amRole AM)}. 
     Context {EQ_ST: EqDecision (amSt AM)}. 
     Context {INH_ST: Inhabited (amSt AM)} {INH_R: Inhabited (amRole AM)}.
 
@@ -388,7 +397,7 @@ Section ActionModel.
     Qed. 
 
     Definition AM2FM : FairModel.
-      refine {| fmtrans := am_fmtrans; live_roles := AM_live_roles AM_S |}.
+      refine {| fmtrans := am_fmtrans; live_roles := AM_live_roles |}.
     Proof. 
       intros. apply AM_live_roles_spec.
       inversion H; eauto.

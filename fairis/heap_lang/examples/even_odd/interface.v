@@ -21,32 +21,16 @@ Proof.
 Qed.
 
 Definition pub_ns := nroot .@ "pub". 
-(* (* constructs an ActionModel with pre-defined set of public roles *) *)
-(* Definition BuildSubModel (St Priv Role: Type) Trans := {| *)
-(*    amSt := St; *)
-(*    amA := PubA + Priv; *)
-(*    amRole := Role; *)
-(*    amTrans := Trans; *)
-(* |}. *)
-
-
-(* (* convention: if the type of ActionModel's actions is defined as a sum, *)
-(*    the left summand defines "public" actions (used for synchronization) *)
-(*    and the right one defines "private" actions *) *)
-(* Definition pub_act {A B: Type} := @inl A B. *)
-(* Definition priv_act {A B: Type} := @inr A B. *)
 
 
 Class ActionModelExtra (AM: ActionModel) := {
-    ame_role_eqdec :> EqDecision (amRole AM);
-    ame_role_cnt :> Countable (amRole AM);
     ame_st_eqdec :> EqDecision (amSt AM);
     ame_st_inh :> Inhabited (amSt AM);
     ame_role_inh :> Inhabited (amRole AM);
 
-    ame_fin_branch': AM_fin_branch' AM;
-    ame_step_dec: AM_step_dec AM;
-    ame_strong := fin_branch_strong AM (ame_fin_branch') (ame_step_dec);
+    ame_fin_branch' :> AM_fin_branch' AM;
+    ame_step_dec :> AM_step_dec AM;
+    (* ame_strong := fin_branch_strong AM (ame_fin_branch') (ame_step_dec); *)
 }.
 
 
@@ -54,13 +38,6 @@ Definition pub_act '(step_sync k) := ns_nth pub_ns k.
 
 
 Record EvenModel := {
-    (* eSt: Type; *)
-    (* ePriv: Type; *)
-    (* eRole: Type; *)
-    (* eTrans; *)
-
-
-    (* even_AM := BuildSubModel eSt ePriv eRole eTrans; *)
     even_AM: ActionModel; 
     even_AME :> ActionModelExtra even_AM;
 
@@ -95,11 +72,11 @@ Record EvenModel := {
 
     even_step_lr_nonincr st st' a oρ
       (STEP: amTrans even_AM st (a, oρ) st'):
-      AM_live_roles ame_strong st' ⊆ AM_live_roles ame_strong st;
+      AM_live_roles st' ⊆ AM_live_roles st;
 
     even_init: amSt even_AM;
     even_init_0: cur_even even_init = 0;
-    even_init_lr: AM_live_roles ame_strong even_init = {[ ρ__e ]};
+    even_init_lr: AM_live_roles even_init = {[ ρ__e ]};
 
   (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
   even_role_pub_priv_disj (st__e: amSt even_AM):
@@ -111,7 +88,6 @@ Record EvenModel := {
 
 
 Record OddModel := {
-    (* odd_AM := BuildSubModel oSt oPriv oRole oTrans; *)
     odd_AM: ActionModel;
     odd_AME :> ActionModelExtra odd_AM;
 
@@ -146,11 +122,11 @@ Record OddModel := {
 
     odd_step_lr_nonincr st st' a oρ
       (STEP: amTrans odd_AM st (a, oρ) st'):
-      AM_live_roles ame_strong st' ⊆ AM_live_roles ame_strong st;
+      AM_live_roles st' ⊆ AM_live_roles st;
 
     odd_init: amSt odd_AM;
     odd_init_0: cur_odd odd_init = 0;
-    odd_init_lr: AM_live_roles ame_strong odd_init = {[ ρ__o ]};
+    odd_init_lr: AM_live_roles odd_init = {[ ρ__o ]};
 
   (* TODO: ? replace with "private actions don't preempt the sync one forever" condition *)
     odd_role_pub_priv_disj (st__o: amSt odd_AM):
@@ -159,9 +135,13 @@ Record OddModel := {
     False;
 }.
 
-Lemma ρ__e_always_live `{em: EvenModel} st__e:
-  ρ__e em ∈ AM_live_roles (@ame_strong _ (even_AME em)) st__e.
-Proof.
+
+Global Existing Instance even_AME. 
+Global Existing Instance odd_AME. 
+
+Lemma ρ__e_always_live `{em: EvenModel} (st__e: amSt $ even_AM em):
+  ρ__e em ∈ AM_live_roles st__e.
+Proof. 
   apply AM_live_roles_spec. 
   destruct (even_or_odd (cur_even _ st__e)) as [E | O]. 
   - eexists. eapply @even_steppable. intuition.
@@ -170,7 +150,7 @@ Proof.
 Qed.
 
 Lemma ρ__o_always_live `{om: OddModel} st__o:
-  ρ__o om ∈ AM_live_roles (@ame_strong _ (odd_AME om)) st__o.
+  ρ__o om ∈ AM_live_roles st__o.
 Proof.
   apply AM_live_roles_spec. 
   destruct (even_or_odd (cur_odd _ st__o)) as [E | O]. 

@@ -73,51 +73,41 @@ End MatchedBy.
 Section MatchedByTrueFacts.
   Context `(MATCH: @matched_by M__s M__m R L (fun _ => True)).
 
-  Lemma matched_AM_live_roles
-    `{Countable (amRole M__s)} {STR__s: AM_strong_lr M__s}
-    `{Countable (amRole M__m)} {STR__m: AM_strong_lr M__m}
-    st__e st__o
-    (R1: R st__e st__o):
-      set_map L (AM_live_roles STR__s st__e) ⊆ proj1_sig STR__m st__o.
+  Lemma matched_AM_live_roles `{AM_strong_lr M__s} `{AM_strong_lr M__m}
+    st__e st__o (R1: R st__e st__o):
+    set_map L (AM_live_roles st__e) ⊆ ams_lr st__o.
   Proof using MATCH.
     apply elem_of_subseteq. intros ρ.
     rewrite elem_of_map. setoid_rewrite <- AM_live_roles_spec.
     intros (ρ__e & -> & (a__e & st__e' & STEP__e)).
-    destruct STR__m as [lr LR]. simpl in *. apply LR.
-    eapply MATCH in STEP__e; eauto. set_solver. 
+    apply ams_lr_spec. eapply MATCH in STEP__e; eauto. set_solver. 
   Qed.
 
-  Lemma live_lift'
-    `{Countable (amRole M__s)} `{STR__s: AM_strong_lr M__s}
-    `{Countable (amRole M__m)} `{STR__m: AM_strong_lr M__m}
+  Lemma live_lift' `{AM_strong_lr M__s} `{AM_strong_lr M__m}
     `{forall a, Decision (is_action_of M__m a)}
     ρ st__s st__m
     (REL: R st__s st__m)
-    (LIVE__s: ρ ∈ AM_live_roles STR__s st__s):
-    L ρ ∈ proj1_sig STR__m st__m.
+    (LIVE__s: ρ ∈ AM_live_roles st__s):
+    L ρ ∈ ams_lr st__m.
   Proof using MATCH.
     apply singleton_subseteq_l. etrans.
     2: { eapply matched_AM_live_roles; eauto. }
     eapply singleton_subseteq_l. by apply elem_of_map_2.
   Qed.
  
-  Lemma live_lift
-    `{Countable (amRole M__s)} `{STR__s: AM_strong_lr M__s}
-    `{Countable (amRole M__m)} `{STR__m: AM_strong_lr M__m}
+  Lemma live_lift `{AM_strong_lr M__s} `{AM_strong_lr M__m}
     `{forall a, Decision (is_action_of M__m a)}
     ρ st__s st__m
     (REL: R st__s st__m)
-    (LIVE: ρ ∈ AM_live_roles STR__s st__s)
-    (NNONE: None ∉ proj1_sig STR__m st__m)
+    (LIVE: ρ ∈ AM_live_roles st__s)
+    (NNONE: None ∉ ams_lr st__m)
     :
-    from_option (flip elem_of (AM_live_roles STR__m st__m)) False (L ρ). 
+    from_option (flip elem_of (AM_live_roles st__m)) False (L ρ). 
   Proof using MATCH.
     opose proof * live_lift'; eauto. 
-    Unshelve. 2: exact STR__m.
     destruct (L ρ).
-    - destruct STR__m as [lr LR]. simpl in *.
-      apply LR in H2. by apply AM_live_roles_spec.
-    - by edestruct NNONE.
+    - apply ams_lr_spec in H2. by apply AM_live_roles_spec.
+    - by destruct NNONE.
   Qed.
  
 End MatchedByTrueFacts.
@@ -173,65 +163,46 @@ Section Models.
   Existing Instance even_AME. 
   Existing Instance odd_AME.
 
-  Lemma prod_AM_fin_branch': AM_fin_branch' prod_model.
-  Proof. 
-    unshelve eapply prod_AM_fin_branch'.
-    - apply even_AME. 
-    - apply odd_AME. 
-  Qed.
+  (* Instance prod_AM_fin_branch': AM_fin_branch' prod_model. *)
+  (* Proof. *)
+  (*   apply _.  *)
+  (* Qed. *)
 
-  Lemma prod_AM_strong_lr: AM_strong_lr prod_model.
-  Proof. 
-    apply fin_branch_strong.
-    - apply prod_AM_fin_branch'. 
-    - unshelve eapply prod_AM_step_dec; try apply _. 
-      all: apply even_AME || apply odd_AME. 
-  Qed.
+  (* Instance prod_AM_strong_lr: AM_strong_lr prod_model. *)
+  (* Proof. apply _. Qed.  *)
 
   (* doesn't look like there is a way to prove it for arbitrary product *)
-  Instance prod_AM_act_dec: ∀ a : Action, Decision (is_action_of prod_model a).
+  Global Instance prod_AM_act_dec: ∀ a : Action, Decision (is_action_of prod_model a).
   Proof. Admitted.
 
   Class EnvironmentAM (env_AM: ActionModel) := {
-      eam_role_eqdec :> EqDecision (amRole env_AM);
-      eam_role_cnt :> Countable (amRole env_AM);
+      (* eam_role_eqdec :> EqDecision (amRole env_AM); *)
+      (* eam_role_cnt :> Countable (amRole env_AM); *)
       eam_st_eqdec :> EqDecision (amSt env_AM);
       eam_st_inh :> Inhabited (amSt env_AM);
-      eam_env_fb: AM_fin_branch' env_AM;
+      eam_env_fb :> AM_fin_branch' env_AM;
       eam_act_dec :> ∀ a, Decision (is_action_of env_AM a);
       eam_step_dec :> AM_step_dec env_AM;
   }.
+  Existing Instance eam_env_fb.
+  Existing Instance eam_step_dec. 
+
   Context `(ENV_AM: EnvironmentAM env_AM).
 
-  Lemma env_AM_strong_lr: AM_strong_lr env_AM.
-  Proof using.
-    apply fin_branch_strong.
-    all: apply ENV_AM. 
-  Qed. 
+  (* Instance env_AM_strong_lr: AM_strong_lr env_AM. *)
+  (* Proof using. apply _. Qed.  *)
 
   Definition full_model := ProdAM prod_model env_AM.
 
-  Lemma full_AM_fin_branch': AM_fin_branch' full_model.
-  Proof using ENV_AM. 
-    unshelve eapply action_model.prod_AM_fin_branch'.
-    - apply prod_AM_fin_branch'. 
-    - apply ENV_AM. 
-  Qed.
+  (* Instance full_AM_fin_branch': AM_fin_branch' full_model. *)
+  (* Proof using ENV_AM. apply _. Qed.  *)
 
-  Lemma full_AM_strong_lr: AM_strong_lr full_model.
-  Proof using All. 
-    apply fin_branch_strong.
-    - apply full_AM_fin_branch'.
-    - unshelve eapply prod_AM_step_dec; try apply _ || apply ENV_AM || auto. 
-      apply prod_AM_step_dec; try by apply _.
-      all: apply even_AME || apply odd_AME.
-  Qed.
+  (* Instance full_AM_strong_lr: AM_strong_lr full_model. *)
+  (* Proof using All. apply _. Qed.  *)
 
   Definition the_fair_model: FairModel.
     unshelve eapply (AM2FM full_model).
-  Proof using All. 
-    apply full_AM_strong_lr. 
-  Defined.
+  Proof using All. apply _. Defined.  
 
   Definition the_model: LiveModel heap_lang the_fair_model :=
     {| lm_flm := 61%nat; |}.
@@ -288,11 +259,10 @@ Section Models.
   (* Let even_AM := @even_AM even_impl.  *)
   (* Let odd_AM := @odd_AM odd_impl. *)
 
-  Lemma prod_no_ext_sync st:
-    None ∉ proj1_sig prod_AM_strong_lr st.
+  Lemma prod_no_ext_sync (st: amSt prod_model):
+    None ∉ ams_lr st.
   Proof.
-    destruct prod_AM_strong_lr as [lr LR]. simpl in *.
-    intros IN%LR. destruct IN as (?&?&STEP).
+    intros IN%ams_lr_spec. destruct IN as (?&?&STEP).
     inversion STEP; subst.
     pose proof STEP1 as ACT1%action_of_step%even_acts.
     pose proof STEP2 as ACT2%action_of_step%odd_acts.
@@ -340,9 +310,9 @@ Section Models.
   Lemma prod_AM_live_roles st__e st__o n
     (CUR: st2nat (st__e, st__o) n)
     :
-    AM_live_roles prod_AM_strong_lr (st__e, st__o) = 
-    set_map even_role (AM_live_roles ame_strong st__e) ∪ 
-    set_map odd_role (AM_live_roles ame_strong st__o).
+    AM_live_roles ((st__e, st__o): amSt prod_model) = 
+    set_map even_role (AM_live_roles st__e) ∪ 
+    set_map odd_role (AM_live_roles st__o).
   Proof using.
     apply set_eq_subseteq. split.
     { apply elem_of_subseteq. intros ρ. 
@@ -356,17 +326,15 @@ Section Models.
       { apply Some_inj. }
       rewrite <- set_map_compose_gset.
       etrans.
-      { erewrite @matched_AM_live_roles; [reflexivity|..].
+      { erewrite matched_AM_live_roles; [reflexivity|..].
         { apply even_matched_by_prod. }
         Unshelve.
-        2: { apply prod_AM_strong_lr. }
+        2: { apply _. }
         2: exact (st__e, st__o).
         rewrite /st2nat_ex. eauto.  }
-      (* TODO: simplify somehow *)
+      (* TODO: simplify somehow? *)
       simpl.
       pose proof (prod_no_ext_sync (st__e, st__o)) as NNONE. 
-      destruct prod_AM_strong_lr as [lr LR]. simpl in *.
-      rewrite /AM_live_roles. simpl.
       rewrite extract_Somes_gset_inv.
       apply subseteq_difference_r; auto.
       by apply disjoint_singleton_r.
@@ -376,7 +344,7 @@ Section Models.
   Lemma prod_step_lr_nonincr st st' a oρ n n'
     (STEP: amTrans prod_model st (a, oρ) st')
     (CUR: st2nat st n) (NEXT: st2nat st' n'):
-      AM_live_roles prod_AM_strong_lr st' ⊆ AM_live_roles prod_AM_strong_lr st.
+      AM_live_roles st' ⊆ AM_live_roles st.
   Proof.
     destruct st as [st__e st__o], st' as [st__e' st__o'].
     erewrite !prod_AM_live_roles; eauto.
@@ -392,7 +360,7 @@ Section Models.
 
   Lemma ρEven_always_live' (st: amSt prod_model) n
     (CUR: st2nat st n):
-    even_role (ρ__e even_impl) ∈ AM_live_roles prod_AM_strong_lr st.
+    even_role (ρ__e even_impl) ∈ AM_live_roles st.
   Proof.
     opose proof * live_lift as LIVE. 
     { eapply even_matched_by_prod. }
@@ -435,8 +403,7 @@ Section Models.
              eapply action_of_step; eauto. }
            simpl. setoid_rewrite @prod_indep_live_roles; eauto. 
            apply union_mono; [| done]. apply set_map_mono; [done| ].
-           eapply prod_step_lr_nonincr; done.
-           Unshelve. apply env_AM_strong_lr. }
+           eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
       iFrame. done. }
     
@@ -478,8 +445,7 @@ Section Models.
              eapply action_of_step; eauto. }
            simpl. setoid_rewrite @prod_indep_live_roles; eauto.  
            apply union_mono; [| done]. apply set_map_mono; [done| ].
-           eapply prod_step_lr_nonincr; done.
-           Unshelve. apply env_AM_strong_lr. }
+           eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
       iFrame. done. }
  

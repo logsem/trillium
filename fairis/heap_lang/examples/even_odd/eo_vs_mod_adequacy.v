@@ -41,8 +41,8 @@ Proof.
 Qed.
 
 Lemma unit_lr st:
-  AM_live_roles unit_AM_strong st = ∅.
-Proof.
+  AM_live_roles st = ∅.
+Proof. 
   apply set_eq. intros. by rewrite -AM_live_roles_spec.
 Qed. 
 
@@ -93,11 +93,10 @@ Section ModelMono.
     done. 
   Qed.
 
-  Lemma full_no_ext_sync st:
-    None ∉ proj1_sig (@full_AM_strong_lr even_impl odd_impl _ EnvUnitAM) st.
+  Lemma full_no_ext_sync (st: amSt FM):
+    None ∉ ams_lr st.
   Proof.
-    destruct full_AM_strong_lr as [lr LR]. simpl in *.
-    intros IN%LR. destruct IN as (?&?&STEP).
+    intros IN%ams_lr_spec. destruct IN as (?&?&STEP).
     by inversion STEP. 
   Qed.
 
@@ -733,7 +732,7 @@ Section Adequacy.
     Finite
       {'(s2, ℓ) | fmtrans M s1 ℓ s2}. 
   Proof.
-    pose proof (@prod_AM_fin_branch' even_impl odd_impl) as [ns NEXTS].
+    pose (@amfb'_ns PM _) as ns. 
     destruct s1 as [s1 u]. 
     apply (in_list_finite ((fun '(x, y, z) => ((x, u), z ≫= Some ∘ inl)) <$> ns s1)).
     intros [st oρ] STEP. apply am_fmtrans_action in STEP as [? STEP].
@@ -743,7 +742,9 @@ Section Adequacy.
     simpl in STEP. inversion STEP; subst.
     2: { done. }
 
-    eapply elem_of_list_fmap. eexists (_, _, _). split; eauto. done. 
+    eapply elem_of_list_fmap. eexists (_, _, _). split.
+    2: { by apply amfb'_ns_spec. }
+    eauto. 
   Qed.
 
   (* TODO: find more general versions *)
@@ -762,13 +763,12 @@ Section Adequacy.
   Proof. split; auto using even_init_0, odd_init_0. Qed.
 
   Lemma st0_lr: 
-    AM_live_roles (@full_AM_strong_lr even_impl odd_impl _ EnvUnitAM) st0' = init_roles.
+    AM_live_roles st0' = init_roles.
   Proof. 
     subst init_roles st0'.
-    erewrite (@prod_indep_live_roles _ _ (unit_indep PM)).
-    Unshelve.
-    3: by apply unit_AM_strong.
-    2: by apply prod_AM_strong_lr.
+    (* Set Printing Implicit. *)
+    (* erewrite prod_indep_live_roles.  *)
+    erewrite (@prod_indep_live_roles _ _ _ _ (unit_indep PM)).
     
     rewrite unit_lr set_map_empty union_empty_r_L.
     erewrite <- !set_map_singleton_L. erewrite <- set_map_union_L.

@@ -27,7 +27,6 @@ Class evenoddG (Σ: gFunctors) := EvenoddG {
 
 
 
-
 Section proof_start.
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
   Context `(ENV_AM: EnvironmentAM env_AM).
