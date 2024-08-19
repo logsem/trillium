@@ -87,17 +87,37 @@ Section MatchedByTrueFacts.
     eapply MATCH in STEP__e; eauto. set_solver. 
   Qed.
 
-  Lemma always_live_lift_l
+  Lemma live_lift'
     `{Countable (amRole M__s)} `{STR__s: AM_strong_lr M__s}
     `{Countable (amRole M__m)} `{STR__m: AM_strong_lr M__m}
     `{forall a, Decision (is_action_of M__m a)}
-    ρ
-    (LIVE: forall st__s, ρ ∈ AM_live_roles STR__s st__s):
-    forall st__s st__m, R st__s st__m -> L ρ ∈ proj1_sig STR__m st__m.
+    ρ st__s st__m
+    (REL: R st__s st__m)
+    (LIVE__s: ρ ∈ AM_live_roles STR__s st__s):
+    L ρ ∈ proj1_sig STR__m st__m.
   Proof using MATCH.
-    intros. apply singleton_subseteq_l. etrans.
+    apply singleton_subseteq_l. etrans.
     2: { eapply matched_AM_live_roles; eauto. }
     eapply singleton_subseteq_l. by apply elem_of_map_2.
+  Qed.
+ 
+  Lemma live_lift
+    `{Countable (amRole M__s)} `{STR__s: AM_strong_lr M__s}
+    `{Countable (amRole M__m)} `{STR__m: AM_strong_lr M__m}
+    `{forall a, Decision (is_action_of M__m a)}
+    ρ st__s st__m
+    (REL: R st__s st__m)
+    (LIVE: ρ ∈ AM_live_roles STR__s st__s)
+    (NNONE: None ∉ proj1_sig STR__m st__m)
+    :
+    from_option (flip elem_of (AM_live_roles STR__m st__m)) False (L ρ). 
+  Proof using MATCH.
+    opose proof * live_lift'; eauto. 
+    Unshelve. 2: exact STR__m.
+    destruct (L ρ).
+    - destruct STR__m as [lr LR]. simpl in *.
+      apply LR in H2. by apply AM_live_roles_spec.
+    - by edestruct NNONE.
   Qed.
  
 End MatchedByTrueFacts.
@@ -172,35 +192,37 @@ Section Models.
   Instance prod_AM_act_dec: ∀ a : Action, Decision (is_action_of prod_model a).
   Proof. Admitted.
 
-  Context (env_AM: ActionModel).
-  Context `{Countable (amRole env_AM)}. 
-  Context `{EqDecision (amSt env_AM)}. 
-  Context `{Inhabited (amSt env_AM)}. 
-  Context {ENV_FB: AM_fin_branch' env_AM}.
-  Context `{∀ a : Action, Decision (is_action_of env_AM a)}.
-  Context {ENV_STEP_DEC: AM_step_dec env_AM}.
+  Class EnvironmentAM (env_AM: ActionModel) := {
+      eam_role_eqdec :> EqDecision (amRole env_AM);
+      eam_role_cnt :> Countable (amRole env_AM);
+      eam_st_eqdec :> EqDecision (amSt env_AM);
+      eam_st_inh :> Inhabited (amSt env_AM);
+      eam_env_fb: AM_fin_branch' env_AM;
+      eam_act_dec :> ∀ a, Decision (is_action_of env_AM a);
+      eam_step_dec :> AM_step_dec env_AM;
+  }.
+  Context `(ENV_AM: EnvironmentAM env_AM).
 
   Lemma env_AM_strong_lr: AM_strong_lr env_AM.
-  Proof using ENV_FB ENV_STEP_DEC. 
+  Proof using.
     apply fin_branch_strong.
-    - apply ENV_FB.
-    - auto.
+    all: apply ENV_AM. 
   Qed. 
 
   Definition full_model := ProdAM prod_model env_AM.
 
   Lemma full_AM_fin_branch': AM_fin_branch' full_model.
-  Proof using ENV_FB. 
+  Proof using ENV_AM. 
     unshelve eapply action_model.prod_AM_fin_branch'.
     - apply prod_AM_fin_branch'. 
-    - apply ENV_FB. 
+    - apply ENV_AM. 
   Qed.
 
   Lemma full_AM_strong_lr: AM_strong_lr full_model.
   Proof using All. 
     apply fin_branch_strong.
     - apply full_AM_fin_branch'.
-    - unshelve eapply prod_AM_step_dec; try apply _ || auto. 
+    - unshelve eapply prod_AM_step_dec; try apply _ || apply ENV_AM || auto. 
       apply prod_AM_step_dec; try by apply _.
       all: apply even_AME || apply odd_AME.
   Qed.
@@ -236,7 +258,9 @@ Section Models.
     + eapply even_odd_priv_disj; eauto.
   Qed.
 
-  Lemma even_matched_by_odd: matched_by (fun st__e st__o => exists N, st2nat (st__e, st__o) N) (fun _ => None) (is_action_of odd_AM). 
+  Definition st2nat_ex st__e st__o := exists N, st2nat (st__e, st__o) N. 
+
+  Lemma even_matched_by_odd: matched_by st2nat_ex (fun _ => None) (is_action_of odd_AM). 
   Proof. 
     red. intros st__e st__e' a ρ st__o [n CORR] ACT__o STEP__e.
     pose proof STEP__e as ACT%action_of_step%even_acts.
@@ -252,7 +276,7 @@ Section Models.
     eexists. split; eauto.
   Qed.        
 
-  Lemma odd_matched_by_even: matched_by (fun st__o st__e => exists N, st2nat (st__e, st__o) N) (fun _ => None) (is_action_of even_AM).
+  Lemma odd_matched_by_even: matched_by (flip st2nat_ex) (fun _ => None) (is_action_of even_AM).
   Proof. 
   Admitted. 
 
@@ -272,13 +296,45 @@ Section Models.
     inversion STEP; subst.
     pose proof STEP1 as ACT1%action_of_step%even_acts.
     pose proof STEP2 as ACT2%action_of_step%odd_acts.
-    destruct ACT1 as [[k ?] | PRIV1], ACT2 as [[? ?] | PRIV2]; subst; cycle 1. 
+    destruct ACT1 as [[k ?] | PRIV1], ACT2 as [[? EQ] | PRIV2]; subst; cycle 1. 
     { by apply odd_pub_priv_disj in PRIV2. }
     { by apply even_pub_priv_disj in PRIV1. }
     { by edestruct @even_odd_priv_disj; eauto. }
-    apply coPset_nth_inj in H3. subst.
+    apply coPset_nth_inj in EQ. subst.
     apply even_sync_inv in STEP1 as (?&?&?). apply odd_sync_inv in STEP2 as (?&?&?).
     edestruct even_odd_False; eauto.
+  Qed.
+
+  Lemma even_matched_by_prod: 
+    @matched_by even_AM prod_model
+      (fun st__s '(st__s', st__m) => st__s' = st__s /\ st2nat_ex st__s st__m)
+      (Some ∘ inl)
+      (fun _ => True).
+  Proof.
+    apply matched_by_prod_l; try by apply _.
+    { apply even_matched_by_odd. }
+    intros st__e st__e' a ρ st__o [? CUR] STEP__e NACT__o. 
+    pose proof STEP__e as ACT%action_of_step%even_acts.
+    destruct ACT as [[k ->] | PRIV].
+    { destruct NACT__o. apply odd_acts. eauto. }
+    apply even_stutter_inv in STEP__e; eauto.
+    eexists. split; eauto. simpl. destruct CUR. simpl in *. congruence.
+  Qed. 
+    
+  Lemma odd_matched_by_prod: 
+    @matched_by odd_AM prod_model
+      (fun st__s '(st__m, st__s') => st__s' = st__s /\ st2nat_ex st__m st__s)
+      (Some ∘ inr)
+      (fun _ => True).
+  Proof.
+    apply matched_by_prod_r; try by apply _.
+    { apply odd_matched_by_even. }
+    intros st__o st__o' a ρ st__e [? CUR] STEP__o NACT__o. 
+    pose proof STEP__o as ACT%action_of_step%odd_acts.
+    destruct ACT as [[k ->] | PRIV].
+    { destruct NACT__o. apply even_acts. eauto. }
+    apply odd_stutter_inv in STEP__o; eauto.
+    eexists. split; eauto. simpl. destruct CUR. simpl in *. congruence.
   Qed. 
   
   Lemma prod_AM_live_roles st__e st__o n
@@ -300,21 +356,12 @@ Section Models.
       { apply Some_inj. }
       rewrite <- set_map_compose_gset.
       etrans.
-      { erewrite @matched_AM_live_roles; [reflexivity|..]. 
-        { eapply @matched_by_prod_l.
-          2: { apply even_matched_by_odd. }
-          { apply _. }
-          simpl. clear. 
-          intros st__e st__e' a ρ st__o [? CUR] STEP__e NACT__o. 
-          pose proof STEP__e as ACT%action_of_step%even_acts.
-          destruct ACT as [[k ->] | PRIV].
-          { destruct NACT__o. apply odd_acts. eauto. }
-          apply even_stutter_inv in STEP__e; eauto.
-          eexists. split; eauto. simpl. destruct CUR. simpl in *. congruence. }
+      { erewrite @matched_AM_live_roles; [reflexivity|..].
+        { apply even_matched_by_prod. }
         Unshelve.
         2: { apply prod_AM_strong_lr. }
-        2: exact (st__e, st__o). 
-        simpl. eauto. }
+        2: exact (st__e, st__o).
+        rewrite /st2nat_ex. eauto.  }
       (* TODO: simplify somehow *)
       simpl.
       pose proof (prod_no_ext_sync (st__e, st__o)) as NNONE. 
