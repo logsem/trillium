@@ -409,31 +409,38 @@ End ActionModel.
 
 Section MatchedBy.
 
-  Definition matched_by {M__s M__m} 
+  Definition synced_by {M__s M__m} 
     (R: amSt M__s -> amSt M__m -> Prop)
-    (L: amRole M__s -> option (amRole M__m))
-    (F: Action -> Prop)
     := 
     forall st__s st__s' a ρ st__m,
-      R st__s st__m -> F a ->
+      R st__s st__m -> is_action_of M__m a ->
       amTrans _ st__s (a, Some ρ) st__s' -> 
-    exists st__m', amTrans _ st__m (a, L ρ) st__m' /\ R st__s' st__m'.
+    exists st__m', amTrans _ st__m (a, None) st__m' /\ R st__s' st__m'.
+
+  Definition matched_by {M__s M__m} 
+    (R: amSt M__s -> amSt M__m -> Prop)
+    (L: amRole M__s -> amRole M__m)
+    := 
+    forall st__s st__s' a ρ st__m,
+      R st__s st__m -> 
+      amTrans _ st__s (a, Some ρ) st__s' -> 
+    exists st__m', amTrans _ st__m (a, Some $ L ρ) st__m' /\ R st__s' st__m'.
 
   Lemma matched_by_prod_l {M__s M__m} R
     {is_act_m_dec: forall a, Decision (is_action_of M__m a)}
-    (MATCH: matched_by R (fun _ => None) (is_action_of M__m))
+    (SYNC: synced_by R)
     (PRIV_S_R: forall st__s st__s' a ρ st__m,
         R st__s st__m -> amTrans _ st__s (a, Some ρ) st__s' -> ¬ (is_action_of M__m a) ->
         R st__s' st__m)
     :
     @matched_by M__s (ProdAM M__s M__m)
       (fun st__s '(st__s', st__m) => st__s' = st__s /\ R st__s st__m)
-      (Some ∘ inl)
-      (fun _ => True). 
+      inl
+  .
   Proof using.
-    red. intros st__s st__s' a ρ [? st__m]. intros [-> R1] ? STEP. 
+    red. intros st__s st__s' a ρ [? st__m]. intros [-> R1] STEP. 
     destruct (decide (is_action_of M__m a)).
-    - opose proof * MATCH as (st__m' & STEP__m & R2); eauto.
+    - opose proof * SYNC as (st__m' & STEP__m & R2); eauto.
       eexists (_, _). split; eauto. econstructor; eauto.
     - eexists (_, _). split; [| split]; [| reflexivity| eapply PRIV_S_R]; eauto.  
       econstructor; eauto.
@@ -441,18 +448,18 @@ Section MatchedBy.
 
   Lemma matched_by_prod_r {M__s M__m} R
     {is_act_m_dec: forall a, Decision (is_action_of M__m a)}
-    (MATCH: matched_by R (fun _ => None) (is_action_of M__m))
+    (SYNC: synced_by R)
     (PRIV_S_R: forall st__s st__s' a ρ st__m,
         R st__s st__m -> amTrans _ st__s (a, Some ρ) st__s' -> ¬ (is_action_of M__m a) ->
         R st__s' st__m):
     @matched_by M__s (ProdAM M__m M__s)
       (fun st__s '(st__m, st__s') => st__s' = st__s /\ R st__s st__m)
-      (Some ∘ inr)
-      (fun _ => True). 
+      inr
+  . 
   Proof using.
-    red. intros st__s st__s' a ρ [? st__m]. intros [-> R1] ? STEP. 
+    red. intros st__s st__s' a ρ [? st__m]. intros [-> R1] STEP. 
     destruct (decide (is_action_of M__m a)).
-    - opose proof * MATCH as (st__m' & STEP__m & R2); eauto.
+    - opose proof * SYNC as (st__m' & STEP__m & R2); eauto.
       eexists (_, _). split; eauto. econstructor; eauto.
     - eexists (_, _). split; [| split]; [| reflexivity| eapply PRIV_S_R]; eauto.  
       econstructor; eauto.
@@ -461,44 +468,40 @@ Section MatchedBy.
 End MatchedBy.
 
 
-Section MatchedByTrueFacts.
-  Context `(MATCH: @matched_by M__s M__m R L (fun _ => True)).
+Section MatchedByFacts.
+  Context `(MATCH: @matched_by M__s M__m R L).
 
-  Lemma matched_AM_live_roles `{AM_strong_lr M__s} `{AM_strong_lr M__m}
-    st__e st__o (R1: R st__e st__o):
-    set_map L (AM_live_roles st__e) ⊆ ams_lr st__o.
-  Proof using MATCH.
-    apply elem_of_subseteq. intros ρ.
-    rewrite elem_of_map. setoid_rewrite <- AM_live_roles_spec.
-    intros (ρ__e & -> & (a__e & st__e' & STEP__e)).
-    apply ams_lr_spec. eapply MATCH in STEP__e; eauto. set_solver. 
-  Qed.
-
-  Lemma live_lift' `{AM_strong_lr M__s} `{AM_strong_lr M__m}
-    `{forall a, Decision (is_action_of M__m a)}
-    ρ st__s st__m
-    (REL: R st__s st__m)
-    (LIVE__s: ρ ∈ AM_live_roles st__s):
-    L ρ ∈ ams_lr st__m.
-  Proof using MATCH.
-    apply singleton_subseteq_l. etrans.
-    2: { eapply matched_AM_live_roles; eauto. }
-    eapply singleton_subseteq_l. by apply elem_of_map_2.
-  Qed.
- 
   Lemma live_lift `{AM_strong_lr M__s} `{AM_strong_lr M__m}
-    `{forall a, Decision (is_action_of M__m a)}
     ρ st__s st__m
     (REL: R st__s st__m)
     (LIVE: ρ ∈ AM_live_roles st__s)
-    (NNONE: None ∉ ams_lr st__m)
     :
-    from_option (flip elem_of (AM_live_roles st__m)) False (L ρ). 
+    L ρ ∈ AM_live_roles st__m. 
   Proof using MATCH.
-    opose proof * live_lift'; eauto. 
-    destruct (L ρ).
-    - apply ams_lr_spec in H2. by apply AM_live_roles_spec.
-    - by destruct NNONE.
+    setoid_rewrite <- AM_live_roles_spec.
+    apply AM_live_roles_spec in LIVE. destruct LIVE as (?&?&STEP).
+    (* intros (ρ__e & -> & (a__e & st__e' & STEP__e)). *)
+    eapply MATCH in STEP; eauto. destruct STEP as (?&?&?). eauto. 
   Qed.
  
-End MatchedByTrueFacts.
+  Lemma matched_AM_live_roles `{AM_strong_lr M__s} `{AM_strong_lr M__m}
+    st__e st__o (R1: R st__e st__o):
+    set_map L (AM_live_roles st__e) ⊆ AM_live_roles st__o.
+  Proof using MATCH.
+    apply elem_of_subseteq. intros ρ (?&->&?)%elem_of_map.
+    eapply live_lift; eauto.
+  Qed.
+
+  (* Lemma live_lift' `{AM_strong_lr M__s} `{AM_strong_lr M__m} *)
+  (*   `{forall a, Decision (is_action_of M__m a)} *)
+  (*   ρ st__s st__m *)
+  (*   (REL: R st__s st__m) *)
+  (*   (LIVE__s: ρ ∈ AM_live_roles st__s): *)
+  (*   L ρ ∈ ams_lr st__m. *)
+  (* Proof using MATCH. *)
+  (*   apply singleton_subseteq_l. etrans. *)
+  (*   2: { eapply matched_AM_live_roles; eauto. } *)
+  (*   eapply singleton_subseteq_l. by apply elem_of_map_2. *)
+  (* Qed. *)
+ 
+End MatchedByFacts.
