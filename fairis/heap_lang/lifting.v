@@ -16,14 +16,14 @@ Canonical Structure RoleO (M : FairModel) := leibnizO (M.(fmrole)).
 Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG {
   heapGpreS_inv :> invGpreS Σ;
   heapGpreS_gen_heap :> gen_heapGpreS loc val Σ;
-  heapGpreS_fairness :> fairnessGpreS LM Σ;
+  heapGpreS_fairness :> fairnessGpreS M Σ;
 }.
 
 Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG {
   heap_inG :> heapGpreS Σ LM;
   heap_invGS : invGS_gen HasNoLc Σ;
   heap_gen_heapGS :> gen_heapGS loc val Σ;
-  heap_fairnessGS :> fairnessGS LM Σ;
+  heap_fairnessGS :> fairnessGS M Σ;
 }.
 
 Definition heapΣ (M : FairModel) : gFunctors :=
