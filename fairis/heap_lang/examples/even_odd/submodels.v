@@ -6,10 +6,10 @@ From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness utils.
+From trillium.fairness Require Import fairness utils action_model.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness.heap_lang.examples.even_odd Require Import action_model interface.
+From trillium.fairness.heap_lang.examples.even_odd Require Import interface.
 
 Close Scope Z. 
 

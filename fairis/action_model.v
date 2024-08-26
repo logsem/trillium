@@ -6,22 +6,11 @@ From iris.proofmode Require Import proofmode.
 Import derived_laws_later.bi.
 
 Section Actions.
-  (* Definition to_action `{Countable T}: T -> Action := encode.  *)
-  (* Definition from_action `{Countable T}: Action -> option T := decode. *)
   Definition Action := positive.
 
   Definition pick_act `{Countable T} (pref: namespace) (t: T) :=
     coPpick $ ↑ (pref .@ encode t).
   Definition acts_at (pref: namespace): coPset := ↑ pref. 
-
-  (* (* Set Default Proof Using "Type". *) *)
-  (* Definition pub_prefix: namespace := nroot .@ "pub".  *)
-  (* Definition pub_actions: coPset := ↑pub_prefix.  *)
-  (* Definition pub_act `{Countable T} (t: T): Action := pick_act pub_prefix t. *)
-
-  (* Definition priv_prefix: namespace := nroot .@ "priv".  *)
-  (* Definition priv_actions: coPset := ↑priv_prefix.  *)
-  (* Definition priv_act `{Countable T} (t: T): Action := pick_act priv_prefix t. *)
 
   Lemma pick_act_dom `{Countable T} ns (t: T):
     pick_act ns t ∈ (↑ns: coPset). 
@@ -32,15 +21,6 @@ Section Actions.
     apply nclose_subseteq.
   Qed.
     
-  (* Lemma priv_act_private `{Countable T} (t: T): *)
-  (*   priv_act t ∈ priv_actions. *)
-  (* Proof. *)
-  (*   rewrite /priv_act /priv_actions. *)
-  (*   eapply elem_of_weaken; [apply coPpick_elem_of| ]. *)
-  (*   { apply nclose_infinite. } *)
-  (*   apply nclose_subseteq. *)
-  (* Qed. *)
-
   Lemma pick_act_inj `{CNT: Countable T} pref: Inj eq eq (@pick_act _ _ CNT pref).
   Proof.
     red. rewrite /pick_act. intros ?? EQ.
@@ -55,9 +35,6 @@ Section Actions.
     rewrite EQ in IN1. set_solver.
   Qed.
     
-  (* Lemma pub_priv_actions_disjoint: pub_actions ## priv_actions. *)
-  (* Proof. solve_ndisj. Qed. *)
-
   Lemma pick_act_disj_neq `{Countable T1} `{Countable T2}
     ns1 ns2 (DISJ: ns1 ## ns2):
     forall (a: T1) (b: T2), 
@@ -97,7 +74,6 @@ Section ActionModel.
 
   Record ActionModel := {
       amSt: Type;
-      (* amA: Type; *)
       amRole: Type;
       amTrans: amSt -> Action * option amRole -> amSt -> Prop;
 
@@ -238,12 +214,10 @@ Section ActionModel.
 
     Inductive ProdTrans: PS -> Action * option PR -> PS -> Prop :=
     | pt_inner1 s1 s1' s2 a r1 
-        (* (PRIV: a ∉ pub_actions) *)
         (NO2: ¬ is_action_of AM2 a)
         (STEP1: amTrans s1 (a, Some r1) s1'):
       ProdTrans (s1, s2) (a, Some (inl r1)) (s1', s2)
     | pt_inner2 s2 s2' s1 a r2
-        (* (PRIV: a ∉ pub_actions) *)
         (NO1: ¬ is_action_of AM1 a)
         (STEP2: amTrans s2 (a, Some r2) s2'):
       ProdTrans (s1, s2) (a, Some (inr r2)) (s1, s2')
@@ -262,8 +236,6 @@ Section ActionModel.
     .
     
     Definition ProdAM: ActionModel := {| amTrans := ProdTrans; |}.
-
-    (* Global Instance prod_AM_act_of_dec: forall a, Decision (is_action_of ProdAM a). *)      
 
     Global Instance prod_AM_step_dec {EQ1: EqDecision (amSt AM1)} {EQ2: EqDecision (amSt AM2)}
       (D1: AM_step_dec AM1) (D2: AM_step_dec AM2)
@@ -491,17 +463,5 @@ Section MatchedByFacts.
     apply elem_of_subseteq. intros ρ (?&->&?)%elem_of_map.
     eapply live_lift; eauto.
   Qed.
-
-  (* Lemma live_lift' `{AM_strong_lr M__s} `{AM_strong_lr M__m} *)
-  (*   `{forall a, Decision (is_action_of M__m a)} *)
-  (*   ρ st__s st__m *)
-  (*   (REL: R st__s st__m) *)
-  (*   (LIVE__s: ρ ∈ AM_live_roles st__s): *)
-  (*   L ρ ∈ ams_lr st__m. *)
-  (* Proof using MATCH. *)
-  (*   apply singleton_subseteq_l. etrans. *)
-  (*   2: { eapply matched_AM_live_roles; eauto. } *)
-  (*   eapply singleton_subseteq_l. by apply elem_of_map_2. *)
-  (* Qed. *)
  
 End MatchedByFacts.

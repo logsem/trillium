@@ -1,8 +1,7 @@
 From iris.algebra Require Import excl_auth.
-From trillium.fairness Require Import utils.
+From trillium.fairness Require Import utils action_model.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness.heap_lang.examples.even_odd Require Import action_model.
 
 
 Close Scope Z. 
