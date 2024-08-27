@@ -181,10 +181,10 @@ Section Steps.
       (* apply Hlive in Hin. *)
       simpl in Hin.
       assert (ρ' ∈ AM_live_roles (ls_under (ls_data δ))) as LIVE.
-      { rewrite prod_indep_live_roles in Hin; [| done]. 
+      { rewrite prod_indep_live_roles in Hin. 
         apply elem_of_union in Hin. 
         destruct (ls_under (ls_data δ)) as [? ?] eqn:ST. simpl in Hin.  
-        rewrite prod_indep_live_roles; [| done].  
+        rewrite prod_indep_live_roles.  
         rewrite !elem_of_map in Hin. destruct Hin as [(?&->&Hin)|(?&->&Hin)].
         + apply Hlive in Hin. rewrite ST in Hin. set_solver.
         + set_solver. }
@@ -266,7 +266,7 @@ Section Steps.
     (LRP1: AM_live_roles s2 ⊆ AM_live_roles s1):
     live_roles M ((s2, s'): fmstate M) ⊆ live_roles M (s1, s').
   Proof.
-    simpl. rewrite !prod_indep_live_roles; try done.
+    simpl. rewrite !prod_indep_live_roles.
     apply union_mono; [| done]. apply set_map_mono; done.
   Qed. 
 

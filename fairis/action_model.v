@@ -320,8 +320,8 @@ Section ActionModel.
 
     Section Independent.
 
-      Definition models_independent :=
-        forall a, is_action_of AM1 a -> is_action_of AM2 a -> False.
+      Class models_independent :=
+        mi_indep: forall a, is_action_of AM1 a -> is_action_of AM2 a -> False.
 
       Context (INDEP: models_independent).
 

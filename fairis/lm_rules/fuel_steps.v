@@ -60,7 +60,7 @@ Section Steps.
       intros ρ' Hρ'.
       assert (inl ρ ≠ ρ').
       { intros <-. 
-        simpl in Hρ'. rewrite prod_indep_live_roles in Hρ'; [ | by eauto]. 
+        simpl in Hρ'. rewrite prod_indep_live_roles in Hρ'. 
         apply elem_of_union in Hρ' as [IN | ?]; [| set_solver].
         apply elem_of_map_inj_gset in IN; [| apply _].
         done. }

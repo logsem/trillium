@@ -4,36 +4,44 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness resources fair_termination fuel fuel_termination.
+From trillium.fairness Require Export fairness fair_termination fuel fuel_termination action_model.
+From trillium.fairness.lm_rules Require Import lm_rules.
 From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Export lang.
 From trillium.fairness.heap_lang Require Import tactics notation.
 Set Default Proof Using "Type".
 
-Canonical Structure ModelO (M : FairModel) := leibnizO M.
-Canonical Structure RoleO (M : FairModel) := leibnizO (M.(fmrole)).
+(* Canonical Structure ModelO (M : FairModel) := leibnizO M. *)
+(* Canonical Structure RoleO (M : FairModel) := leibnizO (M.(fmrole)). *)
 
-Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG {
+(* Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG { *)
+Class heapGpreS Σ (AM1 AM2: ActionModel) := HeapPreG {
   heapGpreS_inv :> invGpreS Σ;
   heapGpreS_gen_heap :> gen_heapGpreS loc val Σ;
-  heapGpreS_fairness :> fairnessGpreS M Σ;
+  heapGpreS_fairness :> fairnessGpreS AM1 AM2 Σ;
 }.
 
-Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG {
-  heap_inG :> heapGpreS Σ LM;
+(* Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG { *)
+Class heapGS Σ (AM1 AM2: ActionModel) := HeapG { 
+  heap_inG :> heapGpreS Σ AM1 AM2;
   heap_invGS : invGS_gen HasNoLc Σ;
   heap_gen_heapGS :> gen_heapGS loc val Σ;
-  heap_fairnessGS :> fairnessGS M Σ;
+  heap_fairnessGS :> fairnessGS AM1 AM2 Σ;
 }.
 
-Definition heapΣ (M : FairModel) : gFunctors :=
-  #[ invΣ; gen_heapΣ loc val; fairnessΣ heap_lang M ].
+Definition heapΣ (AM1 AM2: ActionModel) : gFunctors :=
+  #[ invΣ; gen_heapΣ loc val; fairnessΣ heap_lang AM1 AM2 ].
 
-Global Instance subG_heapPreG {Σ} `{LM : LiveModel heap_lang M} :
-  subG (heapΣ M) Σ → heapGpreS Σ LM.
+Global Instance subG_heapPreG {Σ} {AM1 AM2: ActionModel} :
+  subG (heapΣ AM1 AM2) Σ → heapGpreS Σ AM1 AM2.
 Proof. solve_inG. Qed.
 
-#[global] Instance heapG_irisG `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} : irisG heap_lang LM Σ := {
+#[global] Instance heapG_irisG {AM1 AM2: ActionModel} 
+  (PM := ProdAM AM1 AM2)
+  {PMS: AM_strong_lr PM}
+  (M := AM2FM PM PMS)
+  {LM: LiveModel heap_lang M}
+ `{!heapGS Σ AM1 AM2} : irisG heap_lang LM Σ := {
     iris_invGS := heap_invGS;
     state_interp extr auxtr :=
       (⌜valid_state_evolution_fairness extr auxtr⌝ ∗
@@ -208,8 +216,23 @@ Proof. solve_pure_exec. Qed.
 Proof. solve_pure_exec. Qed.
 
 Section lifting.
-Context `{LM:LiveModel heap_lang M}.
-Context `{!heapGS Σ LM}.
+(* Context `{LM:LiveModel heap_lang M}. *)
+(* Context `{!heapGS Σ LM}. *)
+
+Context {AM1 AM2: ActionModel}.
+Let PM := ProdAM AM1 AM2.
+Context {PROD_LR: AM_strong_lr PM}.
+Let M := AM2FM PM PROD_LR.
+Context {LR1: AM_strong_lr AM1} {LR2: AM_strong_lr AM2}.
+Context {INDEP: models_independent AM1 AM2}.
+Context {LM: LiveModel heap_lang M}.
+Context `{hGS: !heapGS Σ AM1 AM2}.
+
+(* Need to explicitly specify the instance, 
+   since the LM argument is not inferred automatically *)
+Let hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS. 
+Existing Instance hi. 
+
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types efs : list expr.
@@ -381,10 +404,10 @@ Proof.
   iMod (model_state_interp_has_fuels_decr with "Hm Hf") as "[$ $]". by iFrame.
 Qed.
 
-Lemma has_fuels_dealloc E tid fs ρ δ :
-  ρ ∉ live_roles _ δ → frag_model_is δ -∗ tid ↦M fs -∗
-  |~{E}~| frag_model_is δ ∗ tid ↦M (delete ρ fs).
-Proof.
+Lemma has_fuels_dealloc E tid fs (ρ: amRole AM1) (δ: amSt AM1) :
+  ρ ∉ AM_live_roles δ → frag_model_is δ -∗ tid ↦M fs -∗
+  |~{E}~| frag_model_is δ ∗ tid ↦M (delete (inl ρ) fs).
+Proof using LR1 LR2 INDEP.
   iIntros (Hnin) "Hst Hf". rewrite weakestpre.pre_step_unseal.
   iIntros (extr atr) "[%Hvse [Hσ Hm]]".
   iMod (model_state_interp_has_fuels_dealloc with "Hm Hst Hf") as "[Hm Hf]";
@@ -393,25 +416,27 @@ Qed.
 
 (* Rule from the Trillium article *)
 Lemma wp_role_dealloc s tid E e fs ρ δ Φ :
-  ρ ∉ live_roles _ δ → frag_model_is δ -∗ tid ↦M fs -∗
-  (frag_model_is δ -∗ tid ↦M (delete ρ fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
+  ρ ∉ AM_live_roles δ → frag_model_is δ -∗ tid ↦M fs -∗
+  (frag_model_is δ -∗ tid ↦M (delete (inl ρ) fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
   WP e @ s; tid; E {{ Φ }}.
-Proof.
+Proof using LR1 LR2 INDEP.
   iIntros (Hnin) "HM Hfuels Hwp".
   iMod (has_fuels_dealloc with "HM Hfuels") as "[HM Hfuels]"; [done|].
   by iApply ("Hwp" with "HM Hfuels").
 Qed.
 
 (* TODO: move? *)
-Lemma model_step_MU tid E s1 s2 ρ f1 fs
-  (Hdom: ρ ∉ dom fs)
-  (TRANS: fmtrans M s1 (Some ρ) s2)
-  (LR: M.(live_roles) s2 ⊆ M.(live_roles) s1):
+Lemma model_step_MU tid E s1 s2 ρ f1 fs a
+  (Hdom: inl ρ ∉ dom fs)
+  (* (TRANS: fmtrans M s1 (Some ρ) s2) *)
+  (TRANS: amTrans AM1 s1 (a, Some ρ) s2)
+  (* (LR: M.(live_roles) s2 ⊆ M.(live_roles) s1): *)
+  (LR: AM_live_roles s2 ⊆ AM_live_roles s1):
   frag_model_is s1 -∗
-  tid ↦M ({[ρ := f1]} ∪ (S <$> fs)) -∗
+  tid ↦M ({[inl ρ := f1]} ∪ (S <$> fs)) -∗
   MU E tid (frag_model_is s2 ∗
-           tid ↦M ({[ρ := lm_fl LM s2]} ∪ fs)).
-Proof.
+           tid ↦M ({[inl ρ := lm_flm LM]} ∪ fs)).
+Proof using LR1 LR2 INDEP.
   iIntros "Hst Hfuel1".
   rewrite /MU /HL_LM_trace_interp'. iIntros (extr lmtr) "X".
   destruct extr; [done| ].
@@ -419,23 +444,24 @@ Proof.
   iMod (update_model_step with "Hfuel1 Hst MSI") as
     (δ2 Hvse) "(Hfuel & Hst & Hmod)"; eauto.
   iModIntro. iFrame. iExists _. iPureIntro. done. 
-Qed.
- 
+Qed. 
   
 
 
-Lemma wp_step_model s tid ρ (f1 : nat) fs s1 s2 E e Φ :
+Lemma wp_step_model s tid ρ (f1 : nat) fs s1 s2 a E e Φ :
   TCEq (to_val e) None →
-  fmtrans M s1 (Some ρ) s2 →
-  M.(live_roles) s2 ⊆ M.(live_roles) s1 →
-  ρ ∉ dom fs →
+  (* fmtrans M s1 (Some ρ) s2 → *)
+  amTrans AM1 s1 (a, Some ρ) s2 →
+  (* M.(live_roles) s2 ⊆ M.(live_roles) s1 → *)
+  AM_live_roles s2 ⊆ AM_live_roles s1 →
+  inl ρ ∉ dom fs →
   ▷ frag_model_is s1 -∗
-  ▷ tid ↦M ({[ρ:=f1]} ∪ fmap S fs) -∗
+  ▷ tid ↦M ({[inl ρ:=f1]} ∪ fmap S fs) -∗
   sswp s E e (λ e', frag_model_is s2 -∗
-                    tid ↦M ({[ρ:=(LM.(lm_fl) s2)]} ∪ fs) -∗
+                    tid ↦M ({[inl ρ:=(LM.(lm_flm))]} ∪ fs) -∗
                     WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
-Proof.
+Proof using LR1 LR2 INDEP.
   iIntros (Hval Htrans Hlive Hdom) ">Hst >Hfuel1 Hwp".
   iApply sswp_MU_wp.
   { by inversion Hval. }
@@ -448,18 +474,20 @@ Qed.
 
 
 
-Lemma wp_step_model_singlerole s tid ρ (f1 : nat) s1 s2 E e Φ :
+Lemma wp_step_model_singlerole s tid ρ (f1 : nat) s1 s2 a E e Φ :
   TCEq (to_val e) None →
-  fmtrans M s1 (Some ρ) s2 →
-  M.(live_roles) s2 ⊆ M.(live_roles) s1 →
-  ▷ frag_model_is s1 -∗ ▷ tid ↦M {[ρ := f1]} -∗
+  (* fmtrans M s1 (Some ρ) s2 → *)
+  amTrans AM1 s1 (a, Some ρ) s2 →
+  (* M.(live_roles) s2 ⊆ M.(live_roles) s1 → *)
+  AM_live_roles s2 ⊆ AM_live_roles s1 →
+  ▷ frag_model_is s1 -∗ ▷ tid ↦M {[inl ρ := f1]} -∗
   sswp s E e (λ e', frag_model_is s2 -∗
-                    tid ↦M {[ρ := (LM.(lm_fl) s2)]} -∗
+                    tid ↦M {[inl ρ := (LM.(lm_flm))]} -∗
                     WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
-Proof.
+Proof using LR1 LR2 INDEP.
   iIntros (Hval Htrans Hlive) ">Hst >Hfuel1 Hwp".
-  replace ({[ρ := f1]}) with ({[ρ := f1]} ∪ (fmap S ∅:gmap _ _)); last first.
+  replace ({[inl ρ := f1]}) with ({[(inl ρ: fmrole M) := f1]} ∪ (fmap S ∅:gmap _ _)); last first.
   { rewrite fmap_empty. rewrite right_id_L. done. }
   iApply (wp_step_model with "Hst Hfuel1"); [done|set_solver|done|].
   iApply (sswp_wand with "[] Hwp"). iIntros (e') "Hwp Hst Hfuel1".
@@ -470,7 +498,7 @@ Lemma wp_step_fuel s tid E e fs Φ :
   fs ≠ ∅ → ▷ tid ↦M++ fs -∗
   sswp s E e (λ e', tid ↦M fs -∗ WP e' @ s; tid; E {{ Φ }} ) -∗
   WP e @ s; tid; E {{ Φ }}.
-Proof.
+Proof using INDEP.
   iIntros (?) ">HfuelS Hwp". rewrite wp_unfold /wp_pre /sswp /=.
   destruct (to_val e).
   { iMod (has_fuels_decr with "HfuelS") as "Hfuel".
@@ -540,6 +568,7 @@ Qed.
 Lemma sswp_pure_step s E e1 e2 (Φ : Prop) Ψ :
   PureExec Φ 1 e1 e2 → Φ → ▷ Ψ e2 -∗ sswp s E e1 Ψ%I.
 Proof.
+  clear INDEP. 
   iIntros (Hpe HΦ) "HΨ".
   assert (pure_step e1 e2) as Hps.
   { specialize (Hpe HΦ). by apply nsteps_once_inv in Hpe. }
@@ -597,6 +626,7 @@ Lemma wp_allocN_seq s E v n (Φ : expr → iProp Σ) :
                  (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤) -∗ Φ #l) -∗
   sswp s E (AllocN (Val $ LitV $ LitInt $ n) (Val v)) Φ.
 Proof.
+  clear INDEP. 
   iIntros (HnO) "HΦ".
   rewrite /sswp. simpl.
   iIntros (σ) "Hσ".
@@ -633,6 +663,7 @@ Lemma wp_choose_nat s E (Φ : expr → iProp Σ) :
   ▷ (∀ (n:nat), Φ $ Val $ LitV (LitInt n)) -∗
   sswp s E ChooseNat Φ.
 Proof.
+  clear INDEP. 
   iIntros "HΦ".
   rewrite /sswp. simpl.
   iIntros (σ) "Hσ".
@@ -655,6 +686,7 @@ Lemma wp_load s E l q v (Φ : expr → iProp Σ) :
   ▷ (l ↦{q} v -∗ Φ v) -∗
   sswp s E (Load (Val $ LitV $ LitLoc l)) Φ.
 Proof.
+  clear INDEP.
   iIntros ">Hl HΦ".
   rewrite /sswp. simpl.
   iIntros (σ) "Hσ".
@@ -677,6 +709,7 @@ Lemma wp_store s E l v' v (Φ : expr → iProp Σ) :
   ▷ (l ↦ v -∗ Φ $ LitV LitUnit) -∗
   sswp s E (Store (Val $ LitV (LitLoc l)) (Val v)) Φ.
 Proof.
+  clear INDEP. 
   iIntros ">Hl HΦ". simpl.
   iIntros (σ1) "Hsi".
   iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
@@ -697,6 +730,7 @@ Lemma wp_cmpxchg_fail s E l q v' v1 v2 (Φ : expr → iProp Σ) :
   ▷ (l ↦{q} v' -∗ Φ $ PairV v' (LitV $ LitBool false)) -∗
   sswp s E (CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2)) Φ.
 Proof.
+  clear INDEP. 
   iIntros (??) ">Hl HΦ". simpl.
   iIntros (σ1) "Hsi".
   iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
@@ -719,6 +753,7 @@ Lemma wp_cmpxchg_suc s E l v' v1 v2 (Φ : expr → iProp Σ) :
   ▷ (l ↦ v2 -∗ Φ $ PairV v' (LitV $ LitBool true)) -∗
   sswp s E (CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2)) Φ.
 Proof.
+  clear INDEP. 
   iIntros (??) ">Hl HΦ". simpl.
   iIntros (σ1) "Hsi".
   iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
