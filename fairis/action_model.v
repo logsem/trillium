@@ -3,6 +3,7 @@ From trillium.fairness Require Import utils.
 From stdpp Require Import namespaces coPset. 
 From iris.proofmode Require Import proofmode.
 
+
 Import derived_laws_later.bi.
 
 Section Actions.
@@ -79,11 +80,18 @@ Section ActionModel.
 
       am_role_eqdec :> EqDecision amRole;
       am_role_cnt :> Countable amRole;
+      am_st_eqdec :> EqDecision amSt;
+      am_st_inh :> Inhabited amSt;
+      am_role_inh :> Inhabited amRole;
   }.
 
   Arguments amTrans {_}.
   Global Existing Instance am_role_eqdec. 
   Global Existing Instance am_role_cnt. 
+  Global Existing Instance am_st_eqdec.
+  Global Existing Instance am_st_inh.
+  Global Existing Instance am_role_inh.
+ 
 
   (* Defining the properites below as typeclasses to allow automatic inference *)
   
@@ -123,10 +131,10 @@ Section ActionModel.
   (* (optional) live roles can be obtained by checking all possible transitions,
      given that there is a finite number of them *)
   Global Instance fin_branch_strong (AM: ActionModel)
-    (FIN: AM_fin_branch' AM) (DEC: AM_step_dec AM):
+    (FIN: AM_fin_branch AM):
     AM_strong_lr AM.
   Proof.
-    eapply AM_fin_branch_dec in FIN as [ns FIN]; auto.
+    destruct FIN as [ns FIN]. 
     exists (fun s => list_to_set ((fun '(_, _, oρ) => oρ) <$> ns s)). 
     intros. rewrite elem_of_list_to_set. rewrite elem_of_list_fmap.
     do 2 rewrite ex_prod.
@@ -235,7 +243,7 @@ Section ActionModel.
       ProdTrans (s1, s2) (a, None) (s1', s2')
     .
     
-    Definition ProdAM: ActionModel := {| amTrans := ProdTrans; |}.
+    Definition ProdAM: ActionModel := {| amTrans := ProdTrans; |}.    
 
     Global Instance prod_AM_step_dec {EQ1: EqDecision (amSt AM1)} {EQ2: EqDecision (amSt AM2)}
       (D1: AM_step_dec AM1) (D2: AM_step_dec AM2)
@@ -318,8 +326,9 @@ Section ActionModel.
       Context (INDEP: models_independent).
 
       Lemma prod_indep_live_roles
-        `{AM_fin_branch' AM1} `{AM_step_dec AM1} `{EqDecision (amSt AM1)}
-        `{AM_fin_branch' AM2} `{AM_step_dec AM2} `{EqDecision (amSt AM2)}
+        (* `{AM_fin_branch' AM1} `{AM_step_dec AM1} `{EqDecision (amSt AM1)} *)
+        (* `{AM_fin_branch' AM2} `{AM_step_dec AM2} `{EqDecision (amSt AM2)} *)
+        `{AM_strong_lr AM1} `{AM_strong_lr AM2} `{AM_strong_lr ProdAM}
         (st1: amSt AM1) (st2: amSt AM2):
         AM_live_roles ((st1, st2): amSt ProdAM) = 
         set_map inl (AM_live_roles st1) ∪ 
@@ -339,7 +348,7 @@ Section ActionModel.
         - do 2 eexists. apply pt_inner2; eauto.
           intros ?. eapply INDEP; eauto.
           eapply action_of_step; eauto.
-      Qed. 
+      Qed.
         
     End Independent.
 
@@ -347,8 +356,6 @@ Section ActionModel.
 
   Section AM2FM.
     Context (AM: ActionModel).
-    Context {EQ_ST: EqDecision (amSt AM)}. 
-    Context {INH_ST: Inhabited (amSt AM)} {INH_R: Inhabited (amRole AM)}.
 
     (* this requirement is not necessary, but allows to reuse the AM_strong_lr machinery *)
     Context (AM_S: AM_strong_lr AM). 
