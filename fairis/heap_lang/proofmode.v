@@ -1,12 +1,16 @@
 From iris.proofmode Require Import coq_tactics reduction spec_patterns.
 From iris.proofmode Require Export tactics.
 From trillium.program_logic Require Import atomic.
+From trillium.fairness Require Import action_model fuel resources.
 From trillium.fairness.heap_lang Require Export tactics lifting. (* derived_laws. *)
-From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Import notation iris_inst sswp_rules.
 From iris.prelude Require Import options.
 Import uPred.
 
-Lemma tac_wp_expr_eval `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} Δ tid E Φ e e' :
+(* Lemma tac_wp_expr_eval `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} Δ tid E Φ e e' : *)
+Lemma tac_wp_expr_eval {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)} {LM: LiveModel heap_lang (AM2FM (ProdAM AM1 AM2) PMS)}
+  (hi := @heapG_irisG AM1 AM2 PMS LM _ hGS)
+  Δ tid E Φ e e' :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (WP e' @ tid; E {{ Φ }}) → envs_entails Δ (WP e @ tid; E {{ Φ }}).
 Proof. by intros ->. Qed.
@@ -21,7 +25,12 @@ Tactic Notation "wp_expr_eval" tactic3(t) :=
   end.
 Ltac wp_expr_simpl := wp_expr_eval simpl.
 
-Lemma tac_wp_pure_helper `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} tid E K e1 e2 fs  φ n Φ :
+Lemma tac_wp_pure_helper
+  (* `{LM:LiveModel heap_lang M} `{!heapGS Σ LM}  *)
+  {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)} {LM: LiveModel heap_lang (AM2FM (ProdAM AM1 AM2) PMS)}
+  (hi := @heapG_irisG AM1 AM2 PMS LM _ hGS)
+  `{models_independent AM1 AM2}
+  tid E K e1 e2 fs  φ n Φ :
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
@@ -62,19 +71,32 @@ Proof.
   apply leibniz_equiv_iff. lia.
 Qed.
 
-Lemma has_fuels_gt_n `{LM : LiveModel heap_lang M} `{!heapGS Σ LM} (fs: gmap (fmrole M) _) n tid:
+Lemma has_fuels_gt_n
+  (* `{LM : LiveModel heap_lang M} `{!heapGS Σ LM} *)
+{AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)}
+(* {LM: LiveModel heap_lang (AM2FM (ProdAM AM1 AM2) PMS)} *)
+  (* (hi := @heapG_irisG AM1 AM2 PMS LM _ hGS) *)
+  (fs: gmap (fmrole (AM2FM (ProdAM AM1 AM2) PMS)) _) n tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels tid ((λ m, n + m)%nat <$> ((λ m, m - n)%nat <$> fs)).
 Proof. intros ?. rewrite {1}(maps_gt_n fs n) //. Qed.
 
-Lemma has_fuels_gt_1 `{LM:LiveModel heap_lang M}
-      `{!heapGS Σ LM} (fs: gmap (fmrole M) _) tid:
+Lemma has_fuels_gt_1
+  (* `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} *)
+{AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)}
+
+ (fs: gmap (fmrole (AM2FM (ProdAM AM1 AM2) PMS)) _) tid:
   (∀ ρ f, fs !! ρ = Some f -> f >= 1)%nat ->
   has_fuels tid fs ⊣⊢ has_fuels_S tid (((λ m, m - 1)%nat <$> fs)).
 Proof. intros ?. by rewrite has_fuels_gt_n //. Qed.
 
-Lemma tac_wp_pure_helper_2 `{LM:LiveModel heap_lang M}
-      `{!heapGS Σ LM} tid E K e1 e2 fs  φ n Φ :
+Lemma tac_wp_pure_helper_2 
+  (* `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} *)
+  {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)}
+  {LM: LiveModel heap_lang (AM2FM (ProdAM AM1 AM2) PMS)}
+  (hi := @heapG_irisG AM1 AM2 PMS LM _ hGS)
+  `{models_independent AM1 AM2}
+  tid E K e1 e2 fs  φ n Φ :
   (∀ ρ f, fs !! ρ = Some f -> f >= n)%nat ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
@@ -139,16 +161,24 @@ Proof.
       * rewrite env_lookup_env_delete_ne //.
 Qed.
 
-Lemma tac_wp_pure `{LM:LiveModel heap_lang M}
-      `{!heapGS Σ LM} Δ Δ'other tid E i K e1 e2 φ n Φ fs :
-  (∀ (ρ : fmrole M) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
+
+Lemma tac_wp_pure 
+  (* `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} *)
+  {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)}
+  {LM: LiveModel heap_lang (AM2FM (ProdAM AM1 AM2) PMS)}
+  (hi := @heapG_irisG AM1 AM2 PMS LM _ hGS)
+  {INDEP: models_independent AM1 AM2}
+  (fGS := @heap_fairnessGS _ _ _ hGS)
+  
+  Δ Δ'other tid E i K e1 e2 φ n Φ fs :
+  (∀ (ρ : fmrole (AM2FM (ProdAM AM1 AM2) PMS)) (f : nat), fs !! ρ = Some f → (f ≥ n)%nat) ->
   fs ≠ ∅ ->
   PureExec φ n e1 e2 →
   φ →
   envs_lookup i Δ = Some (false, has_fuels tid fs)%I →
   let Δother := envs_delete true i false Δ in
   MaybeIntoLaterNEnvs n Δother Δ'other →
-  let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - n)%nat <$> fs)) in
+  let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - n)%nat <$> fs) (fG := fGS)) in
   envs_entails Δ' (WP (fill K e2) @ tid; E {{ Φ }}) →
   envs_entails Δ (WP (fill K e1) @ tid; E {{ Φ }}).
 Proof.
@@ -169,13 +199,27 @@ Proof.
 Qed.
 
 
-Lemma tac_wp_value_nofupd `{LM:LiveModel heap_lang M}
-      `{!heapGS Σ LM} Δ tid E Φ v :
+Lemma tac_wp_value_nofupd
+  (* `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} *)
+  {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)}
+  {LM: LiveModel heap_lang (AM2FM (ProdAM AM1 AM2) PMS)}
+  (hi := @heapG_irisG AM1 AM2 PMS LM _ hGS)
+  (* {INDEP: models_independent AM1 AM2} *)
+  (* (fGS := @heap_fairnessGS _ _ _ hGS) *)
+
+ Δ tid E Φ v :
   envs_entails Δ (Φ v) → envs_entails Δ (WP (Val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. by apply wp_value. Qed.
 
-Lemma tac_wp_value `{LM:LiveModel heap_lang M}
-      `{!heapGS Σ LM} Δ tid E (Φ : val → iPropI Σ) v :
+Lemma tac_wp_value 
+  (* `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} *)
+  {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)}
+  {LM: LiveModel heap_lang (AM2FM (ProdAM AM1 AM2) PMS)}
+  (hi := @heapG_irisG AM1 AM2 PMS LM _ hGS)
+  (* {INDEP: models_independent AM1 AM2} *)
+  (* (fGS := @heap_fairnessGS _ _ _ hGS) *)
+
+  Δ tid E (Φ : val → iPropI Σ) v :
   envs_entails Δ (|={E}=> Φ v) → envs_entails Δ (WP (Val v) @ tid; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. iIntros "?". by iApply wp_value_fupd. Qed.
 
@@ -297,7 +341,15 @@ Tactic Notation "wp_inj" := wp_pure (InjL _) || wp_pure (InjR _).
 Tactic Notation "wp_pair" := wp_pure (Pair _ _).
 Tactic Notation "wp_closure" := wp_pure (Rec _ _ _).
 
-Lemma tac_wp_bind `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} K Δ s E Φ e f :
+Lemma tac_wp_bind
+  (* `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} *)
+  {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2} {PMS: AM_strong_lr (ProdAM AM1 AM2)}
+  {LM: LiveModel heap_lang (AM2FM (ProdAM AM1 AM2) PMS)}
+  (hi := @heapG_irisG AM1 AM2 PMS LM _ hGS)
+  (* {INDEP: models_independent AM1 AM2} *)
+  (* (fGS := @heap_fairnessGS _ _ _ hGS) *)
+
+  K Δ s E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
   envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
   envs_entails Δ (WP fill K e @ s; E {{ Φ }}).
@@ -320,8 +372,21 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 
 (** Heap tactics *)
 Section heap.
-Context `{LM:LiveModel heap_lang M}.
-Context `{!heapGS Σ LM}.
+
+(* Context `{LM:LiveModel heap_lang M}. *)
+(* Context `{!heapGS Σ LM}. *)
+Context  {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2}.
+Context {PMS: AM_strong_lr (ProdAM AM1 AM2)}.
+
+Let M := AM2FM (ProdAM AM1 AM2) PMS.
+Context {LM: LiveModel heap_lang M}. 
+
+Let hi := @heapG_irisG AM1 AM2 PMS LM _ hGS.
+Existing Instance hi. 
+Context {INDEP: models_independent AM1 AM2}. 
+  (* (fGS := @heap_fairnessGS _ _ _ hGS) *)
+
+
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types Δ : envs (uPredI (iResUR Σ)).
@@ -439,7 +504,7 @@ Lemma tac_wp_load K fs tid Δ Δ'other E i j l q v Φ :
   let Δ' := envs_snoc Δ'other false i (has_fuels tid ((λ m, m - 1)%nat <$> fs)) in
   envs_entails Δ' (WP fill K (Val v) @ tid; E {{ Φ }}) →
   envs_entails Δ (WP fill K (Load (LitV l)) @ tid; E {{ Φ }}).
-Proof.
+Proof using INDEP.
   intros ?? Hij ?.
   rewrite envs_entails_unseal=> Δother ?? Δ' Hccl.
   rewrite -wp_bind.
@@ -482,7 +547,7 @@ Lemma tac_wp_store K fs tid Δ Δ'other E i j l v v' Φ :
   | None => False
   end →
   envs_entails Δ (WP fill K (Store (LitV l) (Val v')) @ tid; E {{ Φ }}).
-Proof.
+Proof using INDEP.
   intros ?? Hij ?.
   rewrite envs_entails_unseal=> Δother ??.
   destruct (envs_simple_replace j false (Esnoc Enil j (l ↦ v'))%I Δ'other) as [Δ'other2|] eqn:Heq; last done.
@@ -1028,3 +1093,87 @@ Tactic Notation "wp_faa" :=
   end.
 
 *)
+
+Section tactics_test.
+(* Context  {AM1 AM2} `{hGS: !heapGS Σ AM1 AM2}. *)
+(* Context {PMS: AM_strong_lr (ProdAM AM1 AM2)}. *)
+
+(* Let M := AM2FM (ProdAM AM1 AM2) PMS. *)
+(* Context {LM: LiveModel heap_lang M}.  *)
+
+(* Let hi := @heapG_irisG AM1 AM2 PMS LM _ hGS. *)
+(* Existing Instance hi.  *)
+(* Context {INDEP: models_independent AM1 AM2}.  *)
+  
+  Definition UnitAM: ActionModel :=
+    {| amSt := unit; amRole := unit; amTrans := fun _ _ _ => False |}.
+
+  Definition SingleLoopAM: ActionModel :=
+    {| amSt := unit; amRole := unit; 
+       amTrans := fun _ '(a, oρ) _ => a = xH /\ oρ = Some () |}.
+
+  Let PM := ProdAM SingleLoopAM UnitAM .
+
+  Local Instance INDEP: models_independent SingleLoopAM UnitAM.
+  Proof. 
+    red. intros ?? STEP. inversion STEP. set_solver.
+  Qed.
+
+  Instance UnitAM_fin_branch': AM_fin_branch' UnitAM.
+  Proof. exists (fun _ => []). done. Qed.
+
+  Instance UnitAM_step_dec: AM_step_dec UnitAM.
+  Proof. right. by intros ?. Qed.
+
+  Instance SingleLoopAM_fin_branch': AM_fin_branch' SingleLoopAM.
+  Proof.
+    exists (fun _ => [((), xH, Some ())]). intros [] []?? STEP.
+    set_solver.
+  Qed. 
+
+  Instance SingleLoopAM_step_dec: AM_step_dec SingleLoopAM.
+  Proof.
+    red. intros [] a oρ []. 
+    destruct (decide (a = xH /\ oρ = Some ())) as [[-> ->] | ?].
+    - left. done.
+    - right. done.
+  Qed.
+
+  Let M := AM2FM PM _.
+
+  Context {LM: LiveModel heap_lang M}.
+
+  Context `{hGS: !heapGS Σ SingleLoopAM UnitAM}.
+
+  Let hi := @heapG_irisG _ _ _ LM _ hGS.
+  Existing Instance hi.
+
+  Close Scope Z_scope. 
+
+  Lemma foo tid: 
+    {{{ has_fuels tid {[inl () := 5]} ∗ frag_model_is ()}}}
+      ref (#1 + #1) @ tid 
+    {{{ l, RET l; ⌜ True ⌝ }}}. 
+  Proof.
+    iIntros (Φ) "[FUEL ST] POST".
+    wp_bind (_ + _)%E.
+    wp_pures. iModIntro.
+
+    replace (1 + 1)%Z with 2%Z by done.
+
+    iApply sswp_MU_wp; [done| ].
+    iApply wp_alloc. iIntros "!> %l ? ?".
+    iApply (MU_wand with "[POST]"). 
+    2: { iApply (model_step_MU with "[$] [FUEL]").
+         4: { iApply has_fuels_proper; [reflexivity| | by iFrame].
+              rewrite insert_union_singleton_l.
+              f_equiv. apply leibniz_equiv_iff, fmap_empty. }
+         { done. }
+         { constructor; reflexivity. }
+         reflexivity. }
+    iIntros "[ST FUEL]".
+
+    iApply wp_value. by iApply "POST".
+  Qed. 
+
+End tactics_test.
