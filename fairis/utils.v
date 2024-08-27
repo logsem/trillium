@@ -61,6 +61,16 @@ Section Disjoint.
       `{Set_ A C} → ∀ X1 X2 Y1 Y2: C, X1 ⊆ Y1 -> X2 ⊆ Y2 → Y1 ## Y2 -> X1 ## X2.
   Proof. intros. set_solver. Qed.
 
+  Lemma disjoint_subseteq_l `{Countable A} (xs ys zs : gset A) :
+    xs ⊆ ys → ys ## zs → xs ## zs.
+  Proof. intros Hle Hdisj x Hxs Hzs. eapply Hdisj; [by apply Hle|done]. Qed.
+
+  Lemma disjoint_subseteq_r `{Countable A} (xs ys zs : gset A) :
+    zs ⊆ ys → xs ## ys → xs ## zs.
+  Proof. intros Hle Hdisj x Hxs Hzs. eapply Hdisj; [done|by apply Hle]. Qed.
+
+
+
 End Disjoint.
 
 Section SetMapProperties.
