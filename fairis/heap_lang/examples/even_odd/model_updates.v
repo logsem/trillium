@@ -6,51 +6,15 @@ From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination utils.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
+From trillium.fairness Require Import fairness fair_termination utils action_model fuel resources.
+From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode iris_inst.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness.heap_lang.examples.even_odd Require Import action_model interface thread_progs.
+From trillium.fairness.heap_lang.examples.even_odd Require Import interface thread_progs mu_role.
 Import derived_laws_later.bi.
 
 Open Scope nat.
 
 Set Default Proof Using "Type".
-
-
-
-(* Lemma matched_prod_AM_live_roles *)
-(*   `{MATCH1: @matched_by M__s M__m R} `{MATCH2: @matched_by M__m M__s (flip R)} *)
-(*   `{Countable (amRole M__s)} {STR__s: AM_strong_lr M__s} `{forall a, Decision (is_action_of M__s a)} *)
-(*   `{Countable (amRole M__m)} {STR__m: AM_strong_lr M__m} `{forall a, Decision (is_action_of M__m a)} *)
-(*   `{Countable (amRole (ProdAM M__s M__m))} {STR__p: AM_strong_lr (ProdAM M__s M__m)} *)
-(*   st__e st__o *)
-(*   (R1: R st__e st__o) *)
-(*   (PRIV_S_R: forall st__e' a ρ, amTrans _ st__e (a, Some ρ) st__e' -> *)
-(*                          ¬ (is_action_of M__m a) -> R st__e' st__o) *)
-(*   (PRIV_M_R: forall st__o' a ρ, amTrans _ st__o (a, Some ρ) st__o' -> *)
-(*                          ¬ (is_action_of M__s a) -> R st__e st__o') *)
-(*   : *)
-(*   AM_live_roles STR__p (st__e, st__o) =  *)
-(*     set_map inl (AM_live_roles STR__s st__e) ∪  *)
-(*     set_map inr (AM_live_roles STR__m st__o). *)
-(* Proof using. *)
-(*   apply set_eq. intros ρ. *)
-(*   rewrite elem_of_union !elem_of_map. *)
-(*   setoid_rewrite <- AM_live_roles_spec. *)
-(*   split. *)
-(*   { intros (a & st' & STEP). inversion STEP; subst. *)
-(*     all: set_solver. }  *)
-(*   intros [(ρ__e & -> & (a__e & st__e' & STEP__e))| (ρ__o & -> & (a__o & st__o' & STEP__o))]. *)
-(*   - ogeneralize * matched_by_prod_step_l.  *)
-(*     { eapply MATCH1. } *)
-(*     all: eauto.  *)
-(*     intros (?&?&?). eexists. eauto. *)
-(*   - ogeneralize * matched_by_prod_step_r.  *)
-(*     { eapply MATCH2. } *)
-(*     all: eauto.  *)
-(*     { intros. eapply PRIV_M_R; eauto. } *)
-(*     intros (?&?&?). eexists. eauto. *)
-(* Qed. *)
 
 
 Section Models.
@@ -134,27 +98,28 @@ Section Models.
     + eapply even_odd_priv_disj; eauto.
   Qed.
 
-  Definition st2nat_ex st__e st__o := exists N, st2nat (st__e, st__o) N. 
+  Definition st2nat_ex st__e st__o := exists N, st2nat (st__e, st__o) N.
 
-  Lemma even_matched_by_odd: matched_by st2nat_ex (fun _ => None) (is_action_of odd_AM). 
+  Lemma even_synced_by_odd: 
+    synced_by st2nat_ex. 
   Proof. 
     red. intros st__e st__e' a ρ st__o [n CORR] ACT__o STEP__e.
     pose proof STEP__e as ACT%action_of_step%even_acts.
     destruct ACT as [[k ->] | PRIV]. 
     2: { edestruct even_priv_odd_noact; eauto. }
-    destruct CORR as [CUR__e CUR__o]. simpl in *. 
+    destruct CORR as [CUR__e CUR__o]. simpl in *.
     apply even_step_inv in STEP__e. destruct STEP__e as (<-&?&E).
     opose proof * odd_syncable as (st__o' & STEP__o); eauto.
-    { erewrite (f_equal Nat.even); eauto. rewrite CUR__e. eauto. }
-    rewrite CUR__o -CUR__e in STEP__o. 
-    eexists. split; eauto.
-    apply odd_sync_inv in STEP__o as (?&?&?).
-    eexists. split; eauto.
-  Qed.        
+    { erewrite (f_equal Nat.even); eauto. rewrite CUR__e. eauto. } 
 
-  Lemma odd_matched_by_even: matched_by (flip st2nat_ex) (fun _ => None) (is_action_of even_AM).
+    pose proof STEP__o as (?&?&?)%odd_sync_inv.
+    rewrite CUR__o -CUR__e in STEP__o.
+    eexists. split; eauto. eexists. split; eauto. simpl. lia. 
+  Qed.
+
+  Lemma odd_synced_by_even: synced_by (flip st2nat_ex).
   Proof. 
-  Admitted. 
+  Admitted.
 
   Context {Σ: gFunctors}. 
 
@@ -164,30 +129,30 @@ Section Models.
   (* Let even_AM := @even_AM even_impl.  *)
   (* Let odd_AM := @odd_AM odd_impl. *)
 
-  Lemma prod_no_ext_sync (st: amSt prod_model):
-    None ∉ ams_lr st.
-  Proof.
-    intros IN%ams_lr_spec. destruct IN as (?&?&STEP).
-    inversion STEP; subst.
-    pose proof STEP1 as ACT1%action_of_step%even_acts.
-    pose proof STEP2 as ACT2%action_of_step%odd_acts.
-    destruct ACT1 as [[k ?] | PRIV1], ACT2 as [[? EQ] | PRIV2]; subst; cycle 1. 
-    { by apply odd_pub_priv_disj in PRIV2. }
-    { by apply even_pub_priv_disj in PRIV1. }
-    { by edestruct @even_odd_priv_disj; eauto. }
-    apply coPset_nth_inj in EQ. subst.
-    apply even_sync_inv in STEP1 as (?&?&?). apply odd_sync_inv in STEP2 as (?&?&?).
-    edestruct even_odd_False; eauto.
-  Qed.
+  (* Lemma prod_no_ext_sync (st: amSt prod_model): *)
+  (*   None ∉ ams_lr st. *)
+  (* Proof. *)
+  (*   intros IN%ams_lr_spec. destruct IN as (?&?&STEP). *)
+  (*   inversion STEP; subst. *)
+  (*   pose proof STEP1 as ACT1%action_of_step%even_acts. *)
+  (*   pose proof STEP2 as ACT2%action_of_step%odd_acts. *)
+  (*   destruct ACT1 as [[k ?] | PRIV1], ACT2 as [[? EQ] | PRIV2]; subst; cycle 1.  *)
+  (*   { by apply odd_pub_priv_disj in PRIV2. } *)
+  (*   { by apply even_pub_priv_disj in PRIV1. } *)
+  (*   { by edestruct @even_odd_priv_disj; eauto. } *)
+  (*   apply coPset_nth_inj in EQ. subst. *)
+  (*   apply even_sync_inv in STEP1 as (?&?&?). apply odd_sync_inv in STEP2 as (?&?&?). *)
+  (*   edestruct even_odd_False; eauto. *)
+  (* Qed. *)
 
   Lemma even_matched_by_prod: 
     @matched_by even_AM prod_model
       (fun st__s '(st__s', st__m) => st__s' = st__s /\ st2nat_ex st__s st__m)
-      (Some ∘ inl)
-      (fun _ => True).
+      (inl)
+      .
   Proof.
     apply matched_by_prod_l; try by apply _.
-    { apply even_matched_by_odd. }
+    { apply even_synced_by_odd. }
     intros st__e st__e' a ρ st__o [? CUR] STEP__e NACT__o. 
     pose proof STEP__e as ACT%action_of_step%even_acts.
     destruct ACT as [[k ->] | PRIV].
@@ -199,11 +164,11 @@ Section Models.
   Lemma odd_matched_by_prod: 
     @matched_by odd_AM prod_model
       (fun st__s '(st__m, st__s') => st__s' = st__s /\ st2nat_ex st__m st__s)
-      (Some ∘ inr)
-      (fun _ => True).
+      (inr)
+  .
   Proof.
     apply matched_by_prod_r; try by apply _.
-    { apply odd_matched_by_even. }
+    { apply odd_synced_by_even. }
     intros st__o st__o' a ρ st__e [? CUR] STEP__o NACT__o. 
     pose proof STEP__o as ACT%action_of_step%odd_acts.
     destruct ACT as [[k ->] | PRIV].
@@ -227,22 +192,9 @@ Section Models.
       all: set_solver. }
     
     apply union_subseteq. split.
-    - eapply subseteq_map_inj_gset.
-      { apply Some_inj. }
-      rewrite <- set_map_compose_gset.
-      etrans.
-      { erewrite matched_AM_live_roles; [reflexivity|..].
-        { apply even_matched_by_prod. }
-        Unshelve.
-        2: { apply _. }
-        2: exact (st__e, st__o).
-        rewrite /st2nat_ex. eauto.  }
-      (* TODO: simplify somehow? *)
-      simpl.
-      pose proof (prod_no_ext_sync (st__e, st__o)) as NNONE. 
-      rewrite extract_Somes_gset_inv.
-      apply subseteq_difference_r; auto.
-      by apply disjoint_singleton_r.
+    - eapply matched_AM_live_roles.
+      { apply even_matched_by_prod. }
+      simpl. split; eauto. red. eauto. 
     - admit. 
   Admitted. 
 
@@ -267,15 +219,11 @@ Section Models.
     (CUR: st2nat st n):
     even_role (ρ__e even_impl) ∈ AM_live_roles st.
   Proof.
-    opose proof * live_lift as LIVE. 
-    { eapply even_matched_by_prod. }
-    4: { apply prod_no_ext_sync. }
-    { apply prod_AM_act_dec. }
-    2: { apply ρ__e_always_live. }
-    { simpl. rewrite /st2nat_ex. 
-      Unshelve. 3: eapply pair.
-      { simpl. eauto. } }
-    by destruct st.
+    destruct st as [??]. 
+    eapply live_lift. 
+    { apply even_matched_by_prod. }
+    { simpl. split; eauto. red. eauto. }
+    apply ρ__e_always_live.
   Qed.
 
   Let LM := the_model.
@@ -287,7 +235,7 @@ Section Models.
 
   (* since we use this resource to justify MU, it should include the whole state *)
   Definition cur_st `{!heapGS Σ LM} n: iProp Σ :=
-    ∃ st, frag_model_is st ∗ ⌜ st2nat st.1 n ⌝.
+    ∃ (st: fmstate M), frag_model_is st ∗ ⌜ st2nat st.1 n ⌝.
 
   Hypothesis PROD_ENV_INDEP: forall a, is_action_of PM a -> is_action_of env_AM a -> False.
 
@@ -306,11 +254,12 @@ Section Models.
              eapply pt_inner1; eauto.
              intros ?. edestruct PROD_ENV_INDEP; eauto.
              eapply action_of_step; eauto. }
-           simpl. setoid_rewrite @prod_indep_live_roles; eauto. 
+           simpl. setoid_rewrite @prod_indep_live_roles; eauto.
            apply union_mono; [| done]. apply set_map_mono; [done| ].
            eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
       iFrame. done. }
+    Unshelve. 2: by apply _. 
     
     destruct (Nat.even n) eqn:E.
     - opose proof (even_steppable _ st__e) as (st__e' & STEP__e); eauto.
@@ -353,6 +302,7 @@ Section Models.
            eapply prod_step_lr_nonincr; done. }
       iIntros "(MAP & ST)".
       iFrame. done. }
+    Unshelve. 2: by apply _. 
  
     destruct (Nat.odd n) eqn:O.
     - opose proof (odd_steppable _ st__o) as (st__o' & STEP__o); eauto.
