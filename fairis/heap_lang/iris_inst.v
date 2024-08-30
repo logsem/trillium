@@ -7,34 +7,28 @@ From trillium.fairness.heap_lang Require Export lang tactics notation.
 Set Default Proof Using "Type".
 
 
-(* Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG { *)
-Class heapGpreS Σ (AM1 AM2: ActionModel) := HeapPreG {
+Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG {
   heapGpreS_inv :> invGpreS Σ;
   heapGpreS_gen_heap :> gen_heapGpreS loc val Σ;
-  heapGpreS_fairness :> fairnessGpreS AM1 AM2 Σ;
+  heapGpreS_fairness :> fairnessGpreS M Σ;
 }.
 
-(* Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG { *)
-Class heapGS Σ (AM1 AM2: ActionModel) := HeapG { 
-  heap_inG :> heapGpreS Σ AM1 AM2;
+Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG {
+  heap_inG :> heapGpreS Σ LM;
   heap_invGS : invGS_gen HasNoLc Σ;
   heap_gen_heapGS :> gen_heapGS loc val Σ;
-  heap_fairnessGS :> fairnessGS AM1 AM2 Σ;
+  heap_fairnessGS :> fairnessGS M Σ;
 }.
 
-Definition heapΣ (AM1 AM2: ActionModel) : gFunctors :=
-  #[ invΣ; gen_heapΣ loc val; fairnessΣ heap_lang AM1 AM2 ].
+Definition heapΣ (M: FairModel) : gFunctors :=
+  #[ invΣ; gen_heapΣ loc val; fairnessΣ heap_lang M ].
 
-Global Instance subG_heapPreG {Σ} {AM1 AM2: ActionModel} :
-  subG (heapΣ AM1 AM2) Σ → heapGpreS Σ AM1 AM2.
+Global Instance subG_heapPreG {Σ} `{LM:LiveModel heap_lang M} :
+  subG (heapΣ M) Σ → heapGpreS Σ LM.
 Proof. solve_inG. Qed.
 
-#[global] Instance heapG_irisG {AM1 AM2: ActionModel} 
-  (PM := ProdAM AM1 AM2)
-  {PMS: AM_strong_lr PM}
-  (M := AM2FM PM PMS)
-  {LM: LiveModel heap_lang M}
- `{!heapGS Σ AM1 AM2} : irisG heap_lang LM Σ := {
+#[global] Instance heapG_irisG `{LM: LiveModel heap_lang M}
+ `{!heapGS Σ LM} : irisG heap_lang LM Σ := {
     iris_invGS := heap_invGS;
     state_interp extr auxtr :=
       (⌜valid_state_evolution_fairness extr auxtr⌝ ∗
@@ -211,19 +205,9 @@ Proof. solve_pure_exec. Qed.
 
 (* TODO: move to corresponding files? *)
 Section SSWP_MU.
-
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}.
-  Let M := AM2FM PM PROD_LR.
-  Context {LM: LiveModel heap_lang M}.
-  Context `{hGS: !heapGS Σ AM1 AM2}.
+  Context `{LM: LiveModel heap_lang M}.
+  Context `{hGS: !heapGS Σ LM}.
   
-  (* Need to explicitly specify the instance, 
-     since the LM argument is not inferred automatically *)
-  Let hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS. 
-  Existing Instance hi. 
-
   Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
     match to_val e1 with
     | Some v => |={E}=> (Φ (of_val v))

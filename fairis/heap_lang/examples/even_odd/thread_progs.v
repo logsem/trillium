@@ -6,9 +6,10 @@ From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness utils action_model.
+From trillium.fairness Require Import fairness utils action_model resources fuel.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
-From trillium.fairness.heap_lang Require Import notation.
+From trillium.fairness.heap_lang Require Import notation iris_inst lifting sswp_rules.
+From trillium.fairness.heap_lang.examples Require Import mu_role.
 
 Close Scope Z. 
 
@@ -140,8 +141,9 @@ End StResImpl.
 
 
 Section ProofsGen.  
-  Context `{LM__p: LiveModel heap_lang M__p}.
-  Context `{!heapGS Σ LM__p}.
+  Context `{LM: LiveModel heap_lang M}.
+  Context `{!heapGS Σ LM}.
+
   Context (cond: nat -> bool).
   Hypothesis (COND_S_NEG: forall n, cond (S n) = negb (cond n)). 
   
@@ -156,16 +158,17 @@ Section ProofsGen.
     sr N.
     (* own th_name (●E (if cond N then N else (N + 1))). *)
   
-  Definition eo_vs `(SR: StateRes cond sr frag) l ι (ρ: fmrole M__p) : iProp Σ :=
+  Definition eo_vs `(SR: StateRes cond sr frag) l ι (ρ: fmrole M) : iProp Σ :=
     □ |={⊤, ⊤ ∖ ↑ι}=> ∃ N,
       (▷ eo_corr SR l N) ∗
       (MU__r ρ (⊤ ∖ ↑ι)
          (▷ (eo_corr SR l (if cond N then N + 1 else N)) ={⊤ ∖ ↑ι, ⊤}=∗ True)
+         (LM := LM)
       ).
 
   Definition eo_spec (prog: val) :=
     forall `(SR: StateRes cond sr frag) (tid: locale heap_lang) n ρ (N: nat) f (Hf: f > 40) ι
-    (FL: lm_flm LM__p >= 61),
+    (FL: lm_flm LM >= 61),
     ⊢ {{{ eo_vs SR n ι ρ ∗ has_fuels tid {[ ρ := f ]} ∗ frag N }}}
         prog #n #N @ tid
       {{{ RET #(); has_fuels tid ∅ }}}.    
@@ -178,14 +181,13 @@ Section ProofsGen.
     iIntros (Φ). iIntros "(#VS & Hf & Heven) Hk".
                    
     rewrite /incr_loop.
-    wp_lam.
     wp_pures. wp_bind (CmpXchg _ _ _). iApply wp_atomic.
-    iPoseProof "VS" as "-#V". iMod "V" as "(%M & (>Hn & SR) & CLOS)".
+    iPoseProof "VS" as "-#V". iMod "V" as "(%m & (>Hn & SR) & CLOS)".
 
     iSpecialize ("CLOS" with "[Hf]").
     { iSplitL.
       { iApply has_fuels_proper; [reflexivity| | by iFrame].
-        rewrite insert_union_singleton_l. f_equiv; [reflexivity| ].
+        rewrite insert_union_singleton_l. f_equiv; [reflexivity| ]. 
         apply leibniz_equiv_iff. apply fmap_empty. }
       set_solver. }
     rewrite map_union_empty.
@@ -194,7 +196,7 @@ Section ProofsGen.
     { iNext. iApply (sr_agree _ _ _ SR with "[$] [$]"). }
     iMod "EQ" as "%".
             
-    destruct (cond M) eqn:Heqn.
+    destruct (cond m) eqn:Heqn.
     - iModIntro. subst. 
       iApply sswp_MU_wp; [done| ].
       iApply (wp_cmpxchg_suc with "[$]"); try done.  
@@ -206,12 +208,13 @@ Section ProofsGen.
       wp_pures.
       iModIntro. 
       iMod ("CLOS" with "[Hay Hb]") as "_". 
-      { replace (Z.of_nat M + 1)%Z with (Z.of_nat (M + 1)) by lia.
+      { replace (Z.of_nat m + 1)%Z with (Z.of_nat (m + 1)) by lia.
         iFrame. }
-      iModIntro. simpl. 
+      iModIntro. simpl.
 
       do 3 wp_pure _.
-      replace (Z.of_nat M + 2)%Z with (Z.of_nat (M + 2)) by lia.
+      
+      replace (Z.of_nat m + 2)%Z with (Z.of_nat (m + 2)) by lia.
       iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
@@ -220,7 +223,7 @@ Section ProofsGen.
 
       iApply sswp_MU_wp; [done| ].
       iApply (wp_cmpxchg_fail with "[$]"); [| done| ].
-      { assert (M ≠ M + 1) by lia. set_solver. }
+      { assert (m ≠ m + 1) by lia. set_solver. }
       iIntros "!> Hb".
       iApply (MU_wand with "[-CLOS] [$]"). 
       iIntros "(Hf & CLOS)". 
@@ -232,11 +235,12 @@ Section ProofsGen.
       iModIntro. simpl.
 
       do 2 wp_pure _.
+
       iApply ("Hg" with "[] [Heven Hf] [$]"); last first.
       { iFrame "∗#". }
       iPureIntro; lia.
   Qed.
-    
+  
 End ProofsGen.
 
 (* TODO: define these interfaces separately? *)

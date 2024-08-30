@@ -4,15 +4,9 @@ From trillium.fairness.heap_lang Require Import notation iris_inst.
 
 
 Section MuRole.
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}. 
-  Let M := AM2FM PM PROD_LR.
-
-  Context {LM: LiveModel heap_lang M}.
-
-  Context `{!heapGS Σ AM1 AM2}. 
-            
+  Context `{LM: LiveModel heap_lang M}.
+  Context `{hG: !heapGS Σ LM}.
+  
   Definition MU__r ρ E P: iProp Σ :=  
     ∀ τ f R, τ ↦M ({[ ρ := f ]} ∪ (S <$> R)) ∗ ⌜ ρ ∉ dom R ⌝ -∗
               MU E τ (τ ↦M ({[ ρ := lm_flm LM ]} ∪ R) ∗ P) (LM := LM).

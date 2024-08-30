@@ -3,47 +3,38 @@ From trillium.fairness Require Import fairness fuel map_included_utils utils act
 
 
 Section Steps.
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}. 
-  Let M := AM2FM PM PROD_LR.
+  Context {M: FairModel}.
 
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
-  Context {fG: fairnessGS AM1 AM2 Σ}.
+  Context {fG: fairnessGS M Σ}.
 
-  Context {LR1: AM_strong_lr AM1} {LR2: AM_strong_lr AM2}.
-  Context {INDEP: models_independent AM1 AM2}.
-  Existing Instance LR1.
-  Existing Instance LR2.
-
-  Lemma model_state_interp_has_fuels_dealloc tid fs ρ tp (δ: amSt AM1) δ':
-    ρ ∉ AM_live_roles δ →
+  Lemma model_state_interp_has_fuels_dealloc tid fs ρ tp (δ: fmstate M) δ':
+    ρ ∉ live_roles _ δ →
     model_state_interp tp δ' -∗
     frag_model_is δ -∗
     has_fuels tid fs ==∗
-    model_state_interp tp δ' ∗ frag_model_is δ ∗ has_fuels tid (delete (inl ρ) fs).
+    model_state_interp tp δ' ∗ frag_model_is δ ∗ has_fuels tid (delete ρ fs).
   Proof.
     intros Hρ.
-    destruct (decide (inl ρ ∈ dom fs)) as [Hin|Hnin]; last first.
-    { assert (delete (inl ρ) fs = fs) as ->.
+    destruct (decide (ρ ∈ dom fs)) as [Hin|Hnin]; last first.
+    { assert (delete (ρ) fs = fs) as ->.
       { apply delete_notin. by rewrite -not_elem_of_dom. }
       by iIntros "$$$". }
     iDestruct 1 as
       (fm [Hfmle Hdom] Hfmdead Htp) "(Hm & Hfm)".
     iIntros "Hst Hfs". 
     iDestruct (model_agree with "Hm Hst") as %Heq.
-    Set Printing Coercions.
-    destruct (ls_under (ls_data δ')) as [s1 s'] eqn:ST. simpl in Heq.  subst. 
+    (* destruct (ls_under (ls_data δ')) as s1 eqn:ST. simpl in Heq.  subst.  *)
     (* rewrite !Heq. *)
-    assert (is_Some (fs !! inl ρ)) as [f HSome].
+    assert (is_Some (fs !! ρ)) as [f HSome].
     { by rewrite -elem_of_dom. }
     iDestruct (has_fuels_agree with "Hfm Hfs") as %Hagree.
     iMod (has_fuels_delete with "Hfm Hfs") as "[Hfm Hfs]".
     iModIntro.
     iFrame "Hst". iFrame "Hfs".
-    iExists _. iFrame. rewrite ST. iFrame.
+    iExists _. iFrame. iFrame.
     iPureIntro.
     repeat split; try done.
     - rewrite /fuel_map_le.
@@ -58,17 +49,12 @@ Section Steps.
       set_solver.
     - rewrite /fuel_map_preserve_dead.
       intros ρ' Hρ'.
-      assert (inl ρ ≠ ρ').
-      { intros <-. 
-        simpl in Hρ'. rewrite prod_indep_live_roles in Hρ'. 
-        apply elem_of_union in Hρ' as [IN | ?]; [| set_solver].
-        apply elem_of_map_inj_gset in IN; [| apply _].
-        done. }
+      assert (ρ ≠ ρ') by set_solver. 
       rewrite /fuel_map_preserve_dead in Hfmdead.
       (* rewrite Heq in Hfmdead. *)
       apply Hfmdead in Hρ' as (ζ&ρs&HSome'&Hρs).
       destruct (decide (tid = ζ)) as [->|Hneq].
-      + exists ζ, (delete (inl ρ) fs).
+      + exists ζ, (delete (ρ) fs).
         rewrite lookup_insert. set_solver.
       + exists ζ, ρs. rewrite lookup_insert_ne; [|done].
         set_solver.
@@ -243,8 +229,7 @@ Section Steps.
       destruct f''; [lia|].
       simplify_eq.
 
-      (* lia. *)
-      simpl in *. rewrite Hv2 in Heq. inversion Heq. lia.  
+      lia.
     - rewrite /model_update_locale_role_map.
       simpl.
       rewrite dom_fmap_L.

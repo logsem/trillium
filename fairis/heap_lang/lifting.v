@@ -3,25 +3,11 @@ From trillium.program_logic Require Import ectx_lifting.
 From trillium.fairness.heap_lang Require Import iris_inst.
 From trillium.fairness Require Import action_model fuel.
 From trillium.fairness.lm_rules Require Import lm_rules.
-From trillium.fairness.heap_lang Require Export lang tactics notation.
+From trillium.fairness.heap_lang Require Export lang tactics notation locales_lemmas.
 
 Section lifting.
-(* Context `{LM:LiveModel heap_lang M}. *)
-(* Context `{!heapGS Σ LM}. *)
-
-Context {AM1 AM2: ActionModel}.
-Let PM := ProdAM AM1 AM2.
-Context {PROD_LR: AM_strong_lr PM}.
-Let M := AM2FM PM PROD_LR.
-Context {LR1: AM_strong_lr AM1} {LR2: AM_strong_lr AM2}.
-Context {INDEP: models_independent AM1 AM2}.
-Context {LM: LiveModel heap_lang M}.
-Context `{hGS: !heapGS Σ AM1 AM2}.
-
-(* Need to explicitly specify the instance, 
-   since the LM argument is not inferred automatically *)
-Let hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS. 
-Existing Instance hi. 
+Context `{LM: LiveModel heap_lang M}.
+Context `{hG: !heapGS Σ LM}.
 
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
@@ -33,11 +19,6 @@ Implicit Types tid : nat.
 
 
 
-    (* TODO: move *)
-    Lemma locale_fill' e K t1: locale_of t1 (fill K e) = locale_of t1 e.
-    Proof. done. Qed.
-
-
 Lemma has_fuels_decr E tid fs :
   tid ↦M++ fs -∗ |~{E}~| tid ↦M fs.
 Proof.
@@ -46,10 +27,10 @@ Proof.
   iMod (model_state_interp_has_fuels_decr with "Hm Hf") as "[$ $]". by iFrame.
 Qed.
 
-Lemma has_fuels_dealloc E tid fs (ρ: amRole AM1) (δ: amSt AM1) :
-  ρ ∉ AM_live_roles δ → frag_model_is δ -∗ tid ↦M fs -∗
-  |~{E}~| frag_model_is δ ∗ tid ↦M (delete (inl ρ) fs).
-Proof using LR1 LR2 INDEP.
+Lemma has_fuels_dealloc E tid fs (ρ: fmrole M) (δ: fmstate M) :
+  ρ ∉ live_roles _ δ → frag_model_is δ -∗ tid ↦M fs -∗
+  |~{E}~| frag_model_is δ ∗ tid ↦M (delete (ρ) fs).
+Proof using.
   iIntros (Hnin) "Hst Hf". rewrite weakestpre.pre_step_unseal.
   iIntros (extr atr) "[%Hvse [Hσ Hm]]".
   iMod (model_state_interp_has_fuels_dealloc with "Hm Hst Hf") as "[Hm Hf]";
@@ -58,27 +39,25 @@ Qed.
 
 (* Rule from the Trillium article *)
 Lemma wp_role_dealloc s tid E e fs ρ δ Φ :
-  ρ ∉ AM_live_roles δ → frag_model_is δ -∗ tid ↦M fs -∗
-  (frag_model_is δ -∗ tid ↦M (delete (inl ρ) fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
+  ρ ∉ live_roles _ δ → frag_model_is δ -∗ tid ↦M fs -∗
+  (frag_model_is δ -∗ tid ↦M (delete (ρ) fs) -∗ WP e @ s; tid; E {{ Φ }}) -∗
   WP e @ s; tid; E {{ Φ }}.
-Proof using LR1 LR2 INDEP.
+Proof using.
   iIntros (Hnin) "HM Hfuels Hwp".
   iMod (has_fuels_dealloc with "HM Hfuels") as "[HM Hfuels]"; [done|].
   by iApply ("Hwp" with "HM Hfuels").
 Qed.
 
 (* TODO: move? *)
-Lemma model_step_MU tid E s1 s2 ρ f1 fs a
-  (Hdom: inl ρ ∉ dom fs)
-  (* (TRANS: fmtrans M s1 (Some ρ) s2) *)
-  (TRANS: amTrans AM1 s1 (a, Some ρ) s2)
-  (* (LR: M.(live_roles) s2 ⊆ M.(live_roles) s1): *)
-  (LR: AM_live_roles s2 ⊆ AM_live_roles s1):
+Lemma model_step_MU tid E s1 s2 ρ f1 fs
+  (Hdom: ρ ∉ dom fs)
+  (TRANS: fmtrans M s1 (Some ρ) s2)
+  (LR: M.(live_roles) s2 ⊆ M.(live_roles) s1):
   frag_model_is s1 -∗
-  tid ↦M ({[inl ρ := f1]} ∪ (S <$> fs)) -∗
+  tid ↦M ({[ρ := f1]} ∪ (S <$> fs)) -∗
   MU E tid (frag_model_is s2 ∗
-           tid ↦M ({[inl ρ := lm_flm LM]} ∪ fs)) (LM := LM).
-Proof using LR1 LR2 INDEP.
+           tid ↦M ({[ρ := lm_flm LM]} ∪ fs)) (LM := LM).
+Proof using.
   iIntros "Hst Hfuel1".
   rewrite /MU /HL_LM_trace_interp'. iIntros (extr lmtr) "X".
   destruct extr; [done| ].
@@ -89,21 +68,18 @@ Proof using LR1 LR2 INDEP.
 Qed. 
   
 
-
-Lemma wp_step_model s tid ρ (f1 : nat) fs s1 s2 a E e Φ :
+Lemma wp_step_model s tid ρ (f1 : nat) fs s1 s2 E e Φ :
   TCEq (to_val e) None →
-  (* fmtrans M s1 (Some ρ) s2 → *)
-  amTrans AM1 s1 (a, Some ρ) s2 →
-  (* M.(live_roles) s2 ⊆ M.(live_roles) s1 → *)
-  AM_live_roles s2 ⊆ AM_live_roles s1 →
-  inl ρ ∉ dom fs →
+  fmtrans M s1 (Some ρ) s2 →
+  M.(live_roles) s2 ⊆ M.(live_roles) s1 →
+  ρ ∉ dom fs →
   ▷ frag_model_is s1 -∗
-  ▷ tid ↦M ({[inl ρ:=f1]} ∪ fmap S fs) -∗
+  ▷ tid ↦M ({[ρ:=f1]} ∪ fmap S fs) -∗
   sswp s E e (λ e', frag_model_is s2 -∗
-                    tid ↦M ({[inl ρ:=(LM.(lm_flm))]} ∪ fs) -∗
+                    tid ↦M ({[ρ:=(LM.(lm_flm))]} ∪ fs) -∗
                     WP e' @ s; tid; E {{ Φ }} ) (LM := LM) -∗
   WP e @ s; tid; E {{ Φ }}.
-Proof using LR1 LR2 INDEP.
+Proof using.
   iIntros (Hval Htrans Hlive Hdom) ">Hst >Hfuel1 Hwp".
   iApply sswp_MU_wp.
   { by inversion Hval. }
@@ -115,20 +91,18 @@ Proof using LR1 LR2 INDEP.
 Qed. 
 
 
-Lemma wp_step_model_singlerole s tid ρ (f1 : nat) s1 s2 a E e Φ :
+Lemma wp_step_model_singlerole s tid ρ (f1 : nat) s1 s2 E e Φ :
   TCEq (to_val e) None →
-  (* fmtrans M s1 (Some ρ) s2 → *)
-  amTrans AM1 s1 (a, Some ρ) s2 →
-  (* M.(live_roles) s2 ⊆ M.(live_roles) s1 → *)
-  AM_live_roles s2 ⊆ AM_live_roles s1 →
-  ▷ frag_model_is s1 -∗ ▷ tid ↦M {[inl ρ := f1]} -∗
+  fmtrans M s1 (Some ρ) s2 →
+  M.(live_roles) s2 ⊆ M.(live_roles) s1 →
+  ▷ frag_model_is s1 -∗ ▷ tid ↦M {[ρ := f1]} -∗
   sswp s E e (λ e', frag_model_is s2 -∗
-                    tid ↦M {[inl ρ := (LM.(lm_flm))]} -∗
+                    tid ↦M {[ρ := (LM.(lm_flm))]} -∗
                     WP e' @ s; tid; E {{ Φ }} ) (LM := LM) -∗
   WP e @ s; tid; E {{ Φ }}.
-Proof using LR1 LR2 INDEP.
+Proof using.
   iIntros (Hval Htrans Hlive) ">Hst >Hfuel1 Hwp".
-  replace ({[inl ρ := f1]}) with ({[(inl ρ: fmrole M) := f1]} ∪ (fmap S ∅:gmap _ _)); last first.
+  replace ({[ρ := f1]}) with ({[(ρ: fmrole M) := f1]} ∪ (fmap S ∅:gmap _ _)); last first.
   { rewrite fmap_empty. rewrite right_id_L. done. }
   iApply (wp_step_model with "Hst Hfuel1"); [done|set_solver|done|].
   iApply (sswp_wand with "[] Hwp"). iIntros (e') "Hwp Hst Hfuel1".
@@ -139,7 +113,7 @@ Lemma wp_step_fuel s tid E e fs Φ :
   fs ≠ ∅ → ▷ tid ↦M++ fs -∗
   sswp s E e (λ e', tid ↦M fs -∗ WP e' @ s; tid; E {{ Φ }} ) (LM := LM)-∗
   WP e @ s; tid; E {{ Φ }}.
-Proof using INDEP.
+Proof using.
   iIntros (?) ">HfuelS Hwp". rewrite wp_unfold /wp_pre /sswp /=.
   destruct (to_val e).
   { iMod (has_fuels_decr with "HfuelS") as "Hfuel".
@@ -158,21 +132,6 @@ Proof using INDEP.
   iDestruct ("Hwp" with "Hfuel") as "Hwp". iSplit; [|done].
   iApply (wp_wand with "Hwp"). iIntros (v) "HΦ'". by iFrame.
 Qed.
-
-(* TODO: Move this somewhere else *)
-Lemma heap_lang_locales_equiv_from_length (es10 es1 es20 es2 : list expr) :
-  length es10 = length es20 → length es1 = length es2 →
-  locales_equiv_from es10 es20 es1 es2.
-Proof.
-  revert es10 es20 es2.
-  induction es1 as [|e es1 IHes1]; intros es10 es20 es2 Hlen; [by destruct es2|].
-  destruct es2; [done|]=> /=. constructor; [done|].
-  apply IHes1; [by rewrite !app_length=> /=;f_equiv|lia].
-Qed.
-
-Lemma heap_lang_locales_equiv_length (es1 es2 : list expr) :
-  length es1 = length es2 → locales_equiv es1 es2.
-Proof. intros Hlen. by apply heap_lang_locales_equiv_from_length. Qed.  
 
 Lemma wp_role_fork s tid E e Φ R1 R2 (Hdisj: R1 ##ₘ R2) (Hnemp: R1 ∪ R2 ≠ ∅):
   tid ↦M++ (R1 ∪ R2) -∗

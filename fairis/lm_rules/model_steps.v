@@ -3,20 +3,11 @@ From trillium.fairness Require Import fairness fuel map_included_utils utils act
 
 
 Section Steps.
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}. 
-  Let M := AM2FM PM PROD_LR.
-
+  Context {M: FairModel}.
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
-  Context {fG: fairnessGS AM1 AM2 Σ}.
-
-  Context {LR1: AM_strong_lr AM1} {LR2: AM_strong_lr AM2}.
-  Context {INDEP: models_independent AM1 AM2}.
-  Existing Instance LR1.
-  Existing Instance LR2.
+  Context {fG: fairnessGS M Σ}.
 
   (* OBS: Maybe use fuel limit instead of generic [f] *)
   Program Definition model_update_set (ζ : locale Λ) (ρ : fmrole M) (f : nat) (δ : LM) : LM :=
@@ -89,32 +80,31 @@ Section Steps.
 
   Lemma update_model' δ s s' :
     auth_model_is δ -∗ frag_model_is s ==∗
-    auth_model_is (s', δ.2) ∗ frag_model_is s'.
+    auth_model_is (s') ∗ frag_model_is s'.
   Proof. iApply update_model. Qed. 
 
   (* OBS: Need to make frag model abstract *)
   Lemma model_state_interp_model_step_update
     (* (ρ : fmrole M) *)
-    (ρ : amRole AM1)
+    (ρ : fmrole M)
         (fs : gmap (fmrole M) nat) tp1 tp2
-        (δ δ2 : LM) ζ σ1 σ2 (f1 : nat) (s1 s2: amSt AM1) a:
-    inl ρ ∉ dom fs →
-    AM_live_roles s2 ⊆ AM_live_roles s1 →
+        (δ δ2 : LM) ζ σ1 σ2 (f1 : nat) (s1 s2: fmstate M):
+    ρ ∉ dom fs →
+    live_roles _  s2 ⊆ live_roles _  s1 →
     locale_step (tp1, σ1) (Some ζ) (tp2, σ2) →
-    (* fmtrans _ s1 (Some ρ) s2 → *)
-    amTrans AM1 s1 (a, Some ρ) s2 ->
-    (ls_data δ2) = model_update_model_step ζ ({[inl ρ]} ∪ dom fs) (inl ρ) (s2, (ls_under $ ls_data δ).2) δ →
+    fmtrans _ s1 (Some ρ) s2 →
+    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ dom fs) (ρ) (s2) δ →
     model_state_interp tp1 δ -∗
-    has_fuels ζ ({[inl ρ := f1]} ∪ (S <$> fs)) -∗
+    has_fuels ζ ({[ρ := f1]} ∪ (S <$> fs)) -∗
     frag_model_is s1 ==∗
     model_state_interp tp2 δ2 ∗
-    has_fuels ζ ({[inl ρ := LM.(lm_flm)]} ∪ fs) ∗
+    has_fuels ζ ({[ρ := LM.(lm_flm)]} ∪ fs) ∗
     frag_model_is s2.
   Proof.
     iIntros (Hfs Hlive Hstep Hmstep Hδ2) "Hm Hf Hs".
     iDestruct "Hm" as (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
     iDestruct (has_fuels_agree with "Hfm Hf") as %Hagree.
-    iMod (has_fuels_update _ _ _ ({[inl ρ := lm_flm LM]} ∪ fs) with "Hfm Hf")
+    iMod (has_fuels_update _ _ _ ({[ρ := lm_flm LM]} ∪ fs) with "Hfm Hf")
       as "[Hfm Hf]".
     iDestruct (model_agree with "Hm Hs") as %<-.
     iMod (update_model' _ _ s2 with "Hm Hs") as "[Hm Hs]".
@@ -141,12 +131,12 @@ Section Steps.
       rewrite -(insert_id (ls_map δ) ζ fs'); [|done].
       rewrite !alter_insert.
       apply map_included_insert; [|done].
-      assert ({[inl ρ := lm_flm LM]} ∪ fs =
-              (alter (λ _ : nat, lm_flm LM) (inl ρ)
+      assert ({[ρ := lm_flm LM]} ∪ fs =
+              (alter (λ _ : nat, lm_flm LM) (ρ)
                      ((λ f : nat, f - 1) <$>
                                          (filter
-                                            (λ ρf : fmrole M * nat, ρf.1 ∈ live_roles M δ ∨ ρf.1 ∈ {[inl ρ]} ∪ dom fs)
-                                            ({[inl ρ := f1]} ∪ (S <$> fs)))))) as EQ.
+                                            (λ ρf : fmrole M * nat, ρf.1 ∈ live_roles M δ ∨ ρf.1 ∈ {[ρ]} ∪ dom fs)
+                                            ({[ρ := f1]} ∪ (S <$> fs)))))) as EQ.
       { rewrite -!insert_union_singleton_l.
         rewrite map_filter_insert. simpl.
         case_decide; [|set_solver].
@@ -160,7 +150,7 @@ Section Steps.
       rewrite EQ. 
       apply map_included_mono_strong; [set_solver..| |].
       { intros k x1 x2 y1 y2 Hx1 Hx2 Hy1 Hy2 HR.
-        destruct (decide (k = inl ρ)) as [->|Hneq].
+        destruct (decide (k = ρ)) as [->|Hneq].
         - erewrite alter_insert_alt in Hy1; [|done].
           erewrite alter_insert_alt in Hy2; [|done].
           rewrite lookup_insert in Hy1.
@@ -180,14 +170,8 @@ Section Steps.
 
       (* apply Hlive in Hin. *)
       simpl in Hin.
-      assert (ρ' ∈ AM_live_roles (ls_under (ls_data δ))) as LIVE.
-      { rewrite prod_indep_live_roles in Hin. 
-        apply elem_of_union in Hin. 
-        destruct (ls_under (ls_data δ)) as [? ?] eqn:ST. simpl in Hin.  
-        rewrite prod_indep_live_roles.  
-        rewrite !elem_of_map in Hin. destruct Hin as [(?&->&Hin)|(?&->&Hin)].
-        + apply Hlive in Hin. rewrite ST in Hin. set_solver.
-        + set_solver. }
+      assert (ρ' ∈ live_roles _  (ls_under (ls_data δ))) as LIVE.
+      { apply Hlive in Hin. set_solver. }
       apply Hfmdead in LIVE as (ζ'&ρs&HSome&Hρ).
       destruct (decide (ζ = ζ')) as [<-|Hneq].
       * eexists ζ, _. rewrite lookup_insert. split; [done|]. by set_solver.
@@ -201,7 +185,7 @@ Section Steps.
       apply Htp in Hζ''.
       rewrite -not_elem_of_dom. rewrite -not_elem_of_dom in Hζ''.
       rewrite dom_insert_L.
-      rewrite -(insert_id fm ζ ({[inl ρ := f1]} ∪ (S <$> fs))) in Hζ''; [|done].
+      rewrite -(insert_id fm ζ ({[ρ := f1]} ∪ (S <$> fs))) in Hζ''; [|done].
       rewrite dom_insert_L in Hζ''.
       set_solver.
   Qed.
@@ -253,35 +237,35 @@ Section Steps.
     by eapply model_step_suff_data_weak_alt.
   Qed.
 
-  Lemma fmtrans_left s1 s2 s' a ρ
-    (STEP1: amTrans AM1 s1 (a, Some ρ) s2):
-    fmtrans M (s1, s') (Some $ inl ρ) (s2, s').
-  Proof.
-    simpl. econstructor. simpl.
-    econstructor; [| done]. 
-    intros ?. edestruct INDEP; eauto. eapply action_of_step; eauto.
-  Qed.
+  (* Lemma fmtrans_left s1 s2 s' a ρ *)
+  (*   (STEP1: amTrans AM1 s1 (a, Some ρ) s2): *)
+  (*   fmtrans M (s1, s') (Some $ ρ) (s2, s'). *)
+  (* Proof. *)
+  (*   simpl. econstructor. simpl. *)
+  (*   econstructor; [| done].  *)
+  (*   intros ?. edestruct INDEP; eauto. eapply action_of_step; eauto. *)
+  (* Qed. *)
 
-  Lemma live_roles_preserved_left (s1 s2: amSt AM1) s'
-    (LRP1: AM_live_roles s2 ⊆ AM_live_roles s1):
-    live_roles M ((s2, s'): fmstate M) ⊆ live_roles M (s1, s').
-  Proof.
-    simpl. rewrite !prod_indep_live_roles.
-    apply union_mono; [| done]. apply set_map_mono; done.
-  Qed. 
+  (* Lemma live_roles_preserved_left (s1 s2: fmstate M) s' *)
+  (*   (LRP1: live_roles _  s2 ⊆ live_roles _  s1): *)
+  (*   live_roles M ((s2, s'): fmstate M) ⊆ live_roles M (s1, s'). *)
+  (* Proof. *)
+  (*   simpl. rewrite !prod_indep_live_roles. *)
+  (*   apply union_mono; [| done]. apply set_map_mono; done. *)
+  (* Qed.  *)
 
-  Lemma model_state_interp_can_model_step es (δ δ2 : LM) ζ (ρ: amRole AM1) f
-        (fs : gmap (fmrole M) nat) (s1 s2 : amSt AM1) a:
+  Lemma model_state_interp_can_model_step es (δ δ2 : LM) ζ (ρ: fmrole M) f
+        (fs : gmap (fmrole M) nat) (s1 s2 : fmstate M):
     (* fmtrans _ s1 (Some ρ) s2 → *)
-    amTrans AM1 s1 (a, Some ρ) s2 →
+    fmtrans _ s1 (Some ρ) s2 →
     (* M.(live_roles) s2 ⊆ M.(live_roles) s1 → *)
-    AM_live_roles s2 ⊆ AM_live_roles s1 →
-    inl ρ ∉ dom fs →
-    (ls_data δ2) = model_update_model_step ζ ({[inl ρ]} ∪ dom fs) (inl ρ) (s2, (ls_under $ ls_data δ).2) δ →
+    live_roles _  s2 ⊆ live_roles _  s1 →
+    ρ ∉ dom fs →
+    (ls_data δ2) = model_update_model_step ζ ({[ρ]} ∪ dom fs) (ρ) (s2) δ →
     model_state_interp es δ -∗
-    has_fuels ζ ({[inl ρ := f]} ∪ (S <$> fs)) -∗
+    has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗
     frag_model_is s1 -∗
-    ⌜model_can_model_step δ ζ (inl ρ) δ2⌝.
+    ⌜model_can_model_step δ ζ (ρ) δ2⌝.
   Proof.
     iIntros (Hstep Hle Hρ Hδ2) "Hm Hf Hδ".
     iDestruct "Hm" as (fm Hfmle Hfmdead Htp) "(Hm & Hfm)".
@@ -291,15 +275,11 @@ Section Steps.
     rewrite /fuel_map_le /fuel_map_le_inner map_included_spec in Hfmle.
     pose proof Hagree as Hagree'.
     apply Hfmle in Hagree as (fs'&Hζ&Hfs').
-    assert (inl ρ ∈ dom fs') as Hρ'.
+    assert (ρ ∈ dom fs') as Hρ'.
     { apply map_included_subseteq_inv in Hfs'. set_solver. }
     eexists _, _. repeat split; try done.
-    - rewrite Hδ2. destruct (ls_under (ls_data δ)) as [? ?] eqn:ST. simpl.
-      rewrite ST in Hstep.
-      eapply fmtrans_left; eauto. 
-    - rewrite Hδ2. destruct (ls_under (ls_data δ)) as [? ?] eqn:ST. simpl.
-      rewrite ST in Hle. 
-      by apply live_roles_preserved_left. 
+    - by rewrite Hδ2. 
+    - by rewrite Hδ2. 
     - rewrite Hδ2. simpl. rewrite -!alter_compose.
       rewrite -{1}(insert_id (ls_map δ) ζ fs'); [|done].
       rewrite alter_insert.
@@ -313,7 +293,7 @@ Section Steps.
       right; set_solver.
     - rewrite map_included_spec.
       intros ρ' f' HSome.
-      assert (inl ρ ≠ ρ').
+      assert (ρ ≠ ρ').
       { intros Heq. rewrite Heq in HSome.
         by rewrite lookup_delete in HSome. }
       rewrite lookup_delete_ne in HSome; [|done].
@@ -325,10 +305,10 @@ Section Steps.
       rewrite map_lookup_filter in HSome. simpl in *.
       destruct (fs' !! ρ') eqn:Heqn; [|done].
       simpl in *.
-      destruct (decide (ρ' ∈ live_roles M δ ∨ ρ' ∈ {[inl ρ]} ∪ dom fs)) as [Hin|Hnin].
+      destruct (decide (ρ' ∈ live_roles M δ ∨ ρ' ∈ {[ρ]} ∪ dom fs)) as [Hin|Hnin].
       + rewrite option_guard_True in HSome; [|done].
         simpl in *. simplify_eq. f_equiv.
-        assert (ρ' ∈ dom ({[inl ρ := f]} ∪ (S <$> fs))) as Hin'.
+        assert (ρ' ∈ dom ({[ρ := f]} ∪ (S <$> fs))) as Hin'.
         { destruct Hin as [Hin|Hin]; [|set_solver].
           eapply (fuel_map_le_live_roles _ δ.(ls_map)); [| |done..|].
           - intros ???????. by eapply δ.(ls_map_disj).
@@ -379,30 +359,28 @@ Section Steps.
 
   Lemma update_model_step
         (extr : execution_trace Λ)
-        (auxtr: auxiliary_trace LM) c2 (s1 s2 : amSt AM1) fs 
-        (ρ: amRole AM1) (δ1 : LM) ζ f a:
+        (auxtr: auxiliary_trace LM) c2 (s1 s2 : fmstate M) fs 
+        (ρ: fmrole M) (δ1 : LM) ζ f:
     (* M.(live_roles) s2 ⊆ M.(live_roles) s1 → *)
-    AM_live_roles s2 ⊆ AM_live_roles s1 →
-    inl ρ ∉ dom fs →
+    live_roles _  s2 ⊆ live_roles _  s1 →
+    ρ ∉ dom fs →
     trace_last auxtr = δ1 →
     locale_step (trace_last extr) (Some ζ) c2 →
     (* fmtrans _ s1 (Some ρ) s2 → *)
-    amTrans AM1 s1 (a, Some ρ) s2 →
-    has_fuels ζ ({[inl ρ := f]} ∪ (S <$> fs)) -∗ frag_model_is s1 -∗
+    fmtrans _ s1 (Some ρ) s2 →
+    has_fuels ζ ({[ρ := f]} ∪ (S <$> fs)) -∗ frag_model_is s1 -∗
     model_state_interp (trace_last extr).1 δ1 ==∗
     ∃ (δ2: LM),
       ⌜valid_state_evolution_fairness
-        (extr :tr[Some ζ]: c2) (auxtr :tr[ Take_step (inl ρ) ζ]: δ2)⌝ ∗
-      has_fuels ζ ({[inl ρ := LM.(lm_flm)]} ∪ fs) ∗
+        (extr :tr[Some ζ]: c2) (auxtr :tr[ Take_step (ρ) ζ]: δ2)⌝ ∗
+      has_fuels ζ ({[ρ := LM.(lm_flm)]} ∪ fs) ∗
       frag_model_is s2 ∗ model_state_interp c2.1 δ2.
   Proof.
     iIntros (Hlive Hdom Hlast Hstep Htrans) "Hfuel Hfrag Hm".
     iDestruct (model_agree' with "Hm Hfrag") as %<-.
     pose proof (model_update_model_step_valid
-                  ζ ({[inl ρ]} ∪ dom fs) (inl ρ) (s2, (ls_under $ ls_data δ1).2) δ1) as [δ2 Hδ2].
-    { destruct (ls_under (ls_data δ1)) as [? ?] eqn:ST. simpl.
-      rewrite ST in Hlive. 
-      by apply live_roles_preserved_left. } 
+                  ζ ({[ρ]} ∪ dom fs) (ρ) (s2) δ1) as [δ2 Hδ2].
+    { eauto. } 
     iExists δ2.
     iDestruct (model_state_interp_can_model_step with "Hm Hfuel Hfrag")
       as %Hcan_step; [try done..|].

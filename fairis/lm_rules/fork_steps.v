@@ -4,22 +4,14 @@ From trillium.fairness Require Import fairness fuel map_included_utils utils act
 
 
 Section Steps.
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}. 
-  Let M := AM2FM PM PROD_LR.
+  Context {M: FairModel}.
 
   Context `{Countable (locale Λ)}.
   Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
-  Context {fG: fairnessGS AM1 AM2 Σ}.
+  Context {fG: fairnessGS M Σ}.
 
-  (* Context {LR1: AM_strong_lr AM1} {LR2: AM_strong_lr AM2}. *)
-  (* Context {INDEP: models_independent AM1 AM2}. *)
-  (* Existing Instance LR1. *)
-  (* Existing Instance LR2. *)
-
-  Context `{EqDecision (expr Λ)}. 
+  Context `{EqDecision (expr Λ)}.
 
   Definition has_forked (tp1 tp2 : list (expr Λ)) e : Prop :=
     ∃ tp1', tp2 = tp1' ++ [e] ∧ locales_equiv tp1 tp1'.
@@ -529,7 +521,7 @@ Section Steps.
         done. }
       rewrite -!alter_compose.
       erewrite alter_insert_alt; [|done].
-      f_equiv; [| done].
+      (* f_equiv; [| done]. *)
       simpl.
       rewrite map_filter_fmap. simpl.
       rewrite map_filter_filter. simpl.

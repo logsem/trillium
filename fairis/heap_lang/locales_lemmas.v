@@ -55,3 +55,20 @@ Qed.
 Lemma locales_of_list_indexes (es : list expr) :
   locales_of_list es = indexes es.
 Proof. apply locales_of_list_from_indexes. Qed.
+
+Lemma locale_fill' e K t1: locale_of t1 (fill K e) = locale_of t1 e.
+Proof. done. Qed.
+
+Lemma heap_lang_locales_equiv_from_length (es10 es1 es20 es2 : list expr) :
+  length es10 = length es20 → length es1 = length es2 →
+  locales_equiv_from es10 es20 es1 es2.
+Proof.
+  revert es10 es20 es2.
+  induction es1 as [|e es1 IHes1]; intros es10 es20 es2 Hlen; [by destruct es2|].
+  destruct es2; [done|]=> /=. constructor; [done|].
+  apply IHes1; [by rewrite !app_length=> /=;f_equiv|lia].
+Qed.
+
+Lemma heap_lang_locales_equiv_length (es1 es2 : list expr) :
+  length es1 = length es2 → locales_equiv es1 es2.
+Proof. intros Hlen. by apply heap_lang_locales_equiv_from_length. Qed.  

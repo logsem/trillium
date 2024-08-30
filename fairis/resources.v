@@ -2,25 +2,23 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import fairness fuel map_included_utils utils action_model.
 
-(* Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl. *)
-Canonical Structure AMO (AM : ActionModel) := leibnizO (amSt AM). 
-(* Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)). *)
-Canonical Structure RoleO (AM : ActionModel) := leibnizO (amRole AM).
+Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
+Canonical Structure RoleO (M : FairModel) := leibnizO (fmrole M).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
-Definition AM_repr (AM: ActionModel) :=
-  optionUR $ exclR $ AMO AM. 
+Definition M_repr (M: FairModel) :=
+  optionUR $ exclR $ ModelO M. 
 
-Class fairnessGpreS `{Countable (locale Λ)} (AM1 AM2: ActionModel) Σ := {
-  fairnessGpreS_model :> inG Σ (authUR (prodUR (AM_repr AM1) (AM_repr AM2)));
+Class fairnessGpreS `{Countable (locale Λ)} (M: FairModel) Σ := {
+  fairnessGpreS_model :> inG Σ (authUR $ M_repr M);
   fairnessGpreS_model_fuel_mapping :>
     inG Σ (authUR (gmapUR (localeO Λ)
-                          (exclR $ gmapUR (RoleO (ProdAM AM1 AM2)) natO)));
-  fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO (ProdAM AM1 AM2))));
+                          (exclR $ gmapUR (RoleO M) natO)));
+  fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
-Class fairnessGS `{Countable (locale Λ)} (AM1 AM2: ActionModel) Σ := FairnessGS {
-  fairness_inG :> fairnessGpreS AM1 AM2 Σ;
+Class fairnessGS `{Countable (locale Λ)} (M: FairModel) Σ := FairnessGS {
+  fairness_inG :> fairnessGpreS M Σ;
   (** Underlying models *)
   fairness_model_name : gname;
   fairness_aux_model_name : gname;
@@ -30,44 +28,30 @@ Class fairnessGS `{Countable (locale Λ)} (AM1 AM2: ActionModel) Σ := FairnessG
   fairness_model_free_roles_name : gname;
 }.
 
-Global Arguments fairnessGS {_ _ _} AM1 AM2 Σ.
-Global Arguments fairness_model_name {_ _ _ AM1 AM2 Σ} _.
-Global Arguments fairness_model_fuel_mapping_name {Λ _ _ AM1 AM2 Σ} _ : assert.
-Global Arguments fairness_model_free_roles_name {Λ _ _ AM1 AM2 Σ} _ : assert.
+Global Arguments fairnessGS {_ _ _} M Σ.
+Global Arguments fairness_model_name {_ _ _ M Σ} _.
+Global Arguments fairness_model_fuel_mapping_name {Λ _ _ M Σ} _ : assert.
+Global Arguments fairness_model_free_roles_name {Λ _ _ M Σ} _ : assert.
 
-Definition fairnessΣ Λ AM1 AM2 `{Countable (locale Λ)} : gFunctors := #[
-   GFunctor (authUR (prodUR (AM_repr AM1) (AM_repr AM2)));
+Definition fairnessΣ Λ M `{Countable (locale Λ)} : gFunctors := #[
+   GFunctor (authUR $ M_repr M);
    GFunctor (authUR (gmapUR (localeO Λ)
-                            (exclR $ gmapUR (RoleO (ProdAM AM1 AM2)) natO)));
-   GFunctor (authUR (gset_disjUR (RoleO (ProdAM AM1 AM2))))
+                            (exclR $ gmapUR (RoleO M) natO)));
+   GFunctor (authUR (gset_disjUR (RoleO M)))
 ].
 
-Global Instance subG_fairnessGpreS {Σ} `{Countable (locale Λ)} {AM1 AM2}
+Global Instance subG_fairnessGpreS {Σ} `{Countable (locale Λ)} {M} 
        :
-  subG (fairnessΣ Λ AM1 AM2) Σ -> fairnessGpreS AM1 AM2 Σ.
-Proof.
-  (* solve_inG.  *)
-  intros. split.
-  all:
-    rewrite /fairnessΣ in H0;
-    repeat (apply subG_inv in H0; destruct H0 as [?X H0]);
-    solve_inG.
-Qed.
+  subG (fairnessΣ Λ M) Σ -> fairnessGpreS M Σ.
+Proof. solve_inG. Qed.
 
 
 Section model_state_interp.
   Context `{Countable (locale Λ)}.
-
-  Context {AM1 AM2: ActionModel}.
-  (* Context `(AM_strong_lr AM1) `(AM_strong_lr AM2). *)
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}. 
-  Let M := AM2FM PM PROD_LR.
-  
+  Context {M: FairModel}.
   Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
-
-  Context {fG: fairnessGS AM1 AM2 Σ}.
+  Context {fG: fairnessGS M Σ}.
 
   Notation Role := (M.(fmrole)).
 
@@ -75,22 +59,22 @@ Section model_state_interp.
              (m: gmap (locale Λ) (gmap Role nat)) : iProp Σ :=
     own (fairness_model_fuel_mapping_name fG)
         (● (fmap Excl m :
-              ucmra_car (gmapUR _ (exclR $ gmapUR (RoleO PM) natO)
+              ucmra_car (gmapUR _ (exclR $ gmapUR (RoleO M) natO)
         ))).
 
   Definition frag_fuel_mapping_is
              (m: gmap (locale Λ) (gmap Role nat)) : iProp Σ :=
     own (fairness_model_fuel_mapping_name fG)
         (◯ (fmap Excl m:
-              ucmra_car (gmapUR _ (exclR $ gmapUR (RoleO PM) natO)
+              ucmra_car (gmapUR _ (exclR $ gmapUR (RoleO M) natO)
         ))).
 
   Definition auth_model_is (fm: fmstate M): iProp Σ :=
-    own (fairness_model_name fG) (● (Excl' fm.1, Excl' fm.2)).
+    own (fairness_model_name fG) (● (Excl' fm)).
 
   (* TODO: rename *)
-  Definition frag_model_is (m: amSt AM1): iProp Σ :=
-    own (fairness_model_name fG) (◯ (Excl' m, None)).
+  Definition frag_model_is (m: fmstate M): iProp Σ :=
+    own (fairness_model_name fG) (◯ (Excl' m)).
 
   Definition auth_free_roles_are (FR: gset Role): iProp Σ :=
     own (fairness_model_free_roles_name fG) (● (GSet FR)).
@@ -149,14 +133,10 @@ Proof. intros ->; auto. Qed.
 Section model_state_lemmas.
   Context `{Countable (locale Λ)}.
 
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}. 
-  Let M := AM2FM PM PROD_LR.
-
+  Context {M: FairModel}.
   Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
-  Context {fG: fairnessGS AM1 AM2 Σ}.
+  Context {fG: fairnessGS M Σ}.
 
   Notation Role := (M.(fmrole)).
 
@@ -210,29 +190,26 @@ Section model_state_lemmas.
     rewrite -own_op. by rewrite -auth_frag_op.
   Qed. 
 
-  Lemma update_model (δ δ1 δ2: amSt AM1) (δ': amSt AM2):
-    auth_model_is (δ1, δ') -∗ frag_model_is δ2 ==∗ auth_model_is (δ, δ') ∗ frag_model_is δ.
+  Lemma update_model (δ δ1 δ2: fmstate M):
+    auth_model_is δ1 -∗ frag_model_is δ2 ==∗ auth_model_is δ ∗ frag_model_is δ.
   Proof.
     iIntros "H1 H2". iCombine "H1 H2" as "H".
     iMod (own_update with "H") as "[??]"; eauto.
     - apply auth_update.
-      apply prod_local_update'; simpl.
-      2: reflexivity. 
       by apply option_local_update, (exclusive_local_update _ (Excl δ)).
     - iModIntro. iFrame.
   Qed.
 
   Lemma model_agree s1 s2:
-    auth_model_is s1 -∗ frag_model_is s2 -∗ ⌜ s1.1 = s2 ⌝.
+    auth_model_is s1 -∗ frag_model_is s2 -∗ ⌜ s1 = s2 ⌝.
   Proof.
     iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %[SUB ?]%auth_both_valid_discrete.
-    apply pair_included in SUB as [SUB _]. 
     by apply Excl_included, leibniz_equiv in SUB. 
   Qed.
 
   Lemma model_agree' δ1 s2 n:
-    model_state_interp n δ1 -∗ frag_model_is s2 -∗ ⌜ (ls_under δ1).1 = s2 ⌝.
+    model_state_interp n δ1 -∗ frag_model_is s2 -∗ ⌜ (ls_under δ1) = s2 ⌝.
   Proof.
     iIntros "Hsi Hs2". iDestruct "Hsi" as (??) "(_&_&Hs1&_)".
     iApply (model_agree with "Hs1 Hs2").
@@ -251,8 +228,7 @@ Section model_state_lemmas.
       [|apply _|done].
     rewrite lookup_fmap in Hincl.
     apply leibniz_equiv in Hincl.
-    destruct (m !! ζ) eqn:L.
-    all: rewrite L in Hincl; simplify_eq /=; done.
+    destruct (m !! ζ) eqn:L; simplify_eq /=; done.
   Qed.
 
   Lemma has_fuels_update fm ζ fs fs' :
@@ -416,12 +392,10 @@ Section model_state_lemmas.
     rewrite lookup_total_alt in Hfs2'.
     destruct (ls_map δ !! ζ1) as [fs1''|] eqn:Hfs1''; last first.
     { apply map_included_subseteq_inv in Hle1.
-      rewrite Hfs1'' in Hfs1'. simpl in Hfs1'. subst.
-      apply map_disjoint_dom. set_solver. }
+      subst. apply map_disjoint_dom. set_solver. }
     destruct (ls_map δ !! ζ2) as [fs2''|] eqn:Hfs2''; last first.
     { apply map_included_subseteq_inv in Hle2.
-      rewrite Hfs2'' in Hfs2'. simpl in Hfs2'. subst.
-      apply map_disjoint_dom. set_solver. }
+      subst. apply map_disjoint_dom. set_solver. }
     simplify_eq; simpl in *.
     specialize (Hdisj ζ1 ζ2 fs1'' fs2'' Hneq Hfs1'' Hfs2'').
     apply map_disjoint_spec.
@@ -431,7 +405,6 @@ Section model_state_lemmas.
     apply Hle1 in HSome1' as (?&?&?).
     rewrite map_included_spec in Hle2.
     apply Hle2 in HSome2' as (?&?&?).
-    rewrite Hfs1'' in H0. rewrite Hfs2'' in H2. simpl in H0, H2.  
     by eapply Hdisj.
   Qed.
   Next Obligation.
@@ -500,13 +473,11 @@ Section model_state_lemmas.
     rewrite lookup_total_alt in Hfs2'.
     destruct (ls_map δ !! ζ1) as [fs1''|] eqn:Hfs1''; last first.
     { apply map_included_subseteq_inv in Hle1.
-      apply map_disjoint_dom.
-      rewrite Hfs1'' in Hfs1'. simpl in Hfs1'.
+      apply map_disjoint_dom.      
       subst. set_solver. }
     destruct (ls_map δ !! ζ2) as [fs2''|] eqn:Hfs2''; last first.
     { apply map_included_subseteq_inv in Hle2.
       apply map_disjoint_dom. 
-      rewrite Hfs2'' in Hfs2'. simpl in Hfs2'.
       subst. set_solver. }
     simplify_eq; simpl in *.
     specialize (Hdisj ζ1 ζ2 fs1'' fs2'' Hneq Hfs1'' Hfs2'').
@@ -517,7 +488,6 @@ Section model_state_lemmas.
     apply Hle1 in HSome1' as (?&?&?).
     rewrite map_included_spec in Hle2.
     apply Hle2 in HSome2' as (?&?&?).
-    rewrite Hfs1'' in H0. rewrite Hfs2'' in H2. simpl in H0, H2.  
     eapply Hdisj; eauto. 
   Qed.
   Next Obligation.
@@ -598,26 +568,22 @@ Notation "tid ↦M++ R" := (has_fuels_S tid R) (at level 20, format "tid  ↦M++
 Section adequacy.
   Context `{Countable (locale Λ)}.
 
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}. 
-  Let M := AM2FM PM PROD_LR.
-
+  Context {M: FairModel}.
   Context `{LM: LiveModel Λ M}.
   Context {Σ : gFunctors}.
-  Context {fG: fairnessGpreS AM1 AM2 Σ}.
+  Context {fG: fairnessGpreS M Σ}.
 
   Lemma model_state_init (s0: M) :
     ⊢ |==> ∃ γ,
         own
           (* (A := authUR (optionUR (exclR (AMO AM)))) *)
           γ
-            (● (Excl' s0.1, Excl' s0.2) ⋅ ◯ (Excl' s0.1, None) ⋅ ◯ (None, Excl' s0.2)).
+            (● (Excl' s0) ⋅ ◯ (Excl' s0)).
   Proof.
-    iMod (own_alloc (● (Excl' s0.1, Excl' s0.2) ⋅ ◯ _)) as (γ) "[Hfl Hfr]".
+    iMod (own_alloc (● (Excl' s0) ⋅ ◯ _)) as (γ) "[Hfl Hfr]".
     { by apply auth_both_valid_2. }
     iModIntro. 
-    iExists _. rewrite -cmra_assoc. rewrite -auth_frag_op.
+    iExists _. 
     rewrite own_op. iFrame. 
   Qed.
 
@@ -638,7 +604,7 @@ Section adequacy.
 
   Lemma model_free_roles_init (s0: M) (FR: gset _):
     ⊢ |==> ∃ γ,
-        own (A := authUR (gset_disjUR (RoleO PM))) γ (● GSet FR  ⋅ ◯ GSet FR).
+        own (A := authUR (gset_disjUR (RoleO M))) γ (● GSet FR  ⋅ ◯ GSet FR).
   Proof.
     iMod (own_alloc (● GSet FR  ⋅ ◯ GSet FR)) as (γ) "[H1 H2]".
     { apply auth_both_valid_2 =>//. }

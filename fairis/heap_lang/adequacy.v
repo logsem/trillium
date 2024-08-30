@@ -28,18 +28,9 @@ Qed.
 
 
 Section adequacy.
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}. 
-  Let M := AM2FM PM PROD_LR.
-
-  Context {LM: LiveModel heap_lang M}.
-
-  (* Let hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS. *)
-  (* Existing Instance hi.  *)
+  Context `{LM:LiveModel heap_lang M}.
   
-  Lemma posts_of_empty_mapping `{hGS: !heapGS Σ AM1 AM2}
-    (hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS)
+  Lemma posts_of_empty_mapping `{hGS: !heapGS Σ LM}
     (e1 e: expr) v (tid : nat) (tp : list expr):
     tp !! tid = Some e ->
     to_val e = Some v ->
@@ -64,7 +55,7 @@ Section adequacy.
         assert (tid < length tp)%nat; last lia. by eapply lookup_lt_Some.
   Qed.
 
-  Context `{hpreGS: !heapGpreS Σ AM1 AM2}. 
+  Context `{hpreGS: !heapGpreS Σ LM}.
 
   Theorem strong_simulation_adequacy
      (s: stuckness) (e1 : expr) σ1 (s1: M) (FR: gset _)
@@ -72,11 +63,11 @@ Section adequacy.
          Prop) :
   rel_finitary (sim_rel_with_user LM ξ) →
   live_roles M s1 ≠ ∅ ->
-  (∀ `{Hinv : !heapGS Σ AM1 AM2} (hi := @heapG_irisG AM1 AM2 PROD_LR LM _ Hinv),
+  (∀ `{Hinv : !heapGS Σ LM},
     ⊢ |={⊤}=>
        (* state_interp (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)) ∗ *)
        ([∗ map] l ↦ v ∈ heap σ1, pointsto l (DfracOwn 1) v) -∗
-       frag_model_is s1.1 -∗
+       frag_model_is s1 -∗
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1)) ={⊤}=∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ v, 0%nat ↦M ∅ }} ∗
@@ -87,7 +78,7 @@ Section adequacy.
     apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
     iIntros (?) "".
     iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".
-    iMod (model_state_init s1) as (γmod) "((Hmoda & Hmodf1) & Hmodf2)".
+    iMod (model_state_init s1) as (γmod) "(Hmoda & Hmodf1)".
     iMod (model_fuel_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
     iMod (model_free_roles_init s1 (FR ∖ live_roles _ s1)) as (γfr) "[HFR Hfr]".
     set (distG :=
@@ -109,7 +100,6 @@ Section adequacy.
       rewrite fmap_insert fmap_empty. iFrame. }
     iDestruct "Hwp" as ">[Hwp H]".
     iModIntro. iFrame "Hwp".
-    Unshelve. 2: exact LM. 
     iSplitL "Hgen Hmoda Hmapa HFR".
     { unfold state_interp. simpl. iFrame.
       iExists (ls_map (initial_ls s1 0%nat)).
@@ -241,9 +231,9 @@ Section adequacy.
     (* The initial configuration satisfies certain properties *)
     (* A big implication, and we get back a Coq proposition *)
     (* For any proper Aneris resources *)
-    (∀ `{hGS: !heapGS Σ AM1 AM2} (hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS),
+    (∀ `{hGS: !heapGS Σ LM},
         ⊢ |={⊤}=>
-       frag_model_is s1.1 -∗
+       frag_model_is s1 -∗
          frag_free_roles_are (FR ∖ live_roles _ s1) -∗
          has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
@@ -277,9 +267,9 @@ Section adequacy.
     (* The model has finite branching *)
     rel_finitary (sim_rel LM)  →
     live_roles M s1 ≠ ∅ ->
-    (∀ `{hGS: !heapGS Σ AM1 AM2} (hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS),
+    (∀ `{hGS: !heapGS Σ LM},
         ⊢ |={⊤}=>
-       frag_model_is s1.1 -∗
+       frag_model_is s1 -∗
          frag_free_roles_are (FR ∖ live_roles _ s1) -∗
          has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
@@ -314,9 +304,9 @@ Section adequacy.
     (* The model has finite branching *)
     rel_finitary (sim_rel LM) →
     live_roles M s1 ≠ ∅ ->
-    (∀ `{hGS: !heapGS Σ AM1 AM2} (hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS),
+    (∀ `{hGS: !heapGS Σ LM},
         ⊢ |={⊤}=>
-       frag_model_is s1.1 -∗
+       frag_model_is s1 -∗
          frag_free_roles_are (FR ∖ live_roles _ s1) -∗
          has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
@@ -359,9 +349,9 @@ Section adequacy.
     (* The model has finite branching *)
     rel_finitary (sim_rel LM) →
     live_roles M s1 ≠ ∅ ->
-    (∀ `{hGS: !heapGS Σ AM1 AM2} (hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS),
+    (∀ `{hGS: !heapGS Σ LM},
         ⊢ |={⊤}=>
-       frag_model_is s1.1 -∗
+       frag_model_is s1 -∗
          frag_free_roles_are (FR ∖ live_roles _ s1) -∗
          has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
        ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
@@ -389,9 +379,9 @@ Theorem simulation_adequacy_terminate
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
   live_roles M s1 ≠ ∅ ->
-  (∀ `{hGS: !heapGS Σ AM1 AM2} (hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS),
+  (∀ `{hGS: !heapGS Σ LM},
       ⊢ |={⊤}=>
-     frag_model_is s1.1 -∗
+     frag_model_is s1 -∗
        frag_free_roles_are (FR ∖ live_roles _ s1) -∗
        has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
      ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}
@@ -420,9 +410,9 @@ Theorem simulation_adequacy_terminate_ftm `{FairTerminatingModel M}
   (* The model has finite branching *)
   rel_finitary (sim_rel LM) →
   live_roles M s1 ≠ ∅ ->
-  (∀ `{hGS: !heapGS Σ AM1 AM2} (hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS),
+  (∀ `{hGS: !heapGS Σ LM},
       ⊢ |={⊤}=>
-        frag_model_is s1.1 -∗
+        frag_model_is s1 -∗
         frag_free_roles_are (FR ∖ live_roles _ s1) -∗
         has_fuels (Σ := Σ) 0%nat (gset_to_gmap (LM.(lm_fl) s1) (M.(live_roles) s1))
         ={⊤}=∗ WP e1 @ s; 0%nat; ⊤ {{ v, 0%nat ↦M ∅ }}

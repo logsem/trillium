@@ -1,26 +1,16 @@
 From iris.proofmode Require Import tactics.
 From trillium.fairness.heap_lang Require Import iris_inst.
-From trillium.fairness Require Import action_model fuel.
+From trillium.fairness Require Import action_model fuel resources.
 From trillium.fairness.heap_lang Require Export lang tactics notation.
 
 
 Section SSWP.
-
-  Context {AM1 AM2: ActionModel}.
-  Let PM := ProdAM AM1 AM2.
-  Context {PROD_LR: AM_strong_lr PM}.
-  Let M := AM2FM PM PROD_LR.
-  Context {LM: LiveModel heap_lang M}.
-  Context `{hGS: !heapGS Σ AM1 AM2}.
-
-  (* (* Need to explicitly specify the instance,  *)
-  (*    since the LM argument is not inferred automatically *) *)
-  (* Let hi := @heapG_irisG AM1 AM2 PROD_LR LM _ hGS.  *)
-  (* Existing Instance hi.  *)
+  Context `{LM: LiveModel heap_lang M}.
+  Context `{hG: !heapGS Σ LM}.
 
   
   Lemma sswp_pure_step s E e1 e2 (Φ : Prop) Ψ :
-    PureExec Φ 1 e1 e2 → Φ → ▷ Ψ e2 -∗ sswp s E e1 Ψ%I (LM := LM).
+    PureExec Φ 1 e1 e2 → Φ → ▷ Ψ e2 -∗ sswp s E e1 Ψ%I.
   Proof.
     iIntros (Hpe HΦ) "HΨ".
     assert (pure_step e1 e2) as Hps.
