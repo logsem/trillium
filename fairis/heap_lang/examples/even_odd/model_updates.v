@@ -17,6 +17,14 @@ Open Scope nat.
 Set Default Proof Using "Type".
 
 
+(* No "pre" version, since this singleton is supposed to be pre-initialized *)
+Class SplitGS Σ (AM1 AM2: ActionModel) := {
+    factor_repr (AM: ActionModel) := optionUR $ exclR $ leibnizO (amSt AM);
+    sp_in :> inG Σ (authUR $ prodUR (factor_repr AM1) (factor_repr AM2));
+    γ__split: gname;
+}.
+
+
 Section Models.
   Context {even_impl: EvenModel}.
   Context {odd_impl: OddModel}.
@@ -233,21 +241,62 @@ Section Models.
   Let ρEven: fmrole M := inl $ even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := inl $ odd_role (ρ__o odd_impl).
 
-  (* since we use this resource to justify MU, it should include the whole state *)
-  Definition cur_st `{!heapGS Σ LM} n: iProp Σ :=
-    ∃ (st: fmstate M), frag_model_is st ∗ ⌜ st2nat st.1 n ⌝.
+  Context {sGS: SplitGS Σ prod_model env_AM}.
 
+  Definition frag_prod_st_is (st: amSt PM): iProp Σ :=
+    own γ__split (◯ ((Excl' st, None): prodUR (factor_repr _) _)). 
+
+  Definition auth_prod_st_is (st: amSt PM): iProp Σ :=
+    own γ__split (● ((Excl' st, None): prodUR (factor_repr _) _)). 
+
+  (* since we use this resource to justify MU, it should include the whole state *)
+  Definition cur_st n: iProp Σ :=
+    (* ∃ (st: fmstate M), frag_model_is st ∗ ⌜ st2nat st.1 n ⌝. *)
+    ∃ st, frag_prod_st_is st ∗ ⌜ st2nat st n ⌝. 
+
+  Lemma update_prod (δ δ1 δ2: amSt PM):
+    auth_prod_st_is δ1 -∗ frag_prod_st_is δ2 ==∗ auth_prod_st_is δ ∗ frag_prod_st_is δ.
+  Proof.
+    iIntros "H1 H2". iCombine "H1 H2" as "H".
+    iMod (own_update with "H") as "[??]"; eauto.
+    2: { rewrite bi.sep_comm. by iFrame. } 
+    simpl. apply auth_update.
+    eapply @prod_local_update_1.
+    eapply @option_local_update.
+    by apply (exclusive_local_update _ ((Excl δ): exclR $ leibnizO (amSt PM))).
+  Qed.
+
+  Lemma prod_agree s1 s2:
+    auth_prod_st_is s1 -∗ frag_prod_st_is s2 -∗ ⌜ s1 = s2 ⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %[SUB ?]%auth_both_valid_discrete.
+    apply pair_included in SUB as [SUB _]. simpl in SUB.
+    by apply @Excl_included, leibniz_equiv in SUB.
+  Qed.
+
+  Definition split_inv_inner `{!heapGS Σ LM}: iProp Σ :=
+      ∃ st__G, frag_model_is st__G ∗ auth_prod_st_is st__G.1. 
+    
   Hypothesis PROD_ENV_INDEP: forall a, is_action_of PM a -> is_action_of env_AM a -> False.
 
-  Lemma mu_even `{!heapGS Σ LM} n:
-    ⊢ cur_st n -∗ MU__r ρEven ∅ (cur_st (if Nat.even n then (n + 1)%nat else n)).
+  Lemma mu_even `{!heapGS Σ LM} n (ns: namespace):
+    inv ns (split_inv_inner) ⊢ cur_st n -∗ MU__r ρEven (↑ ns) (cur_st (if Nat.even n then (n + 1)%nat else n)).
   Proof using PROD_ENV_INDEP.
-    rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]".
-    destruct st as [[st__e st__o] st__env]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
+    rewrite /MU__r /cur_st. iIntros "#INV (%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]".
+    (* destruct st as [[st__e st__o] st__env]. *)
+    destruct st as [st__e st__o]. 
+    destruct CUR as [CUR__E CUR__O]. simpl in *. 
 
     enough (exists a st', amTrans PM (st__e, st__o) (a, Some (even_role (ρ__e even_impl))) st' /\
                    st2nat st' (if Nat.even n then (n + 1) else n)) as (a & st' & TRANS & CUR'). 
-    { iApply (MU_wand with "[]").
+    { iApply (MU_inv with "[$]"); [done| ].
+      (* TODO: avoid unfolding of MU *)
+      rewrite /split_inv_inner. iIntros ">(%S & FRAG & PROD)". destruct S.
+      simpl. iDestruct (prod_agree with "[$] [$]") as %->.
+
+      iMod (update_prod st' with "[$] [$]") as "[ST PROD]". 
+      iApply (MU_wand with "[ST PROD]").
       2: { iApply (model_step_MU with "[$] [MAP]").
            1, 4: by eauto.
            { simpl. eapply am_fmtrans_action. eexists. 
@@ -257,7 +306,7 @@ Section Models.
            simpl. setoid_rewrite @prod_indep_live_roles; eauto.
            apply union_mono; [| done]. apply set_map_mono; [done| ].
            eapply prod_step_lr_nonincr; done. }
-      iIntros "(MAP & ST)".
+      iIntros "(MAP & FRAG)".
       iFrame. done. }
     Unshelve. 2: by apply _. 
     
@@ -284,45 +333,46 @@ Section Models.
   Lemma mu_odd `{!heapGS Σ LM} n:
     ⊢ cur_st n -∗ MU__r ρOdd ∅ (cur_st (if Nat.odd n then (n + 1)%nat else n)).
   Proof using PROD_ENV_INDEP.
-    rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]".
-    destruct st as [[st__e st__o] st__env]. destruct CUR as [CUR__E CUR__O]. simpl in *. 
+  (*   rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]". *)
+  (*   destruct st as [[st__e st__o] st__env]. destruct CUR as [CUR__E CUR__O]. simpl in *.  *)
 
-    enough (exists a st',
-               amTrans PM (st__e, st__o) (a, Some (odd_role (ρ__o odd_impl))) st' /\
-               st2nat st' (if Nat.odd n then (n + 1) else n)) as (a & st' & TRANS & CUR'). 
-    { iApply (MU_wand with "[]").
-      2: { iApply (model_step_MU with "[$] [MAP]").
-           1, 4: by eauto.
-           { simpl. eapply am_fmtrans_action. eexists. 
-             eapply pt_inner1; eauto.
-             intros ?. edestruct PROD_ENV_INDEP; eauto.
-             eapply action_of_step; eauto. }
-           simpl. setoid_rewrite @prod_indep_live_roles; eauto.  
-           apply union_mono; [| done]. apply set_map_mono; [done| ].
-           eapply prod_step_lr_nonincr; done. }
-      iIntros "(MAP & ST)".
-      iFrame. done. }
-    Unshelve. 2: by apply _. 
+  (*   enough (exists a st', *)
+  (*              amTrans PM (st__e, st__o) (a, Some (odd_role (ρ__o odd_impl))) st' /\ *)
+  (*              st2nat st' (if Nat.odd n then (n + 1) else n)) as (a & st' & TRANS & CUR').  *)
+  (*   { iApply (MU_wand with "[]"). *)
+  (*     2: { iApply (model_step_MU with "[$] [MAP]"). *)
+  (*          1, 4: by eauto. *)
+  (*          { simpl. eapply am_fmtrans_action. eexists.  *)
+  (*            eapply pt_inner1; eauto. *)
+  (*            intros ?. edestruct PROD_ENV_INDEP; eauto. *)
+  (*            eapply action_of_step; eauto. } *)
+  (*          simpl. setoid_rewrite @prod_indep_live_roles; eauto.   *)
+  (*          apply union_mono; [| done]. apply set_map_mono; [done| ]. *)
+  (*          eapply prod_step_lr_nonincr; done. } *)
+  (*     iIntros "(MAP & ST)". *)
+  (*     iFrame. done. } *)
+  (*   Unshelve. 2: by apply _.  *)
  
-    destruct (Nat.odd n) eqn:O.
-    - opose proof (odd_steppable _ st__o) as (st__o' & STEP__o); eauto.
-      { rewrite CUR__O. set_solver. }
-      opose proof * even_syncable as (st__e' & STEP__e); eauto.
-      { erewrite (f_equal Nat.odd); eauto. }
-      rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e. 
-      eexists _, (_, _). split; [| split].
-      + simpl. eapply @pt_sync2; eauto.
-      + simpl. eapply even_sync_inv; eauto.
-      + simpl. eapply odd_step_inv; eauto.
-    - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E. 
-      opose proof (odd_stutterable _ st__o) as (st__o' & a__o & PRIV & STEP__o); eauto.
-      { rewrite CUR__O. intuition. }
-      eexists _, (_, _). split; [| split].
-      + simpl. eapply @pt_inner2; eauto.
-        eapply odd_priv_even_noact; eauto.
-      + done. 
-      + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
-  Qed.
+  (*   destruct (Nat.odd n) eqn:O. *)
+  (*   - opose proof (odd_steppable _ st__o) as (st__o' & STEP__o); eauto. *)
+  (*     { rewrite CUR__O. set_solver. } *)
+  (*     opose proof * even_syncable as (st__e' & STEP__e); eauto. *)
+  (*     { erewrite (f_equal Nat.odd); eauto. } *)
+  (*     rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e.  *)
+  (*     eexists _, (_, _). split; [| split]. *)
+  (*     + simpl. eapply @pt_sync2; eauto. *)
+  (*     + simpl. eapply even_sync_inv; eauto. *)
+  (*     + simpl. eapply odd_step_inv; eauto. *)
+  (*   - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E.  *)
+  (*     opose proof (odd_stutterable _ st__o) as (st__o' & a__o & PRIV & STEP__o); eauto. *)
+  (*     { rewrite CUR__O. intuition. } *)
+  (*     eexists _, (_, _). split; [| split]. *)
+  (*     + simpl. eapply @pt_inner2; eauto. *)
+  (*       eapply odd_priv_even_noact; eauto. *)
+  (*     + done.  *)
+  (*     + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto. *)
+  (* Qed. *)
+  Admitted. 
 
   Section Viewshifts.
     Context `{!heapGS Σ LM}.
@@ -331,15 +381,20 @@ Section Models.
     Context
       (st_res_SR_even: @StateRes _ Nat.even st_res even_at)
       (st_res_SR_odd: @StateRes _ Nat.odd st_res odd_at). 
-    
+
     Definition evenodd_inv_inner l : iProp Σ :=
       ∃ N, cur_st N ∗ l ↦ #N ∗ st_res N.
     
-    Lemma even_vs l ns:
-      inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.even st_res_SR_even l ns ρEven. 
+    Lemma even_vs l ns1 ns2
+      (DISJ: ns1 ## ns2)
+      :
+      inv ns1 (evenodd_inv_inner l) ∗
+      inv ns2 (split_inv_inner)
+      ⊢ eo_vs Nat.even st_res_SR_even l ns1 ρEven. 
     Proof using st_res_SR_even PROD_ENV_INDEP.
-      rewrite /eo_vs. iIntros "#INV". iModIntro.
-      iMod (inv_acc with "INV") as "[OPEN CLOS]".
+      clear st_res_SR_odd odd_at. 
+      rewrite /eo_vs. iIntros "#[INV1 INV2]". iModIntro.
+      iMod (inv_acc with "INV1") as "[OPEN CLOS]".
       { apply top_subseteq. }
       
       rewrite {1}/evenodd_inv_inner.
@@ -348,7 +403,8 @@ Section Models.
       iExists _. iSplitL "Hn Hauths".
       { iFrame. }
       
-      iApply (MU__r_mask_weaken with "[-]"); [apply empty_subseteq| ]. 
+      iApply (MU__r_mask_weaken (↑ ns2) with "[-]").
+      { set_solver. }
       iApply (MU__r_wand with "[-CUR]").
       2: by iApply mu_even.
       

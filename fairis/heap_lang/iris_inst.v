@@ -268,6 +268,21 @@ Section SSWP_MU.
     by iApply "MU". 
   Qed.
 
+  From iris.base_logic.lib Require Import invariants.
+
+  Lemma MU_inv E ns ζ P Q
+    (NS: ↑ ns ⊆ E):
+    inv ns Q ⊢ (▷ Q -∗ MU (E ∖ ↑ ns) ζ (P ∗ ▷ Q)) -∗ MU E ζ P.
+  Proof. 
+    iIntros "#INV SUB".
+    rewrite /MU. iIntros (extr atr) "Hσ".
+    iMod (inv_acc with "INV") as "[Q CLOS]"; [done| ].
+    iMod ("SUB" with "[$] [$]") as "SUB".
+    iDestruct "SUB" as "(%&%&SI&P&Q)".
+    iFrame.
+    iMod ("CLOS" with "[$]"). done.
+  Qed. 
+
   (* TODO: unify with existing locales_of_list_from_locale_from, 
      remove restriction for Λ *)
   Lemma locales_of_list_from_locale_from' {Λ: language} `{EqDecision (locale Λ)}
