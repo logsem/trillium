@@ -230,7 +230,7 @@ Theorem yesno_terminates
 Proof.
   assert (heapGpreS yesnoΣ the_model) as HPreG.
   { apply _. }
-  eapply (simulation_adequacy_terminate_ftm yesnoΣ the_model NotStuck _ (N, true) ∅) =>//.
+  eapply (simulation_adequacy_terminate_ftm NotStuck _ ((N, true): fmstate the_fair_model) ∅) =>//.
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1).
   - destruct N; [lia|destruct N; set_solver].

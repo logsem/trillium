@@ -43,7 +43,7 @@ Proof.
   assert (heapGpreS choose_natΣ cn_model) as HPreG.
   { apply _. }
   eapply (strong_simulation_adequacy
-            choose_natΣ _ NotStuck _ _ _ ∅); [|set_solver|].
+            NotStuck _ _ _ ∅); [|set_solver|].
   { clear.
     apply rel_finitary_sim_rel_with_user_ξ.
     intros extr atr c' oζ.

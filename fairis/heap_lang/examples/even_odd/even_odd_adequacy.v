@@ -5,7 +5,7 @@ From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness trace_utils.
-From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
+From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy iris_inst.
 From trillium.fairness.heap_lang.examples.even_odd Require Import even_odd.
 From stdpp Require Import finite.
 
@@ -549,7 +549,7 @@ Proof.
   assert (heapGpreS evenoddΣ the_model) as HPreG.
   { apply _. }
   eapply (strong_simulation_adequacy
-            evenoddΣ _ NotStuck _ _ _ ∅); [|set_solver|].
+            NotStuck _ _ _ ∅); [|set_solver|].
   { eapply rel_finitary_sim_rel_with_user_sim_rel.
     eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1). }

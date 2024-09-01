@@ -6,8 +6,8 @@ From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
+From trillium.fairness Require Import fairness fair_termination fuel resources.
+From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode sswp_rules iris_inst.
 From trillium.fairness.heap_lang Require Import notation.
 
 Section ActionModel.

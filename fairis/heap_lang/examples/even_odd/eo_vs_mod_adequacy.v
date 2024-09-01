@@ -11,7 +11,7 @@ From stdpp Require Import finite.
 
 
 Definition UnitAM: ActionModel :=
-  {| amSt := unit; amRole := Empty_set; amTrans := fun _ _ _ => False |}.
+  {| amSt := unit; amRole := unit; amTrans := fun _ _ _ => False |}.
 
 Instance EnvUnitAM: EnvironmentAM UnitAM.
 Proof. 
@@ -21,14 +21,11 @@ Proof.
   - right. tauto.
 Defined.
 
-Lemma unit_AM_strong: AM_strong_lr UnitAM.
-Proof.
-  apply fin_branch_strong; apply EnvUnitAM. 
-Defined. 
+(* Instance unit_AM_strong: AM_strong_lr UnitAM. *)
+(* Proof. apply _. Qed. _ *)
 
-
-Lemma matched_by_unit AM R L:
-  @matched_by AM UnitAM R L (is_action_of UnitAM).
+Lemma matched_by_unit AM R:
+  @synced_by AM UnitAM R. 
 Proof. 
   red. intros ?????? ACT.
   red in ACT. set_solver.
@@ -43,7 +40,7 @@ Qed.
 Lemma unit_lr st:
   AM_live_roles st = ∅.
 Proof. 
-  apply set_eq. intros. by rewrite -AM_live_roles_spec.
+  apply set_eq. intros. rewrite -AM_live_roles_spec. set_solver. 
 Qed. 
 
 
@@ -85,8 +82,8 @@ Section ModelMono.
   Lemma prod_matched_by_full: 
     @matched_by PM FM
       (fun st__s '(st__s', st__m) => st__s' = st__s /\ True)
-      (Some ∘ inl)
-      (fun _ => True).
+      (inl)
+      .
   Proof.
     apply matched_by_prod_l; try by apply _.
     { apply matched_by_unit. }
@@ -107,15 +104,12 @@ Section ModelMono.
     (CUR: st2nat' st n):
     ρEven ∈ live_roles _ st.
   Proof.
-    simpl. destruct st. red in CUR. simpl in CUR.     
-    
-    opose proof * live_lift.
-    { apply prod_matched_by_full. }
-    { apply full_AM_act_dec. }
-    3: { apply full_no_ext_sync. }
-    2: { eapply ρEven_always_live'; eauto. }
-    { simpl. Unshelve. 2: eapply pair. 1: simpl; eauto. done. }  
-    simpl in H. done. 
+    simpl. destruct st.
+    rewrite /ρEven. simpl.
+    unshelve eapply (live_lift _ _ a (_: amSt FM)).
+    2: { apply prod_matched_by_full. }
+    { done. }
+    eapply ρEven_always_live'; eauto.
   Qed. 
 
   Lemma ρOdd_always_live (st: fmstate M) n
@@ -716,7 +710,7 @@ Section Adequacy.
   Qed.
 
   Definition evenoddΣ : gFunctors :=
-    #[ heapΣ M; GFunctor (excl_authR boolO) ].
+    #[ heapΣ M; GFunctor (excl_authR natO) ].
 
   Global Instance subG_evenoddΣ {Σ} : subG evenoddΣ Σ → evenoddPreG Σ.
   Proof. Qed. 
@@ -768,7 +762,7 @@ Section Adequacy.
     subst init_roles st0'.
     (* Set Printing Implicit. *)
     (* erewrite prod_indep_live_roles.  *)
-    erewrite (@prod_indep_live_roles _ _ _ _ (unit_indep PM)).
+    rewrite (@prod_indep_live_roles _ _ (unit_indep PM)).
     
     rewrite unit_lr set_map_empty union_empty_r_L.
     erewrite <- !set_map_singleton_L. erewrite <- set_map_union_L.
@@ -805,8 +799,7 @@ Section Adequacy.
     { apply _. }
     assert (threadPreG wholeΣ) as thPreG.
     { apply _. }
-    eapply (strong_simulation_adequacy
-              wholeΣ _ NotStuck _ _ _ ∅).
+    eapply (strong_simulation_adequacy NotStuck _ _ _ ∅).
     2: { simpl. rewrite st0_lr. set_solver. }
     { eapply rel_finitary_sim_rel_with_user_sim_rel.
       eapply valid_state_evolution_finitary_fairness_simple.
@@ -823,7 +816,8 @@ Section Adequacy.
       iPureIntro. apply st0_zero. }
     iModIntro.
     iSplitL.
-    2: { iApply eo_rah; try done. apply st0_zero. } 
+    2: { iApply eo_rah; try done.
+         by apply st0_zero. }
     iApply (start_spec_use with "[-]"); try done.
     { eapply SPEC; eauto. done. }
     2: { iNext. by iIntros "**". }

@@ -406,8 +406,7 @@ Proof.
   { apply _. }
   assert (heapGpreS evenoddΣ the_model) as HPreG.
   { apply _. }
-  eapply (strong_simulation_adequacy
-            evenoddΣ _ NotStuck _ _ _ ∅); [|set_solver|].
+  eapply (strong_simulation_adequacy NotStuck _ _ _ ∅); [|set_solver|].
   { eapply rel_finitary_sim_rel_with_user_sim_rel.
     eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1). }
