@@ -17,12 +17,76 @@ Open Scope nat.
 Set Default Proof Using "Type".
 
 
-(* No "pre" version, since this singleton is supposed to be pre-initialized *)
-Class SplitGS Σ (AM1 AM2: ActionModel) := {
-    factor_repr (AM: ActionModel) := optionUR $ exclR $ leibnizO (amSt AM);
-    sp_in :> inG Σ (authUR $ prodUR (factor_repr AM1) (factor_repr AM2));
-    γ__split: gname;
-}.
+Section SplitModel.
+  Let factor_repr (AM: ActionModel) := optionUR $ exclR $ leibnizO (amSt AM).
+
+  Let split_cmra (AM1 AM2: ActionModel) := (authUR $ prodUR (factor_repr AM1) (factor_repr AM2)). 
+  Definition SplitΣ (AM1 AM2: ActionModel) : gFunctors :=
+    #[GFunctor (split_cmra AM1 AM2)].
+
+  Class SplitPreGS Σ (AM1 AM2: ActionModel) := {
+      spre_in :> inG Σ (split_cmra AM1 AM2);
+  }.
+
+  Class SplitGS Σ (AM1 AM2: ActionModel) := {
+      spre :> SplitPreGS Σ AM1 AM2;
+      γ__split: gname;
+  }.
+
+  Lemma split_init `{SplitPreGS Σ AM1 AM2} st1 st2:
+    ⊢ |==> ∃ γ, own γ (● (Excl' st1, Excl' st2)) ∗
+           own γ (◯ (Excl' st1, None)) ∗ own γ (◯ (None, Excl' st2)).
+  Proof. 
+    iMod (own_alloc (● (Excl' st1, Excl' st2) ⋅ ◯ _)) as (γ) "[AUTH FRAG]".
+    { by apply auth_both_valid_2. }
+    iFrame. rewrite -own_op -auth_frag_op -pair_op. by iFrame.
+  Qed. 
+
+  Context {AM1 AM2: ActionModel}.
+  Context `{SplitGS Σ AM1 AM2}.
+
+  Let PM := ProdAM AM1 AM2.
+  Context `{AM_strong_lr PM}.
+  Let M := AM2FM PM _. 
+
+  Context {LM: LiveModel heap_lang M}. 
+  
+  Context {hGS: heapGS Σ LM}. 
+
+  Definition frag_left_st_is (st: amSt AM1): iProp Σ :=
+    own γ__split (◯ ((Excl' st, None): prodUR (factor_repr AM1) _)). 
+  Definition frag_right_st_is (st: amSt AM2): iProp Σ :=
+    own γ__split (◯ ((None, Excl' st): prodUR _ (factor_repr AM2))). 
+  Definition auth_prod_st_is st1 st2: iProp Σ :=
+    own γ__split (● ((Excl' st1, Excl' st2): prodUR _ (factor_repr AM2))). 
+
+  Lemma update_left (δ δ1 δ2: amSt AM1) (δ': amSt AM2):
+    auth_prod_st_is δ1 δ' -∗ frag_left_st_is δ2 ==∗ auth_prod_st_is δ δ' ∗ frag_left_st_is δ.
+  Proof.
+    iIntros "H1 H2". iCombine "H1 H2" as "H".
+    iMod (own_update with "H") as "[??]"; eauto.
+    2: { rewrite bi.sep_comm. by iFrame. } 
+    simpl. apply auth_update.
+    eapply @prod_local_update_1.
+    eapply @option_local_update.
+    by apply (exclusive_local_update _ ((Excl δ): exclR $ leibnizO (amSt AM1))).
+  Qed.
+
+  Lemma left_agree s1 s2 s':
+    auth_prod_st_is s1 s' -∗ frag_left_st_is s2 -∗ ⌜ s1 = s2 ⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %[SUB ?]%auth_both_valid_discrete.
+    apply pair_included in SUB as [SUB _]. simpl in SUB.
+    by apply @Excl_included, leibniz_equiv in SUB.
+  Qed.
+
+  Definition split_inv_inner: iProp Σ :=
+    ∃ st__G, frag_model_is st__G ∗ auth_prod_st_is st__G.1 st__G.2. 
+
+  Definition split_inv Ns := inv Ns split_inv_inner.
+
+End SplitModel.
 
 
 Section Models.
@@ -242,43 +306,12 @@ Section Models.
   Let ρOdd: fmrole M := inl $ odd_role (ρ__o odd_impl).
 
   Context {sGS: SplitGS Σ prod_model env_AM}.
-
-  Definition frag_prod_st_is (st: amSt PM): iProp Σ :=
-    own γ__split (◯ ((Excl' st, None): prodUR (factor_repr _) _)). 
-
-  Definition auth_prod_st_is (st: amSt PM): iProp Σ :=
-    own γ__split (● ((Excl' st, None): prodUR (factor_repr _) _)). 
-
-  (* since we use this resource to justify MU, it should include the whole state *)
-  Definition cur_st n: iProp Σ :=
-    (* ∃ (st: fmstate M), frag_model_is st ∗ ⌜ st2nat st.1 n ⌝. *)
-    ∃ st, frag_prod_st_is st ∗ ⌜ st2nat st n ⌝. 
-
-  Lemma update_prod (δ δ1 δ2: amSt PM):
-    auth_prod_st_is δ1 -∗ frag_prod_st_is δ2 ==∗ auth_prod_st_is δ ∗ frag_prod_st_is δ.
-  Proof.
-    iIntros "H1 H2". iCombine "H1 H2" as "H".
-    iMod (own_update with "H") as "[??]"; eauto.
-    2: { rewrite bi.sep_comm. by iFrame. } 
-    simpl. apply auth_update.
-    eapply @prod_local_update_1.
-    eapply @option_local_update.
-    by apply (exclusive_local_update _ ((Excl δ): exclR $ leibnizO (amSt PM))).
-  Qed.
-
-  Lemma prod_agree s1 s2:
-    auth_prod_st_is s1 -∗ frag_prod_st_is s2 -∗ ⌜ s1 = s2 ⌝.
-  Proof.
-    iIntros "Ha Hf".
-    iDestruct (own_valid_2 with "Ha Hf") as %[SUB ?]%auth_both_valid_discrete.
-    apply pair_included in SUB as [SUB _]. simpl in SUB.
-    by apply @Excl_included, leibniz_equiv in SUB.
-  Qed.
-
-  Definition split_inv_inner `{!heapGS Σ LM}: iProp Σ :=
-      ∃ st__G, frag_model_is st__G ∗ auth_prod_st_is st__G.1. 
     
   Hypothesis PROD_ENV_INDEP: forall a, is_action_of PM a -> is_action_of env_AM a -> False.
+
+  Definition cur_st n: iProp Σ :=
+    (* ∃ (st: fmstate M), frag_model_is st ∗ ⌜ st2nat st.1 n ⌝. *)
+    ∃ st, frag_left_st_is st ∗ ⌜ st2nat st n ⌝. 
 
   Lemma mu_even `{!heapGS Σ LM} n (ns: namespace):
     inv ns (split_inv_inner) ⊢ cur_st n -∗ MU__r ρEven (↑ ns) (cur_st (if Nat.even n then (n + 1)%nat else n)).
@@ -293,9 +326,9 @@ Section Models.
     { iApply (MU_inv with "[$]"); [done| ].
       (* TODO: avoid unfolding of MU *)
       rewrite /split_inv_inner. iIntros ">(%S & FRAG & PROD)". destruct S.
-      simpl. iDestruct (prod_agree with "[$] [$]") as %->.
+      simpl. iDestruct (left_agree with "[$] [$]") as %->.
 
-      iMod (update_prod st' with "[$] [$]") as "[ST PROD]". 
+      iMod (update_left st' with "[$] [$]") as "[PROD ST]". 
       iApply (MU_wand with "[ST PROD]").
       2: { iApply (model_step_MU with "[$] [MAP]").
            1, 4: by eauto.

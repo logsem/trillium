@@ -8,7 +8,7 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination utils action_model resources.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
-From trillium.fairness.heap_lang Require Import notation sswp_rules.
+From trillium.fairness.heap_lang Require Import notation sswp_rules iris_inst.
 From trillium.fairness.heap_lang.examples.even_odd Require Import interface thread_progs model_updates.
 Import derived_laws_later.bi.
 
@@ -37,22 +37,23 @@ Section proof_start.
 
   Hypothesis PROD_ENV_INDEP: forall a, is_action_of PM a -> is_action_of env_AM a -> False.
 
-  Context `{!heapGS Σ LM, !evenoddG Σ}.
+  Context `{hGS: !heapGS Σ LM, !evenoddG Σ, SplitGS Σ PM env_AM}.
 
   Context (st_res even_at odd_at: nat -> iProp Σ). 
   Context
     (st_res_SR_even: @StateRes _ Nat.even st_res even_at)
     (st_res_SR_odd: @StateRes _ Nat.odd st_res odd_at). 
 
-  Definition Ns := nroot .@ "even_odd".
-  Definition evenodd_inv n := inv Ns (evenodd_inv_inner ENV_AM st_res n).
+  Definition Ns__eo := nroot .@ "even_odd".
+  Definition Ns__split := nroot .@ "split".
+  Definition evenodd_inv n := inv Ns__eo (evenodd_inv_inner ENV_AM st_res n).
 
   Let ρEven: fmrole M := inl $ even_role (ρ__e even_impl).
   Let ρOdd: fmrole M := inl $ odd_role (ρ__o odd_impl).
 
   Definition even_odd_spec (prog: val): Prop :=
     forall tid n N1 N2 f (Hf: f > 60) (EVEN: N1 < N2), 
-    {{{ evenodd_inv n ∗ 
+    {{{ split_inv Ns__split ∗ evenodd_inv n ∗ 
         tid ↦M {[ ρEven := f; ρOdd := f ]} ∗
         even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅ }}}
       prog #n @ tid
@@ -72,12 +73,12 @@ Section proof_start.
   Lemma start_spec: even_odd_spec start. 
   Proof using All.
     rewrite /even_odd_spec. iIntros (tid n N1 N2 f Hf EVEN). 
-    iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". unfold start.
+    iIntros (Φ) "(#SPLIT & #Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". unfold start.
     rewrite <- (union_empty_l_L ∅). 
     wp_pures.
     wp_bind (Load _).
     iApply wp_atomic.
-    iInv Ns as (m) "(>CUR & >Hn & Hauths)" "Hclose".
+    iInv Ns__eo as (m) "(>CUR & >Hn & Hauths)" "Hclose".
     iIntros "!>". wp_load. iIntros "!>".
     
     iDestruct (sr_agree _ _ _ st_res_SR_even with "[$] [$]") as %->.
@@ -102,7 +103,7 @@ Section proof_start.
       iApply (@e_spec ep M _ _ _ _ _ st_res_SR_even
                with "[$Hf $Heven_at]"); [lia| simpl; lia | ..].
       2: { by iIntros "!> ?". }
-      by iApply even_vs. }
+      iApply even_vs; eauto. solve_ndisj. }
 
     iIntros "!> Hf".
     iIntros "!>".
@@ -122,7 +123,7 @@ Section proof_start.
       iApply (@o_spec op M _ _ _ _ _ st_res_SR_odd
                with "[$Hf $Hodd_at]"); [lia| simpl; lia | ..].
       2: { by iIntros "!> ?". }
-      by iApply odd_vs. }
+      iApply odd_vs; eauto. }
 
     iIntros "!> Hf". by iApply "HΦ". 
   Qed. 
@@ -140,7 +141,7 @@ Section short_prog.
 
   Hypothesis PROD_ENV_INDEP: forall a, is_action_of PM a -> is_action_of env_AM a -> False.
 
-  Context `{!heapGS Σ LM, !evenoddG Σ}.
+  Context `{hGS: !heapGS Σ LM, !evenoddG Σ, SplitGS Σ PM env_AM}.
 
   Context (st_res even_at odd_at: nat -> iProp Σ). 
   Context
@@ -160,7 +161,10 @@ Section short_prog.
   Proof. lia. Qed. 
 
   Lemma add_helper: forall y d, y >= d -> (y - d) + d = y.
-  Proof. lia. Qed. 
+  Proof. lia. Qed.
+
+  (* Definition Ns := nroot .@ "eo". *)
+  (* Definition split_inv: iProp Σ := inv Ns (split_inv_inner (hGS := hGS)). *)
 
   Lemma short_spec_impl tid n N1 N2 
     (ev := Nat.ltb N1 N2)
@@ -168,7 +172,7 @@ Section short_prog.
     (b := 40)
     f1 f2 (Hf1: f1 > b) (Hf2: f2 > b)
     :
-    {{{ evenodd_inv ENV_AM st_res n ∗ 
+    {{{ split_inv Ns__split ∗ evenodd_inv ENV_AM st_res n ∗ 
         tid ↦M {[ ρEven := f1 + (if ev then 0 else d); ρOdd := f2 + (if ev then d else 0) ]} ∗
         even_at N1 ∗ odd_at N2 ∗ frag_free_roles_are ∅
     }}}
@@ -177,26 +181,27 @@ Section short_prog.
   Proof using All.
     subst ev. 
     iLöb as "Hg" forall (N1 N2 f1 Hf1 f2 Hf2).
-    iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". 
+    iIntros (Φ) "(#SPLIT & #Hinv & Hf & Heven_at & Hodd_at & HFR) HΦ". 
     rewrite /short.
 
     wp_lam.
     wp_bind (!_)%E. iApply wp_atomic.
-    iInv Ns as (m) "(>CUR & >Hn & Hauths)" "Hclose".
+    iInv Ns__eo as (m) "(>CUR & >Hn & Hauths)" "Hclose".
     iIntros "!>". wp_load. iIntros "!>".
     iDestruct (sr_agree _ _ _ st_res_SR_even with "[$] [$]") as %->.
     iDestruct (sr_agree _ _ _ st_res_SR_odd with "[$] [$]") as %->.
     rewrite -Nat.negb_even.
     iMod ("Hclose" with "[Hauths CUR Hn]") as "_".
     { iFrame. }
-    iModIntro.  
+    iModIntro.
 
     wp_pures.
     wp_bind (_ <- _)%E. iApply wp_atomic.
 
     destruct (Nat.even m) eqn:E; simpl.  
     - erewrite (proj2 (Nat.ltb_lt _ _)); [| lia].
-      iPoseProof (even_vs  _ _ _ _ st_res_SR_even with "Hinv") as "#VS".
+      iPoseProof (even_vs  _ _ _ _ st_res_SR_even with "[$]") as "#VS".
+      { solve_ndisj. }
       rewrite /eo_vs. iMod "VS".
       iDestruct "VS" as (m') "[CORR MU]".
       rewrite {1}/eo_corr. iDestruct "CORR" as "[CNT ST]".
@@ -241,7 +246,7 @@ Section short_prog.
       do 2 wp_pure _. 
 
       iApply ("Hg" with "[] [] [-HΦ]"); [..| done]. 
-      3: { iFrame "Hodd_at EVEN Hinv HFR". 
+      3: { iFrame "Hodd_at EVEN Hinv SPLIT HFR". 
            iApply has_fuels_proper; [reflexivity| | iFrame].
            rewrite insert_empty. erewrite (proj2 (Nat.ltb_ge _ _)); [| lia]. 
            f_equiv; [| f_equiv]. 
@@ -289,7 +294,7 @@ Section short_prog.
       do 2 wp_pure _. 
 
       iApply ("Hg" with "[] [] [-HΦ]"); [..| done]. 
-      3: { iFrame "Heven_at ODD Hinv HFR". 
+      3: { iFrame "Heven_at ODD Hinv SPLIT HFR". 
            iApply has_fuels_proper; [reflexivity| | iFrame].
            rewrite insert_commute; [| done].  
            rewrite insert_empty.
@@ -302,9 +307,9 @@ Section short_prog.
   Lemma short_spec: even_odd_spec ENV_AM st_res even_at odd_at short.
   Proof using All. 
     rewrite /even_odd_spec. iIntros (tid n N1 N2 f Hf EVEN). 
-    iIntros (Φ) "(#INV & Hf & EVEN & ODD & FR) HΦ". unfold short.
+    iIntros (Φ) "(#SPLIT & #INV & Hf & EVEN & ODD & FR) HΦ". unfold short.
     iApply (short_spec_impl with "[-HΦ]"); [..| done]. 
-    3: { iFrame "EVEN ODD FR INV". iApply has_fuels_proper; [reflexivity| | by iFrame].
+    3: { iFrame "EVEN ODD FR SPLIT INV". iApply has_fuels_proper; [reflexivity| | by iFrame].
          erewrite (proj2 (Nat.ltb_lt _ _)); [| lia].
          f_equiv; [| f_equiv].
          all: apply add_helper; lia. }

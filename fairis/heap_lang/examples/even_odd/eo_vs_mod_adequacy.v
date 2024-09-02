@@ -567,12 +567,14 @@ Section Adequacy.
     (l : loc)
     (Hinv : heapGS Σ LM)
     (eoΣ: evenoddG Σ)
-    (th_preG: threadPreG Σ)    
+    (th_preG: threadPreG Σ)
+    (sGS: SplitGS Σ PM UnitAM)
     `(SR__e: StateRes Nat.even sr even_at)
     `(SR__o: StateRes Nat.odd sr odd_at)
     (SPEC: even_odd_spec EnvUnitAM sr even_at odd_at prog)
     :
-    {{{ inv (nroot.@"even_odd") (evenodd_inv_inner EnvUnitAM sr l) ∗
+    {{{ inv (Ns__split) (split_inv_inner) ∗ 
+        inv (nroot.@"even_odd") (evenodd_inv_inner EnvUnitAM sr l) ∗
         0 ↦M gset_to_gmap 61 init_roles ∗
         even_at 0 ∗
         odd_at 1 ∗
@@ -582,9 +584,9 @@ Section Adequacy.
   Proof.  
     simpl. rewrite /init_roles.
     rewrite !gset_to_gmap_union_singleton. rewrite gset_to_gmap_singleton. 
-    iIntros (Φ) "(#Hinv & Hf & Heven_at & Hodd_at & FR) HΦ".
-    iApply (SPEC with "[Hf Heven_at Hodd_at Hinv FR]"); eauto.
-    iFrame. done. 
+    iIntros (Φ) "(#SPLIT & #Hinv & Hf & Heven_at & Hodd_at & FR) HΦ".
+    iApply (SPEC with "[Hf Heven_at Hodd_at Hinv SPLIT FR]"); eauto.
+    iFrame "#∗". 
   Qed.
   
   Lemma dom_locales
@@ -670,27 +672,33 @@ Section Adequacy.
   Existing Instance even_AME. 
   Existing Instance odd_AME.
 
-  Lemma eo_rah l `(!heapGS Σ LM) sr (eoΣ: evenoddG Σ) `(threadPreG Σ)
+  Lemma eo_rah l `(!heapGS Σ LM) sr
+    (eoΣ: evenoddG Σ) `(threadPreG Σ) (sGS: SplitGS Σ PM UnitAM)
     st e h
     (CUR__0: st2nat' st 0)
     :
     inv (nroot.@"even_odd") (evenodd_inv_inner EnvUnitAM sr l) -∗
+    inv Ns__split split_inv_inner -∗
       rel_always_holds NotStuck [λ _ : language.val heap_lang, 0 ↦M ∅]
       (λ (extr : execution_trace heap_lang) (atr : auxiliary_trace LM),
         ξ_evenodd_trace l extr (map_underlying_trace atr))
       ([e], h)
       (initial_ls st 0).
   Proof.
-    iIntros "#Hinv".
+    iIntros "#Hinv #SPLIT".
     iIntros (extr auxtr c) "_ _ _ %Hends _ %Hnstuck %Hequiv [_ [Hσ Hδ]] Hposts".
     
     iInv "Hinv" as (N) "(>CUR & >Hn & Hauths)" "Hclose".
-    rewrite /cur_st. iDestruct "CUR" as ([st__e st__o]) "[Hmod %CUR]". 
+    rewrite /cur_st. iDestruct "CUR" as ([st__e st__o]) "[ST %CUR]".
+    rewrite {1}/split_inv_inner. simpl. 
+    iInv "SPLIT" as ([p ?]) ">(Hmod & PROD)" "_". simpl.
+    iDestruct (left_agree with "[$] [$]") as %->.
     iApply fupd_mask_intro; [set_solver|].
     iIntros "Hclose'".
     iDestruct (gen_heap_valid with "Hσ Hn") as %Hn.
     iDestruct (model_state_interp_tids_smaller with "Hδ") as %Hsmaller.
     iDestruct "Hδ" as (fm Hfmle Hfmdead Htp) "[Hδ Hfm]".
+
     iDestruct (model_agree with "Hδ Hmod") as %Hn'.
     iSplitL; last first.
     { iPureIntro. exists N. split; [done|].
@@ -699,10 +707,11 @@ Section Adequacy.
     rewrite Hends.
     iSplit.
     - iIntros "%Hall". subst c.
-      iPoseProof (not_all_val with "[$] [$]") as "%LR0"; eauto.
+      iPoseProof (not_all_val with "Hfm Hposts") as "%LR0"; eauto.
       rewrite Hn' in LR0.
       opose proof * (ρEven_always_live (_, _)) as LR.
       { apply CUR. }
+      Unshelve. 2: exact u. 
       clear -LR LR0. set_solver. 
     - iPureIntro.
       apply Forall_forall.
@@ -710,10 +719,14 @@ Section Adequacy.
   Qed.
 
   Definition evenoddΣ : gFunctors :=
-    #[ heapΣ M; GFunctor (excl_authR natO) ].
+    #[ heapΣ M; GFunctor (excl_authR natO); SplitΣ PM UnitAM ].
+
+  (* TODO: move *)
+  Global Instance subG_evenoddΣ' {Σ} : subG evenoddΣ Σ → SplitPreGS Σ PM UnitAM.
+  Proof. solve_inG. Qed. 
 
   Global Instance subG_evenoddΣ {Σ} : subG evenoddΣ Σ → evenoddPreG Σ.
-  Proof. Qed. 
+  Proof. Qed.
   (* Proof. solve_inG. Qed. *)
 
   Definition wholeΣ := #[evenoddΣ; threadΣ]. 
@@ -783,7 +796,7 @@ Section Adequacy.
   Qed.
 
   Lemma evenodd_sim prog l
-    (SPEC: forall `{!heapGS Σ LM, evenoddG Σ} st_res even_at odd_at
+    (SPEC: forall `{!heapGS Σ LM, evenoddG Σ, SplitGS Σ PM UnitAM} st_res even_at odd_at
              (SR__e: StateRes Nat.even st_res even_at)
              (SR__o: StateRes Nat.odd st_res odd_at),
         even_odd_spec EnvUnitAM st_res even_at odd_at prog)
@@ -799,7 +812,9 @@ Section Adequacy.
     { apply _. }
     assert (threadPreG wholeΣ) as thPreG.
     { apply _. }
-    eapply (strong_simulation_adequacy NotStuck _ _ _ ∅).
+    assert (SplitPreGS wholeΣ PM UnitAM) as sPreG.
+    { apply _. }
+    eapply (strong_simulation_adequacy NotStuck _ _ _ ∅ (Σ := wholeΣ)).
     2: { simpl. rewrite st0_lr. set_solver. }
     { eapply rel_finitary_sim_rel_with_user_sim_rel.
       eapply valid_state_evolution_finitary_fairness_simple.
@@ -807,13 +822,21 @@ Section Adequacy.
     iIntros (?) "!> Hσ Hs Hr Hf".
 
     iMod (st_res_init 0) as "(%st_res & %even_at & %odd_at & SR & E & O & %SR__e & %SR__o)"; [done| ].
+    iMod (split_init st0 ((): amSt UnitAM)) as (γ__s) "(PROD & LEFT & RIGHT)".
 
-    iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner EnvUnitAM st_res l) with "[Hσ Hs SR]") as "#Hinv".
+    set (sGS := {| γ__split := γ__s; spre := sPreG |}). 
+
+    iMod (inv_alloc (nroot .@ "even_odd") _ (evenodd_inv_inner EnvUnitAM st_res l (sGS := sGS)) with "[Hσ LEFT SR]") as "#Hinv".
     { iNext. unfold evenodd_inv_inner.
       rewrite /st0. 
       iExists 0.
       simpl. rewrite big_sepM_singleton. iFrame.
+      rewrite /cur_st. 
       iPureIntro. apply st0_zero. }
+
+    iMod (inv_alloc Ns__split _ (split_inv_inner) with "[PROD Hs]") as "#SPLIT".
+    { iNext. iFrame. }
+
     iModIntro.
     iSplitL.
     2: { iApply eo_rah; try done.
@@ -991,7 +1014,7 @@ Section Adequacy.
 
   (** Proof that the execution trace satisfies the liveness properties *)
   Theorem evenodd_ex_liveness prog
-    (SPEC: forall `{!heapGS Σ LM, evenoddG Σ} st_res even_at odd_at
+    (SPEC: forall `{!heapGS Σ LM, evenoddG Σ, SplitGS Σ PM UnitAM} st_res even_at odd_at
              (SR__e: StateRes Nat.even st_res even_at)
              (SR__o: StateRes Nat.odd st_res odd_at),
         even_odd_spec EnvUnitAM st_res even_at odd_at prog)
