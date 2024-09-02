@@ -104,17 +104,16 @@ Section Models.
   Existing Instance even_AME. 
   Existing Instance odd_AME.
 
-  (* Instance prod_AM_fin_branch': AM_fin_branch' prod_model. *)
-  (* Proof. *)
-  (*   apply _.  *)
-  (* Qed. *)
-
-  (* Instance prod_AM_strong_lr: AM_strong_lr prod_model. *)
-  (* Proof. apply _. Qed.  *)
-
+      
   (* doesn't look like there is a way to prove it for arbitrary product *)
   Global Instance prod_AM_act_dec: ∀ a : Action, Decision (is_action_of prod_model a).
-  Proof. Admitted.
+  Proof.
+    (* intros. destruct (decide (is_action_of even_AM a)) as [ACT__e | NACT__e], (decide (is_action_of odd_AM a)) as [ACT__o | NACT__o]. *)
+    (* 1-3: left. 4: right.  *)
+    (* { pose proof ACT__e as A__e.  *)
+    (*   apply even_acts in ACT__e as [[k ->] | ?]. *)
+    (*   {  *)
+  Admitted.
 
   Class EnvironmentAM (env_AM: ActionModel) := {
       (* eam_role_eqdec :> EqDecision (amRole env_AM); *)
@@ -191,7 +190,19 @@ Section Models.
 
   Lemma odd_synced_by_even: synced_by (flip st2nat_ex).
   Proof. 
-  Admitted.
+    red. intros st__o st__o' a ρ st__e [n CORR] ACT__e STEP__o.
+    pose proof STEP__o as ACT%action_of_step%odd_acts.
+    destruct ACT as [[k ->] | PRIV]. 
+    2: { edestruct odd_priv_even_noact; eauto. }
+    destruct CORR as [CUR__e CUR__o]. simpl in *.
+    apply odd_step_inv in STEP__o. destruct STEP__o as (<-&?&O).
+    opose proof * even_syncable as (st__e' & STEP__e); eauto.
+    { erewrite (f_equal Nat.odd); eauto. rewrite CUR__o. eauto. } 
+
+    pose proof STEP__e as (?&?&?)%even_sync_inv.
+    rewrite CUR__e -CUR__o in STEP__e.
+    eexists. split; eauto. eexists. split; eauto. simpl. lia. 
+  Qed. 
 
   Context {Σ: gFunctors}. 
 
@@ -267,8 +278,10 @@ Section Models.
     - eapply matched_AM_live_roles.
       { apply even_matched_by_prod. }
       simpl. split; eauto. red. eauto. 
-    - admit. 
-  Admitted. 
+    - eapply matched_AM_live_roles.
+      { apply odd_matched_by_prod. }
+      simpl. split; eauto. red. eauto. 
+  Qed.
 
   Lemma prod_step_lr_nonincr st st' a oρ n n'
     (STEP: amTrans prod_model st (a, oρ) st')
@@ -285,17 +298,6 @@ Section Models.
     inversion STEP; subst.
     all: (try apply even_step_lr_nonincr in STEP1);
       (try apply odd_step_lr_nonincr in STEP2); set_solver.
-  Qed.
-
-  Lemma ρEven_always_live' (st: amSt prod_model) n
-    (CUR: st2nat st n):
-    even_role (ρ__e even_impl) ∈ AM_live_roles st.
-  Proof.
-    destruct st as [??]. 
-    eapply live_lift. 
-    { apply even_matched_by_prod. }
-    { simpl. split; eauto. red. eauto. }
-    apply ρ__e_always_live.
   Qed.
 
   Let LM := the_model.
@@ -363,49 +365,55 @@ Section Models.
       + done.
   Qed.
 
-  Lemma mu_odd `{!heapGS Σ LM} n:
-    ⊢ cur_st n -∗ MU__r ρOdd ∅ (cur_st (if Nat.odd n then (n + 1)%nat else n)).
+  Lemma mu_odd `{!heapGS Σ LM} n ns:
+    inv ns (split_inv_inner) ⊢ cur_st n -∗ MU__r ρOdd (↑ ns) (cur_st (if Nat.odd n then (n + 1)%nat else n)).
   Proof using PROD_ENV_INDEP.
-  (*   rewrite /MU__r /cur_st. iIntros "(%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]". *)
-  (*   destruct st as [[st__e st__o] st__env]. destruct CUR as [CUR__E CUR__O]. simpl in *.  *)
+    rewrite /MU__r /cur_st. iIntros "#INV (%st & ST & %CUR)" (tid f' R) "[MAP %DISJ__R]".
+    destruct st as [st__e st__o]. destruct CUR as [CUR__E CUR__O]. simpl in *.
 
-  (*   enough (exists a st', *)
-  (*              amTrans PM (st__e, st__o) (a, Some (odd_role (ρ__o odd_impl))) st' /\ *)
-  (*              st2nat st' (if Nat.odd n then (n + 1) else n)) as (a & st' & TRANS & CUR').  *)
-  (*   { iApply (MU_wand with "[]"). *)
-  (*     2: { iApply (model_step_MU with "[$] [MAP]"). *)
-  (*          1, 4: by eauto. *)
-  (*          { simpl. eapply am_fmtrans_action. eexists.  *)
-  (*            eapply pt_inner1; eauto. *)
-  (*            intros ?. edestruct PROD_ENV_INDEP; eauto. *)
-  (*            eapply action_of_step; eauto. } *)
-  (*          simpl. setoid_rewrite @prod_indep_live_roles; eauto.   *)
-  (*          apply union_mono; [| done]. apply set_map_mono; [done| ]. *)
-  (*          eapply prod_step_lr_nonincr; done. } *)
-  (*     iIntros "(MAP & ST)". *)
-  (*     iFrame. done. } *)
-  (*   Unshelve. 2: by apply _.  *)
+    enough (exists a st',
+               amTrans PM (st__e, st__o) (a, Some (odd_role (ρ__o odd_impl))) st' /\
+               st2nat st' (if Nat.odd n then (n + 1) else n)) as (a & st' & TRANS & CUR').
+    { iApply (MU_inv with "[$]"); [done| ].
+      (* TODO: avoid unfolding of MU *)
+      rewrite /split_inv_inner. iIntros ">(%S & FRAG & PROD)". destruct S.
+      simpl. iDestruct (left_agree with "[$] [$]") as %->.
+
+      iMod (update_left st' with "[$] [$]") as "[PROD ST]". 
+      iApply (MU_wand with "[ST PROD]").
+      2: { iApply (model_step_MU with "[$] [MAP]").
+           1, 4: by eauto.
+           { simpl. eapply am_fmtrans_action. eexists.
+             eapply pt_inner1; eauto.
+             intros ?. edestruct PROD_ENV_INDEP; eauto.
+             eapply action_of_step; eauto. }
+           simpl. setoid_rewrite @prod_indep_live_roles; eauto.
+           apply union_mono; [| done]. apply set_map_mono; [done| ].
+           eapply prod_step_lr_nonincr; done. }
+      iIntros "(MAP & FRAG)".
+      iFrame. done. }
+    Unshelve. 2: by apply _.
  
-  (*   destruct (Nat.odd n) eqn:O. *)
-  (*   - opose proof (odd_steppable _ st__o) as (st__o' & STEP__o); eauto. *)
-  (*     { rewrite CUR__O. set_solver. } *)
-  (*     opose proof * even_syncable as (st__e' & STEP__e); eauto. *)
-  (*     { erewrite (f_equal Nat.odd); eauto. } *)
-  (*     rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e.  *)
-  (*     eexists _, (_, _). split; [| split]. *)
-  (*     + simpl. eapply @pt_sync2; eauto. *)
-  (*     + simpl. eapply even_sync_inv; eauto. *)
-  (*     + simpl. eapply odd_step_inv; eauto. *)
-  (*   - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E.  *)
-  (*     opose proof (odd_stutterable _ st__o) as (st__o' & a__o & PRIV & STEP__o); eauto. *)
-  (*     { rewrite CUR__O. intuition. } *)
-  (*     eexists _, (_, _). split; [| split]. *)
-  (*     + simpl. eapply @pt_inner2; eauto. *)
-  (*       eapply odd_priv_even_noact; eauto. *)
-  (*     + done.  *)
-  (*     + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto. *)
-  (* Qed. *)
-  Admitted. 
+    destruct (Nat.odd n) eqn:O.
+    - opose proof (odd_steppable _ st__o) as (st__o' & STEP__o); eauto.
+      { rewrite CUR__O. set_solver. }
+      opose proof * even_syncable as (st__e' & STEP__e); eauto.
+      { erewrite (f_equal Nat.odd); eauto. }
+      rewrite CUR__O in STEP__o. rewrite CUR__E in STEP__e.
+      eexists _, (_, _). split; [| split].
+      + simpl. eapply @pt_sync2; eauto.
+      + simpl. eapply even_sync_inv; eauto.
+      + simpl. eapply odd_step_inv; eauto.
+    - pose proof O as E. rewrite -negb_true_iff Nat.negb_odd in E.
+      opose proof (odd_stutterable _ st__o) as (st__o' & a__o & PRIV & STEP__o); eauto.
+      { rewrite CUR__O. intuition. }
+      eexists _, (_, _). split; [| split].
+      + simpl. eapply @pt_inner2; eauto.
+        eapply odd_priv_even_noact; eauto.
+      + done.
+      + simpl. symmetry. rewrite -CUR__O. eapply odd_stutter_inv; eauto.
+  Qed.
+  
 
   Section Viewshifts.
     Context `{!heapGS Σ LM}.
@@ -446,11 +454,14 @@ Section Models.
       rewrite /evenodd_inv_inner. iNext. iFrame.
     Qed.
     
-    Lemma odd_vs l ns:
-      inv ns (evenodd_inv_inner l) ⊢ eo_vs Nat.odd st_res_SR_odd l ns ρOdd. 
+    Lemma odd_vs l ns1 ns2
+      (DISJ: ns1 ## ns2):
+      inv ns1 (evenodd_inv_inner l) ∗ inv ns2 (split_inv_inner) ⊢ eo_vs Nat.odd st_res_SR_odd l ns1 ρOdd. 
     Proof using st_res_SR_odd PROD_ENV_INDEP.
-      rewrite /eo_vs. iIntros "#INV". iModIntro. 
-      iMod (inv_acc with "INV") as "[OPEN CLOS]".
+      clear st_res_SR_even even_at.
+
+      rewrite /eo_vs. iIntros "#[INV1 INV2]". iModIntro. 
+      iMod (inv_acc with "INV1") as "[OPEN CLOS]".
       { apply top_subseteq. }
       
       iDestruct "OPEN" as (m) "(>CUR & >Hn & Hauths)".
@@ -458,9 +469,10 @@ Section Models.
       { iFrame. }
       simpl.
       
-      iApply (MU__r_mask_weaken with "[-]"); [apply empty_subseteq| ]. 
+      iApply (MU__r_mask_weaken (↑ ns2) with "[-]").
+      { set_solver. }
       iApply (MU__r_wand with "[-CUR]").
-      2: by iApply mu_odd.
+      2: { by iApply mu_odd. }
       
       rewrite /eo_corr. iIntros "? (?&?)".
       iMod ("CLOS" with "[-]") as "_"; [| done].

@@ -123,7 +123,7 @@ Section proof_start.
       iApply (@o_spec op M _ _ _ _ _ st_res_SR_odd
                with "[$Hf $Hodd_at]"); [lia| simpl; lia | ..].
       2: { by iIntros "!> ?". }
-      iApply odd_vs; eauto. }
+      iApply odd_vs; eauto. solve_ndisj. }
 
     iIntros "!> Hf". by iApply "HΦ". 
   Qed. 
@@ -253,7 +253,8 @@ Section short_prog.
            all: apply add_helper; lia. }
       all: iPureIntro; lia.
     - erewrite (proj2 (Nat.ltb_ge _ _)); [| lia].       
-      iPoseProof (odd_vs _ _ _ _ st_res_SR_odd with "Hinv") as "#VS".      
+      iPoseProof (odd_vs _ _ _ _ st_res_SR_odd with "[$]") as "#VS".
+      { solve_ndisj. } 
       rewrite /eo_vs. iMod "VS".
       iDestruct "VS" as (m') "[CORR MU]".
       rewrite {1}/eo_corr. iDestruct "CORR" as "[CNT ST]".

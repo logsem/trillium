@@ -100,6 +100,28 @@ Section ModelMono.
   Instance full_AM_act_dec: ∀ a : Action, Decision (is_action_of FM a).
   Proof. Admitted.
 
+  Lemma ρEven_always_live' (st: amSt PM) n
+    (CUR: st2nat st n):
+    inl $ ρ__e even_impl ∈ AM_live_roles st.
+  Proof.
+    destruct st as [??]. 
+    eapply live_lift. 
+    { apply even_matched_by_prod. }
+    { simpl. split; eauto. red. eauto. }
+    apply ρ__e_always_live.
+  Qed.
+
+  Lemma ρOdd_always_live' (st: amSt PM) n
+    (CUR: st2nat st n):
+    inr $ ρ__o odd_impl ∈ AM_live_roles st.
+  Proof.
+    destruct st as [??]. 
+    eapply live_lift. 
+    { apply odd_matched_by_prod. }
+    { simpl. split; eauto. red. eauto. }
+    apply ρ__o_always_live.
+  Qed.
+
   Lemma ρEven_always_live (st: fmstate M) n
     (CUR: st2nat' st n):
     ρEven ∈ live_roles _ st.
@@ -115,7 +137,14 @@ Section ModelMono.
   Lemma ρOdd_always_live (st: fmstate M) n
     (CUR: st2nat' st n):
     ρOdd ∈ live_roles _ st.
-  Proof. Admitted.
+  Proof.
+    simpl. destruct st.
+    rewrite /ρOdd. simpl.
+    unshelve eapply (live_lift _ _ a (_: amSt FM)).
+    2: { apply prod_matched_by_full. }
+    { done. }
+    eapply ρOdd_always_live'; eauto.
+  Qed. 
 
   Lemma st2nat_next st aoρ (st': fmstate M) i j
     (TRANS: amTrans FM st aoρ st')
