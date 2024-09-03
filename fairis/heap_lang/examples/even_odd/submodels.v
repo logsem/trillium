@@ -172,7 +172,7 @@ Definition thread_0_even: EvenModel.
     { red in H. symmetry in H. 
       edestruct @pick_act_ns_nth_disj_neq; [| apply H]. solve_ndisj. }
     subst. edestruct even_odd_False; eauto.
-Qed. 
+Defined.
 
 Definition thread_1_odd: OddModel.
   unshelve refine {| 
@@ -214,4 +214,4 @@ Definition thread_1_odd: OddModel.
     { red in H. symmetry in H. 
       edestruct @pick_act_ns_nth_disj_neq; [| apply H]. solve_ndisj. }
     subst. edestruct even_odd_False; eauto.
-Qed. 
+Defined.

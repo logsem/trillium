@@ -47,11 +47,14 @@ Qed.
 Section ModelMono.
 (** Proof that any fair execution of model visits all natural numbers *)
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
-  Let M := @the_fair_model even_impl odd_impl _ EnvUnitAM.
+
+  Let PM := @prod_model even_impl odd_impl.
+  Context {prod_AM_act_dec: ∀ a, Decision (is_action_of PM a)}. 
+
+  Let M := @the_fair_model even_impl odd_impl _ _ EnvUnitAM.
   Let even_AM := @even_AM even_impl. 
   Let odd_AM := @odd_AM odd_impl. 
 
-  Let PM := @prod_model even_impl odd_impl.
   Let FM := @full_model even_impl odd_impl UnitAM. 
   (* TODO: work with PM trace only *)
   Definition evenodd_mtrace : Type := mtrace M.
@@ -97,8 +100,65 @@ Section ModelMono.
     by inversion STEP. 
   Qed.
 
+  (* None case is hard *)
+  (* (* TODO: move *) *)
+  (* Lemma prod_indep_acts_dec {AM1 AM2} *)
+  (*   (INDEP: models_independent AM1 AM2) *)
+  (*   (DEC1: ∀ a, Decision (is_action_of AM1 a)) *)
+  (*   (DEC2: ∀ a, Decision (is_action_of AM2 a)): *)
+  (*   ∀ a, Decision (is_action_of (ProdAM AM1 AM2) a). *)
+  (* Proof.  *)
+  (*   intros a. *)
+  (*   destruct (DEC1 a). *)
+  (*   -  *)
+  (*     left. destruct i as (st & oρ & st' & STEP). *)
+  (*     set (s := inhabitant $ am_st_inh AM2: amSt AM2).  *)
+  (*     exists (st, s). exists (from_option (Some ∘ inl) None oρ), (st', s). *)
+  (*     econstructor.  *)
+                            
+
+  (* TODO: move *)
+  Lemma prod_actions_sub {AM1 AM2} a
+    (ACT: is_action_of (ProdAM AM1 AM2) a):
+    is_action_of AM1 a \/ is_action_of AM2 a.
+  Proof. 
+    destruct ACT as (st & oρ & st' & STEP).
+    inversion STEP; subst.
+    all: try apply action_of_step in STEP1; try apply action_of_step in STEP2.
+    all: tauto.
+  Qed. 
+
+  Lemma prod_no_ext_sync (st: amSt PM):
+    None ∉ ams_lr st.
+  Proof.
+    intros IN%ams_lr_spec. destruct IN as (?&?&STEP).
+    inversion STEP; subst.
+    pose proof STEP1 as ACT1%action_of_step%even_acts.
+    pose proof STEP2 as ACT2%action_of_step%odd_acts.
+    destruct ACT1 as [[k ?] | PRIV1], ACT2 as [[? EQ] | PRIV2]; subst; cycle 1.
+    { by apply odd_pub_priv_disj in PRIV2. }
+    { by apply even_pub_priv_disj in PRIV1. }
+    { by edestruct @even_odd_priv_disj; eauto. }
+    apply coPset_nth_inj in EQ. subst.
+    apply even_sync_inv in STEP1 as (?&?&?). apply odd_sync_inv in STEP2 as (?&?&?).
+    edestruct even_odd_False; eauto.
+  Qed.
+
+  (* TODO: move *)
+  Lemma UnitAM_actions a: is_action_of UnitAM a <-> False.
+  Proof. split; [| done]. by intros (?&?&?&?). Qed. 
+
   Instance full_AM_act_dec: ∀ a : Action, Decision (is_action_of FM a).
-  Proof. Admitted.
+  Proof.
+    intros. destruct (decide (is_action_of PM a)).
+    - left. destruct i as (st & oρ & st' & STEP).
+      destruct oρ. 
+      2: { edestruct prod_no_ext_sync. eapply ams_lr_spec; eauto. }
+      red. do 3 eexists. simpl. eapply pt_inner1; eauto.
+      by intros ?%UnitAM_actions.
+    - right. intros [? | ?%UnitAM_actions]%prod_actions_sub; done. 
+      Unshelve. exact (). 
+  Qed. 
 
   Lemma ρEven_always_live' (st: amSt PM) n
     (CUR: st2nat st n):
@@ -385,10 +445,13 @@ Section MonoLMPreserved.
   (** Proof that fair progress is preserved through auxiliary trace *)
 
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
-  Let M := @the_fair_model even_impl odd_impl _ EnvUnitAM.
-  Let LM := @the_model even_impl odd_impl _ EnvUnitAM.
-  (* Let st2nat := st2nat even_impl odd_impl.  *)
+
   Let PM := @prod_model even_impl odd_impl.
+  Context {prod_AM_act_dec: ∀ a, Decision (is_action_of PM a)}. 
+
+  Let M := @the_fair_model even_impl odd_impl _ _ EnvUnitAM.
+  Let LM := @the_model even_impl odd_impl _ _ EnvUnitAM.
+  (* Let st2nat := st2nat even_impl odd_impl.  *)
   Let FM := @full_model even_impl odd_impl UnitAM. 
 
   Definition evenodd_aux_progress (auxtr : auxtrace LM) :=
@@ -472,10 +535,13 @@ Section ExAuxPropsPreserved.
       for a specific ξ *)
   
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
-  Let M := @the_fair_model even_impl odd_impl _ EnvUnitAM.
-  Let LM := @the_model even_impl odd_impl _ EnvUnitAM.
-  (* Let st2nat := st2nat even_impl odd_impl.  *)
+
   Let PM := @prod_model even_impl odd_impl.
+  Context {prod_AM_act_dec: ∀ a, Decision (is_action_of PM a)}. 
+
+  Let M := @the_fair_model even_impl odd_impl _ _ EnvUnitAM.
+  Let LM := @the_model even_impl odd_impl _ _ EnvUnitAM.
+  (* Let st2nat := st2nat even_impl odd_impl.  *)
   Let FM := @full_model even_impl odd_impl UnitAM. 
 
   Definition evenodd_ex_progress (l:loc) (extr : heap_lang_extrace) :=
@@ -580,10 +646,13 @@ End ExAuxPropsPreserved.
 
 Section Adequacy.
   Context (even_impl: EvenModel) (odd_impl: OddModel).
-  Let M := @the_fair_model even_impl odd_impl _ EnvUnitAM.
-  Let LM := @the_model even_impl odd_impl _ EnvUnitAM.
-  (* Let st2nat := st2nat even_impl odd_impl.  *)
+
   Let PM := @prod_model even_impl odd_impl.
+  Context {prod_AM_act_dec: ∀ a, Decision (is_action_of PM a)}. 
+
+  Let M := @the_fair_model even_impl odd_impl _ _ EnvUnitAM.
+  Let LM := @the_model even_impl odd_impl _ _ EnvUnitAM.
+  (* Let st2nat := st2nat even_impl odd_impl.  *)
   Let FM := @full_model even_impl odd_impl UnitAM. 
 
   Let init_roles: gset (fmrole M) := 
@@ -1097,6 +1166,43 @@ End Adequacy.
 Section AdequacyConcrete.
 
   From trillium.fairness.heap_lang.examples.even_odd Require Import submodels.
+
+  Let PM := @prod_model thread_0_even thread_1_odd.
+
+  Local Instance PM_act_dec: ∀ a, Decision (is_action_of PM a).
+  Proof.
+    intros a. 
+    destruct (decide (a ∈ (↑ pub_ns: coPset))).
+    { left. unshelve eapply coPset_nth_surj in e.
+      { by apply nclose_infinite. }
+      destruct e as [n ->]. red. 
+      destruct (even_or_odd n).
+      - exists (n, n), (Some $ inl $ ρ__e thread_0_even), (S n, S n).
+        econstructor; eauto.
+        + econstructor. by rewrite Nat.add_0_r.
+        + econstructor. by rewrite odd_plus1_negb Nat.negb_odd.
+      - exists (n, n), (Some $ inr $ ρ__o thread_1_odd), (S n, S n).
+        econstructor; eauto.
+        + econstructor. by rewrite Nat.add_0_r.
+        + econstructor. by rewrite even_plus1_negb Nat.negb_even. }
+    destruct (even_priv_dec thread_0_even a).
+    { left. red. exists (1, 1), (Some $ inl $ ρ__e thread_0_even), (1, 1).
+      econstructor.
+      { eapply even_priv_odd_noact; eauto. }
+      simpl in e. red in e. subst.  
+      simpl. by econstructor. }
+    destruct (odd_priv_dec thread_1_odd a).
+    { left. red. exists (0, 0), (Some $ inr $ ρ__o thread_1_odd), (0, 0). 
+      econstructor.
+      { eapply odd_priv_even_noact; eauto. }
+      simpl in o. red in o. subst.  
+      simpl. by econstructor. }
+
+    right. intros ACT%prod_actions_sub.
+    rewrite even_acts odd_acts in ACT.
+    destruct ACT as [[[? ->]|] | [[? ->]|]]; eauto. 
+    all: destruct n; apply coPset_nth_in. 
+  Qed.
 
   Lemma start_adequacy
     (l:loc) (extr : heap_lang_extrace)

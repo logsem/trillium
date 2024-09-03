@@ -105,15 +105,10 @@ Section Models.
   Existing Instance odd_AME.
 
       
-  (* doesn't look like there is a way to prove it for arbitrary product *)
-  Global Instance prod_AM_act_dec: ∀ a : Action, Decision (is_action_of prod_model a).
-  Proof.
-    (* intros. destruct (decide (is_action_of even_AM a)) as [ACT__e | NACT__e], (decide (is_action_of odd_AM a)) as [ACT__o | NACT__o]. *)
-    (* 1-3: left. 4: right.  *)
-    (* { pose proof ACT__e as A__e.  *)
-    (*   apply even_acts in ACT__e as [[k ->] | ?]. *)
-    (*   {  *)
-  Admitted.
+  (* doesn't look like there is a way to prove it for arbitrary product.
+     Even the interface lemmas don't seem enough *)
+  (* Global Instance prod_AM_act_dec: ∀ a : Action, Decision (is_action_of prod_model a). *)
+  Context {prod_AM_act_dec: ∀ a, Decision (is_action_of prod_model a)}. 
 
   Class EnvironmentAM (env_AM: ActionModel) := {
       (* eam_role_eqdec :> EqDecision (amRole env_AM); *)

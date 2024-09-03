@@ -31,9 +31,11 @@ Section proof_start.
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
   Context `(ENV_AM: EnvironmentAM env_AM).
 
-  Let M := @the_fair_model even_impl odd_impl _ ENV_AM.
   Let PM := @prod_model even_impl odd_impl.
-  Let LM := @the_model even_impl odd_impl _ ENV_AM.
+  Context {prod_AM_act_dec: ∀ a, Decision (is_action_of PM a)}.
+
+  Let M := @the_fair_model even_impl odd_impl prod_AM_act_dec _ ENV_AM.
+  Let LM := @the_model even_impl odd_impl prod_AM_act_dec _ ENV_AM.
 
   Hypothesis PROD_ENV_INDEP: forall a, is_action_of PM a -> is_action_of env_AM a -> False.
 
@@ -135,9 +137,11 @@ Section short_prog.
   Context {even_impl: EvenModel} {odd_impl: OddModel}.
   Context `(ENV_AM: EnvironmentAM env_AM).
 
-  Let M := @the_fair_model even_impl odd_impl _ ENV_AM.
   Let PM := @prod_model even_impl odd_impl.
-  Let LM := @the_model even_impl odd_impl _ ENV_AM.
+  Context {prod_AM_act_dec: ∀ a, Decision (is_action_of PM a)}. 
+
+  Let M := @the_fair_model even_impl odd_impl prod_AM_act_dec _ ENV_AM.
+  Let LM := @the_model even_impl odd_impl prod_AM_act_dec _ ENV_AM.
 
   Hypothesis PROD_ENV_INDEP: forall a, is_action_of PM a -> is_action_of env_AM a -> False.
 
