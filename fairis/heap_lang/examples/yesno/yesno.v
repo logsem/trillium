@@ -6,7 +6,7 @@ From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination fuel sswp_rules resources.
+From trillium.fairness Require Import fairness fair_termination fuel sswp_rules resources action_model.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode  notation iris_inst.
 
 Import derived_laws_later.bi.
@@ -15,18 +15,17 @@ Open Scope nat.
 
 Set Default Proof Using "Type".
 
-Definition yes_go : val :=
-  rec: "yes_go" "n" "b" :=
-    (if: CAS "b" #true #false then "n" <- !"n" - #1 else #());;
-    if: #0 < !"n" then "yes_go" "n" "b" else #().
+Definition go_impl (b: bool): val :=
+  rec: "go_impl" "n" "b" :=
+    (if: CAS "b" #(b) #(negb b) then "n" <- !"n" - #1 else #());;
+    if: #0 < !"n" then "go_impl" "n" "b" else #().
+
+Definition yes_go : val := go_impl true.
 
 Definition yes : val :=
   λ: "N" "b", let: "n" := Alloc "N" in yes_go "n" "b".
 
-Definition no_go : val :=
-  rec: "no_go" "n" "b" :=
-    (if: CAS "b" #false #true then "n" <- !"n" - #1 else #());;
-    if: #0 < !"n" then "no_go" "n" "b" else #().
+Definition no_go : val := go_impl false .
 
 Definition no : val :=
   λ: "N" "b", let: "n" := Alloc "N" in no_go "n" "b".
@@ -53,11 +52,13 @@ Qed.
 #[global] Instance YN_inhabited: Inhabited YN.
 Proof. exact (populate Y). Qed.
 
-Inductive yntrans: nat*bool -> option YN -> nat*bool -> Prop :=
-| yes_trans n: (n > 0)%nat -> yntrans (n, true) (Some Y) (n, false) (* < *)
-| yes_fail n: (n > 1)%nat -> yntrans (n, false) (Some Y) (n, false) (* ≤ *)
-| no_trans n: yntrans (S n, false) (Some No) (n, true) (* < *)
-| no_fail n: (n > 0)%nat → yntrans (n, true) (Some No) (n, true) (* ≤ *)
+Definition yn_act: Action := coPpick (↑ nroot .@ "yesno"). 
+
+Inductive yntrans: nat*bool -> (Action * option YN) -> nat*bool -> Prop :=
+| yes_trans n: (n > 0)%nat -> yntrans (n, true) (yn_act, Some Y) (n, false) (* < *)
+| yes_fail n: (n > 1)%nat -> yntrans (n, false) (yn_act, Some Y) (n, false) (* ≤ *)
+| no_trans n: yntrans (S n, false) (yn_act, Some No) (n, true) (* < *)
+| no_fail n: (n > 0)%nat → yntrans (n, true) (yn_act, Some No) (n, true) (* ≤ *)
 .
 
 Definition yn_live_roles nb : gset YN :=
@@ -67,23 +68,137 @@ Definition yn_live_roles nb : gset YN :=
   | _ => {[ No; Y ]}
   end.
 
-Lemma live_spec_holds:
-     forall s ρ s', yntrans s (Some ρ) s' -> ρ ∈ yn_live_roles s.
+Definition yn_AM: ActionModel := {| amTrans := yntrans |}.
+
+Instance yn_step_dec: AM_step_dec yn_AM. 
+Proof. 
+  red. intros [n1 b1] a oρ [n2 b2].
+  Local Ltac nostep := right; intros STEP; inversion STEP; try (subst; tauto || lia). 
+  destruct (decide (a = yn_act)) as [-> | ].
+  2: { by nostep. }
+  destruct oρ as [ρ| ]; [| by nostep].
+  destruct (decide (n2 = n1 /\ b1 = true /\ b2 = false /\ ρ = Y /\ 0 < n1)) as [S| ]. 
+  { destruct S as (->&->&->&->&?).
+    left. simpl. by constructor. } 
+  destruct (decide (n2 = n1 /\ b1 = false /\ b2 = false /\ ρ = Y /\ 1 < n1)) as [S| ]. 
+  { destruct S as (->&->&->&->&?).
+    left. simpl. by constructor. } 
+  destruct (decide (n1 = S n2 /\ b1 = false /\ b2 = true /\ ρ = No)) as [S| ]. 
+  { destruct S as (->&->&->&->).
+    left. simpl. by constructor. } 
+  destruct (decide (n2 = n1 /\ b1 = true /\ b2 = true /\ ρ = No /\ 0 < n1)) as [S| ]. 
+  { destruct S as (->&->&->&->&?).
+    left. simpl. by constructor. }
+  by nostep.
+Qed. 
+
+(* (* The model is finitely branching *) *)
+(* Definition steppable '(n, w): list ((nat * bool) * option YN) := *)
+(*   n' ← [n; (n-1)%nat]; *)
+(*   w' ← [w; negb w]; *)
+(*   ℓ ← [Some Y; Some No]; *)
+(*   mret ((n', w'), ℓ). *)
+
+(* #[local] Instance proof_irrel_trans s x: *)
+(*   ProofIrrel ((let '(s', ℓ) := x in yntrans s ℓ s'): Prop). *)
+(* Proof. apply make_proof_irrel. Qed. *)
+
+(* Lemma model_finitary s: *)
+(*   Finite { '(s', ℓ) | yntrans s ℓ s'}. *)
+(* Proof. *)
+(*   assert (H: forall A (y x: A) xs, (y = x ∨ y ∈ xs) -> y ∈ x::xs) by set_solver. *)
+(*   eapply (in_list_finite (steppable s)). *)
+(*   intros [n w] Htrans. *)
+(*   inversion Htrans; try (repeat (rewrite ?Nat.sub_0_r; simpl; *)
+(*     eapply H; try (by left); right); done). *)
+(* Qed. *)
+
+Instance yn_fb: AM_fin_branch' yn_AM.
 Proof.
-  intros [n b] yn [n' ?] Htrans. rewrite /yn_live_roles.
-  inversion Htrans; simplify_eq; destruct n'; try set_solver; try lia; destruct n'; try set_solver; lia.
+  exists (fun '(n, b) => 
+         n' ← [n; (n-1)%nat];
+         w' ← [b; negb b];
+         ℓ ← [Some Y; Some No];
+         mret ((n', w'), yn_act, ℓ)). 
+  intros [??] [??] ?? Htrans.
+  repeat setoid_rewrite elem_of_list_bind.
+  setoid_rewrite elem_of_list_ret.
+  setoid_rewrite (and_comm (exists _, _) _).
+  setoid_rewrite <- utils.ex_and_comm. rewrite utils.ex_prod'.
+  setoid_rewrite (and_comm _ (_ /\ _)).
+  setoid_rewrite <- (and_assoc _ _). 
+  setoid_rewrite (and_comm _ (_ /\ _)).
+  setoid_rewrite <- utils.ex_and_comm. rewrite utils.ex_prod'.
+  eapply utils.ex_det_iff.
+  { intros [[? ?] ?] (?&EQ&?). simpl in EQ.
+    inversion EQ. subst. reflexivity. }
+  simpl.
+  inversion Htrans; subst; simpl; try set_solver.
+  repeat split; try set_solver.
+  rewrite Nat.sub_0_r. set_solver.
+Qed. 
+
+
+(* Lemma live_spec_holds: *)
+(*      forall s a ρ s', yntrans s (a, Some ρ) s' <-> ρ ∈ yn_live_roles s. *)
+(* Proof. *)
+(*   intros [n b] a yn [n' b']. *)
+(*   split.  *)
+(*   - intros Htrans.  *)
+(*     inversion Htrans; simplify_eq; destruct n'; try set_solver; try lia; destruct n'; try set_solver; lia. *)
+(*   - simpl. destruct n as [| [| ]], b; simpl. *)
+(*     all: try by intros. *)
+(*     2: { rewrite elem_of_singleton; intros ->. constructor.  *)
+(*     all: try ().  *)
+(*     1, 2: in *)
+(*     intros IN. *)
+    
+(*     inversion Htrans; simplify_eq; destruct n'; try set_solver; try lia; destruct n'; try set_solver; lia. *)
+  
+(*   symmetry. etrans; [etrans| ]. *)
+(*   2: { apply (@ams_lr_spec yn_AM _ (n, b) (Some yn)). } *)
+(*   -   *)
+(*   rewrite <- ams_lr_spec.  *)
+(*   [n' ?]. *)
+  
+  
+(*   Htrans. rewrite /yn_live_roles. *)
+(*   inversion Htrans; simplify_eq; destruct n'; try set_solver; try lia; destruct n'; try set_solver; lia. *)
+(* Qed. *)
+
+Lemma yn_AM_live_roles (nb: amSt yn_AM) ρ:
+  ρ ∈ AM_live_roles nb <-> ρ ∈ yn_live_roles nb.
+Proof.
+  destruct nb as [n b]. 
+  rewrite -AM_live_roles_spec. simpl.
+  destruct n as [| [| ]], b; simpl.
+  - split; [| done]. intros (?&?&STEP). inversion STEP; lia.
+  - split; [| done]. intros (?&?&STEP). inversion STEP; lia.
+  - split.
+    + intros (?&?&STEP). inversion STEP; set_solver.
+    + rewrite elem_of_union !elem_of_singleton. intros [-> | ->].
+      all: do 2 eexists; constructor; lia.  
+  - rewrite !elem_of_singleton. 
+    split.
+    + intros (?&?&STEP). inversion STEP; try lia || done.
+    + intros ->. do 2 eexists. constructor.
+  - split.
+    + intros (?&?&STEP). inversion STEP; set_solver.
+    + rewrite elem_of_union !elem_of_singleton. intros [-> | ->].
+      all: do 2 eexists; constructor; lia.  
+  - split.
+    + intros (?&?&STEP). inversion STEP; set_solver.
+    + rewrite elem_of_union !elem_of_singleton. intros [-> | ->].
+      all: do 2 eexists; constructor; lia.  
 Qed.
 
-Definition the_fair_model: FairModel.
-Proof.
-  refine({|
-            fmstate := nat * bool;
-            fmrole := YN;
-            fmtrans := yntrans;
-            live_roles nb := yn_live_roles nb;
-            fm_live_spec := live_spec_holds;
-          |}).
-Defined.
+Definition the_fair_model: FairModel := AM2FM yn_AM _. 
+
+Lemma yn_AM_live_roles' (st: amSt yn_AM):
+  live_roles the_fair_model st = yn_live_roles st.
+Proof. 
+  apply set_eq. intros. rewrite -yn_AM_live_roles. done.
+Qed. 
 
 Definition the_model: LiveModel heap_lang the_fair_model :=
   {| lm_flm := 61%nat; |}.
@@ -164,7 +279,7 @@ Section proof.
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iLöb as "Hg" forall (N f Hf).
-    iIntros (Φ) "(#Hinv & Hf & HnN & %HN & Hyes) Hk". unfold yes_go.
+    iIntros (Φ) "(#Hinv & Hf & HnN & %HN & Hyes) Hk". unfold yes_go, go_impl.
     wp_pures.
     wp_bind (CmpXchg _ _ _).
     assert (∀ s, Atomic s (CmpXchg #b #true #false)) by apply _.
@@ -176,8 +291,8 @@ Section proof.
       destruct (decide (M = 1)) as [->|Nneq1].
       + iModIntro.
         iApply (wp_step_model_singlerole with "Hmod Hf").
-        { econstructor. lia. }
-        { set_solver. }
+        { simpl. do 2 econstructor. lia. }
+        { rewrite !yn_AM_live_roles'. simpl. set_solver. }
         iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
         iIntros "!> Hb Hmod Hf".
         iMod (yes_update 0 with "[$]") as "[Hay Hyes]".
@@ -202,7 +317,8 @@ Section proof.
           iDestruct (yes_agree with "Hyes Hay") as %Heq.
           assert (M = 0) by lia. simplify_eq.
           iMod (has_fuels_dealloc _ _ _ (Y:fmrole the_fair_model)
-                 with "Hmod Hf") as "[Hmod Hf]"; [done|].
+                 with "Hmod Hf") as "[Hmod Hf]".
+          { by intros IN%yn_AM_live_roles. }
           iModIntro. iMod "Hclose'".
           iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
           { iNext. iExists _, _. iFrame. done. }
@@ -221,7 +337,8 @@ Section proof.
           iApply fupd_mask_intro; [done|].
           iIntros "Hclose'".
           iMod (has_fuels_dealloc _ _ _ (Y:fmrole the_fair_model)
-                 with "Hmod Hf") as "[Hmod Hf]"; [set_solver|].
+                 with "Hmod Hf") as "[Hmod Hf]".
+          { intros IN%yn_AM_live_roles. simpl in IN. set_solver. } 
           iModIntro. iMod "Hclose'".
           iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
           { iNext. iExists _, _. iFrame. done. }
@@ -231,8 +348,9 @@ Section proof.
       + assert (N = N) by lia. simplify_eq.
         iModIntro.
         iApply (wp_step_model_singlerole with "Hmod Hf").
-        { constructor. lia. }
-        {  simpl. destruct M; [set_solver | destruct M; set_solver]. }
+        { simpl. do 2 econstructor. lia. }
+        { rewrite !yn_AM_live_roles'. 
+          destruct M; [set_solver | destruct M; set_solver]. }
         iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
         iIntros "!> Hb Hmod Hf".
         iMod (yes_update (M-1) with "[$]") as "[Hay Hyes]".
@@ -257,7 +375,7 @@ Section proof.
       have HM: M > 0 by lia.
       iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf").
-      { constructor. lia. }
+      { simpl. do 2 econstructor. lia. }
       { set_solver. }
       iApply (wp_cmpxchg_fail with "Bb"); [done|done|].
       iIntros "!> Hb Hmod Hf".
@@ -296,7 +414,7 @@ Section proof.
     {{{ RET #(); tid ↦M ∅ }}}.
   Proof.
     iLöb as "Hg" forall (N f Hf).
-    iIntros (Φ) "(#Hinv & Hf & HnN & %HN & Hno) Hk". unfold no_go.
+    iIntros (Φ) "(#Hinv & Hf & HnN & %HN & Hno) Hk". unfold no_go, go_impl.
     wp_pures.
     wp_bind (CmpXchg _ _ _).
     assert (∀ s, Atomic s (CmpXchg #b #true #false)) by apply _.
@@ -308,8 +426,8 @@ Section proof.
       destruct (decide (M = 1)) as [->|Nneq1].
       + iModIntro.
         iApply (wp_step_model_singlerole with "Hmod Hf").
-        { econstructor. }
-        { set_solver. }
+        { simpl. do 2 econstructor. }
+        { rewrite !yn_AM_live_roles'. simpl. set_solver. }
         iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
         iIntros "!> Hb Hmod Hf".
         iMod (no_update 0 with "[$]") as "[Han Hno]".
@@ -332,7 +450,8 @@ Section proof.
           assert (M = 0) by lia. simplify_eq.
           iMod (has_fuels_dealloc _ _ _
                                   (No:fmrole the_fair_model) with "Hmod Hf")
-            as "[Hmod Hf]"; [set_solver|].
+            as "[Hmod Hf]".
+          { by intros IN%yn_AM_live_roles. }
           wp_pures. iModIntro.
           iMod ("Hclose" with "[Hmod Hay Han Hb HFR]").
           { iNext. iExists _, _. iFrame. done. }
@@ -345,8 +464,9 @@ Section proof.
         destruct M; first done.
         iModIntro.
         iApply (wp_step_model_singlerole with "Hmod Hf").
-        { econstructor. }
-        { simpl. destruct M; [set_solver | destruct M; set_solver]. }
+        { simpl. do 2 econstructor. }
+        { rewrite !yn_AM_live_roles'. simpl.
+          destruct M as [| [| ]]; try lia; done. }
         iApply (wp_cmpxchg_suc with "Bb"); [done|done|].
         iIntros "!> Hb Hmod Hf".
         iMod (no_update (M) with "[$]") as "[Han Hno]".
@@ -367,8 +487,8 @@ Section proof.
       have HM: M > 0 by lia.
       assert (M = N) by lia. simplify_eq. iModIntro.
       iApply (wp_step_model_singlerole with "Hmod Hf").
-      { econstructor. lia. }
-      { set_solver. }
+      { simpl. do 2 econstructor. done. }
+      { rewrite !yn_AM_live_roles'. simpl. set_solver. }
       iApply (wp_cmpxchg_fail with "Bb"); [done|done|].
       iIntros "!> Hb Hmod Hf".
       wp_pures.

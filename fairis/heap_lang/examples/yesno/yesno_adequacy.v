@@ -168,56 +168,77 @@ Next Obligation.
   - split.
     + simpl. destruct N.
       * destruct Hex as [ρ' [s' Hex]].
-        inversion Hex; subst; lia.
-      * destruct N; set_solver.
+        inversion Hex; subst. 
+        2: { inversion STEP. }
+        inversion STEP; subst; lia.
+      * apply yn_AM_live_roles. simpl.  
+        destruct N; set_solver.
     + intros [??] H. inversion H; simplify_eq.
-      * split; [right; right; compute; done| compute; intros [?|contra] =>//].
-        inversion contra; simplify_eq; intuition.
-      * destruct n =>//.
+      * split.
+        ** inversion STEP; subst.
+           2: { by destruct n. }
+           right. right. compute. done.
+        ** compute; intros [?|contra] =>//.
+           { inversion H0. subst. destruct n; inversion STEP. } 
+           destruct N; inversion STEP; subst. 
+           all: inversion contra; subst; tauto. 
   - split.
     + destruct N; simpl.
       * destruct Hex as [ρ' [s' Hex]].
-        inversion Hex; subst; lia.
-      * destruct N; set_solver.
+        inversion Hex; subst. 
+        2: { inversion STEP. }
+        inversion STEP; subst; lia.
+      * apply yn_AM_live_roles. simpl.
+        destruct N; set_solver.
     + intros [[|?] ?] H.
-      * inversion H; simplify_eq; [lia|]. unfold strict, the_order; split.
-        ** right; left. compute. lia.
-        ** intros [|contra] =>//. inversion contra; simplify_eq. compute in *. lia.
-      * inversion H; simplify_eq. split; [right;left; compute; lia|].
-        intros [|contra] =>//; inversion contra; simplify_eq; last lia. compute in *. lia.
+      * inversion H; simplify_eq.
+        unfold strict, the_order; split.
+        ** right; left. compute. split; [lia| ].
+           intros ->%Nat.le_0_r. inversion STEP. lia.  
+        ** intros [|contra] =>//.
+           { inversion H0. subst. inversion STEP. lia. } 
+           destruct N; inversion STEP; subst. 
+           all: inversion contra; subst; try lia || tauto.
+           red in H1. apply proj1 in H1. lia. 
+      * inversion H; simplify_eq. split.
+        ** destruct N; inversion STEP; subst.  
+           right;left; compute; tauto || lia.
+        ** intros [|contra] =>//.
+           { inversion H0. subst. inversion STEP. }
+           inversion contra; simplify_eq.
+           2: { inversion STEP. subst. lia. }
+           destruct N; inversion STEP; subst.
+           compute in *. lia.
 Qed.
 Next Obligation.
   intros [N B]  [N' B'] ρ Htrans Hnex.
-  inversion Htrans ; simplify_eq; eauto; simpl in *;
+  inversion Htrans; subst; [| by inversion STEP].
+  inversion STEP; simplify_eq; eauto; simpl in *;
     try (destruct N'; eauto); try lia; (try (destruct N'; done)); try done.
 Qed.
 Next Obligation.
   intros [N B] ρ [N' B'] Htrans.
-  destruct ρ; last by inversion Htrans.
-  inversion Htrans; simplify_eq; simpl; try reflexivity.
-  - right; constructor 2; by compute.
-  - right; constructor 1; compute. lia.
+  inversion Htrans; subst; [| by inversion STEP].
+  destruct r.
+  { inversion STEP; simplify_eq; simpl; try reflexivity.
+    right; constructor 2; by compute. }
+  inversion STEP; simplify_eq; simpl; try reflexivity.
+  right; constructor 1; compute. lia.
 Qed.
 
-(* The model is finitely branching *)
-Definition steppable '(n, w): list ((nat * bool) * option YN) :=
-  n' ← [n; (n-1)%nat];
-  w' ← [w; negb w];
-  ℓ ← [Some Y; Some No];
-  mret ((n', w'), ℓ).
 
 #[local] Instance proof_irrel_trans s x:
-  ProofIrrel ((let '(s', ℓ) := x in yntrans s ℓ s'): Prop).
+  ProofIrrel ((let '(s', ℓ) := x in am_fmtrans yn_AM s ℓ s'): Prop).
 Proof. apply make_proof_irrel. Qed.
 
-Lemma model_finitary s:
-  Finite { '(s', ℓ) | yntrans s ℓ s'}.
+Lemma model_finitary (s: amSt yn_AM):
+  Finite { '(s', ℓ) | am_fmtrans yn_AM s ℓ s'}.
 Proof.
-  assert (H: forall A (y x: A) xs, (y = x ∨ y ∈ xs) -> y ∈ x::xs) by set_solver.
-  eapply (in_list_finite (steppable s)).
-  intros [n w] Htrans.
-  inversion Htrans; try (repeat (rewrite ?Nat.sub_0_r; simpl;
-    eapply H; try (by left); right); done).
+  eapply (in_list_finite ((fun '(x, y, z) => (x, z)) <$> amfb_ns s)).
+  intros [[??]?] ?. apply elem_of_list_fmap.
+  apply am_fmtrans_action in H as [??]. 
+  eexists (_, _, _). split; [reflexivity| ].
+  eapply amfb_ns_spec. eauto. 
 Qed.
 
 Theorem yesno_terminates
@@ -233,11 +254,15 @@ Proof.
   eapply (simulation_adequacy_terminate_ftm NotStuck _ ((N, true): fmstate the_fair_model) ∅) =>//.
   - eapply valid_state_evolution_finitary_fairness_simple.
     intros ?. simpl. apply (model_finitary s1).
-  - destruct N; [lia|destruct N; set_solver].
-  - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>". simpl.
+  - rewrite yn_AM_live_roles'. simpl.  
+    destruct N as [|[|]]; try lia. set_solver.     
+  - intros ?. iStartProof. iIntros "!> Hm HFR Hf !>".
+    rewrite !yn_AM_live_roles'. 
+    simpl.
     iApply (start_spec _ _ 61 with "[Hm Hf HFR]"); eauto.
     + iSplitL "Hm"; eauto. do 2 (destruct N; first lia).
-      assert (∅ ∖ {[ No; Y ]} = ∅) as -> by set_solver. iFrame. iSplit; last (iPureIntro; lia).
+      rewrite subseteq_empty_difference_L; [| set_solver].
+      iFrame. iSplit; last (iPureIntro; lia).
       assert ({[Y := 61%nat; No := 61%nat]} = gset_to_gmap 61 {[No;Y]}) as <-; last done.
       rewrite -leibniz_equiv_iff. intros ρ.
       destruct (gset_to_gmap 61 {[Y; No]} !! ρ) as [f|] eqn:Heq.
