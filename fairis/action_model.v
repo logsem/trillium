@@ -472,3 +472,41 @@ Section MatchedByFacts.
   Qed.
  
 End MatchedByFacts.
+
+(* TODO: move all of this *)
+Definition UnitAM: ActionModel :=
+  {| amSt := unit; amRole := unit; amTrans := fun _ _ _ => False |}.
+
+Lemma matched_by_unit AM R:
+  @synced_by AM UnitAM R. 
+Proof. 
+  red. intros ?????? ACT.
+  red in ACT. set_solver.
+Qed. 
+
+Lemma unit_indep_r AM:
+  models_independent AM UnitAM.
+Proof. 
+  red. intros ?? ACT. red in ACT. set_solver.
+Qed.
+
+Lemma unit_indep_l AM:
+  models_independent UnitAM AM.
+Proof. 
+  red. intros ? ACT. red in ACT. set_solver.
+Qed.
+
+Global Instance UnitAM_step_dec: AM_step_dec UnitAM. 
+Proof. right. tauto. Qed.
+
+Global Instance UnitAM_fin_branch': AM_fin_branch' UnitAM.
+Proof. exists (fun _ => []). done. Qed. 
+
+Lemma unit_lr (st: amSt UnitAM):
+  AM_live_roles st = ∅.
+Proof. 
+  apply set_eq. intros. rewrite -AM_live_roles_spec. set_solver. 
+Qed. 
+
+Lemma UnitAM_actions a: is_action_of UnitAM a <-> False.
+Proof. split; [| done]. by intros (?&?&?&?). Qed. 

@@ -3,6 +3,7 @@ From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
+From trillium.fairness.heap_lang.examples Require Import env_am split_model.
 From trillium.fairness.heap_lang.examples.yesno Require Import yesno.
 
 From stdpp Require Import finite.
@@ -241,44 +242,6 @@ Proof.
   eapply amfb_ns_spec. eauto. 
 Qed.
 
-(* TODO: move all of this *)
-Definition UnitAM: ActionModel :=
-  {| amSt := unit; amRole := unit; amTrans := fun _ _ _ => False |}.
-
-Instance EnvUnitAM: EnvironmentAM UnitAM.
-Proof. 
-  unshelve esplit.
-  all: try by apply _.
-  - exists (fun _ => []). done. 
-  - right. tauto.
-Defined.
-
-Lemma matched_by_unit AM R:
-  @synced_by AM UnitAM R. 
-Proof. 
-  red. intros ?????? ACT.
-  red in ACT. set_solver.
-Qed. 
-
-Lemma unit_indep_l AM:
-  models_independent AM UnitAM.
-Proof. 
-  red. intros ?? ACT. red in ACT. set_solver.
-Qed.
-
-Lemma unit_indep_r AM:
-  models_independent UnitAM AM.
-Proof. 
-  red. intros ? ACT. red in ACT. set_solver.
-Qed.
-
-Lemma unit_lr (st: amSt UnitAM):
-  AM_live_roles st = ∅.
-Proof. 
-  apply set_eq. intros. rewrite -AM_live_roles_spec. set_solver. 
-Qed. 
-(* ********************** *)
-
 Let M := the_fair_model EnvUnitAM. 
 Let LM := the_model EnvUnitAM.
 Let PM := @FM UnitAM. 
@@ -310,7 +273,7 @@ Proof.
     intros ?. simpl.
     (* apply (model_finitary s1). *)
     Unshelve. all: admit.
-  - simpl. rewrite (prod_indep_live_roles _ _ (unit_indep_r yn_AM)). 
+  - simpl. rewrite (prod_indep_live_roles _ _ (unit_indep_l yn_AM)). 
     rewrite yn_AM_live_roles'. simpl.  
     destruct N as [|[|]]; try lia. set_solver.     
   - intros ?.
@@ -322,13 +285,13 @@ Proof.
     iMod (inv_alloc Ns__split _ (split_inv_inner) with "[PROD Hm]") as "#SPLIT".
     { iNext. iFrame. }
 
-    simpl. rewrite (prod_indep_live_roles _ _ (unit_indep_r yn_AM)).
+    simpl. rewrite (prod_indep_live_roles _ _ (unit_indep_l yn_AM)).
     rewrite subseteq_empty_difference_L; [| done].
     rewrite unit_lr set_map_empty union_empty_l_L. 
     rewrite !yn_AM_live_roles'. simpl.  
     simpl.
     iApply (start_spec EnvUnitAM _ _ 61 with "[RIGHT Hf HFR]"); eauto.
-    Unshelve. 2: apply unit_indep_r. 
+    Unshelve. 2: apply unit_indep_l. 
     iFrame "#∗".     
     do 2 (destruct N; first lia).
     iFrame. iSplit; last (iPureIntro; lia).
@@ -337,4 +300,4 @@ Proof.
     rewrite union_comm_L. rewrite set_map_union_L !set_map_singleton_L.
     rewrite !gset_to_gmap_union_singleton utils.gset_to_gmap_singleton.
     done. 
-Admitted. x
+Admitted. 

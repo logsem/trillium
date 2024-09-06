@@ -6,42 +6,9 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination fairness_finiteness trace_utils utils action_model.
 From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
+From trillium.fairness.heap_lang.examples Require Import env_am split_model.
 From trillium.fairness.heap_lang.examples.even_odd Require Import eo_vs_mod interface thread_progs model_updates.
 From stdpp Require Import finite.
-
-
-Definition UnitAM: ActionModel :=
-  {| amSt := unit; amRole := unit; amTrans := fun _ _ _ => False |}.
-
-Instance EnvUnitAM: EnvironmentAM UnitAM.
-Proof. 
-  unshelve esplit.
-  all: try by apply _.
-  - exists (fun _ => []). done. 
-  - right. tauto.
-Defined.
-
-(* Instance unit_AM_strong: AM_strong_lr UnitAM. *)
-(* Proof. apply _. Qed. _ *)
-
-Lemma matched_by_unit AM R:
-  @synced_by AM UnitAM R. 
-Proof. 
-  red. intros ?????? ACT.
-  red in ACT. set_solver.
-Qed. 
-
-Lemma unit_indep AM:
-  models_independent AM UnitAM.
-Proof. 
-  red. intros ?? ACT. red in ACT. set_solver.
-Qed.
-
-Lemma unit_lr st:
-  AM_live_roles st = ∅.
-Proof. 
-  apply set_eq. intros. rewrite -AM_live_roles_spec. set_solver. 
-Qed. 
 
 
 Section ModelMono.
@@ -143,10 +110,6 @@ Section ModelMono.
     apply even_sync_inv in STEP1 as (?&?&?). apply odd_sync_inv in STEP2 as (?&?&?).
     edestruct even_odd_False; eauto.
   Qed.
-
-  (* TODO: move *)
-  Lemma UnitAM_actions a: is_action_of UnitAM a <-> False.
-  Proof. split; [| done]. by intros (?&?&?&?). Qed. 
 
   Instance full_AM_act_dec: ∀ a : Action, Decision (is_action_of FM a).
   Proof.
@@ -873,7 +836,7 @@ Section Adequacy.
     subst init_roles st0'.
     (* Set Printing Implicit. *)
     (* erewrite prod_indep_live_roles.  *)
-    rewrite (@prod_indep_live_roles _ _ (unit_indep PM)).
+    rewrite (@prod_indep_live_roles _ _ (unit_indep_r PM)).
     
     rewrite unit_lr set_map_empty union_empty_r_L.
     erewrite <- !set_map_singleton_L. erewrite <- set_map_union_L.
@@ -1214,7 +1177,7 @@ Section AdequacyConcrete.
   Proof.
     apply (evenodd_ex_liveness thread_0_even thread_1_odd).
     intros. apply start_spec; eauto.
-    apply unit_indep. 
+    apply unit_indep_r. 
   Qed. 
 
   Lemma short_adequacy
@@ -1227,7 +1190,7 @@ Section AdequacyConcrete.
   Proof.
     apply (evenodd_ex_liveness thread_0_even thread_1_odd).
     intros. eapply short_spec; eauto.
-    apply unit_indep. 
+    apply unit_indep_r. 
   Qed. 
 
 End AdequacyConcrete.
