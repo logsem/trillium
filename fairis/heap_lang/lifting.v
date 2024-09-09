@@ -67,6 +67,24 @@ Proof using.
   iModIntro. iFrame. iExists _. iPureIntro. done. 
 Qed. 
   
+(* TODO: move? *)
+Lemma model_step_singlerole_MU tid E s1 s2 ρ f1
+  (TRANS: fmtrans M s1 (Some ρ) s2)
+  (LR: M.(live_roles) s2 ⊆ M.(live_roles) s1):
+  frag_model_is s1 -∗
+  tid ↦M ({[ρ := f1]}) -∗
+  MU E tid (frag_model_is s2 ∗ tid ↦M ({[ρ := lm_flm LM]})).
+Proof using.
+  iIntros "Hst FS".
+  iApply MU_wand.
+  2: { iApply (model_step_MU with "[$] [FS]"); eauto.       
+       2: { iApply has_fuels_proper; [reflexivity| | by iFrame].
+            rewrite -insert_union_singleton_l -insert_empty.
+            f_equiv; [done| ]. apply leibniz_equiv_iff, fmap_empty. }
+       set_solver. }
+  rewrite map_union_empty. set_solver.
+Qed.
+  
 
 Lemma wp_step_model s tid ρ (f1 : nat) fs s1 s2 E e Φ :
   TCEq (to_val e) None →
