@@ -266,16 +266,6 @@ Section proof.
 
   Let yn_role (ρ: YN): amRole PM := inr ρ.
 
-  (* TODO: some of updates should drop the role *)
-  Definition yes_vs l ι: iProp Σ :=
-    □ |={⊤, ⊤ ∖ ↑ι}=> ∃ n b,
-      (▷ yn_corr l n b) ∗
-      (MU__r (yn_role Y) (⊤ ∖ ↑ι)
-         (* this redundancy should disappear soon*)
-         (▷ (if b then yn_corr l n false else yn_corr l n false) ={⊤ ∖ ↑ι, ⊤}=∗ True)
-         (LM := LM)
-      ).
-
   Lemma yes_go_spec tid n b (N: nat) f (Hf: f > 40):
     {{{ split_inv Ns__split ∗ yesno_inv b ∗ tid ↦M {[ yn_role Y := f ]} ∗ n ↦ #N ∗ ⌜N > 0⌝%nat ∗
         yes_at N }}}
@@ -398,8 +388,143 @@ Section proof.
       iApply ("Hg" with "[] [Hyes HnN Hf] [$]"); last first.
       { iFrame "∗#". iPureIntro; lia. }
       iPureIntro; lia.
-  Time Qed.
+  (* This proof works but takes forever to typecheck *)
+  (* Time Qed. *)
+  Abort. 
 
+  Definition MU__drop ρ E P: iProp Σ :=  
+    ∀ τ f R, τ ↦M ({[ ρ := f ]} ∪ R) ∗ ⌜ ρ ∉ dom R ⌝ -∗
+              (* MU E τ (τ ↦M R ∗ P) (LM := LM). *)
+               |~{ E }~| (τ ↦M R ∗ P).
+
+  (* TODO: some of updates should drop the role *)
+  Definition yes_vs l ι: iProp Σ :=
+    □ |={⊤, ⊤ ∖ ↑ι}=> ∃ n b,
+      (▷ yn_corr l n b) ∗
+      ((⌜ if b then n > 0 else n > 1 ⌝ -∗ MU__r (yn_role Y) (⊤ ∖ ↑ι)
+         (* redundancy to ease subsequent adaptation for No thread *)
+           (▷ (if b then yn_corr l n false else yn_corr l n false) ={⊤ ∖ ↑ι, ⊤}=∗ True)
+       ) ∧
+       (⌜ n = 0 /\ b = true \/ n = 1 /\ b = false ⌝ -∗ 
+        MU__drop (yn_role Y) (⊤ ∖ ↑ι) (▷ yn_corr l n b ={⊤ ∖ ↑ι, ⊤}=∗ True))
+      ).
+
+  Lemma mu_yes n (b: bool) (ns: namespace)
+    (NB: if b then n > 0 else n > 1):
+    inv ns (split_inv_inner) ⊢ frag_right_st_is (n, b) -∗ 
+      MU__r (yn_role Y) (↑ ns) (frag_right_st_is $ if b then (n, false) else (n, false)).
+  Proof using INDEP.
+    rewrite /MU__r. iIntros "#INV ST" (tid f' R) "[MAP %DISJ__R]".
+    (* destruct st as [[st__e st__o] st__env]. *)
+
+    enough (exists a, amTrans yn_AM (n, b) (a, Some Y) (if b then (n, false) else (n, false))) as (a & TRANS). 
+    { iApply (MU_inv with "[$]"); [done| ].
+      (* TODO: avoid unfolding of MU *)
+      rewrite /split_inv_inner. simpl. iIntros ">(%S & FRAG & PROD)". destruct S.
+      simpl. iDestruct (right_agree with "[$] [$]") as %->.
+
+      iMod (update_right ((if b then (n, false) else (n, false)): amSt yn_AM) with "[$] [$]") as "[PROD ST]".
+      iApply (MU_wand with "[ST PROD]").
+      2: { iApply (model_step_MU with "[$] [MAP]").
+           1, 4: by eauto.
+           { simpl. eapply am_fmtrans_action. eexists. 
+             eapply pt_inner2; eauto.
+             intros ?. edestruct INDEP; eauto.
+             eapply action_of_step; eauto. }
+           simpl. setoid_rewrite @prod_indep_live_roles; eauto.
+           apply union_mono; [done| ]. apply set_map_mono; [done| ].
+           erewrite !yn_AM_live_roles'.
+           simpl. destruct b, n as [|[|]]; set_solver. }
+      iIntros "(MAP & FRAG)".
+      iFrame. }
+    Unshelve. 2: by apply _.
+
+    exists yn_act. simpl. destruct b; by constructor. 
+  Qed.
+
+  Lemma dealloc_yes n (b: bool) (ns: namespace)
+    (NB: n = 0 /\ b = true \/ n = 1 /\ b = false):
+    inv ns (split_inv_inner) ⊢ frag_right_st_is (n, b) -∗
+        MU__drop (yn_role Y) (↑ ns) (frag_right_st_is (n, b)). 
+  Proof using INDEP. 
+    rewrite /MU__drop. iIntros "#INV ST" (tid f' R) "[MAP %DISJ__R]".
+
+    iApply (pre_step_inv with "[$]"); [done| ].
+    rewrite /split_inv_inner. simpl. iIntros "(%S & FRAG & PROD)". destruct S.
+    iApply fupd_pre_step. iMod "FRAG". iMod "PROD". iModIntro. 
+    simpl. iDestruct (right_agree with "[$] [$]") as %->.
+
+    (* iApply (pre_step_mono with "[ST MAP]"). *)
+    (* 2: { iApply (has_fuels_dealloc with "[$]").  *)
+    
+    iMod (has_fuels_dealloc _ _ _ (yn_role Y: fmrole M) with "FRAG MAP") as "[FRAG MAP]".
+    { simpl. rewrite prod_indep_live_roles. apply not_elem_of_union.
+      split; [set_solver| ].
+      intros IN%elem_of_map_inj_gset; [| by apply _].
+      rewrite yn_AM_live_roles in IN.
+      destruct NB as [[-> ->]|[-> ->]]; set_solver. }
+
+    iModIntro. rewrite -insert_union_singleton_l delete_insert_dom.
+    2: set_solver.
+    by iFrame.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma MU__drop_mask_weaken E1 E2 ρ (P: iProp Σ)
+    (SUB: E1 ⊆ E2):
+    MU__drop ρ E1 P -∗ MU__drop ρ E2 P.
+  Proof.
+    iIntros "MU". rewrite /MU__drop. iIntros "**".
+    iMod pre_step_mask_subseteq as "CLOS"; [by apply SUB| ].
+    iMod ("MU" with "[$]") as "X". iMod "CLOS".
+    iModIntro. done. 
+  Qed.
+
+  (* TODO: move *)
+  Lemma MU__drop_wand E ρ (P Q: iProp Σ):
+    (P -∗ Q) -∗ MU__drop ρ E P -∗ MU__drop ρ E Q.
+  Proof.
+    iIntros "PQ MU". rewrite /MU__drop. iIntros "**".
+    iSpecialize ("MU" with "[$]"). 
+    iApply (pre_step_mono with "[PQ] [$]").
+    iIntros "[??]". iFrame. by iApply "PQ". 
+  Qed.
+
+  Lemma yes_vs_from_invs l:
+    yesno_inv l ∗ split_inv Ns__split  ⊢ yes_vs l Ns.
+  Proof using INDEP.
+    rewrite /yes_vs. iIntros "#[INV1 INV2]". iModIntro.
+    iMod (inv_acc with "INV1") as "[OPEN CLOS]".
+    { apply top_subseteq. }
+    
+    rewrite {1}/yesno_inv_inner. rewrite {1}/yn_corr.  
+    iDestruct "OPEN" as (n b) "((>%NEQ & >LOC & AUTHS) & >RIGHT)".
+    iModIntro.
+    iExists _, _. iSplitL "LOC AUTHS".
+    { by iFrame. }
+
+    iSplit. 
+    - iIntros "%B". 
+      iApply (MU__r_mask_weaken (↑ Ns__split) with "[-]").
+      { assert (Ns__split ## Ns) by solve_ndisj. set_solver. }
+      iApply (MU__r_wand with "[-RIGHT]").
+      2: { by iApply (mu_yes with "[$] [$]"). }
+      iIntros "RIGHT CORR".
+      iMod ("CLOS" with "[-]"); [| done].
+      rewrite /yesno_inv_inner. iNext.
+      (* some redundancy to ease subsequent "No" proofs *)
+      iExists (if b then n else n), (if b then false else false).
+      destruct b; iFrame.
+    - iIntros "%NB". 
+      iApply (MU__drop_mask_weaken (↑ Ns__split) with "[-]").
+      { assert (Ns__split ## Ns) by solve_ndisj. set_solver. }
+      iApply (MU__drop_wand with "[-RIGHT]"). 
+      2: { by iApply (dealloc_yes with "[$]"). }
+      iIntros "RIGHT CORR".
+      iMod ("CLOS" with "[-]"); [| done].
+      rewrite /yesno_inv_inner. iNext.
+      iFrame. 
+  Qed.
 
   Lemma yes_go_spec_vs tid n b (N: nat) f (Hf: f > 40):
     {{{ (* split_inv Ns__split ∗ *)
@@ -417,7 +542,8 @@ Section proof.
     iApply wp_atomic.
 
     iPoseProof "VS" as "-#V". 
-    iMod "V" as "(%m & %B & ((>%Hnever & >Bb & Hauths) & MU_y))".
+    iMod "V" as "(%m & %B & ((>%Hnever & >Bb & Hauths) & V))".
+    iDestruct (bi.and_elim_l with "V") as "MU_y".       
 
     (* iInv Ns__split as ([e ?]) "(>ST & >PROD)" "Hclose'". *)
     simpl. 
@@ -441,34 +567,20 @@ Section proof.
       iIntros "!> Hb". 
 
       iApply (MU_wand with "[-Hf MU_y]").
-      2: { iSpecialize ("MU_y" with "[Hf]").
-           2: by iFrame. 
+      2: { iSpecialize ("MU_y" with "[] [Hf]").
+           { iPureIntro. lia. }
+           2: { by iFrame. }
            iSplitL.
            { iApply has_fuels_proper; [reflexivity| | by iFrame].
              rewrite insert_union_singleton_l. f_equiv.
              apply leibniz_equiv_iff, fmap_empty. }
            iPureIntro. set_solver. } 
 
-           (* (* TODO: move to viewshift proof *) *)
-
-           (* iApply (model_step_singlerole_MU with "[$] [$]").  *)
-           (* { simpl. do 2 econstructor; eauto. *)
-           (*   intros ?. apply action_of_step in STEP. *)
-           (*   edestruct INDEP; eauto. } *)
-           (* simpl. rewrite !(prod_indep_live_roles _ _ INDEP).  *)
-           (* rewrite !yn_AM_live_roles'. simpl. *)
-           (* apply union_mono; [done| ]. *)
-           (* destruct m as [|[|]]; [lia| ..]; set_solver.  *)
-      
-           (* iMod (update_right ((m, false): amSt yn_AM) with "[$] [$]") as "[PROD Hmod]". *)
-
       iIntros "[Hf CLOS]".
 
       iMod (yes_update (m - 1) with "[$]") as "[Hay Hyes]".
       wp_pures.
       iModIntro. 
-      (* iMod ("Hclose'" with "[PROD ST]") as "_". *)
-      (* { iFrame. } *)
       iMod ("CLOS" with "[Hb Hay Han]") as "_".
       { iNext. iFrame. iPureIntro. by intros [=]. }
       iModIntro.
@@ -480,13 +592,11 @@ Section proof.
       + rewrite bool_decide_eq_false_2; [| lia]. 
         iApply wp_atomic.
 
-        (* iInv Ns as (m B) "((>%Hbever' & >Hb & Hauths) & >Hmod)" "Hclose". *)
-        (* clear e. iInv Ns__split as ([e ?]) "(>ST & >PROD)" "Hclose_". *)
         iPoseProof "VS" as "-#V".
         clear Hnever. 
-        iMod "V" as "(%m & %B & ((>%Hnever & >Bb & Hauths) & MU_y))".
+        iMod "V" as "(%m & %B & ((>%Hnever & >Bb & Hauths) & V))".
+        iDestruct (bi.and_elim_r with "V") as "DEALLOC".
 
-        (* iDestruct (right_agree with "PROD Hmod") as %EQ. simpl in EQ. subst. simpl. *)
         rewrite if_arg2_comm. iDestruct "Hauths" as "[Hay Han]". 
         rewrite !if_arg_comm. iMod "Hay". iMod "Han".
         iDestruct (yes_agree with "Hyes Hay") as %Heq.
@@ -502,25 +612,18 @@ Section proof.
         iIntros "Hclose'".
         rewrite insert_empty.
 
-        (* TODO: deallocating requires owning the current state *)
-        (* iMod (has_fuels_dealloc _ _ _ (yn_role Y: fmrole M) with "ST Hf") as "[ST Hf]". *)
-        (* { simpl. rewrite prod_indep_live_roles. apply not_elem_of_union. *)
-        (*   split; [set_solver| ].  *)
-        (*   intros IN%elem_of_map_inj_gset; [| by apply _].  *)
-        (*   rewrite yn_AM_live_roles in IN. *)
-        (*   destruct EQ as [[-> ->]|[-> ->]]; set_solver. } *)
-        (* iModIntro. *)
-        (* iMod ("Hclose_" with "[PROD ST]"). *)
-        (* { iFrame. } *)
-        (* iMod ("Hclose" with "[Hmod Hay Han Hb]"). *)
-        (* { iNext. iExists _, _. iFrame. *)
-        (*   destruct EQ as [[-> ->]|[-> ->]]; iFrame; done. } *)
-        (* iModIntro. iApply "Hk". *)
-        (* rewrite delete_insert; [|set_solver]. *)
-        (* iFrame "Hf". *)
-
-        admit. 
-
+        iSpecialize ("DEALLOC" with "[//] [Hf]").
+        { iSplitL.
+          { iApply has_fuels_proper; [reflexivity| | by iFrame].
+            apply leibniz_equiv_iff, map_union_empty. }
+          iPureIntro. set_solver. }
+ 
+        iApply (pre_step_mono with "[-DEALLOC] [$]").
+        iIntros "[MAP CORR]".
+        iMod ("CORR" with "[Bb Hay Han]").
+        { iNext. iFrame. iSplit; [done| ].
+          destruct B; iFrame. }
+        by iApply "Hk". 
       + rewrite bool_decide_eq_true_2 //; last lia.
         wp_pure _.
         iApply ("Hg" with "[] [Hf Hyes HnN] [$]"); last first.
@@ -535,24 +638,17 @@ Section proof.
       iIntros "!> Hb".
  
       iApply (MU_wand with "[-MU_y Hf]").
-      2: { iSpecialize ("MU_y" with "[Hf]").
+      2: { iSpecialize ("MU_y" with "[] [Hf]").
+           { iPureIntro. lia. }
            2: by iFrame.
            iSplitL.
            { iApply has_fuels_proper; [reflexivity| | by iFrame].
              rewrite insert_union_singleton_l. f_equiv.
              apply leibniz_equiv_iff, fmap_empty. }
-           iPureIntro. set_solver. 
-
-           (* { simpl. do 2 econstructor; eauto. *)
-           (*   intros ?. apply action_of_step in STEP.  *)
-           (*   edestruct INDEP; eauto. } *)
-           (* set_solver.  *)
-      }
+           iPureIntro. set_solver. }
 
       iIntros "[Hf CLOS]".
       wp_pures. iModIntro.
-      (* iMod ("Hclose'" with "[ST PROD]"). *)
-      (* { iFrame. simpl. iFrame. } *)
       iMod ("CLOS" with "[Hb Hay Han]").
       { iNext. iFrame. done. }
       iModIntro.
@@ -577,9 +673,10 @@ Section proof.
     { rewrite has_fuels_gt_1; last by solve_fuel_positive.
       rewrite fmap_insert fmap_empty. done. }
     iApply wp_alloc. iNext. iIntros (n) "HnN _ Hf". wp_pures. iModIntro. wp_pures.
-    iApply (yes_go_spec with "[-Hk]"); try iFrame.
+    iApply (yes_go_spec_vs with "[-Hk]"); try iFrame.
     { lia. }
-    iFrame "SPLIT Hinv". iPureIntro; lia. 
+    iSplit; [| done].
+    iApply (yes_vs_from_invs with "[$]"). 
   Qed.
 
   Lemma no_go_spec tid n b (N: nat) f (Hf: f > 40):

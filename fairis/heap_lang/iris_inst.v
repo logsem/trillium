@@ -283,6 +283,21 @@ Section SSWP_MU.
     iMod ("CLOS" with "[$]"). done.
   Qed. 
 
+  (* TODO: move *)
+  Lemma pre_step_inv E ns P Q
+    (NS: ↑ ns ⊆ E):
+    inv ns Q ⊢ (▷ Q -∗ |~{ E ∖ ↑ ns }~| (P ∗ ▷ Q)) -∗ |~{ E }~| P.
+  Proof. 
+    iIntros "#INV SUB".
+    rewrite trillium.program_logic.weakestpre.pre_step_unseal /pre_step_def. 
+    iIntros (extr atr) "Hσ".
+    iMod (inv_acc with "INV") as "[Q CLOS]"; [done| ].
+    iMod ("SUB" with "[$] [$]") as "SUB".
+    iDestruct "SUB" as "(SI&P&Q)".
+    iFrame.
+    iMod ("CLOS" with "[$]"). done.
+  Qed. 
+
   (* TODO: unify with existing locales_of_list_from_locale_from, 
      remove restriction for Λ *)
   Lemma locales_of_list_from_locale_from' {Λ: language} `{EqDecision (locale Λ)}
