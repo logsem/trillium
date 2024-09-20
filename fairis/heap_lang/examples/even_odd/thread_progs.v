@@ -243,6 +243,15 @@ Section ProofsGen.
   
 End ProofsGen.
 
+Definition even_vs `{LM__p: LiveModel heap_lang M__p} `{hGS: !heapGS Σ LM__p}
+  `(SR: StateRes Nat.even sr frag):= 
+  eo_vs _ SR (heapGS0 := hGS). 
+
+Definition odd_vs `{LM__p: LiveModel heap_lang M__p} `{hGS: !heapGS Σ LM__p}
+  `(SR: StateRes Nat.odd sr frag):= 
+  eo_vs _ SR (heapGS0 := hGS). 
+
+
 (* TODO: define these interfaces separately? *)
 
 Record EvenProg := {

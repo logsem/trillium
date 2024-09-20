@@ -9,8 +9,8 @@ From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination utils action_model fuel resources.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode iris_inst.
 From trillium.fairness.heap_lang Require Import notation.
-From trillium.fairness.heap_lang.examples Require Import env_am split_model.
-From trillium.fairness.heap_lang.examples.even_odd Require Import interface thread_progs mu_role.
+From trillium.fairness.heap_lang.examples Require Import env_am split_model mu_role.
+From trillium.fairness.heap_lang.examples.even_odd Require Import interface thread_progs.
 Import derived_laws_later.bi.
 
 Open Scope nat.
@@ -338,12 +338,13 @@ Section Models.
     Definition evenodd_inv_inner l : iProp Σ :=
       ∃ N, cur_st N ∗ l ↦ #N ∗ st_res N.
     
-    Lemma even_vs l ns1 ns2
+    Lemma invs_even_vs l ns1 ns2
       (DISJ: ns1 ## ns2)
       :
       inv ns1 (evenodd_inv_inner l) ∗
       inv ns2 (split_inv_inner)
-      ⊢ eo_vs Nat.even st_res_SR_even l ns1 ρEven. 
+      ⊢
+      even_vs st_res_SR_even l ns1 ρEven.
     Proof using st_res_SR_even PROD_ENV_INDEP.
       clear st_res_SR_odd odd_at. 
       rewrite /eo_vs. iIntros "#[INV1 INV2]". iModIntro.
@@ -366,9 +367,10 @@ Section Models.
       rewrite /evenodd_inv_inner. iNext. iFrame.
     Qed.
     
-    Lemma odd_vs l ns1 ns2
+    Lemma invs_odd_vs l ns1 ns2
       (DISJ: ns1 ## ns2):
-      inv ns1 (evenodd_inv_inner l) ∗ inv ns2 (split_inv_inner) ⊢ eo_vs Nat.odd st_res_SR_odd l ns1 ρOdd. 
+      inv ns1 (evenodd_inv_inner l) ∗ inv ns2 (split_inv_inner) ⊢ 
+      odd_vs st_res_SR_odd l ns1 ρOdd. 
     Proof using st_res_SR_odd PROD_ENV_INDEP.
       clear st_res_SR_even even_at.
 
@@ -390,6 +392,19 @@ Section Models.
       iMod ("CLOS" with "[-]") as "_"; [| done].
       rewrite /evenodd_inv_inner. iNext. iFrame.
     Qed.
+
+    (* Definition eo_inv_main_vs l ns: *)
+    (*   inv ns (evenodd_inv_inner l) ⊢ main_vs ns. *)
+    (* Proof using. *)
+    (*   rewrite /main_vs. iIntros "#INV". iModIntro.  *)
+    (*   iMod (inv_acc with "INV") as "[OPEN CLOS]". *)
+    (*   { apply top_subseteq. } *)
+    (*   iModIntro.  *)
+    (*   rewrite /evenodd_inv_inner. iDestruct "OPEN" as (?) "(?&?&?)". *)
+    (*   iFrame. *)
+    (*   iIntros "?". iMod ("CLOS" with "[-]") as "_"; [| done]. *)
+    (*   iFrame. *)
+    (* Qed.  *)
 
   End Viewshifts.
     
