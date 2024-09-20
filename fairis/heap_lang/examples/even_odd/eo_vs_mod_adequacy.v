@@ -621,7 +621,24 @@ Section Adequacy.
   Let init_roles: gset (fmrole M) := 
         {[ inl $ even_role (ρ__e even_impl); inl $ odd_role (ρ__o odd_impl) ]}.
 
-  Let start_prog := @start incr_loop_even_prog incr_loop_odd_prog. 
+  Let start_prog := @start incr_loop_even_prog incr_loop_odd_prog.
+
+  Definition Ns__split := nroot .@ "split".
+
+  Definition eo_inv_main_vs `{!heapGS Σ LM}
+    `{sGS: SplitGS Σ PM UnitAM}
+    l ns (sr: nat -> iProp Σ):
+    inv ns (evenodd_inv_inner EnvUnitAM sr l) ⊢ main_vs sr l ns.
+  Proof using.
+    rewrite /main_vs. iIntros "#INV". iModIntro.
+    iMod (inv_acc with "INV") as "[OPEN CLOS]".
+    { apply top_subseteq. }
+    iModIntro.
+    rewrite /evenodd_inv_inner. iDestruct "OPEN" as (?) "(?&?&?)".
+    iFrame.
+    iIntros "?". iMod ("CLOS" with "[-]") as "_"; [| done].
+    iFrame.
+  Qed.
 
   Lemma start_spec_use Σ
     prog 
@@ -632,7 +649,7 @@ Section Adequacy.
     (sGS: SplitGS Σ PM UnitAM)
     `(SR__e: StateRes Nat.even sr even_at)
     `(SR__o: StateRes Nat.odd sr odd_at)
-    (SPEC: even_odd_spec EnvUnitAM sr even_at odd_at prog)
+    (SPEC: even_odd_spec sr even_at odd_at SR__e SR__o prog)
     :
     {{{ inv (Ns__split) (split_inv_inner) ∗ 
         inv (nroot.@"even_odd") (evenodd_inv_inner EnvUnitAM sr l) ∗
@@ -647,7 +664,13 @@ Section Adequacy.
     rewrite !gset_to_gmap_union_singleton. rewrite gset_to_gmap_singleton. 
     iIntros (Φ) "(#SPLIT & #Hinv & Hf & Heven_at & Hodd_at & FR) HΦ".
     iApply (SPEC with "[Hf Heven_at Hodd_at Hinv SPLIT FR]"); eauto.
-    iFrame "#∗". 
+    2: { iFrame "#∗". iSplit; [| iSplit].
+         - iApply invs_even_vs; [..| by iFrame "#∗"]; [| solve_ndisj].
+           apply unit_indep_r.
+         - iApply invs_odd_vs; [..| by iFrame "#∗"]; [| solve_ndisj].
+           apply unit_indep_r.
+         - iApply eo_inv_main_vs. done. }
+    set_solver. 
   Qed.
   
   Lemma dom_locales
@@ -860,7 +883,7 @@ Section Adequacy.
     (SPEC: forall `{!heapGS Σ LM, evenoddG Σ, SplitGS Σ PM UnitAM} st_res even_at odd_at
              (SR__e: StateRes Nat.even st_res even_at)
              (SR__o: StateRes Nat.odd st_res odd_at),
-        even_odd_spec EnvUnitAM st_res even_at odd_at prog)
+        even_odd_spec st_res even_at odd_at SR__e SR__o prog)
     :
     continued_simulation
       (sim_rel_with_user LM (ξ_evenodd_trace l))
@@ -907,6 +930,8 @@ Section Adequacy.
     2: { iNext. by iIntros "**". }
     rewrite subseteq_empty_difference_L; [| done]. 
     rewrite -st0_lr. iFrame "#∗".
+    iSplitL "E"; [iApply "E"| iApply "O"].
+    Unshelve. all: done. 
   Qed.
   
   CoInductive extrace_maximal {Λ} : extrace Λ → Prop :=
@@ -1078,7 +1103,7 @@ Section Adequacy.
     (SPEC: forall `{!heapGS Σ LM, evenoddG Σ, SplitGS Σ PM UnitAM} st_res even_at odd_at
              (SR__e: StateRes Nat.even st_res even_at)
              (SR__o: StateRes Nat.odd st_res odd_at),
-        even_odd_spec EnvUnitAM st_res even_at odd_at prog)
+        even_odd_spec st_res even_at odd_at SR__e SR__o prog)
     (l:loc) (extr : heap_lang_extrace)
     :
     extrace_maximal extr →
@@ -1177,7 +1202,6 @@ Section AdequacyConcrete.
   Proof.
     apply (evenodd_ex_liveness thread_0_even thread_1_odd).
     intros. apply start_spec; eauto.
-    apply unit_indep_r. 
   Qed. 
 
   Lemma short_adequacy
@@ -1190,7 +1214,6 @@ Section AdequacyConcrete.
   Proof.
     apply (evenodd_ex_liveness thread_0_even thread_1_odd).
     intros. eapply short_spec; eauto.
-    apply unit_indep_r. 
   Qed. 
 
 End AdequacyConcrete.

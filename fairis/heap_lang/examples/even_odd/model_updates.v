@@ -393,19 +393,6 @@ Section Models.
       rewrite /evenodd_inv_inner. iNext. iFrame.
     Qed.
 
-    (* Definition eo_inv_main_vs l ns: *)
-    (*   inv ns (evenodd_inv_inner l) ⊢ main_vs ns. *)
-    (* Proof using. *)
-    (*   rewrite /main_vs. iIntros "#INV". iModIntro.  *)
-    (*   iMod (inv_acc with "INV") as "[OPEN CLOS]". *)
-    (*   { apply top_subseteq. } *)
-    (*   iModIntro.  *)
-    (*   rewrite /evenodd_inv_inner. iDestruct "OPEN" as (?) "(?&?&?)". *)
-    (*   iFrame. *)
-    (*   iIntros "?". iMod ("CLOS" with "[-]") as "_"; [| done]. *)
-    (*   iFrame. *)
-    (* Qed.  *)
-
   End Viewshifts.
     
 End Models.

@@ -9,8 +9,7 @@ From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import fairness fair_termination utils action_model resources fuel.
 From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
 From trillium.fairness.heap_lang Require Import notation sswp_rules iris_inst.
-From trillium.fairness.heap_lang.examples Require Import env_am split_model.
-From trillium.fairness.heap_lang.examples.even_odd Require Import interface thread_progs model_updates.
+From trillium.fairness.heap_lang.examples.even_odd Require Import interface thread_progs.
 Import derived_laws_later.bi.
 
 Open Scope nat.
