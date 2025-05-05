@@ -55,6 +55,7 @@ Proof.
     ) as Hcs.
   { eapply (simulation_adequacy_multiple_strong _ {[saA;saB]} NotStuck _ _ _ _ ∅).
     { rewrite /initial_state /=. lia. }
+    { admit. }
     { rewrite //=. }
     { rewrite /config_net_match /model_state_socket_incl /model_state_socket_coh /=. split=>//. split.
       - naive_solver.
@@ -163,4 +164,4 @@ Proof.
   { rewrite ltl_sat_def /trace_now /pred_at /=. destruct utr=>//. }
   intros tr. rewrite !ltl_sat_def /trace_label /pred_at /usr_send_filter /=. destruct tr=>//.
   intros [ρ ->]. naive_solver.
-Qed.
+Admitted.

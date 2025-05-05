@@ -44,9 +44,24 @@ Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
   | _ :tr[ℓ]: _ => Some ℓ
   end.
 
+Program Definition enumerate_next `(LM: LiveModel aneris_lang (joint_model M Net)) (δ : LM) : list (LM * mlabel LM).
+  destruct δ.
+
+ Admitted.
+
+Instance garbage {M : UserModel aneris_lang} {s1 : M} : EqDecision {'(s2, ℓ) : M * (usr_role M * option (action aneris_lang)) | lts_trans M s1 ℓ s2}. Admitted.
+
+Definition aneris_model_rel_finitary (M : UserModel aneris_lang) := forall s1, Finite { '(s2, ℓ) | M.(lts_trans) s1 ℓ s2 }.
+
 Lemma rel_finitary_valid_state_evolution_fairness `(LM: LiveModel aneris_lang (joint_model M Net)) inv:
+  aneris_model_rel_finitary M →
   rel_finitary (valid_state_evolution_fairness LM inv).
-Proof. Admitted.
+Proof.
+  intros Hfin ex atr [tr' σ'] oζ.
+  eapply finite_smaller_card_nat.
+  eapply (in_list_finite (enumerate_next LM (trace_last atr))).
+  intros [δ ℓ] Hval.
+Admitted.
 
 (* Lemma derive_live_tid_inl c δ (ℓ : fmrole retransmit_fair_model) ζ : *)
 (*   role_enabled_locale_exists c δ → *)
@@ -276,7 +291,7 @@ Theorem simulation_adequacy_multiple_strong
         A s (es : list aneris_expr) σ st fss FR net_init
         (Hfss: good_fuel_alloc es st fss) inv :
   length es >= 1 →
-  (* aneris_model_rel_finitary Mdl → *)
+  aneris_model_rel_finitary M →
   dom (state_heaps σ) = dom (state_sockets σ) →
   config_net_match (es, σ) net_init →
   (* Port coherence *)
@@ -294,11 +309,11 @@ Theorem simulation_adequacy_multiple_strong
   wp_proto_multiple_strong M inv A σ s es FR st fss →
   continued_simulation_init (valid_state_evolution_fairness LM inv) (es, σ) (lm_init es st fss net_init Hfss).
 Proof.
-  intros Hlen Hdom Hnetinit Hport_coh Hbuf_coh Hsh_coh Hsa_coh Hms Hwp.
+  intros Hlen Hfin Hdom Hnetinit Hport_coh Hbuf_coh Hsh_coh Hsa_coh Hms Hwp.
   apply (wp_strong_adequacy_multiple aneris_lang
                                      (live_model_to_model LM) Σ s);
     [done| |].
-  { apply rel_finitary_valid_state_evolution_fairness. }
+  { apply (rel_finitary_valid_state_evolution_fairness _ _ Hfin). }
   iIntros (?) "".
   iMod node_gnames_auth_init as (γmp) "Hmp".
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
