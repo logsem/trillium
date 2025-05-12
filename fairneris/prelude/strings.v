@@ -477,3 +477,49 @@ Proof.
   assert (not_number "_"%char ∧ "_"%char ≠ "-"%char) as Hnan by done.
   by eapply get_StringOfZ_ne in Hnan.
 Qed.
+
+
+Definition valid_tag t := index 0 "_" t = None.
+
+Lemma valid_tag_String c s :
+  index 0 "_" (String c "") = None → valid_tag s → valid_tag (String c s).
+Proof.
+  rewrite /valid_tag /=.
+  repeat (case_match; try done).
+Qed.
+
+Lemma valid_tag_pretty_Npos p :
+  valid_tag (pretty (N.pos p)).
+Proof.
+  rewrite /pretty /pretty_N.
+  assert (valid_tag "") as Hemp by done; revert Hemp.
+  apply (λ H, N.strong_right_induction
+                (λ n, ∀ s, valid_tag s → valid_tag (pretty_N_go n s))
+                0%N H); last done.
+  intros n Hn IH s Hs.
+  destruct (decide (n = 0%N)); first by subst.
+  rewrite pretty_N_go_step; last lia.
+  destruct (decide (n < 10)%N).
+  - rewrite N.div_small; last done.
+    rewrite pretty_N_go_0.
+    apply valid_tag_String; auto.
+    rewrite /pretty_N_char.
+    repeat case_match; done.
+  - apply IH; first apply N.le_0_l.
+    + eapply N.lt_le_trans; last by apply (N.Div0.mul_div_le _ 10).
+      assert (n `div` 10 ≠ 0)%N.
+      { by intros ?%N.div_small_iff. }
+      assert (0 < n `div` 10)%N by by apply N.div_str_pos; auto with lia.
+      lia.
+    + apply valid_tag_String; auto.
+      rewrite /pretty_N_char.
+      repeat case_match; done.
+Qed.
+
+Lemma valid_tag_stringOfZ a :
+  valid_tag (StringOfZ a).
+Proof.
+  destruct a; rewrite/valid_tag /=; first done.
+  apply valid_tag_pretty_Npos.
+  by rewrite valid_tag_pretty_Npos.
+Qed.

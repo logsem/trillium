@@ -1079,3 +1079,24 @@ Tactic Notation "wp_faa" :=
   end.
 
 *)
+
+Tactic Notation "wp_if" := wp_pure (If _ _ _).
+Tactic Notation "wp_if_true" := wp_pure (If (LitV (LitBool true)) _ _).
+Tactic Notation "wp_if_false" := wp_pure (If (LitV (LitBool false)) _ _).
+Tactic Notation "wp_unop" := wp_pure (UnOp _ _).
+Tactic Notation "wp_binop" := wp_pure (BinOp _ _ _).
+Tactic Notation "wp_op" := wp_unop || wp_binop.
+Tactic Notation "wp_lam" := wp_rec.
+Tactic Notation "wp_let" := wp_pure (Rec BAnon (BNamed _) _); wp_lam.
+Tactic Notation "wp_seq" := wp_pure (Rec BAnon BAnon _); wp_lam.
+Tactic Notation "wp_proj" := wp_pure (Fst _) || wp_pure (Snd _).
+Tactic Notation "wp_case" := wp_pure (Case _ _ _).
+Tactic Notation "wp_match" := wp_case; wp_pure (Rec _ _ _); wp_lam.
+Tactic Notation "wp_inj" := wp_pure (InjL _) || wp_pure (InjR _).
+Tactic Notation "wp_pair" := wp_pure (Pair _ _).
+Tactic Notation "wp_closure" := wp_pure (Rec _ _ _).
+
+Tactic Notation "wp_find_from" := wp_pure (FindFrom _ _ _ ).
+Tactic Notation "wp_substring" := wp_pure (Substring _ _ _).
+Tactic Notation "wp_makeaddress" := wp_pure (MakeAddress _ _).
+
