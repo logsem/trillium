@@ -1196,7 +1196,7 @@ Proof.
     apply locale_step_equiv in Hstep.
     rewrite (locales_equiv_prefix_drop_alt _ tp); [|done].
     rewrite -drop_app_le; last first.
-    { rewrite fmap_length. rewrite prefixes_from_length. lia. }
+    { rewrite length_fmap. rewrite prefixes_from_length. lia. }
     rewrite (locales_equiv_prefix_drop_alt es c'.1);
       [|by eapply locales_equiv_prefix_trans].
     f_equiv.
@@ -1610,7 +1610,7 @@ Proof.
   specialize (Hψ (t2, σ2)) as [Hsafe Hstuck]; [done|].
   split; [|done].
   intros i v Hlen1 Hlen2 Ht2.
-  rewrite fmap_length in Hlen2.
+  rewrite length_fmap in Hlen2.
   specialize (Hsafe i v Hlen2 Ht2).
   clear Himpl Ht2 Hsm Hexstr. revert i es Hlen1 Hlen2 Hsafe.
   induction φs as [|φ φs Hφs]; intros i es Hlen1 Hlen2 Hsafe; [done|].
