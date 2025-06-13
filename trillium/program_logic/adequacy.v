@@ -1495,6 +1495,36 @@ Proof.
   iModIntro; iIntros "[$ ?]"; done.
 Qed.
 
+Definition cur_posts `{irisG Λ M Σ} (tp: list (expr Λ)) e0 (Φ0: val Λ → iProp Σ): iProp Σ :=
+  posts_of tp (Φ0 :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
+                        prefixes_from [e0] (drop 1 tp))).
+
+
+Definition rel_always_holds0 `{irisG Λ M Σ}
+  (ξ: execution_trace Λ → auxiliary_trace M → Prop)
+  (s: stuckness)
+  (stateI: execution_trace Λ → auxiliary_trace M → iProp Σ)
+  (Φ0: val Λ → iProp Σ) 
+  e1 σ1 δ1: iProp Σ
+  :=
+  ∀ (ex : execution_trace Λ) (atr : auxiliary_trace M)
+    (c : cfg Λ),
+    ⌜valid_system_trace ex atr⌝ -∗
+    ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
+    ⌜trace_starts_in atr δ1⌝ -∗
+    ⌜trace_ends_in ex c⌝ -∗
+    ⌜∀ (ex' : finite_trace (cfg Λ) (olocale Λ))
+       (atr' : auxiliary_trace M) (oζ : olocale Λ)
+       (ℓ: mlabel M),
+    trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+    ⌜∀ e2 : expr Λ, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
+    ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
+    stateI ex atr -∗
+    (* posts_of c.1 (Φ0 :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> *)
+    (*                         prefixes_from [e1] (drop (length [e1]) c.1))) *)
+    cur_posts c.1 e1 Φ0
+    ={⊤,∅}=∗ ⌜ξ ex atr⌝.
+
 Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
         (s: stuckness)
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
@@ -1509,7 +1539,8 @@ Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
        config_wp ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
        WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
-       rel_always_holds s [Φ] ξ ([e1], σ1) δ1) →
+       (* rel_always_holds s [Φ] ξ ([e1], σ1) δ1) → *)
+       rel_always_holds0 ξ s stateI Φ e1 σ1 δ1) ->
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
 Proof.
   intros Hsc Hwptp.
