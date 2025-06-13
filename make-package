@@ -1,17 +1,6 @@
 #!/bin/bash
+# A simplified version of Iris project build script.
 set -e
-# adapted from Iris repo build script.
-# Helper script to build and/or install just one package out of this repository.
-# Assumes that all the other packages it depends on have been installed already!
-
-# Make sure we get a GNU version of make.
-# This is exactly how opam determines which make executable to use.
-OS=$(uname)
-MAKE="make"
-if [ $OS == "FreeBSD" ] || [ $OS == "OpenBSD" ] ||\
-       [ $OS == "NetBSD" ] || [ $OS == "DragonFly" ]; then
-    MAKE="gmake"
-fi
 
 PROJECT="$1"
 shift
@@ -19,27 +8,16 @@ shift
 COQFILE="_CoqProject.$PROJECT"
 MAKEFILE="Makefile.package.$PROJECT"
 
-# if ! grep -E -q "^$PROJECT/" _CoqProject; then
-#     echo "No files in $PROJECT/ found in _CoqProject; this does not seem to be a valid project name."
-#     exit 1
-# fi
-
 # Generate _CoqProject file and Makefile
 rm -f "$COQFILE"
-# Get the right "-Q" line.
-grep -E "^-Q $PROJECT[ /]" _CoqProject >> "$COQFILE"
-# # Get everything until the first empty line except for the "-Q" lines.
-# sed -n '/./!q;p' _CoqProject | grep -E -v "^-Q " >> "$COQFILE"
 cp _CoqProject "$COQFILE"
-# # Get the files.
-# grep -E "^$PROJECT/" _CoqProject >> "$COQFILE"
-echo >> "$COQFILE"
+# Get the files.
 find "$PROJECT/" -type f -name "*.v" >> "$COQFILE"
 # Now we can run coq_makefile.
 "${COQBIN}coq_makefile" -f "$COQFILE" -o "$MAKEFILE"
 
 # Run build
-$MAKE -f "$MAKEFILE" "$@"
+make -f "$MAKEFILE" "$@"
 
 # Cleanup
 rm -f ".$MAKEFILE.d" "$MAKEFILE"*
