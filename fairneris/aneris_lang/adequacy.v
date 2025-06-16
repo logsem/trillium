@@ -44,24 +44,151 @@ Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
   | _ :tr[ℓ]: _ => Some ℓ
   end.
 
-Program Definition enumerate_next `(LM: LiveModel aneris_lang (joint_model M Net)) (δ : LM) : list (LM * mlabel LM).
-  destruct δ.
+Local Notation net_label := (action aneris_lang + config_label aneris_lang)%type.
+Local Notation exe_label := (locale_label aneris_lang + config_label aneris_lang)%type.
 
- Admitted.
+Instance decidable_eq_finiteness {M : UserModel aneris_lang} {s1 : M} {a} : EqDecision {'(s2, ρ) : M * (usr_role M) | lts_trans M s1 (ρ, a) s2}.
+Proof. intros ??; apply make_decision. Qed.
 
-Instance garbage {M : UserModel aneris_lang} {s1 : M} : EqDecision {'(s2, ℓ) : M * (usr_role M * option (action aneris_lang)) | lts_trans M s1 ℓ s2}. Admitted.
+Definition aneris_model_rel_finitary (M : UserModel aneris_lang) := forall s1 a, Finite { '(s2, ρ) | M.(lts_trans) s1 (ρ, a) s2 }.
 
-Definition aneris_model_rel_finitary (M : UserModel aneris_lang) := forall s1, Finite { '(s2, ℓ) | M.(lts_trans) s1 ℓ s2 }.
+Section finiteness.
 
-Lemma rel_finitary_valid_state_evolution_fairness `(LM: LiveModel aneris_lang (joint_model M Net)) inv:
-  aneris_model_rel_finitary M →
+Section gmap.
+  Context `{!EqDecision K, !Countable K}.
+
+  Definition max_gmap (m: gmap K nat) : nat :=
+    map_fold (λ k v r, v `max` r) 0 m.
+
+  Lemma max_gmap_spec m:
+    map_Forall (λ _ v, v <= max_gmap m) m.
+  Proof.
+    induction m using map_ind; first done.
+    apply map_Forall_insert =>//. rewrite /max_gmap map_fold_insert //.
+    - split; first lia. intros ?? Hnotin. specialize (IHm _ _ Hnotin). simpl in IHm.
+      unfold max_gmap in IHm. lia.
+    - intros **. lia.
+  Qed.
+End gmap.
+
+Context {M : UserModel aneris_lang}.
+Variable (LM: LiveModel aneris_lang (joint_model M net_model)).
+Variable (model_finite : aneris_model_rel_finitary M).
+
+Definition enum_inner m1 a : list (M * M.(usr_role)) :=
+    map proj1_sig (@enum _ _ (model_finite m1 a)).
+
+Definition enum_inner' m1 a : list (M * option M.(usr_role)) :=
+  ((λ mρ, (mρ.1, Some mρ.2)) <$> enum_inner m1 a).
+
+Definition net_apply_action (n : net_model) (a : net_label) : net_model :=
+  let (ms, bs) := n in
+  match a with
+  | inl (Send msg) => (ms ⊎ {[+ msg +]}, bs)
+  | inl (Recv sa None) => n
+  | inl (Recv sa (Some msg)) =>
+      let rb := bs !!! sa in
+      (ms, <[sa := take (length rb - 1) rb]>bs)
+  | inr (Duplicate msg) => (ms ⊎ {[+ msg +]}, bs)
+  | inr (Drop msg) => (ms ∖ {[+ msg +]}, bs)
+  | inr (Deliver msg) =>
+      let rb := bs !!! m_destination msg in
+      (ms ∖ {[+ msg +]}, <[m_destination msg := msg::rb]>bs)
+  end.
+
+Lemma net_apply_action_spec n n' a :
+  net_model.(lts_trans) n a n' → n' = net_apply_action n a.
+Proof. Admitted.
+
+  (* Inductive FairLabel {FM: FairModel} := *)
+  (* | Take_step: FM.(fmrole) -> FM.(fmaction) → locale Λ -> option (action Λ) → FairLabel *)
+  (* | Silent_step: locale Λ -> option (action Λ) → FairLabel *)
+  (* | Config_step: FM.(fmconfig) → config_label Λ → FairLabel *)
+(* . *)
+
+Definition get_aneris_action (oa : net_label) : option aneris_action :=
+  match oa with
+  | inl a => Some a
+  | inr _ => None
+  end.
+
+Definition get_aneris_action' (oa : option net_label) : option aneris_action :=
+  match oa with
+  | Some a => get_aneris_action a
+  | None => None
+  end.
+
+Definition exe_label_to_net_label (a : exe_label) : option net_label :=
+  match a with
+  | inl (_, Some ac) => Some (inl ac)
+  | inl (_, None) => None
+  | inr a => Some (inr a)
+  end.
+
+Eval cbn in fmconfig (joint_model M net_model).
+
+Notation "m ≫= f" := (mbind (M := list) f m) (at level 60, right associativity).
+Notation "( m ≫=.)" := (λ f, mbind (M := list) f m) (only parsing).
+Notation "(.≫= f )" := (mbind (M := list) f) (only parsing).
+Notation "(≫=)" := (λ m f, mbind (M := list) f m) (only parsing).
+Notation "x <-- y ; z" := (mbind (M := list) (λ x : _, z) y)
+                            (at level 20, y at level 100, z at level 200, only parsing).
+Notation "' x <-- y ; z" := (y ≫= (λ x : _, z))
+  (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
+
+
+
+Program Definition enumerate_next (δ1 : LM) (exe_a : exe_label) (c2 : cfg aneris_lang) : list (LiveStateData aneris_lang (joint_model M net_model) * mlabel LM) :=
+  let oa := exe_label_to_net_label exe_a in
+  let n2 := match oa with None => δ1.(ls_under).2 | Some a => net_apply_action δ1.(ls_under).2 a end in
+  '(s2, oρ) <-- (δ1.(ls_under).1, None) :: enum_inner' δ1.(ls_under).1 (get_aneris_action' oa);
+  let js2 := ((s2, n2) : fmstate (joint_model M net_model)) in
+  d <-- enumerate_dom_gsets' (dom (ls_fuel δ1) ∪ live_roles _ js2);
+  let fss := enumerate_subdomain_gmap d (max_gmap (ls_fuel δ1) `max` M.(usr_fl) s2) in
+  locs <-- enumerate_dom_gsets' $ list_to_set $ locales_of_list c2.1;
+  ms <-- enum_gmap_range_bounded' locs fss;
+  let ℓ' := match oρ with
+              | None => match exe_a with
+                       | inl (ζ, a) => Silent_step ζ a
+                       | inr a => Config_step (a : fmconfig (joint_model M net_model)) a
+                       end
+              | Some ρ => match exe_a with
+                       | inl (ζ, a)  => Take_step ρ a ζ a
+                       | inr a => Config_step a a
+                       end
+              end in
+  mret (M := list) ({| ls_under := js2;
+           ls_map := `ms;
+        |}, ℓ').
+
+Instance to_ls_decidable_instance x : Decision (∀ (ζ ζ' : locale aneris_lang) (fs fs' : gmap (fmrole (joint_model M net_model)) nat), ζ ≠ ζ' → ls_map x !! ζ = Some fs → ls_map x !! ζ' = Some fs' → fs ##ₘ fs').
+Proof. apply make_decision. Qed.
+
+Definition to_ls (x: LiveStateData aneris_lang (joint_model M net_model)) : option LM :=
+  match decide (∀ ζ ζ' fs fs', ζ ≠ ζ' → x.(ls_map) !! ζ = Some fs → x.(ls_map) !! ζ' = Some fs' → fs ##ₘ fs')
+  with
+  | right _ => None
+  | left Hdisj =>
+      match decide (∀ ρ, ρ ∈ M.(usr_live_roles) x.(ls_under).1 → ∃ ζ fs, x.(ls_map) !! ζ = Some fs ∧ ρ ∈ dom fs) with
+      | right _ => None
+      | left Hlive => Some {| ls_data := x; ls_map_disj := Hdisj; ls_map_live := Hlive |}
+      end
+  end.
+
+Definition enumerate_next_valid (extr : execution_trace aneris_lang) (fmodtr: auxiliary_trace LM) exe_a : list (LM * @mlabel LM) :=
+  let ns := enumerate_next (trace_last fmodtr) exe_a (trace_last extr) in
+  omap (λ '(x, ℓ), (λ x, (x, ℓ)) <$> to_ls x) ns.
+
+Lemma rel_finitary_valid_state_evolution_fairness inv:
   rel_finitary (valid_state_evolution_fairness LM inv).
 Proof.
-  intros Hfin ex atr [tr' σ'] oζ.
+  intros ex atr [tr' σ'] oζ.
   eapply finite_smaller_card_nat.
-  eapply (in_list_finite (enumerate_next LM (trace_last atr))).
+  eapply (in_list_finite (enumerate_next_valid ex atr oζ)).
   intros [δ ℓ] Hval.
 Admitted.
+
+End finiteness.
 
 (* Lemma derive_live_tid_inl c δ (ℓ : fmrole retransmit_fair_model) ζ : *)
 (*   role_enabled_locale_exists c δ → *)
@@ -313,7 +440,7 @@ Proof.
   apply (wp_strong_adequacy_multiple aneris_lang
                                      (live_model_to_model LM) Σ s);
     [done| |].
-  { apply (rel_finitary_valid_state_evolution_fairness _ _ Hfin). }
+  { apply (rel_finitary_valid_state_evolution_fairness _ Hfin). }
   iIntros (?) "".
   iMod node_gnames_auth_init as (γmp) "Hmp".
   iMod saved_si_init as (γsi) "[Hsi Hsi']".
