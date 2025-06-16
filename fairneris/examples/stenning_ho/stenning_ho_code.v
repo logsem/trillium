@@ -373,20 +373,25 @@ Section with_Σ.
   Definition int_to_val_pred (Φ : Z → iProp Σ) : val → iProp Σ := 
     (λ v, ∃ (x:Z), ⌜v = #x⌝ ∗ Φ x)%I.
 
-  Lemma wp_client Φ Ψ tid (fl : nat) (Hf: fl > 100) (f h : val) :
-    (∀ fl v, ⌜ fl > 5 ⌝ -∗
+  Lemma wp_client Φ Ψ tid (fl : nat) (Hf: fl > 100) (f h : val) gc :
+    let st := ((inhabitant stenning_state):stenning_model) in
+    gc < usr_fl st / 10 →
+    (∃ c, ⌜c < usr_fl st / 10⌝ ∗
+          ∀ fl v , ⌜ fl > c ⌝ -∗
        {{{ (ipA, tid) ↦M {[ Arole := fl ]} ∗ int_to_val_pred Ψ v }}}
             mkExpr ipA (h v) @ (ipA,tid)
-          {{{ w, RET mkVal ipA w; (ipA, tid) ↦M {[ Arole := fl - 5 ]} }}}) -∗
+          {{{ w, RET mkVal ipA w; (ipA, tid) ↦M {[ Arole := fl - c ]} }}}) -∗
     {{{ inv Ns retinv ∗ counter_inv ∗ is_node ipA ∗ saA ⤇ client_si Ψ ∗ saB ⤇ server_si Φ ∗
           own stenning_A_name (◯E (ASending 0)) ∗ saA ↦c{1/2} 0%Z ∗ saA ↦c{1/4} 0%Z ∗ saB ↦c{1/4} (-1)%Z ∗
           (ipA, tid) ↦M {[ Arole := fl ]} ∗ saA ⤳ (∅, ∅) ∗
           free_ports (ip_of_address saA) {[port_of_address saA]} ∗
-          is_gen ipA tid 8 f (int_to_val_pred Φ) }}}
+          is_gen ipA tid gc f (int_to_val_pred Φ) }}}
       (mkExpr (ip_of_address saA) (client saA saB f h)) @ (ipA, tid); ⊤
-                                                                        {{{ v, RET v; (ipA, tid) ↦M ∅  }}}.
+    {{{ v, RET v; (ipA, tid) ↦M ∅  }}}.
   Proof.
-    iIntros "#Hh" (Φ')"!> (#Hinv&#Hcinv&#Hin&#HsA&#HsB&Hst&Hcc&Hccm&Hcs&Hf&HRT&Hfp&Hvs) HΦ".
+    simpl.
+    intros Hgc.
+    iIntros "(%c&%Hc'&#Hh)" (Φ')"!> (#Hinv&#Hcinv&#Hin&#HsA&#HsB&Hst&Hcc&Hccm&Hcs&Hf&HRT&Hfp&Hvs) HΦ".
     rewrite /client.
     wp_pures.
 
@@ -421,7 +426,7 @@ Section with_Σ.
     iApply (is_gen_spec with "[$Hvs $Hf]"); [lia|].
     iIntros "!>" (w) "(HΦ'&Hgen&Hf)".
 
-    iAssert (∃ (f : nat), ⌜ f > 25 ⌝ ∗ (ipA, tid) ↦M <[Arole:=f]> ∅)%I
+    iAssert (∃ (f : nat), ⌜ f > 20 ⌝ ∗ (ipA, tid) ↦M <[Arole:=f]> ∅)%I
       with "[Hf]" as (f') "[%Hf' Hf]".
     { iExists _. iFrame. iPureIntro. lia. }
     clear Hf.
@@ -579,7 +584,7 @@ Section with_Σ.
       case_bool_decide; [|done].
       wp_pures.
       wp_bind (h _).
-      iApply ("Hh" with "[] [$Hf HΨ]"); [iPureIntro; lia|..].
+      iApply ("Hh" with "[] [$Hf HΨ]"); [iPureIntro;lia|..].
       { iExists _. iFrame. done. }
       iIntros "!>" (w'') "Hf".
       wp_pures.
@@ -692,11 +697,13 @@ Section with_Σ.
         { rewrite -Hmsg. iIntros (Hin). set_solver. }
   Qed.
 
-  Lemma wp_server Φ Ψ tid (g : val) (f : nat) (Hf: f > 40) :
-    (∀ fl (x:Z), ⌜ fl > 6 ⌝ -∗
+  Lemma wp_server Φ Ψ tid (g : val) (f : nat) (Hf: f > 100) :
+    let st := ((inhabitant stenning_state):stenning_model) in
+    (∃ c, ⌜c < usr_fl st / 10⌝ ∗
+          ∀ fl (x:Z), ⌜ fl > c ⌝ -∗
                   {{{ (ipB, tid) ↦M {[ Brole := fl ]} ∗ Φ x }}}
                     mkExpr ipB (g #x) @ (ipB, tid); ⊤
-                  {{{ (y:Z), RET mkVal ipB #y; Ψ y ∗ (ipB, tid) ↦M {[ Brole := fl-6 ]} }}}) →
+                  {{{ (y:Z), RET mkVal ipB #y; Ψ y ∗ (ipB, tid) ↦M {[ Brole := fl-c ]} }}})%I -∗
     {{{ inv Ns retinv ∗ counter_inv ∗ is_node ipB ∗ saA ⤇ client_si Ψ ∗ saB ⤇ server_si Φ ∗
           own stenning_B_name (◯E (BReceiving 0)) ∗ saB ↦c{1/2} (-1)%Z ∗
           (ipB, tid) ↦M {[ Brole := f ]} ∗ saB ⤳ (∅, ∅) ∗
@@ -704,7 +711,8 @@ Section with_Σ.
       (mkExpr (ip_of_address saB) (server saA saB g)) @ (ipB, tid); ⊤
     {{{ v, RET v; (ipB, tid) ↦M ∅ }}}.
   Proof.
-    iIntros (Hg Φ') "(#Hinv&#Hcinv&#Hin&#HsA&#HsB&Hst&Hcs&Hf&HRT&Hfp) HΦ".
+    simpl.
+    iIntros "(%c&%Hc'&#Hg)" (Φ') "!> (#Hinv&#Hcinv&#Hin&#HsA&#HsB&Hst&Hcs&Hf&HRT&Hfp) HΦ".
     rewrite /server.
     wp_pure _.
 
@@ -843,7 +851,7 @@ Section with_Σ.
       wp_pures.
       
       wp_bind (g _).
-      iApply (Hg with "[] [$Hf $HΦ']"); [iPureIntro; lia|].
+      iApply ("Hg" with "[] [$Hf $HΦ']"); [iPureIntro; lia|].
       iIntros "!>" (y) "[HΨ Hf]".
       wp_pures.
       
@@ -1045,7 +1053,8 @@ Section with_Σ.
     iApply (new_gen_spec with "[$]"); [lia|].
     iIntros "!>" (w) "[Hgen Hf]".
     wp_pures.
-    iApply (wp_client with "[] [$]"); [lia| |done].
+    iApply (wp_client with "[] [$]"); [lia|simpl;lia| |done].
+    iExists 5. iSplit; [iPureIntro;simpl;lia|].
     iIntros (fl v Hfl) "!>".
     iIntros (Φ) "[Hfl Hpre] HΦ".
     iDestruct "Hpre" as (x ->) "%Heven".
@@ -1062,7 +1071,7 @@ Section with_Σ.
   Definition server_example saA saB :=
     server saA saB double_if_even.
 
-  Lemma wp_server_example tid (f : nat) (Hf: f > 40) :
+  Lemma wp_server_example tid (f : nat) (Hf: f > 100) :
     {{{ inv Ns retinv ∗ counter_inv ∗ is_node ipB ∗ saA ⤇ client_si post_example ∗ saB ⤇ server_si pre_example ∗
           own stenning_B_name (◯E (BReceiving 0)) ∗ saB ↦c{1/2} (-1)%Z ∗
           (ipB, tid) ↦M {[ Brole := f ]} ∗ saB ⤳ (∅, ∅) ∗
@@ -1073,7 +1082,8 @@ Section with_Σ.
      iIntros (Φ') "(#Hinv&#Hcinv&#Hin&#HsA&#HsB&Hst&Hcs&Hf&HRT&Hfp) HΦ".
     wp_pures.
     rewrite /server_example.
-    iApply (wp_server with "[$]"); [lia| |done].
+    iApply (wp_server with "[] [$]"); [lia| |done].
+    iExists 6. iSplit; [iPureIntro; simpl; lia|].
     iIntros (fl x Hfl Φ) "!> [Hfl %Heven] HΦ".
     wp_lam.
     wp_pures.
