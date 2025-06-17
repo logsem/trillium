@@ -100,24 +100,6 @@ Definition server_RT (n : Z) (R T : gset message) : Prop :=
 
 Definition garbage_message b msg := ∀ n, (n >= 0)%Z → ¬ good_message b n (Some msg).
 
-Lemma StringOfZ_inv x y : StringOfZ x = StringOfZ y → x = y.
-Proof. naive_solver. Qed.
-
-Lemma prod_ser_str_inv s1 s2 s3 s4 :
-  prod_ser_str s1 s2 = prod_ser_str s3 s4 → s1 = s3 ∧ s2 = s4.
-Proof. 
-  rewrite /prod_ser_str.
-  intros Heq.
-  assert (String.length s1 = String.length s3).
-  { apply not_elem_of_string_app_cons_inv_l in Heq; [naive_solver| |].
-    - intros H. by apply StringOfZ_not_sep in H.
-    - intros H. by apply StringOfZ_not_sep in H. }
-  rewrite H in Heq.
-  apply append_eq_length_inv in Heq as [_ Heq]; [|done].
-  apply append_eq_length_inv in Heq as [_ Heq]; [|done].
-  by apply append_eq_length_inv.
-Qed.
-
 Lemma client_RT_good msg n m R T :
   (n >= 0)%Z →
   good_message false n (Some msg) →
@@ -1032,10 +1014,17 @@ Section with_Σ.
       client saA saB "f" test_even.
 
   Lemma even_rem_0 x : Z.even x → x `rem` 2 = 0.
-  Proof. Admitted.
-
-  Lemma even_double_even x : Z.even x → Z.even (x * 2).
-  Proof. Admitted.
+  Proof.
+    intros Heven.
+    assert (Zeven x) as Heven'.
+    { destruct x; [done|..]; by destruct p. }
+    assert (∃ y, x = y * 2)%Z as [y ->].
+    { apply Zeven_ex in Heven' as [? ->]. eexists _. rewrite Z.mul_comm. done. }
+    by apply Z.rem_mul.
+  Qed.
+      
+  Lemma double_even x : Z.even (x * 2).
+  Proof. by rewrite Z.even_mul orb_true_r. Qed.
 
   Lemma wp_client_example tid (f : nat) (Hf: f > 110) :
     {{{ inv Ns retinv ∗ counter_inv ∗ is_node ipA ∗
@@ -1094,7 +1083,7 @@ Section with_Σ.
     wp_pures.
     iApply wp_value. iApply "HΦ".
     iFrame.
-    iPureIntro. by apply even_double_even.
+    iPureIntro. by apply double_even.
   Qed.
 
 End with_Σ.

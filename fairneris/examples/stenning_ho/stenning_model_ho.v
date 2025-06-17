@@ -78,12 +78,35 @@ Definition good_message (sender_is_A : bool) (n : Z) (msg : option message) :=
   ∃ m msg', msg = Some msg' ∧
           if sender_is_A then msg' = mAB n m else msg' = mBA n m.
 
-(* Lemma prod_ser_str_inj s1 s2 : *)
-(*   prod_ser_str s1 s2 = prod_ser_str s3 s4 → *)
+(* TOOD: Move *)
+Lemma StringOfZ_inv x y : StringOfZ x = StringOfZ y → x = y.
+Proof. naive_solver. Qed.
+
+Lemma prod_ser_str_inv s1 s2 s3 s4 :
+  prod_ser_str s1 s2 = prod_ser_str s3 s4 → s1 = s3 ∧ s2 = s4.
+Proof. 
+  rewrite /prod_ser_str.
+  intros Heq.
+  assert (String.length s1 = String.length s3).
+  { apply not_elem_of_string_app_cons_inv_l in Heq; [naive_solver| |].
+    - intros H. by apply StringOfZ_not_sep in H.
+    - intros H. by apply StringOfZ_not_sep in H. }
+  rewrite H in Heq.
+  apply append_eq_length_inv in Heq as [_ Heq]; [|done].
+  apply append_eq_length_inv in Heq as [_ Heq]; [|done].
+  by apply append_eq_length_inv.
+Qed.
 
 Lemma good_message_inj b b' n n' msg :
   good_message b n msg → good_message b' n' msg → n = n'.
-Proof. Admitted.
+Proof.
+  rewrite /good_message. intros H1 H2.
+  destruct H1 as (m1&msg1&Hmsg1&H1).
+  destruct H2 as (m2&msg2&Hmsg2&H2).
+  destruct b, b'; simplify_eq.
+  - apply prod_ser_str_inv in Hmsg2 as [H1 _]. by apply StringOfZ_inv in H1.
+  - apply prod_ser_str_inv in Hmsg2 as [H1 _]. by apply StringOfZ_inv in H1.
+Qed.
 
 Global Instance good_message_decidable b n omsg : Decision (good_message b n omsg).
 Proof. apply make_decision. Qed.
