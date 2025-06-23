@@ -73,6 +73,7 @@ End gmap.
 
 Context {M : UserModel aneris_lang}.
 Variable (LM: LiveModel aneris_lang (joint_model M net_model)).
+Context `{!LiveModelEq LM}.
 Variable (model_finite : aneris_model_rel_finitary M).
 
 Definition enum_inner m1 a : list (M * M.(usr_role)) :=
@@ -80,6 +81,22 @@ Definition enum_inner m1 a : list (M * M.(usr_role)) :=
 
 Definition enum_inner' m1 a : list (M * option M.(usr_role)) :=
   ((λ mρ, (mρ.1, Some mρ.2)) <$> enum_inner m1 a).
+
+
+Lemma enum_inner_spec (δ' : M) m1 ℓ a:
+    lts_trans _ m1 (ℓ, a) δ' → (δ', ℓ) ∈ enum_inner m1 a.
+Proof.
+  intros Hxi. unfold enum_inner. rewrite elem_of_list_fmap.
+  exists (exist _ (δ', ℓ) Hxi). split =>//. apply elem_of_enum.
+Qed.
+
+Lemma enum_inner'_spec (δ' : M) m1 ℓ a:
+    lts_trans _ m1 (ℓ, a) δ' → (δ', Some ℓ) ∈ enum_inner' m1 a.
+Proof.
+  intros H%enum_inner_spec.
+  apply elem_of_list_fmap.
+  exists (δ', ℓ). naive_solver.
+Qed.
 
 Definition net_apply_action (n : net_model) (a : net_label) : net_model :=
   let (ms, bs) := n in
@@ -96,15 +113,54 @@ Definition net_apply_action (n : net_model) (a : net_label) : net_model :=
       (ms ∖ {[+ msg +]}, <[m_destination msg := msg::rb]>bs)
   end.
 
+Definition net_apply_action' (n : net_model) (a : fmlabel (joint_model M net_model)) : net_model :=
+  match a with
+  | inl (_, Some a) => net_apply_action n (inl a)
+  | inl (_, None) => n
+  | inr a => net_apply_action n (inr a)
+  end.
+
+Definition net_apply_action_lm (n : net_model) (a : @FairLabel aneris_lang (joint_model M net_model)) : net_model :=
+  match a with
+  | Take_step _ _ _ (Some a) => net_apply_action n (inl a)
+  | Silent_step _ (Some a) => net_apply_action n (inl a)
+  | Config_step _ a => net_apply_action n (inr a)
+  | _ => n
+  end.
+
 Lemma net_apply_action_spec n n' a :
   net_model.(lts_trans) n a n' → n' = net_apply_action n a.
-Proof. Admitted.
+Proof.
+  inversion 1; simplify_eq; simpl; try naive_solver.
+  have Heq : length ms' + 1 - 1 = length ms' by lia.
+  f_equal. rewrite H0 app_length /= Heq take_app_length //.
+Qed.
 
-  (* Inductive FairLabel {FM: FairModel} := *)
-  (* | Take_step: FM.(fmrole) -> FM.(fmaction) → locale Λ -> option (action Λ) → FairLabel *)
-  (* | Silent_step: locale Λ -> option (action Λ) → FairLabel *)
-  (* | Config_step: FM.(fmconfig) → config_label Λ → FairLabel *)
-(* . *)
+Lemma net_apply_action_lm_spec δ δ' a x :
+  labels_match (LM := LM) x a → lm_ls_trans LM δ a δ' → δ'.(ls_under).2 = net_apply_action_lm δ.(ls_under).2 a.
+Proof.
+  intros Hlm.
+  unfold net_apply_action_lm.
+  destruct a as [ρ act ζ [|]|aa [|] cc dd|] eqn:Heq; simpl.
+  - intros (Htr&_).
+    inversion Htr; simplify_eq.
+    + destruct x as [[]|] =>//. destruct Hlm as (?&?&Hm).
+      rewrite actions_match_is_eq in Hm. naive_solver.
+    + destruct x as [[]|] =>//. destruct Hlm as (?&?&Hm).
+      rewrite actions_match_is_eq in Hm; simplify_eq.
+      by apply net_apply_action_spec.
+  - intros (Htr&_).
+    inversion Htr; simplify_eq; simpl=>//.
+    destruct x as [[]|] =>//. destruct Hlm as (?&?&Hm).
+    rewrite actions_match_is_eq in Hm; simplify_eq.
+  - destruct x as [[]|]; naive_solver.
+  - intros (_&_&_&_&->). done.
+  - intros (Htr&?).
+    inversion Htr; simplify_eq; simpl=>//.
+    destruct x as [[]|] =>//. destruct Hlm as (Heq&Hlm).
+    rewrite cfg_labels_match_is_eq in Hlm. simplify_eq.
+    by apply net_apply_action_spec.
+Qed.
 
 Definition get_aneris_action (oa : net_label) : option aneris_action :=
   match oa with
@@ -179,14 +235,179 @@ Definition enumerate_next_valid (extr : execution_trace aneris_lang) (fmodtr: au
   let ns := enumerate_next (trace_last fmodtr) exe_a (trace_last extr) in
   omap (λ '(x, ℓ), (λ x, (x, ℓ)) <$> to_ls x) ns.
 
+Lemma model_trans_of_ls_trans a b act ex_act ρ ζ :
+  lm_ls_trans LM a (Take_step ρ act ζ ex_act) b → lts_trans M a.(ls_under).1 (ρ, act) b.(ls_under).1.
+Proof. intros (h&_). inversion h; naive_solver. Qed.
+
+Lemma inv_labels_match_take_step {oζ ρ lab ζ o} :
+  labels_match (LM := LM) oζ (Take_step ρ lab ζ o) → oζ = inl (ζ, lab) ∧ o = lab.
+Proof.
+  intros Hlm.
+  unfold labels_match in *.
+  destruct oζ as [[]|] =>//.
+  destruct Hlm as (?&?&Hlm). apply actions_match_is_eq in Hlm. naive_solver.
+Qed.
+
+Lemma get_aneris_action_label l lab :
+  get_aneris_action' (exe_label_to_net_label (inl (l, lab))) = lab.
+Proof. by destruct lab; simpl. Qed.
+
+Lemma lm_ls_trans_silent {δ δ' l o} :
+  lm_ls_trans LM δ (Silent_step l o) δ' → δ.(ls_under).1 = δ'.(ls_under).1.
+Proof.
+  inversion 1; simplify_eq.
+  have -> : δ.(ls_data).(ls_under) = δ'.(ls_under).
+  { naive_solver. }
+  done.
+Qed.
+
+Lemma lm_ls_trans_config {δ δ' l o} :
+  lm_ls_trans LM δ (Config_step l o) δ' → δ.(ls_under).1 = δ'.(ls_under).1 ∧ δ.(ls_map) = δ'.(ls_map).
+Proof.
+  inversion 1 as (Htrans&?); simplify_eq.
+  have -> : δ.(ls_data).(ls_under).1 = δ'.(ls_under).1.
+  { inversion Htrans; simplify_eq. done. }
+  naive_solver.
+Qed.
+
+Lemma lm_ls_trans_config_fuel {δ δ' l o} :
+  lm_ls_trans LM δ (Config_step l o) δ' → ls_fuel δ = ls_fuel δ'.
+Proof.
+  unfold ls_fuel.
+  intros [? ->]%lm_ls_trans_config =>//.
+Qed.
+
+Lemma lm_ls_trans_config_under {δ δ' l o} :
+  lm_ls_trans LM δ (Config_step l o) δ' → δ.(ls_under).1 = δ'.(ls_under).1.
+Proof. intros [-> ?]%lm_ls_trans_config =>//. Qed.
+
 Lemma rel_finitary_valid_state_evolution_fairness inv:
   rel_finitary (valid_state_evolution_fairness LM inv).
 Proof.
-  intros ex atr [tr' σ'] oζ.
+  intros ex atr [tp' σ'] oζ.
   eapply finite_smaller_card_nat.
-  eapply (in_list_finite (enumerate_next_valid ex atr oζ)).
-  intros [δ ℓ] Hval.
-Admitted.
+  eapply (in_list_finite (enumerate_next_valid (ex :tr[oζ]: (tp', σ')) atr oζ)).
+  intros [δ' ℓ] [Htrans [Hlabels [HC HD]]]. unfold enumerate_next_valid.
+  apply elem_of_list_omap.
+  exists (δ'.(ls_data), ℓ).
+
+  have Hlm : labels_match (LM := LM) oζ ℓ.
+  { unfold labels_match. naive_solver. }
+
+  split; last first.
+  { simpl. rewrite /to_ls.
+    destruct (decide _); last first.
+    { pose proof ls_map_disj δ'. done. }
+    destruct (decide _); last first.
+    { pose proof ls_map_live δ'. done. }
+    simpl. do 2 f_equal. destruct δ'. simpl. destruct ls_data. f_equal; eapply proof_irrel. }
+  unfold enumerate_next.
+  apply elem_of_list_bind.
+  exists (δ'.(ls_under).1, match ℓ with Take_step l _ _ _ => Some l | _ => None end).
+  split; last first.
+  { destruct ℓ as [ρ lab | |].
+    - inversion Htrans. simplify_eq. apply elem_of_cons; right. eapply enum_inner'_spec.
+      destruct (inv_labels_match_take_step Hlm) as [??]. simplify_eq.
+      rewrite get_aneris_action_label. rewrite H2.
+      eapply (model_trans_of_ls_trans x δ' lab). done.
+    - apply elem_of_cons; left. f_equal. inversion Htrans. simplify_eq.
+      erewrite <-lm_ls_trans_silent=>//.
+      rewrite H2. done.
+    - inversion Htrans; simplify_eq.
+      apply elem_of_cons; left. f_equal.
+      erewrite <-lm_ls_trans_config_under=>//.
+      rewrite H2. done. }
+  apply elem_of_list_bind. eexists (dom $ ls_fuel δ'). split; last first.
+  { apply enumerate_dom_gsets'_spec. destruct ℓ as [ρ lab | |].
+    - inversion Htrans; simplify_eq. intros ρ' Hin. destruct (decide (ρ' ∈ live_roles _ δ')); first set_solver.
+      destruct (decide (ρ' ∈ dom $ ls_fuel (trace_last atr))); first set_solver.
+      rewrite -> H2 in *.
+      set_solver.
+    - inversion Htrans. simplify_eq. rewrite -> H2 in *. set_solver.
+    - inversion Htrans. simplify_eq. inversion H3. rewrite -> H2 in *.
+      have -> := lm_ls_trans_config_fuel H3.
+      set_solver. }
+  apply elem_of_list_bind.
+  assert (Hfueldom: dom $ ls_fuel δ' = live_roles _ δ' ∪ dom (ls_fuel δ')).
+  { rewrite subseteq_union_1_L //. apply ls_fuel_dom. }
+
+  exists (dom δ'.(ls_data).(ls_map)).
+  split; last first.
+  { apply enumerate_dom_gsets'_spec. intros ζ Hin. simpl.
+
+    (* unfold tids_smaller in Hsmall. *)
+    (* specialize (Hsmall _ Hin). *)
+    apply elem_of_list_to_set, locales_of_list_from_locale_from.
+    destruct HC as (?&Hts&?).
+    apply Hts; exact Hin. }
+
+  apply elem_of_list_bind.
+  unshelve eexists (ls_map δ' ↾ _); first done. split.
+  { apply elem_of_list_ret.
+    inversion Htrans; simplify_eq.
+    have Heq := net_apply_action_lm_spec _ _ _ _ Hlm H3.
+    destruct x as [[[??] ?] ??]. rewrite !H2.
+    simpl in Hlabels; unfold labels_match in Hlabels.
+
+    destruct ℓ; destruct oζ as [[? [|]] bb| aa bb]; simpl; try naive_solver;
+    f_equal; try naive_solver.
+    - destruct δ'. simpl. destruct ls_data. simpl. f_equal. destruct ls_under. naive_solver.
+    - destruct Hlabels as (->&->&Hmatch). apply actions_match_is_eq in Hmatch. simplify_eq. naive_solver.
+    - destruct δ'. simpl. destruct ls_data. simpl. f_equal. destruct ls_under. naive_solver.
+    - destruct Hlabels as (->&->&Hmatch). apply actions_match_is_eq in Hmatch. simplify_eq. naive_solver.
+    - destruct δ'. simpl. destruct ls_data. simpl. f_equal. destruct ls_under. naive_solver.
+    - destruct δ'. simpl. destruct ls_data. simpl. f_equal. destruct ls_under. naive_solver.
+    - destruct Hlabels as (->&Hmatch). apply cfg_labels_match_is_eq in Hmatch. simplify_eq. naive_solver. }
+
+  apply enum_gmap_range_bounded'_spec. split=>//.
+  intros ζ fs Hlk. apply enumerate_subdomain_gmap_spec.
+  { intros ρ Hin. eapply ls_fuel_dom_data =>//. }
+  intros ρ f Hlk'.
+  have Hsome: ls_fuel δ' !! ρ = Some f by eapply ls_fuel_data.
+  have Hmapping: ls_mapping δ' !! ρ = Some ζ.
+  { eapply ls_mapping_data=>//. apply elem_of_dom. naive_solver. }
+
+  destruct ℓ as [ρ' tid' | |].
+  - destruct (decide (ρ = ρ')) as [-> | Hneq].
+    + inversion Htrans as [aa bb |cc dd ee ff gg Htr]; simplify_eq.
+      destruct Htr as (AA&BB&CC&DD&EE&FF&GG).
+      rewrite Hsome /= in EE. rewrite Nat.max_le_iff. naive_solver.
+    + inversion Htrans as [aa bb |cc dd ee ff Hend Htr]; simplify_eq.
+      destruct Htr as (AA&BB&CC&Hle&EE&Hnew&GG).
+      destruct (decide (ρ ∈ dom $ ls_fuel (trace_last atr))) as [Hin|Hnotin].
+      * assert (Hok: oleq (ls_fuel δ' !! ρ) (ls_fuel (trace_last atr) !! ρ)).
+        { unfold fuel_must_not_incr in *.
+          assert (ρ ∈ dom $ ls_fuel (trace_last atr)) by set_solver.
+          rewrite -> Hend in *.
+          specialize (Hle ρ ltac:(done) ltac:(congruence)) as [Hleq'|Hleq'] =>//. apply elem_of_dom_2 in Hsome. set_solver. }
+        rewrite Hsome in Hok. destruct (ls_fuel (trace_last atr) !! ρ) as [f'|] eqn:Heqn; last done.
+        pose proof (max_gmap_spec _ _ _ Heqn). simpl in *. lia.
+      * assert (Hok: oleq (ls_fuel δ' !! ρ) (Some (fm_fl δ'))).
+        { apply Hnew. apply elem_of_dom_2 in Hsome. rewrite -Hend. set_solver. }
+        rewrite Hsome in Hok. simpl in Hok. rewrite Nat.max_le_iff. naive_solver.
+  - inversion Htrans as [aa bb |cc dd ee ff Hend Htr]; simplify_eq.
+    inversion Htr as [? [? [Hleq [Hincl Heq]]]]. specialize (Hleq ρ).
+    assert (ρ ∈ dom $ ls_fuel (trace_last atr)) as Hin.
+    { apply elem_of_dom_2 in Hsome. rewrite Hend. set_solver. }
+    rewrite -> Hend in *. specialize (Hleq Hin ltac:(done)) as [Hleq|Hleq].
+    + rewrite Hsome in Hleq. destruct (ls_fuel (trace_last atr) !! ρ) as [f'|] eqn:Heqn.
+      * pose proof (max_gmap_spec _ _ _ Heqn). simpl in *.
+        rewrite -Hend Heqn in Hleq.
+        rewrite Nat.max_le_iff -Hend. left. transitivity f'; naive_solver.
+      * simpl in *. rewrite -Hend Heqn in Hleq. done.
+    + apply elem_of_dom_2 in Hsome. set_solver.
+  - inversion Htrans as [aa bb |cc δ ee ff Hend Htr]; simplify_eq.
+    inversion Htr as (?&Hsame&?).
+    rewrite Hend. rewrite Nat.max_le_iff. left.
+    have -> : ls_fuel δ = ls_fuel δ' by  rewrite /ls_fuel Hsame //.
+    apply (max_gmap_spec (ls_fuel δ') _ _ Hsome).
+
+  Unshelve.
+  + intros ??. apply make_decision.
+  + intros. apply make_proof_irrel.
+  + intros. apply make_proof_irrel.
+  + intros. apply make_proof_irrel.
+Qed.
 
 End finiteness.
 
@@ -581,6 +802,8 @@ Proof.
   { iPureIntro. rewrite /tids_smaller in Htids.
     intros ρ ζ Hlk. apply ls_mapping_data_inv in Hlk as [?[??]]. apply Htids=>//.
     by eapply elem_of_dom_2. }
+  iSplit.
+  { iPureIntro. exact Htids. }
   iIntros (ζ' e' Hsome Hnoval ρ HSome). simpl.
   iAssert (ζ' ↦M ∅)%I with "[Hposts]" as "H".
   { destruct (to_val e') as [?|] eqn:Heq; last done.

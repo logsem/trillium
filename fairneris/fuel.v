@@ -14,7 +14,6 @@ Section fairness.
   }.
   Record LiveState := MkLiveState {
     ls_data :> LiveStateData;
-
     ls_map_disj: ∀ ζ ζ' fs fs', ζ ≠ ζ' → ls_data.(ls_map) !! ζ = Some fs → ls_data.(ls_map) !! ζ' = Some fs' → fs ##ₘ fs';
     ls_map_live: ∀ ρ, ρ ∈ M.(live_roles) ls_data.(ls_under) → ∃ ζ fs, ls_data.(ls_map) !! ζ = Some fs ∧ ρ ∈ dom fs;
   }.
@@ -254,7 +253,7 @@ Section fairness.
       ∧ (oleq (ls_fuel b !! ρ) (Some (fuel_limit b)))
       ∧ (∀ ρ, ρ ∈ (dom $ ls_fuel b) ∖ (dom $ ls_fuel a) -> oleq (ls_fuel b !! ρ) (Some (fuel_limit b)))
       ∧ (dom $ ls_fuel b) ∖ (dom $ ls_fuel a) ⊆ live_roles _ b ∖ live_roles _ a
-    | Silent_step tid act =>
+    | Silent_step tid _ =>
       (∃ ρ, ls_mapping a !! ρ = Some tid)
       ∧ fuel_decr (Some tid) None a b
       ∧ fuel_must_not_incr None a b
@@ -666,6 +665,7 @@ Ltac SS :=
 Definition live_tids `{Countable (locale Λ)} `{LM:LiveModel Λ M}
            (c : cfg Λ) (δ : LM.(lm_ls)) : Prop :=
   (∀ ρ ζ, ls_mapping δ !! ρ = Some ζ -> is_Some (from_locale c.1 ζ)) ∧
+  tids_smaller c.1 δ ∧
   ∀ ζ e, from_locale c.1 ζ = Some e -> (to_val e ≠ None) ->
          ∀ ρ, ls_mapping δ !! ρ = Some ζ → ρ ∉ M.(live_roles) δ.
 
@@ -742,7 +742,7 @@ Section fairness_preserved.
     locale_enabled ζ (trfirst extr).
   Proof.
     intros Hlive Hm Hloc.
-    rewrite /locale_enabled. have [HiS Hneqloc] := traces_match_first _ _ _ _ _ _ Hm.
+    rewrite /locale_enabled. have [HiS [? Hneqloc]] := traces_match_first _ _ _ _ _ _ Hm.
     have [e Hein] := (HiS _ _ Hloc). exists e. split; first done.
     destruct (to_val e) eqn:Heqe =>//.
     exfalso. specialize (Hneqloc ζ e Hein). rewrite Heqe in Hneqloc.
@@ -950,7 +950,7 @@ Section fairness_preserved.
     have [tr1' [Heq' Htr]] : exists tr1', after n extr = Some tr1' ∧ exaux_traces_match tr1' tr
      by eapply traces_match_after.
     have Hte: locale_enabled ζ (trfirst tr1').
-    { rewrite /locale_enabled. have [HiS Hneqζ] := traces_match_first _ _ _ _ _ _ Htr.
+    { rewrite /locale_enabled. have [HiS [? Hneqζ]] := traces_match_first _ _ _ _ _ _ Htr.
       have [e Hein] := (HiS _ _ Hζ). exists e. split; first done.
       destruct (to_val e) eqn:Heqe =>//.
       exfalso. specialize (Hneqζ ζ e Hein). rewrite Heqe in Hneqζ.
