@@ -58,7 +58,8 @@ Proof.
     ) as Hcs.
   { eapply (simulation_adequacy_multiple_strong _ {[saA;saB]} NotStuck _ _ _ _ ∅).
     { rewrite /initial_state /=. lia. }
-    { admit. }
+    { intros s1 act. eapply (in_list_finite (stenning_enum_next s1)).
+      intros [s2 ρ]. apply stenning_enum_next_spec. }
     { rewrite //=. }
     { rewrite /config_net_match /model_state_socket_incl /model_state_socket_coh /=. split=>//. split.
       - naive_solver.
@@ -182,4 +183,4 @@ Proof.
     done. }
 
   eapply program_model_refinement_preserves_upward in Hcs =>//.
-Admitted.
+Qed.

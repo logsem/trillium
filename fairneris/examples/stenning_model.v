@@ -128,6 +128,62 @@ Inductive stenning_trans : stenning_state → stenning_role * option aneris_acti
                  (stA, BSending (1+n))
 .
 
+Definition stenning_enum_next_A (n : Z) : list stenning_A_state :=
+  [AReceiving n; ASending n; ASending (1 + n)].
+
+Lemma stenning_enum_next_A_spec n stA stA' stB stB' ℓ :
+  stenning_trans (stA, stB) ℓ (stA', stB') →
+  stenning_get_n_A stA = n →
+  stA' ∈ stenning_enum_next_A n.
+Proof.
+  intros Htr Hgn.
+  have : stA ∈ stenning_enum_next_A n.
+  { destruct stA; rewrite !elem_of_cons; naive_solver. }
+  inversion Htr; simplify_eq =>//; intros _; rewrite !elem_of_cons; naive_solver.
+Qed.
+
+
+Definition stenning_enum_next_B (n : Z) : list stenning_B_state :=
+  [BReceiving n; BSending n; BSending (1 + n)].
+
+Lemma stenning_enum_next_B_spec n stA stA' stB stB' ℓ :
+  stenning_trans (stA, stB) ℓ (stA', stB') →
+  stenning_get_n_B stB = n →
+  stB' ∈ stenning_enum_next_B n.
+Proof.
+  intros Htr Hgn.
+  have : stB ∈ stenning_enum_next_B n.
+  { destruct stB; rewrite !elem_of_cons; naive_solver. }
+  inversion Htr; simplify_eq =>//; intros _; rewrite !elem_of_cons; naive_solver.
+Qed.
+
+
+Definition stenning_enum_next (st : stenning_state) : list (stenning_state * stenning_role) :=
+  let '(nA, nB) := stenning_get_n st in
+  stA ← stenning_enum_next_A nA;
+  stB ← stenning_enum_next_B nB;
+  ρ ← [Arole; Brole];
+  mret ((stA, stB), ρ).
+
+Lemma stenning_enum_next_spec st st' ρ act :
+  stenning_trans st (ρ, act) st' →
+  (st', ρ) ∈ stenning_enum_next st.
+Proof.
+  intros Htr.
+  destruct st as [stA stB].
+  destruct st' as [stA' stB'].
+  apply elem_of_list_bind.
+  exists stA'. constructor; last first.
+  { eapply stenning_enum_next_A_spec =>//=. }
+  apply elem_of_list_bind.
+  exists stB'. constructor; last first.
+  { eapply stenning_enum_next_B_spec =>//=. }
+  apply elem_of_list_bind.
+  exists ρ. constructor; last first.
+  { destruct ρ; rewrite !elem_of_cons; naive_solver. }
+  by apply elem_of_list_ret.
+Qed.
+
 Definition stenning_live_roles (s : stenning_state) : gset stenning_role :=
   {[Arole; Brole]}.
 
