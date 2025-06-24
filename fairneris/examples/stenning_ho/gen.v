@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import invariants.
 From trillium.program_logic Require Import ectx_lifting.
 From fairneris Require Import fairness fair_resources fuel.
-From fairneris.examples Require Import stenning_model_ho.
+From fairneris.examples Require Import stenning_ho_model.
 From fairneris.aneris_lang Require Import proofmode.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.

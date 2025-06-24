@@ -175,6 +175,6 @@ Proof.
             usr_lts := stenning_lts;
             usr_live_roles := stenning_live_roles;
             usr_live_spec := stenning_live_spec_holds;
-            usr_fl _ := 100;
+            usr_fl _ := 200;
           |}).
 Defined.

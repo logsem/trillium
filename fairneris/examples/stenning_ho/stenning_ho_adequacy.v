@@ -5,7 +5,7 @@ From iris.algebra Require Import excl_auth.
 From iris.base_logic.lib Require Import invariants.
 From trillium.program_logic Require Import ectx_lifting.
 From fairneris Require Import fairness.
-From fairneris.examples Require Import stenning_model_ho.
+From fairneris.examples Require Import stenning_ho_model.
 From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
@@ -17,7 +17,7 @@ From fairneris.examples Require Import stenning_ho_code.
 From fairneris.lib Require Import singletons.
 
 Definition initial_state :=
-  ([mkExpr ipA (client_example saA saB); mkExpr ipB (server_example saA saB)],
+  ([mkExpr ipA (client_example saA saB #()); mkExpr ipB (server_example saA saB)],
      {| state_heaps := {[ipA:=∅; ipB:=∅]};
         state_sockets := {[ipA:=∅; ipB:=∅]} ;
         state_ms := ∅; |}).
@@ -164,14 +164,15 @@ Proof.
       iDestruct (model_agree with "Hst Hst'") as %->. cbn.
       iDestruct "H" as "(%Hstinv&?)". iFrame. iPureIntro. naive_solver. }
     iSplitL "HrtA HnodeA HfuelA HfpA HresFA Hcc Hccm Hcsm".
-    { iApply (wp_client_example _ (usr_fl (initial_model_state : stenning_model)) with
+    { simpl.
+      iApply (wp_client_example _ (usr_fl (initial_model_state : stenning_model)) with
                "[HrtA HnodeA HfuelA HfpA HresFA Hcc Hccm Hcsm]").
       { rewrite //=. lia. }
       { rewrite /locale_of /=. rewrite gset_to_gmap_singleton. iFrame "#∗".
         iDestruct "Hcc" as "[??]".
         replace (1/2/2)%Qp with (1/4)%Qp by compute_done. iFrame.       
       }
-      iIntros "!>" (v) "[H _]".
+      iIntros "!>" (v) "H".
       rewrite /locale_of. iFrame.
     }
     iSplitL "HrtB HnodeB HfuelB HresFB HfpB Hcs".
