@@ -4,7 +4,7 @@ From fairneris.aneris_lang Require Import network_model.
 From iris.algebra Require Import excl_auth.
 From iris.base_logic.lib Require Import invariants.
 From trillium.program_logic Require Import ectx_lifting.
-From fairneris Require Import fairness.
+From fairneris Require Import fairness ltl_lite.
 From fairneris.examples Require Import stenning_model.
 From fairneris.aneris_lang Require Import aneris_lang.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
@@ -183,4 +183,16 @@ Proof.
     done. }
 
   eapply program_model_refinement_preserves_upward in Hcs =>//.
+Qed.
+
+Lemma stenning_fair_live_extr extr i :
+  trfirst extr = initial_state →
+  extrace_valid extr →
+  ex_fair extr →
+  (extr ⊩ ◊ ℓ↓ (λ ℓ, ∃ ℓ' ζ, ℓ = inl (ζ, Some ℓ') ∧ ℓ' = Send $ mAB i)).
+Proof.
+  intros.
+  apply stenning_continued_simulation in H1 as (?&?&?&?&?&?); [|done..].
+  eapply program_model_refinement_downward_eventually; [done|].
+  apply stenning_fair_live.
 Qed.

@@ -235,3 +235,7 @@ Proof.
             usr_fl _ := 200;
           |}).
 Defined.
+
+(* TODO: Prove this in the model *)
+Axiom stenning_fair_live : ∀ (utr : lts_trace stenning_model) i,
+  (utr ⊩ ◊ ℓ↓ λ '(_, α), ∃ α', α = Some α' ∧ ∃ j : Z, α' = Send (mAB i j)).

@@ -210,3 +210,6 @@ Proof.
             usr_fl _ := 50;
           |}).
 Defined.
+
+Axiom stenning_fair_live : ∀ (utr : lts_trace stenning_model) i,
+  (utr ⊩ ◊ ℓ↓ λ '(_, α), ∃ α', α = Some α' ∧ α' = Send (mAB i)).
