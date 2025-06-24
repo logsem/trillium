@@ -3,6 +3,8 @@ From Paco Require Import paco1 paco2 pacotac.
 From fairneris Require Export trace_utils fairness env_model.
 From fairneris.aneris_lang Require Import ast network lang aneris_lang.
 From fairneris Require Export trace_utils ltl_lite strings.
+(* TODO: We need this as adequacy.v contains [usr_fair]. We should move it somewhere else *)
+From fairneris.aneris_lang Require Import adequacy.
 
 Import derived_laws_later.bi.
 
@@ -236,6 +238,13 @@ Proof.
           |}).
 Defined.
 
-(* TODO: Prove this in the model *)
+
+Definition initial_model_state : stenning_state := (ASending 0, BReceiving 0).
+Definition safety_inv := λ st, let (n, m) := stenning_get_n st in (n = m ∨ m = n + 1)%Z.
+
 Axiom stenning_fair_live : ∀ (utr : lts_trace stenning_model) i,
-  (utr ⊩ ◊ ℓ↓ λ '(_, α), ∃ α', α = Some α' ∧ ∃ j : Z, α' = Send (mAB i j)).
+  trfirst utr = initial_model_state →
+  usr_trace_valid utr →
+  usr_fair utr →
+  (utr ⊩ □ ↓ λ s _, safety_inv s) →
+  (utr ⊩ ◊ ℓ↓ λ '(_, α), ∃ α', α = Some α' ∧ ∃ j, α' = Send (mAB i j)).

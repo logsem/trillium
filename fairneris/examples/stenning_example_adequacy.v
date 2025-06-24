@@ -194,5 +194,5 @@ Proof.
   intros.
   apply stenning_continued_simulation in H1 as (?&?&?&?&?&?); [|done..].
   eapply program_model_refinement_downward_eventually; [done|].
-  apply stenning_fair_live.
+  by apply stenning_fair_live.
 Qed.
