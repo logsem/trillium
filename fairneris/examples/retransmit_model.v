@@ -20,12 +20,22 @@ Inductive retransmit_state :=
 | Received
 | Done.
 
+Definition retransmit_state_list := [Start; Received; Done].
+
+Lemma retransmit_state_list_spec s : s ∈ retransmit_state_list.
+Proof. destruct s; rewrite !elem_of_cons; naive_solver. Qed.
+
 #[global] Instance simple_state_eqdec : EqDecision retransmit_state.
 Proof. intros ??. apply make_decision. Qed.
 #[global] Instance simple_state_inhabited : Inhabited retransmit_state.
 Proof. exact (populate Start). Qed.
 
 Inductive retransmit_role := Arole | Brole.
+
+Definition retransmit_role_list := [Arole; Brole].
+
+Lemma retransmit_role_list_spec s : s ∈ retransmit_role_list.
+Proof. destruct s; rewrite !elem_of_cons; naive_solver. Qed.
 
 Definition retransmit_node_action : Set := option message.
 Definition retransmit_network_action : Set := option message.

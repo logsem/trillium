@@ -1,4 +1,4 @@
-From stdpp Require Import list fin_maps.
+From stdpp Require Import list fin_maps finite decidable.
 From iris.proofmode Require Import proofmode.
 From fairneris.aneris_lang Require Import network_model.
 From iris.algebra Require Import excl_auth.
@@ -22,7 +22,20 @@ Definition initial_state :=
 
 Definition initial_model_state : retransmit_state := retransmit_model.Start.
 
+Definition enumerate_next_states : list (retransmit_state * usr_role retransmit_model) :=
+  s ← retransmit_state_list;
+  ρ ← retransmit_role_list;
+  mret (s, ρ).
 
+Lemma retransmit_finitary : aneris_model_rel_finitary retransmit_model.
+Proof.
+  intros s1 act.
+  eapply (in_list_finite enumerate_next_states).
+  intros [s ρ] ?.
+  apply elem_of_list_bind. exists s. split; last by apply retransmit_state_list_spec.
+  apply elem_of_list_bind. exists ρ. split; last by apply retransmit_role_list_spec.
+  by apply elem_of_list_ret.
+Qed.
 
 Lemma retransmit_continued_simulation extr :
   trfirst extr = initial_state →
@@ -55,7 +68,7 @@ Proof.
     ) as Hcs.
   { eapply (simulation_adequacy_multiple_strong _ {[saA;saB]} NotStuck _ _ _ _ ∅).
     { rewrite /initial_state /=. lia. }
-    { admit. }
+    { apply retransmit_finitary. }
     { rewrite //=. }
     { rewrite /config_net_match /model_state_socket_incl /model_state_socket_coh /=. split=>//. split.
       - naive_solver.
@@ -164,4 +177,4 @@ Proof.
   { rewrite ltl_sat_def /trace_now /pred_at /=. destruct utr=>//. }
   intros tr. rewrite !ltl_sat_def /trace_label /pred_at /usr_send_filter /=. destruct tr=>//.
   intros [ρ ->]. naive_solver.
-Admitted.
+Qed.

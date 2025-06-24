@@ -47,12 +47,9 @@ Definition trace_last_label {A L} (ft : finite_trace A L) : option L :=
 Local Notation net_label := (action aneris_lang + config_label aneris_lang)%type.
 Local Notation exe_label := (locale_label aneris_lang + config_label aneris_lang)%type.
 
-Instance decidable_eq_finiteness {M : UserModel aneris_lang} {s1 : M} {a} : EqDecision {'(s2, ρ) : M * (usr_role M) | lts_trans M s1 (ρ, a) s2}.
-Proof. intros ??; apply make_decision. Qed.
-
-Definition aneris_model_rel_finitary (M : UserModel aneris_lang) := forall s1 a, Finite { '(s2, ρ) | M.(lts_trans) s1 (ρ, a) s2 }.
 
 Section finiteness.
+
 
 Section gmap.
   Context `{!EqDecision K, !Countable K}.
@@ -74,7 +71,14 @@ End gmap.
 Context {M : UserModel aneris_lang}.
 Variable (LM: LiveModel aneris_lang (joint_model M net_model)).
 Context `{!LiveModelEq LM}.
-Variable (model_finite : aneris_model_rel_finitary M).
+
+Instance fairneris_proof_irrel : ∀ s1 a x, ProofIrrel (match x return Prop with (s2, ρ) => lts_trans M s1 (ρ, a) s2 end). (* TODO: why?*)
+Proof. intros ???. apply make_proof_irrel. Qed.
+
+Definition aneris_model_rel_finitary := forall s1 a, Finite { '(s2, ρ) | M.(lts_trans) s1 (ρ, a) s2 }.
+
+Variable (model_finite : aneris_model_rel_finitary).
+
 
 Definition enum_inner m1 a : list (M * M.(usr_role)) :=
     map proj1_sig (@enum _ _ (model_finite m1 a)).
@@ -93,7 +97,7 @@ Qed.
 Lemma enum_inner'_spec (δ' : M) m1 ℓ a:
     lts_trans _ m1 (ℓ, a) δ' → (δ', Some ℓ) ∈ enum_inner' m1 a.
 Proof.
-  intros H%enum_inner_spec.
+  intros ?%enum_inner_spec.
   apply elem_of_list_fmap.
   exists (δ', ℓ). naive_solver.
 Qed.
@@ -181,28 +185,15 @@ Definition exe_label_to_net_label (a : exe_label) : option net_label :=
   | inr a => Some (inr a)
   end.
 
-Eval cbn in fmconfig (joint_model M net_model).
-
-Notation "m ≫= f" := (mbind (M := list) f m) (at level 60, right associativity).
-Notation "( m ≫=.)" := (λ f, mbind (M := list) f m) (only parsing).
-Notation "(.≫= f )" := (mbind (M := list) f) (only parsing).
-Notation "(≫=)" := (λ m f, mbind (M := list) f m) (only parsing).
-Notation "x <-- y ; z" := (mbind (M := list) (λ x : _, z) y)
-                            (at level 20, y at level 100, z at level 200, only parsing).
-Notation "' x <-- y ; z" := (y ≫= (λ x : _, z))
-  (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
-
-
-
 Program Definition enumerate_next (δ1 : LM) (exe_a : exe_label) (c2 : cfg aneris_lang) : list (LiveStateData aneris_lang (joint_model M net_model) * mlabel LM) :=
   let oa := exe_label_to_net_label exe_a in
   let n2 := match oa with None => δ1.(ls_under).2 | Some a => net_apply_action δ1.(ls_under).2 a end in
-  '(s2, oρ) <-- (δ1.(ls_under).1, None) :: enum_inner' δ1.(ls_under).1 (get_aneris_action' oa);
+  '(s2, oρ) ← (δ1.(ls_under).1, None) :: enum_inner' δ1.(ls_under).1 (get_aneris_action' oa);
   let js2 := ((s2, n2) : fmstate (joint_model M net_model)) in
-  d <-- enumerate_dom_gsets' (dom (ls_fuel δ1) ∪ live_roles _ js2);
+  d ← enumerate_dom_gsets' (dom (ls_fuel δ1) ∪ live_roles _ js2);
   let fss := enumerate_subdomain_gmap d (max_gmap (ls_fuel δ1) `max` M.(usr_fl) s2) in
-  locs <-- enumerate_dom_gsets' $ list_to_set $ locales_of_list c2.1;
-  ms <-- enum_gmap_range_bounded' locs fss;
+  locs ← enumerate_dom_gsets' $ list_to_set $ locales_of_list c2.1;
+  ms ← enum_gmap_range_bounded' locs fss;
   let ℓ' := match oρ with
               | None => match exe_a with
                        | inl (ζ, a) => Silent_step ζ a
@@ -410,6 +401,8 @@ Proof.
 Qed.
 
 End finiteness.
+
+Arguments aneris_model_rel_finitary _ : clear implicits.
 
 (* Lemma derive_live_tid_inl c δ (ℓ : fmrole retransmit_fair_model) ζ : *)
 (*   role_enabled_locale_exists c δ → *)
@@ -633,11 +626,9 @@ Next Obligation.
   rewrite IH //.
 Qed.
 
-
 Theorem simulation_adequacy_multiple_strong
-        `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
-        A s (es : list aneris_expr) σ st fss FR net_init
-        (Hfss: good_fuel_alloc es st fss) inv :
+  `(M: UserModel aneris_lang) `{@anerisPreG M net_model LM LMeq Σ}
+  A s (es : list aneris_expr) σ st fss FR net_init (Hfss: good_fuel_alloc es st fss) inv :
   length es >= 1 →
   aneris_model_rel_finitary M →
   dom (state_heaps σ) = dom (state_sockets σ) →
