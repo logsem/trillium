@@ -145,7 +145,7 @@ Lemma net_apply_action_lm_spec δ δ' a x :
 Proof.
   intros Hlm.
   unfold net_apply_action_lm.
-  destruct a as [ρ act ζ [|]|aa [|] cc dd|] eqn:Heq; simpl.
+  destruct a as [ρ act ζ [|]|aa [|]|] eqn:Heq; simpl.
   - intros (Htr&_).
     inversion Htr; simplify_eq.
     + destruct x as [[]|] =>//. destruct Hlm as (?&?&Hm).
@@ -340,7 +340,7 @@ Proof.
     destruct x as [[[??] ?] ??]. rewrite !H2.
     simpl in Hlabels; unfold labels_match in Hlabels.
 
-    destruct ℓ; destruct oζ as [[? [|]] bb| aa bb]; simpl; try naive_solver;
+    destruct ℓ; destruct oζ as [[? [|]]|]; simpl; try naive_solver;
     f_equal; try naive_solver.
     - destruct δ'. simpl. destruct ls_data. simpl. f_equal. destruct ls_under. naive_solver.
     - destruct Hlabels as (->&->&Hmatch). apply actions_match_is_eq in Hmatch. simplify_eq. naive_solver.
