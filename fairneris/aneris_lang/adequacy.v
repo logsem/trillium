@@ -1062,6 +1062,33 @@ Section lm_network.
   Definition usr_fair (tr: lts_trace M) :=
     usr_network_fair_send_receive tr ∧ usr_fair_scheduling tr.
 
+  Lemma mtrace_fair_always :
+    usr_fair ⇔ (□ usr_fair).
+  Proof.
+    rewrite /usr_fair. intros mtr.
+    split; last by intros Hfair%trace_always_elim.
+    rewrite /usr_fair /usr_network_fair_send_receive /usr_network_fair_send_receive_of
+      /usr_fair_scheduling /usr_fair_scheduling_mtr.
+    intros [Hmtr1 Hmtr2].
+    repeat setoid_rewrite trace_always_forall in Hmtr1.
+    repeat setoid_rewrite trace_always_forall in Hmtr2.
+    eassert (Ha : (mtr ⊩ (□ trace_and _ _))).
+    { apply trace_always_and. split; [apply Hmtr1|apply Hmtr2]. }
+    apply trace_always_idemp in Ha.
+    revert Ha. apply trace_always_mono.
+    intros tr.
+    apply trace_impliesI.
+    intros Htr.
+    apply trace_always_and in Htr as [Htr1 Htr2].
+    split.
+    + intros ???. revert Htr1.
+      apply trace_always_mono. intros tr'. apply trace_impliesI.
+      intros Htr'. naive_solver.
+    + intros ?. revert Htr2.
+      apply trace_always_mono. intros tr'. apply trace_impliesI.
+      intros Htr'. naive_solver.
+  Qed.
+
   Lemma simulation_adequacy_trace_remove_fuel
           (auxtr : auxtrace LM) inv :
     lm_fair auxtr →

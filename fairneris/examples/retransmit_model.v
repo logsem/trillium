@@ -37,6 +37,7 @@ Definition retransmit_role_list := [Arole; Brole].
 Lemma retransmit_role_list_spec s : s ∈ retransmit_role_list.
 Proof. destruct s; rewrite !elem_of_cons; naive_solver. Qed.
 
+
 Definition retransmit_node_action : Set := option message.
 Definition retransmit_network_action : Set := option message.
 Definition retransmit_action : Set :=
@@ -112,34 +113,6 @@ Defined.
 
 Notation mtrace := (lts_trace retransmit_model).
 
-(* Put somewhere *)
-Lemma mtrace_fair_always :
-  (usr_fair (M := retransmit_model)) ⇔ (□ usr_fair).
-Proof.
-  rewrite /usr_fair. intros mtr.
-  split; last by intros Hfair%trace_always_elim.
-  rewrite /usr_fair /usr_network_fair_send_receive /usr_network_fair_send_receive_of
-    /usr_fair_scheduling /usr_fair_scheduling_mtr.
-  intros [Hmtr1 Hmtr2].
-  apply trace_always_forall in Hmtr1.
-  apply trace_always_forall in Hmtr2.
-  eassert (mtr ⊩ (□ trace_and _ _)).
-  { apply trace_always_and. split; [apply Hmtr1|apply Hmtr2]. }
-  apply trace_always_idemp in H.
-  revert H. apply trace_always_mono.
-  intros tr.
-  apply trace_impliesI.
-  intros Htr.
-  apply trace_always_and in Htr as [Htr1 Htr2].
-  split.
-  + intros x. revert Htr1.
-    apply trace_always_mono. intros tr'. apply trace_impliesI.
-    intros Htr'. naive_solver.
-  + intros x. revert Htr2.
-    apply trace_always_mono. intros tr'. apply trace_impliesI.
-    intros Htr'. naive_solver.
-Qed.
-
 Definition option_lift {S L} (P : S → L → Prop) : S → option L → Prop :=
   λ s ol, ∃ l, ol = Some l ∧ P s l.
 
@@ -183,13 +156,16 @@ Lemma retransmit_fair_traces_always_eventually_mAB (mtr : mtrace) :
   (mtr ⊩ usr_trace_valid) → (mtr ⊩ usr_fair) →
   (mtr ⊩ □ ◊ ℓ↓ usr_send_filter mAB).
 Proof.
-  intros Hvalid [Hfairn Hfairs]. eapply trace_always_implies_always_strong;
-    [|apply trace_always_and; split; [apply Hvalid|apply Hfairn]].
+  intros Hvalid [Hfairn Hfairs].
+  (* apply usr_network_fair_send_receive_pred_implies_eq in Hfairn. *)
+  eapply trace_always_implies_always_strong;
+    [|apply trace_always_and; split; [apply Hvalid|apply (Hfairn (λ msg, msg = mAB) saB)]].
+  2: { rewrite /msg_pred_dest. naive_solver. }
+
   intros tr' Hsuff [Hvalid' Hfair']%trace_always_and.
   apply retransmit_fair_traces_eventually_mAB=>//. split=>//.
-  - intros msg. eapply trace_always_suffix_of in Hfairn=>//.
+  - intros ???. eapply trace_always_suffix_of in Hfairn=>//.
   - intros ρ. eapply trace_always_suffix_of in Hfairs=>//.
-  Unshelve. exact inhabitant.
 Qed.
 
 Lemma retransmit_node_B_receives (mtr : mtrace) :
@@ -225,6 +201,7 @@ Lemma retransmit_fair_node_B_receives (mtr : mtrace) :
   (mtr ⊩ ◊ ↓ (λ s _, s = Received)).
 Proof.
   intros Hval Hfair Hstart. have [Hfairn Hfairs] := Hfair.
+  apply usr_network_fair_send_receive_pred_implies_eq in Hfairn.
   specialize (Hfairn mAB).
   apply trace_always_elim in Hfairn.
   rewrite trace_impliesI in Hfairn.
@@ -308,7 +285,7 @@ Proof.
       rewrite mtrace_fair_always in Hfair.
       eapply trace_always_cons in Hfair.
       rewrite -mtrace_fair_always // in Hfair.
-    + intros msg. specialize (Hfairn msg). by apply trace_always_cons in Hfairn.
+    + intros P dest_sa Hsa. specialize (Hfairn P dest_sa Hsa). by apply trace_always_cons in Hfairn.
     + apply trace_always_elim in Hval.
       rewrite /usr_trans_valid ltl_sat_def /usr_any_recv_filter /= in Hval.
       inversion Hval; simplify_eq; try naive_solver. exfalso. apply Hlater.

@@ -225,9 +225,22 @@ Section ltl_lemmas.
     - rewrite /trace_now /pred_at /=. intros HPQ Htr. by apply HPQ.
   Qed.
 
+  Lemma trace_label_mono_strong (P Q : L → Prop) tr :
+    (∀ l, trfirst_label tr = Some l → P l → Q l) →
+    (tr ⊩ ℓ↓ P) → (tr ⊩ ℓ↓Q).
+  Proof.
+    destruct tr as [s|s l tr].
+    - intros HPQ Htr. naive_solver.
+    - rewrite /trace_now /pred_at /=. intros HPQ Htr. by apply HPQ.
+  Qed.
+
   Lemma trace_now_mono (P Q : S → option L → Prop) tr :
     (∀ s l, P s l → Q s l) → (tr ⊩ ↓P) → (tr ⊩ ↓Q).
   Proof. intros. eapply trace_now_mono_strong; [|naive_solver]. by eauto. Qed.
+
+  Lemma trace_label_mono (P Q : L → Prop) (tr : trace S L) :
+    (∀ l, P l → Q l) → (tr ⊩ ℓ↓ P) → (tr ⊩ ℓ↓Q).
+  Proof. intros. eapply trace_label_mono_strong; [|naive_solver]. by eauto. Qed.
 
   Lemma trace_now_not P (tr : trace S L) :
     (↓ (λ s l, ¬ P s l)) tr ↔ (tr ⊩ ⫬ ↓ P).

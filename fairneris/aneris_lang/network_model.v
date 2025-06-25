@@ -226,18 +226,18 @@ Section fairness.
   Notation jmlabel := ((usr_role M * option (action aneris_lang)) + config_label aneris_lang)%type.
   Notation jmtrace := (trace (joint_model M net_model) jmlabel).
 
-  Definition send_filter msg : jmlabel → Prop :=
-    λ l, ∃ ρ, l = inl $ (ρ, Some $ Send msg).
-  Instance send_filter_decision msg l : Decision (send_filter msg l).
+  Definition send_filter P : jmlabel → Prop :=
+    λ l, ∃ ρ msg, l = inl $ (ρ, Some $ Send msg) ∧ P msg.
+  Instance send_filter_decision P l : Decision (send_filter P l).
   Proof. apply make_decision. Qed.
 
-  Definition deliver_filter msg : jmlabel → Prop :=
-    λ l, l = inr $ Deliver msg.
+  Definition deliver_filter P : jmlabel → Prop :=
+    λ l, ∃ msg, l = inr $ Deliver msg ∧ P msg.
   Instance deliver_filter_decision msg l : Decision (deliver_filter msg l).
   Proof. apply make_decision. Qed.
 
-  Definition recv_filter msg : jmlabel → Prop :=
-    λ l, ∃ ρ, l = inl $ (ρ, Some $ Recv (m_destination msg) (Some msg)).
+  Definition recv_filter P : jmlabel → Prop :=
+    λ l, ∃ ρ msg, l = inl $ (ρ, Some $ Recv (m_destination msg) (Some msg)) ∧ P msg.
   Instance recv_filter_decision msg l : Decision (recv_filter msg l).
   Proof. apply make_decision. Qed.
 
@@ -249,18 +249,25 @@ Section fairness.
   Definition jm_network_fair_delivery_of msg : jmtrace → Prop :=
     □ (□◊ ℓ↓send_filter msg → ◊ ℓ↓ deliver_filter msg).
 
+  Definition msg_pred_dest (P : message → Prop) dest_sa := ∀ msg, P msg → msg.(m_destination) = dest_sa.
+
   Definition jm_network_fair_delivery (mtr : jmtrace) : Prop :=
     ∀ msg, (mtr ⊩ jm_network_fair_delivery_of msg).
 
-  Definition jm_network_fair_send_receive_of msg : jmtrace → Prop :=
-    □ (□◊ℓ↓send_filter msg → □◊ℓ↓ any_recv_filter (m_destination msg) → ◊ℓ↓ recv_filter msg).
+  Definition jm_network_fair_send_receive_of P dest_sa (H : msg_pred_dest P dest_sa) : jmtrace → Prop :=
+    □ (□◊ℓ↓send_filter P → □◊ℓ↓ any_recv_filter dest_sa → ◊ℓ↓ recv_filter P).
 
   Definition jm_network_fair_send_receive (mtr : jmtrace) : Prop :=
-    ∀ msg, (mtr ⊩ jm_network_fair_send_receive_of msg).
+    ∀ P dest_sa H, (mtr ⊩ jm_network_fair_send_receive_of P dest_sa H).
 
   Definition usr_send_filter msg : lts_label M → Prop :=
     λ l, ∃ ρ, l = (ρ, Some $ Send msg).
   Instance usr_send_filter_decision msg l : Decision (usr_send_filter msg l).
+  Proof. apply make_decision. Qed.
+
+  Definition usr_send_pred_filter P : lts_label M → Prop :=
+    λ l, ∃ ρ msg, l = (ρ, Some $ Send msg) ∧ P msg.
+  Instance usr_send_pred_filter_decision msg l : Decision (usr_send_pred_filter msg l).
   Proof. apply make_decision. Qed.
 
   Definition usr_recv_filter msg : lts_label M → Prop :=
@@ -268,16 +275,47 @@ Section fairness.
   Instance usr_recv_filter_decision msg l : Decision (usr_recv_filter msg l).
   Proof. apply make_decision. Qed.
 
+  Definition usr_recv_pred_filter P : lts_label M → Prop :=
+    λ l, ∃ ρ msg, l = (ρ, Some $ Recv (m_destination msg) (Some msg)) ∧ P msg.
+  Instance usr_recv_pred_filter_decision P l : Decision (usr_recv_filter P l).
+  Proof. apply make_decision. Qed.
+
   Definition usr_any_recv_filter sa : lts_label M → Prop :=
     λ l, ∃ ρ omsg, l = (ρ, Some $ Recv sa omsg).
   Instance usr_any_recv_filter_decision msg l : Decision (usr_any_recv_filter msg l).
   Proof. apply make_decision. Qed.
 
-  Definition usr_network_fair_send_receive_of msg : lts_trace M → Prop :=
+  Definition usr_network_fair_send_receive_of P dest_sa (H : msg_pred_dest P dest_sa) : lts_trace M → Prop :=
+    □ (□◊ℓ↓ usr_send_pred_filter P → □◊ℓ↓ usr_any_recv_filter dest_sa → ◊ℓ↓ usr_recv_pred_filter P).
+
+  Definition usr_network_fair_send_receive_of_eq msg : lts_trace M → Prop :=
     □ (□◊ℓ↓ usr_send_filter msg → □◊ℓ↓ usr_any_recv_filter (m_destination msg) → ◊ℓ↓ usr_recv_filter msg).
 
   Definition usr_network_fair_send_receive (utr : lts_trace M) : Prop :=
-    ∀ msg, (utr ⊩ usr_network_fair_send_receive_of msg).
+    ∀ P dest_sa H, (utr ⊩ usr_network_fair_send_receive_of P dest_sa H).
+
+  Definition usr_network_fair_send_receive_eq (utr : lts_trace M) : Prop :=
+    ∀ msg, (utr ⊩ usr_network_fair_send_receive_of_eq msg).
+
+  Lemma usr_network_fair_send_receive_pred_implies_eq (utr : lts_trace M) :
+    usr_network_fair_send_receive utr → usr_network_fair_send_receive_eq utr.
+  Proof.
+    intros Hfairn msg. specialize (Hfairn (λ m, m = msg) (m_destination msg) ltac:(rewrite /msg_pred_dest; naive_solver)).
+    rewrite trace_alwaysI in Hfairn. rewrite trace_alwaysI.
+    repeat setoid_rewrite  trace_impliesI in Hfairn. repeat setoid_rewrite  trace_impliesI.
+    intros tr1 Htr1 Ha Hb.
+    ospecialize (Hfairn tr1 Htr1 _ _).
+    - eapply trace_always_mono; last apply Ha. intros tr2. rewrite trace_impliesI => He.
+      eapply trace_eventually_mono; last apply He. intros tr3 Hn.
+      eapply trace_label_mono; last apply Hn. intros l. rewrite /usr_send_filter /usr_send_pred_filter.
+      naive_solver.
+    - eapply trace_always_mono; last apply Hb. intros tr2. rewrite trace_impliesI => He.
+      eapply trace_eventually_mono; last apply He. intros tr3 Hn. naive_solver.
+    - eapply trace_eventually_mono; last apply Hfairn. intros tr2 Hn.
+      eapply trace_label_mono; last apply Hn. intros l. rewrite /usr_recv_pred_filter /usr_recv_filter.
+      naive_solver.
+  Qed.
+
 End fairness.
 
 Section fuel_fairness.
@@ -289,18 +327,18 @@ Section fuel_fairness.
 
   Notation fuel_trace := (trace LM LM.(lm_lbl)).
 
-  Definition fuel_send_filter msg : LM.(lm_lbl) → Prop :=
-    λ l, ∃ ρ ζ x, l = Take_step ρ (Some $ Send msg : fmaction (joint_model M _)) ζ x.
-  Instance fuel_send_filter_decision msg l : Decision (fuel_send_filter msg l).
+  Definition fuel_send_filter P : LM.(lm_lbl) → Prop :=
+    λ l, ∃ ρ ζ x msg, l = Take_step ρ (Some $ Send msg : fmaction (joint_model M _)) ζ x ∧ P msg.
+  Instance fuel_send_filter_decision P l : Decision (fuel_send_filter P l).
   Proof. apply make_decision. Qed.
 
-  Definition fuel_deliver_filter msg : LM.(lm_lbl) → Prop :=
-    λ l, ∃ x, l = Config_step (Deliver msg : fmconfig (joint_model M _)) x.
-  Instance fuel_deliver_filter_decision msg l : Decision (fuel_deliver_filter msg l).
+  Definition fuel_deliver_filter P : LM.(lm_lbl) → Prop :=
+    λ l, ∃ x msg, l = Config_step (Deliver msg : fmconfig (joint_model M _)) x ∧ P msg.
+  Instance fuel_deliver_filter_decision P l : Decision (fuel_deliver_filter P l).
   Proof. apply make_decision. Qed.
 
-  Definition fuel_network_fair_delivery_of msg : fuel_trace → Prop :=
-    □ (□◊ ℓ↓fuel_send_filter msg → ◊ ℓ↓ fuel_deliver_filter msg).
+  Definition fuel_network_fair_delivery_of P : fuel_trace → Prop :=
+    □ (□◊ ℓ↓fuel_send_filter P → ◊ ℓ↓ fuel_deliver_filter P).
 
   Definition fuel_network_fair_delivery (mtr : fuel_trace) : Prop :=
     ∀ msg, fuel_network_fair_delivery_of msg mtr.
@@ -308,33 +346,33 @@ Section fuel_fairness.
   Lemma fuel_network_fairness_destutter :
     fuel_se fuel_network_fair_delivery jm_network_fair_delivery.
   Proof.
-    apply ltl_se_forall=> msg.
+    apply ltl_se_forall=> P.
     apply ltl_se_always, ltl_se_impl.
     - apply ltl_se_always, ltl_se_eventually_now.
       intros l. rewrite /fuel_send_filter /send_filter. split.
       + intros (?&?&?). simplify_eq. naive_solver.
-      + intros (?&?&?&?). simplify_eq. destruct l=>//. simpl in *. simplify_eq.
-        eexists _, _, _. reflexivity.
+      + intros (?&?&?&?&?&?). simplify_eq. destruct l=>//. simpl in *. simplify_eq.
+        eexists _, _, _, _. naive_solver.
     - apply ltl_se_eventually_now.
       intros l. rewrite /fuel_deliver_filter /deliver_filter. split; first naive_solver.
-      + intros (?&?&?). simplify_eq. destruct l=>//. simpl in *; simplify_eq. naive_solver.
+      + intros (?&?&?&?&?). simplify_eq. destruct l=>//. simpl in *; simplify_eq. naive_solver.
   Qed.
 End fuel_fairness.
 
-Definition ex_send_filter msg : ex_label aneris_lang → Prop :=
-  λ l, sum_map snd id l = inl $ Some $ Send msg.
-Instance ex_send_filter_decision msg l : Decision (ex_send_filter msg l).
+Definition ex_send_filter P : ex_label aneris_lang → Prop :=
+  λ l, ∃ msg, sum_map snd id l = inl $ Some $ Send msg ∧ P msg.
+Instance ex_send_filter_decision P l : Decision (ex_send_filter P l).
 Proof. apply make_decision. Qed.
 
-Definition ex_deliver_filter msg : ex_label aneris_lang → Prop :=
-  λ l, sum_map snd id l = inr $ Deliver msg.
-Instance ex_deliver_filter_decision msg l : Decision (ex_deliver_filter msg l).
+Definition ex_deliver_filter P : ex_label aneris_lang → Prop :=
+  λ l, ∃ msg, sum_map snd id l = inr $ Deliver msg ∧ P msg.
+Instance ex_deliver_filter_decision P l : Decision (ex_deliver_filter P l).
 Proof. apply make_decision. Qed.
-Definition ex_fair_network_of msg : extrace aneris_lang → Prop :=
-  □ (□◊ ℓ↓ex_send_filter msg → ◊ ℓ↓ex_deliver_filter msg).
+Definition ex_fair_network_of P : extrace aneris_lang → Prop :=
+  □ (□◊ ℓ↓ex_send_filter P → ◊ ℓ↓ex_deliver_filter P).
 
 Definition ex_fair_network (extr : extrace aneris_lang) : Prop :=
-  ∀ msg, (extr ⊩ ex_fair_network_of msg).
+  ∀ P, (extr ⊩ ex_fair_network_of P).
 
 Section exec_fairness.
   Context `{LM: LiveModel aneris_lang (joint_model M net_model)}.
@@ -347,25 +385,25 @@ Section exec_fairness.
     apply ltl_tme_always, ltl_tme_impl.
     - apply ltl_tme_always, ltl_tme_eventually, ltl_tme_now.
       intros l1 l2 Hlm. split.
-      + destruct l1 as [[? [|]]|], l2 =>//=; try naive_solver.
-        rewrite /ex_send_filter /=. intros ?. simplify_eq.
+      + rewrite /ex_send_filter /=. intros (?&?&?).
+        destruct l1 as [[? [|]]|], l2 =>//=; try naive_solver.
         destruct Hlm as (?&?&Hlm). apply actions_match_is_eq in Hlm. simplify_eq.
         rewrite /fuel_send_filter. naive_solver.
       + rewrite /fuel_send_filter /ex_send_filter.
-        destruct l1 as [[? ?]|], l2 =>//=; try naive_solver.
-        intros ?. simplify_eq.
+        intros (?&?&?&?&?&?). simplify_eq.
+        destruct l1 as [[? ?]|] =>//=; try naive_solver.
         destruct Hlm as (?&?&Hlm). apply actions_match_is_eq in Hlm. simplify_eq.
-        rewrite /fuel_send_filter. naive_solver.
+        naive_solver.
     - apply ltl_tme_eventually, ltl_tme_now.
       intros l1 l2 Hlm. split.
-      + destruct l1 as [|[| |]], l2 =>//=; try naive_solver.
-        rewrite /ex_deliver_filter /=. intros ?. simplify_eq.
+      + rewrite /ex_deliver_filter /=. intros (?&?&?).
+        destruct l1 as [|[| |]], l2 =>//=; try naive_solver.
         destruct Hlm as (?&Hcm). apply cfg_labels_match_is_eq in Hcm. simplify_eq.
         rewrite /fuel_deliver_filter. naive_solver.
-      + rewrite /ex_deliver_filter /fuel_deliver_filter. intros (?&?). simplify_eq.
+      + rewrite /ex_deliver_filter /fuel_deliver_filter. intros (?&?&?&?). simplify_eq.
         destruct l1 as [[?[|]]|] =>//=; try naive_solver.
         destruct Hlm as [? Hlm].
-        apply cfg_labels_match_is_eq in Hlm. simplify_eq. done.
+        apply cfg_labels_match_is_eq in Hlm. simplify_eq. naive_solver.
   Qed.
 End exec_fairness.
 
@@ -383,7 +421,7 @@ Section fairness.
     jm_network_fair_delivery (trim_trace tr).
   Proof.
     rewrite /jm_network_fair_delivery /jm_network_fair_delivery_of.
-    intros Hf msg. specialize (Hf msg).
+    intros Hf P. specialize (Hf P).
     apply trace_alwaysI. intros tr' Hsuff. rewrite trace_impliesI. intros Hae.
     have Hinf: infinite_trace tr'.
     { by eapply trace_always_eventually_label_infinite. }
@@ -395,12 +433,12 @@ Section fairness.
     specialize (Hf _ Hsuff').
     rewrite trace_impliesI in Hf.
 
-    have Hleq: ltl_equiv (□ ◊ ℓ↓ send_filter msg).
+    have Hleq: ltl_equiv (□ ◊ ℓ↓ send_filter P).
     { apply ltl_tme_always, ltl_tme_eventually, ltl_tme_now. naive_solver. }
 
     ospecialize (Hf _); first by eapply Hleq=>//.
 
-    have {}Hleq: ltl_equiv (◊ ℓ↓ deliver_filter msg).
+    have {}Hleq: ltl_equiv (◊ ℓ↓ deliver_filter P).
     { apply ltl_tme_eventually, ltl_tme_now. naive_solver. }
 
     eapply Hleq=>//.
@@ -451,9 +489,9 @@ Section user_fairness.
     (jmtr ⊩ jm_network_fair_delivery) →
     (jmtr ⊩ jm_network_fair_send_receive).
   Proof.
-    intros Hv Hf msg. apply trace_alwaysI. intros tr' Hsuff.
+    intros Hv Hf P dest_sa Hsa. apply trace_alwaysI. intros tr' Hsuff.
     apply trace_impliesI. intros Hae.
-    specialize (Hf msg).
+    specialize (Hf P).
     rewrite /jm_network_fair_delivery_of trace_alwaysI in Hf. specialize (Hf _ Hsuff).
     rewrite trace_impliesI in Hf. specialize (Hf Hae). clear Hae.
     rewrite trace_impliesI. intros Hae.
@@ -462,15 +500,20 @@ Section user_fairness.
     rewrite trace_eventuallyI in Hf. destruct Hf as (tr1&Hsuff1&Hdel).
     destruct tr1 as [|s1 ℓ1 tr1].
     { rewrite /trace_label /pred_at //= in Hdel. }
-    pose sa := m_destination msg.
-    assert (∃ rest, (buffer_of sa (trfirst tr1) = msg::rest)) as [rest Hbuf1].
+    pose sa := dest_sa.
+    assert (∃ rest msg, buffer_of sa (trfirst tr1) = msg::rest ∧ P msg) as [rest Hbuf1].
     { do 2 eapply trace_always_suffix_of in Hv=>//.
       apply trace_always_elim in Hv. simpl in Hv.
       destruct (trfirst tr1) eqn:Heq. rewrite ltl_sat_def /= Heq in Hv.
       rewrite ltl_sat_def /trace_label /pred_at /deliver_filter /= in Hdel.
+      destruct Hdel as (msg&->&Hmsg).
       inversion Hv as [|???? Hnet|]; simplify_eq.
       inversion Hnet; simplify_eq.
-      eexists. simpl. rewrite lookup_total_insert. done. }
+      rewrite (Hsa _ Hmsg).
+      eexists _, msg. simpl. rewrite lookup_total_insert. done. }
+
+    destruct Hbuf1 as (msg&Hbuf1&Hmsg).
+    have Hsa_msg := Hsa _ Hmsg.
 
     (* Execute unil the next message in the buffer is msg *)
     assert (∃ tr2, trace_suffix_of tr2 tr1 ∧ ∃ pre, buffer_of sa (trfirst tr2) = pre ++ [msg])
@@ -480,7 +523,7 @@ Section user_fairness.
           [eapply trace_suffix_of_cons_l=>// | done]. }
       have {Hbuf1}: ∃ pre, buffer_of sa (trfirst tr1) = pre ++ msg :: rest by exists nil.
       have {Hae}: (□ trace_until (trace_not (ℓ↓ any_recv_filter (m_destination msg))) (ℓ↓ any_recv_filter (m_destination msg))) tr1.
-      { eapply trace_always_suffix_of =>//. eapply trace_suffix_of_cons_l=>//. }
+      { eapply trace_always_suffix_of; last naive_solver. eapply trace_suffix_of_cons_l=>//. }
       clear Hdel Hsuff1.
       revert tr1. induction rest as [|msg' rest IH] using rev_ind.
       { intros tr1 Hae [pre Hbuf1] Hv. exists tr1; split; first apply trace_suffix_of_refl. exists pre=>//. }
@@ -514,7 +557,7 @@ Section user_fairness.
           exists tr3. split=>//; last by exists pre3.
           apply (trace_suffix_of_trans _ tr2)=>//. apply trace_suffix_of_cons_r, trace_suffix_of_refl.
       - have Hbuf':  ∃ pre : list message, buffer_of sa (trfirst tr) = pre ++ msg :: rest ++ [msg'].
-        { eapply not_receive_buffer=>//. }
+        { rewrite /sa -Hsa_msg. eapply not_receive_buffer=>//. naive_solver. }
         odestruct (IHuntil _ Hbuf' _) as (tr2&Hsuff2&pre2&Hbuf2).
         { eapply trace_always_suffix_of=>//. apply trace_suffix_of_cons_r'. }
         { eapply trace_always_suffix_of=>//. apply trace_suffix_of_cons_r'. }
@@ -541,11 +584,12 @@ Section user_fairness.
       + rewrite /sa /= in Hbuf2. rewrite -> Hbuf2 in *. destruct pre2=>//.
       + rewrite /sa /= in Hbuf2. rewrite -> Hbuf2 in *. list_simplifier.
       rewrite /trace_label /pred_at /recv_filter /=. naive_solver.
-    - opose proof (not_receive_buffer Hbuf2 _ Hnot).
+    - rewrite /sa -Hsa_msg in Hbuf2 Hnot.
+      opose proof (not_receive_buffer Hbuf2 _ Hnot).
       { eapply trace_always_suffix_of; last done.
         eapply (trace_suffix_of_trans _ tr1) =>//.
         by eapply trace_suffix_of_cons_l. }
-      apply IH=>//. by eapply trace_suffix_of_cons_l.
+      apply IH=>//. by eapply trace_suffix_of_cons_l. naive_solver.
   Qed.
 
   Proposition network_fairness_project_usr (jmtr: jmtrace) (utr: lts_trace M) :
@@ -554,14 +598,15 @@ Section user_fairness.
     (jmtr ⊩ jm_network_fair_delivery) →
     (utr ⊩ usr_network_fair_send_receive).
   Proof.
-    move=> Hval ? /network_fairness_user Hf // msg. specialize (Hf Hval msg).
-    have Hse //: ltl_se_env (M := M) (jm_network_fair_send_receive_of msg) (usr_network_fair_send_receive_of msg);
+    move=> Hval ? /network_fairness_user Hf // P dest_sa Hsa. specialize (Hf Hval P dest_sa Hsa).
+    have Hse //: ltl_se_env (M := M) (jm_network_fair_send_receive_of P dest_sa Hsa) (usr_network_fair_send_receive_of P dest_sa Hsa);
       last by eapply Hse.
     apply ltl_se_always, ltl_se_impl; last apply ltl_se_impl.
-    - apply ltl_se_always, ltl_se_eventually_now. rewrite /send_filter /usr_send_filter.
+    - apply ltl_se_always, ltl_se_eventually_now. rewrite /send_filter /usr_send_pred_filter.
       intros [?|?]; naive_solver.
     - apply ltl_se_always, ltl_se_eventually_now. rewrite /any_recv_filter /usr_any_recv_filter.
       intros [?|?]; naive_solver.
-    - apply ltl_se_eventually_now. rewrite /recv_filter /usr_recv_filter. intros [?|?]; naive_solver.
+    - apply ltl_se_eventually_now. rewrite /recv_filter /usr_recv_pred_filter. intros [?|?]; naive_solver.
   Qed.
+
 End user_fairness.
