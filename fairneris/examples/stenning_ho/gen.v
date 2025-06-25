@@ -8,7 +8,7 @@ From fairneris.examples Require Import stenning_ho_model.
 From fairneris.aneris_lang Require Import proofmode.
 From fairneris.aneris_lang.state_interp Require Import state_interp state_interp_events.
 From fairneris.aneris_lang.program_logic Require Import aneris_weakestpre.
-From fairneris.aneris_lang.lib Require Import list_code serialization_code.
+From fairneris.aneris_lang.lib Require Import serialization_code.
 From fairneris.lib Require Import gen_heap_light.
 
 Definition new_gen : val :=
