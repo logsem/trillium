@@ -1226,20 +1226,15 @@ Section StrongAdequacyHelpers.
   (H1 : ∀ e2 : expr Λ, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2)
   (δ'' : M)
   (ℓ : mlabel M):
-    rel_always_holds_with_trace_inv s trace_inv Φs ξ
-              (es, σ) δ -∗
-          trace_inv ex atr  -∗
-          state_interp (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')  -∗
-             (wptp s c'.1
-               (all_posts tp es Φs ++
-                ((λ '(tnew, e), post (locale_of tnew e)) <$>
-                 prefixes_from tp (drop (length tp) c'.1))))  -∗
-            fupd_to_bupd ⊤ -∗
-          ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
+      rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
+      trace_inv ex atr  -∗
+      state_interp (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')  -∗
+      (wptp s c'.1 (all_posts c'.1 es Φs))  -∗
+      fupd_to_bupd ⊤ -∗
+      ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
   Proof using.
     iIntros "Hstep HTI HSI WPS FB".
     iPoseProof (wptp_of_val_post with "WPS") as "WPS".
-    (* iMod (pre_step_elim with "HSI WPS") as "[HSI [POSTS WPS']]". *)
     iPoseProof (pre_step_elim with "HSI WPS") as "foo".
 
     rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
@@ -1263,11 +1258,8 @@ Section StrongAdequacyHelpers.
       rewrite !firstn_firstn in Hstep.
       subst c.
       rewrite !min_l in Hstep; [done|simpl; lia].
-    -
+    - 
       subst c.
-      opose proof (locales_rewrite _ _ _ _ Htake Htakelen _ _ Hstep) as Hlocales.
-      rewrite -app_assoc Hlocales.
-      
       rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
       iApply except_0_later.
       (* iModIntro. *)
@@ -1275,7 +1267,6 @@ Section StrongAdequacyHelpers.
       iApply "FB".
 
       iDestruct ("H" with "POSTS") as "[? Hξ]".
-      (* unshelve iApply fupd_mask_weaken; [exact ∅| done| ]. *)
       iMod ("Hξ" with "[HTI]") as "%".
       + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
                  [-> ->]%trace_contract_of_extend); done.
@@ -1412,8 +1403,6 @@ Section StrongAdequacyHelpers.
     iSpecialize ("IHlen" with "Hstep HTI").
     remember (((λ '(tnew, e), post (locale_of tnew e)) <$>
                        prefixes_from tp (drop (length tp) c'.1))) as foo.
-    
-    (* iClear "HTI Hstep". *) 
     rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
     iApply except_0_later.
     iApply bupd_elim.
@@ -1454,7 +1443,10 @@ Section StrongAdequacyHelpers.
     { by rewrite -Hc1 in Htakelen. }
     { iDestruct "Hback" as "[X Y]".
       iSpecialize ("Y" with "X").
-      rewrite -Hc1. done. }
+      subst c. rewrite Hc1 in Hstep. 
+      opose proof (locales_rewrite _ _ _ _ Htake Htakelen _ _ _) as Hlocales.
+      { rewrite <- surjective_pairing. eauto. }
+      by rewrite -app_assoc Hlocales. }
     iFrame "#∗".
     iSplitL "HTI". 
     + iIntros (???? [-> ->]%trace_contract_of_extend
