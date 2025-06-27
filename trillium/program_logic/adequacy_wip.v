@@ -1192,21 +1192,24 @@ Section StrongAdequacyHelpers.
     (let i := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ in
      wptp s c1.1 (all_posts c1.1 es Φs)).
 
+  Lemma f2b_helper `{invGS_gen HasNoLc Σ} E1 E2 P
+    {PLAIN: Plain P}:
+    fupd_to_bupd E1 -∗ (|={E1, E2}=> fupd_to_bupd E2 -∗ ▷ P) -∗ ▷ P.
+  Proof using.
+    iIntros "FB X".
+    rewrite {1}fupd_to_bupd_unfold. rewrite /fupd_to_bupd_aux.
+    iApply except_0_later.
+    iApply bupd_elim.
+    iApply "FB".
+    done.
+  Qed.
+
   Lemma ref_preserved'
-    (s : stuckness)
-    (es : list (expr Λ))
-    (σ : state Λ)
-    (δ : M)
+    (s : stuckness) (es : list (expr Λ)) (σ : state Λ) (δ : M)
     (Hinv : invGS_gen HasNoLc Σ)
     (Φs : list (val Λ → iProp Σ))
-  (i :=
-    {|
-      iris_invGS := Hinv;
-      state_interp := stateI;
-      fork_post := post
-    |} : irisG Λ M Σ)
-  (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ))
-  (atr : auxiliary_trace M)
+    (i := {| iris_invGS := Hinv; state_interp := stateI;fork_post := post |} : irisG Λ M Σ)
+    ex atr
   (Hv : valid_system_trace ex atr)
   (Hex : trace_starts_in ex (es, σ))
   (Hatr : trace_starts_in atr δ)
@@ -1215,7 +1218,6 @@ Section StrongAdequacyHelpers.
   (Hc1 : (tp, σ1') = trace_last ex)
   (Htake : locales_equiv es (take (length es) tp))
   (Htakelen : length es ≤ length tp)
-  (Hlen : length tp ≥ 1)
   (Hξ' : ξ ex atr)
   (c : cfg Λ)
   (oζ : olocale Λ)
@@ -1227,22 +1229,20 @@ Section StrongAdequacyHelpers.
   (δ'' : M)
   (ℓ : mlabel M):
       rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-      trace_inv ex atr  -∗
-      state_interp (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')  -∗
-      (wptp s c'.1 (all_posts c'.1 es Φs))  -∗
+      strong_adeq_tr_res Hinv s es Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') -∗
       fupd_to_bupd ⊤ -∗
       ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
   Proof using.
-    iIntros "Hstep HTI HSI WPS FB".
+    iIntros "Hstep (HSI & HTI & WPS) FB". simpl. 
     iPoseProof (wptp_of_val_post with "WPS") as "WPS".
+    replace stateI with state_interp by done.
     iPoseProof (pre_step_elim with "HSI WPS") as "foo".
+    rewrite /steps_from_inv. simpl.
+    iSpecialize ("HTI" with "[] []").
+    1, 2: by iPureIntro; red; eauto.
 
-    rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
-    iApply except_0_later.
-    iApply bupd_elim.
-    iApply "FB".
-    iMod "foo" as "[HSI [POSTS WPS']]". iModIntro.
-    iIntros "FB".     
+    iApply (f2b_helper with "[$]"). 
+    iMod "foo" as "[HSI [POSTS WPS']]". iModIntro. iIntros "FB".     
 
     iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI") as "H"; [iPureIntro..|].
     - eapply valid_system_trace_extend; eauto.
@@ -1258,14 +1258,8 @@ Section StrongAdequacyHelpers.
       rewrite !firstn_firstn in Hstep.
       subst c.
       rewrite !min_l in Hstep; [done|simpl; lia].
-    - 
-      subst c.
-      rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
-      iApply except_0_later.
-      (* iModIntro. *)
-      iApply bupd_elim.
-      iApply "FB".
-
+    - subst c.
+      iApply (f2b_helper with "[$]"). 
       iDestruct ("H" with "POSTS") as "[? Hξ]".
       iMod ("Hξ" with "[HTI]") as "%".
       + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
@@ -1283,6 +1277,54 @@ Section StrongAdequacyHelpers.
             ∧ locales_equiv es (take (length es) c1.1)
               ∧ length es ≤ length c1.1.
 
+  Lemma get_current_facts
+    s es σ δ
+    (* (Hes : length es ≥ 1) *)
+    (Hinv : invGS_gen HasNoLc Σ)
+    (Φs : list (val Λ → iProp Σ))
+  (i :=
+    {|
+      iris_invGS := Hinv;
+      state_interp := stateI;
+      fork_post := post
+    |} : irisG Λ M Σ)
+  (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ))
+  (atr : auxiliary_trace M)
+  (Hextras : tr_extras es σ δ ex atr):
+
+  rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
+  strong_adeq_tr_res Hinv s es Φs ex atr ={⊤}=∗
+  ▷ ⌜ξ ex atr⌝ ∗
+  rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ ∗
+  strong_adeq_tr_res Hinv s es Φs ex atr ∗
+  ⌜ ∀ e, e ∈ (trace_last ex).1 → s = NotStuck → not_stuck e (trace_last ex).2 ⌝.
+  Proof using.
+    iIntros "Hstep PRE". iDestruct "PRE" as "(HSI & HTI & Htp)".
+    destruct Hextras as (Hv & Hex & Hatr & Hξ & Htake & Htakelen).
+
+    iPoseProof (wptp_not_stuck _ _ _ _ _ _ [] with "[$HSI] Htp") as "Htp";
+      [apply locales_equiv_refl| | |].
+    { by eapply valid_system_trace_valid_exec_trace. }
+    { list_simplifier. rewrite <- surjective_pairing. apply trace_ends_in_last. }
+    iMod ("Htp") as "(HSI & Htp & %Hnstk)".
+
+    iApply fupd_plain_keep_l. iSplitR.
+    2: { by iFrame. }
+      
+    iIntros "(Hstep & PRE & _)".
+    iDestruct "PRE" as "(HSI & HTI & Htp)".
+      
+      iPoseProof (wptp_of_val_post with "Htp") as "Htp".
+      replace stateI with state_interp by done.
+      iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
+      iDestruct ("Htp") as "(Hpost & Hback)".
+      
+      iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; eauto.
+      iApply fupd_plain_mask.
+      iMod ("Hξ" with "HTI") as "%"; auto.
+  Qed.
+
+
   Lemma strong_adequacy_trace
     s
     es σ δ
@@ -1298,72 +1340,54 @@ Section StrongAdequacyHelpers.
   (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ))
   (atr : auxiliary_trace M)
   (c1 := trace_last ex)
-
-  (Hlen : length c1.1 ≥ 1)
   (Hextras : tr_extras es σ δ ex atr):
-
     config_wp -∗ 
     rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
     strong_adeq_tr_res _ s es Φs ex atr
     -∗
-    |={⊤, ⊤}=> fupd_to_bupd ⊤ -∗ Gsim Σ M s ξ ex atr.
-  Proof using. 
+    |={⊤}=> fupd_to_bupd ⊤ -∗ Gsim Σ M s ξ ex atr.
+  Proof using.
     iIntros "#config_wp Hstep PRE". 
     subst c1. 
-    iLöb as "IH" forall (ex atr Hextras Hlen) "PRE".
-    iDestruct "PRE" as "(HSI & HTI & Htp)".
-  
+    iLöb as "IH" forall (ex atr Hextras) "PRE".
     destruct Hextras as (Hv & Hex & Hatr & Hξ & Htake & Htakelen).
 
     remember (trace_last ex) as c1 eqn:Hc1. 
+    assert (valid_exec ex) as Hexv.
+    { by eapply valid_system_trace_valid_exec_trace. }
 
-  rewrite {2}/Gsim (fixpoint_unfold (Gsim_pre _ _ _ _) _ _).
-  destruct c1 as [tp σ1'].
-  assert (valid_exec ex) as Hexv.
-  { by eapply valid_system_trace_valid_exec_trace. }
-  iPoseProof (wptp_not_stuck _ _ _ _ _ _ [] with "[$HSI] Htp") as "Htp";
-    [apply locales_equiv_refl|done| |].
-  { list_simplifier.
-    rewrite <- surjective_pairing. apply trace_ends_in_last. }  
+    iMod (get_current_facts with "[$] [$]") as "(Hξ & Hstep & PRE & %NSTUCK)".
+    { repeat split; auto. } 
 
-  iMod ("Htp") as "(HSI & Htp & %Hnstk)".
-  rewrite (last_eq_trace_ends_in _ (tp, σ1')) in Hnstk; last done.
-  iPoseProof (wptp_of_val_post with "Htp") as "Htp".
-  iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
-  iDestruct ("Htp") as "(Hpost & Hback)".
+    iDestruct "PRE" as "(HSI & HTI & Htp)".
+    replace stateI with state_interp by done.
 
-  iAssert (|={⊤}=> ▷ ⌜ξ ex atr⌝ ∗ (_ ∗ _ ∗ _ ∗ _))%I with "[Hstep HTI HSI Hpost]"
-    as ">[Hξ (HSI & Hpost & HTI & Hstep)]".
-  { iClear "IH config_wp".
-    clear Htakelen Hlen Hexv.
-    iCombine "HTI" "Hstep" as "HS".
-    iCombine "Hpost" "HS" as "HS".
-    iCombine "HSI" "HS" as "HS".
-    iApply fupd_plain_keep_l; iSplitR; [|iExact "HS"].
-    iIntros "(HSI & Hpost & HTI & Hstep)".
-    rewrite -Hc1. 
-    iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
-    { by rewrite Hc1. }
-    iApply fupd_plain_mask.
-    iMod ("Hξ" with "HTI") as "%"; auto. }
+    rewrite {2}/Gsim (fixpoint_unfold (Gsim_pre _ _ _ _) _ _).
+    destruct c1 as [tp σ1'].
+    
+    (* TODO: wrap this into a lemma? *)
+    (** lemma starts *)
+    iPoseProof (wptp_of_val_post with "Htp") as "Htp".
+    iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
+    iDestruct ("Htp") as "(Hpost & Hback)".
 
-  iAssert (□ (stateI ex atr -∗
-             (∀ ex' atr' oζ ℓ,
-                 ⌜trace_contract ex oζ ex'⌝ →
-                 ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-                 ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I as "#HTIextend".
-  { rewrite -Hc1.
-    iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[#Hext _]";
-      auto.
-    { by rewrite Hc1. }
-    iModIntro.
-    iIntros "HSI HTI".
-    iApply ("Hext" with "[$HSI $HTI]"). }
-
-  iMod ("HTIextend" with "HSI HTI") as "[HSI HTI]".
-  iClear "HTIextend".
-
-  iDestruct ("Hback" with "Hpost") as "Htp".
+    iAssert (□ (stateI ex atr -∗ steps_from_inv ex atr
+                ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I
+      as "#HTIextend".
+    { rewrite -Hc1.
+      iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[#Hext _]";
+        auto.
+      { iPureIntro. rewrite Hc1. intros. eapply NSTUCK; eauto. }
+      { by rewrite Hc1. }
+      iModIntro.
+      iIntros "HSI HTI".
+      iApply ("Hext" with "[$HSI $HTI]"). }
+    
+    iMod ("HTIextend" with "HSI HTI") as "[HSI HTI]".
+    iClear "HTIextend".
+    iDestruct ("Hback" with "[$]") as "Htp".
+    (** lemma ends *)
+    
   iModIntro. 
   iIntros "HFtB".
   iNext; iSplit; first done.
@@ -1373,59 +1397,42 @@ Section StrongAdequacyHelpers.
   opose proof (trace_ends_in_inj ex c (tp, σ1') Hc _).
   { rewrite Hc1. apply trace_ends_in_last. }
 
-  iPoseProof (take_step with "config_wp HSI Htp") as "Hstp"; [done|done| |].
-  { rewrite -Hc1. subst. eauto. }
+  iPoseProof (take_step with "config_wp HSI [Htp]") as "Hstp"; [done|done| ..].
+  { done. }
+  { rewrite -Hc1.
+    simpl. rewrite H0. simpl.
+    subst. eauto. }
 
   assert (∃ n, n = trace_length ex) as [n Hn] by eauto.
   rewrite -Hn. clear Hn.
 
-  rewrite -> fupd_to_bupd_unfold; rewrite /fupd_to_bupd_aux.
-  iApply except_0_later.
-  iApply bupd_elim.
-  iApply "HFtB".
+  iApply (f2b_helper with "[$]"). 
   iMod "Hstp"; simpl.
-  iMod "Hstp".
-  iModIntro.
-  iIntros "HFtB".
-  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
+  iMod "Hstp". iModIntro. iIntros "HFtB".
+
   iNext.
-  iApply except_0_later.
-  iApply bupd_elim.
-  iApply "HFtB".
-  iMod "Hstp".
-  iModIntro.
-  iIntros "HFtB".
+  iApply (f2b_helper with "[$]"). 
+  iMod "Hstp". iModIntro.  iIntros "HFtB".
+
   (* TODO: This should be generalisable in a lemma *)
 
   iInduction n as [|n] "IHlen"; simpl; last first.
   { iClear "config_wp IH".
-
     iSpecialize ("IHlen" with "Hstep HTI").
-    remember (((λ '(tnew, e), post (locale_of tnew e)) <$>
-                       prefixes_from tp (drop (length tp) c'.1))) as foo.
-    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
-    iApply except_0_later.
-    iApply bupd_elim.
-    iApply "HFtB".
+    
+    iApply (f2b_helper with "[$]"). 
     iMod "Hstp".
-    iModIntro.
-    iIntros "HFtB".
-    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
-    iNext.
-    iApply except_0_later.
-    iApply bupd_elim.
-    iApply "HFtB".
-    iMod "Hstp".
-    iModIntro.
-    iIntros "HFtB".
-    rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
-    iApply ("IHlen" with "Hstp"); done. }
-  
-  rewrite (fupd_to_bupd_unfold (∅ : coPset)); rewrite /fupd_to_bupd_aux.
-  iApply except_0_later.
-  iApply bupd_elim.
-  iApply "HFtB".
+    iModIntro. iIntros "HFtB".
 
+    iNext. 
+
+    iApply (f2b_helper with "[$]"). 
+    iMod "Hstp".
+    iModIntro. iIntros "HFtB".
+
+    iApply ("IHlen" with "[$]"); done. }
+
+  iApply (f2b_helper with "[$]"). 
   iMod "Hstp" as "(% & H)".
   iDestruct "H" as (δ'' ℓ) "(HSI & Hpost & Hback)"; simpl in *.
   iSpecialize ("Hback" with "Hpost").
@@ -1433,38 +1440,44 @@ Section StrongAdequacyHelpers.
   replace stateI with state_interp by done.
   iPoseProof (wptp_of_val_post with "Hback") as "Hback".
   iMod (pre_step_elim with "HSI Hback") as "[HSI Hback]".
-  iModIntro.
-  iIntros "HFtB".
+
+  iModIntro. iIntros "HFtB".
  
   iAssert (strong_adeq_tr_res Hinv s es Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') ∗ fupd_to_bupd ⊤ ∗ rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ)%I
     with "[Hstep HSI HTI Hback HFtB]" as "(PRE' & HFtB & Hstep)".
-  { iPoseProof (ref_preserved' with "[$] [$] [$] [Hback] [$]") as "#Hextend"; eauto.
+  { iPoseProof (ref_preserved' with "[$] [HSI HTI Hback] [$]") as "#Hextend"; eauto.
     { by rewrite -Hc1 in Htake. } 
-    { by rewrite -Hc1 in Htakelen. }
-    { iDestruct "Hback" as "[X Y]".
+    (* { by rewrite -Hc1 in Htakelen. } *)
+    { rewrite -Hc1 in Htakelen. simpl in *. lia. }
+    { iFrame. iSplitL "HTI".
+      { rewrite /steps_from_inv. 
+        by iIntros "*" ([->->]%trace_contract_of_extend [->->]%trace_contract_of_extend). }        
+        
+      iDestruct "Hback" as "[X Y]".
       iSpecialize ("Y" with "X").
       subst c. rewrite Hc1 in Hstep. 
       opose proof (locales_rewrite _ _ _ _ Htake Htakelen _ _ _) as Hlocales.
       { rewrite <- surjective_pairing. eauto. }
-      by rewrite -app_assoc Hlocales. }
+      
+      simpl.
+      rewrite -app_assoc.
+      rewrite -Hc1 in Hlocales.
+      by rewrite Hlocales. }
+    
     iFrame "#∗".
     iSplitL "HTI". 
     + iIntros (???? [-> ->]%trace_contract_of_extend
                   [-> ->]%trace_contract_of_extend); done.
     + unshelve opose proof (locales_rewrite _ _ _ _ Htake Htakelen _ _ _) as Hlocales.
       4: { rewrite <- surjective_pairing. rewrite -Hc1 -H0. eauto. }
-      rewrite -Hc1. rewrite -Hc1 in Hlocales. 
+      rewrite -Hc1 in Hlocales.
       subst c. 
       rewrite -app_assoc Hlocales //.
       iDestruct "Hback" as "(Hpost & Hwptp)". by iApply "Hwptp". }
  
   iExists _, _.
-  rewrite -> (fupd_to_bupd_unfold (⊤ : coPset)); rewrite /fupd_to_bupd_aux.
-  iApply except_0_later.
-  iApply bupd_elim.
-
-  iApply "HFtB".
-  iMod ("IH" with "[] [] [$] PRE'") as "IH'".
+  iApply (f2b_helper with "[$]"). 
+  iMod ("IH" with "[] [$] PRE'") as "IH'".
   - iPureIntro; split_and!.
     + eapply valid_system_trace_extend; eauto.
     + eapply trace_extend_starts_in; eauto.
@@ -1481,8 +1494,6 @@ Section StrongAdequacyHelpers.
       rewrite -Hc1 in Htakelen. simpl in *. lia. 
     + eapply step_tp_length in Hstep. subst c.
       rewrite -Hc1 in Htakelen. simpl in *. lia. 
-  - iPureIntro. pose proof (step_tp_length _ _ _ Hstep). 
-    subst c. simpl in *. lia.
   - iModIntro. iIntros "HFtB". iNext. iApply "IH'"; done.
   Qed.
 
@@ -1547,8 +1558,8 @@ Proof.
   { symmetry. eapply last_eq_trace_ends_in. apply Hextras. }
   rewrite Hlast. 
   iApply (strong_adequacy_trace with "[$] [$]").
-  4: { iFrame "#∗". }
-  1,2: try rewrite -Hlast; tauto.
+  3: { iFrame "#∗". }
+  { tauto. }
   destruct Hextras as (?&?&?&?&?&?&?).
   split_and !; try by eauto.
   all: set_solver.
