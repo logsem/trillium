@@ -1015,11 +1015,7 @@ Definition all_posts `{irisG Λ M Σ} (tp: list (expr Λ)) es
 (* TODO: can tp and es actually be different? *)
 Definition cur_posts_multiple `{irisG Λ M Σ} (tp: list (expr Λ)) es
   (Φs: list (val Λ → iProp Σ)): iProp Σ :=
-  posts_of tp
-    (* (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> *)
-    (*           prefixes_from es (drop (length es) tp))) *)
-           (all_posts tp es Φs)
-.
+  posts_of tp (all_posts tp es Φs).
 
 Definition rel_always_holds `{!irisG Λ M Σ}
            (s:stuckness) Φs
@@ -1034,35 +1030,9 @@ Definition rel_always_holds `{!irisG Λ M Σ}
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
          ⌜locales_equiv c1.1 (take (length c1.1) c.1)⌝ -∗
          state_interp ex atr -∗
-         (* posts_of c.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from c1.1 (drop (length c1.1) c.1)))) *)
          cur_posts_multiple c.1 c1.1 Φs
          -∗
          |={⊤, ∅}=> ⌜ξ ex atr⌝).
-
-(* Definition rel_always_holds_trace_with_trace_inv `{!irisG Λ M Σ} *)
-(*            (s:stuckness) trace_inv Φs *)
-(*            (ξ : execution_trace Λ → auxiliary_trace M → Prop) *)
-(*            (* (c1:cfg Λ) (c2:M) *)            *)
-(*   : iProp Σ := *)
-(*   (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M)  *)
-(*      (* (c : cfg Λ) *) *)
-(*      (c := trace_last ex) *)
-(*     , *)
-(*          ⌜valid_system_trace ex atr⌝ -∗ *)
-(*          (* ⌜trace_starts_in ex c1⌝ -∗ *) *)
-(*          (* ⌜trace_starts_in atr c2⌝ -∗ *) *)
-(*          (* ⌜trace_ends_in ex c⌝ -∗ *) *)
-(*          ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗ *)
-(*          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗ *)
-(*          ⌜locales_equiv c1.1 (take (length c1.1) c.1)⌝ -∗ *)
-(*          state_interp ex atr -∗ *)
-(*          cur_posts_multiple c.1 c1.1 Φs -∗ *)
-(*          □ (state_interp ex atr ∗ *)
-(*              (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr') *)
-(*             ={⊤}=∗ state_interp ex atr ∗ trace_inv ex atr) ∗ *)
-(*          ((∀ ex' atr' oζ ℓ, *)
-(*               ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr') *)
-(*           ={⊤, ∅}=∗ ⌜ξ ex atr⌝)). *)
 
 Definition rel_always_holds_with_trace_inv `{!irisG Λ M Σ}
            (s:stuckness) trace_inv Φs
@@ -1161,13 +1131,6 @@ Section StrongAdequacyHelpers.
    prefixes_from tp (drop (length tp) c'.1)) =
   (λ '(tnew, e), fork_post (locale_of tnew e)) <$>
   prefixes_from es (drop (length es) c'.1).
-
-  (* ((λ '(tnew, e), R tnew e) <$> *)
-  (*  prefixes_from es (drop (length es) tp)) ++ *)
-  (* ((λ '(tnew, e), R tnew e) <$> *)
-  (*  prefixes_from tp (drop (length tp) c'.1)) = *)
-  (* (λ '(tnew, e), R tnew e) <$> *)
-  (* prefixes_from es (drop (length es) c'.1). *)
   Proof using.
     rewrite -fmap_app. apply locales_of_list_from_fork_post. rewrite fmap_app.
     apply locale_step_equiv in Hstep.
@@ -1183,7 +1146,7 @@ Section StrongAdequacyHelpers.
     eauto.
   Qed.
 
-  Definition strong_adeq_tr_res
+  Definition cur_tr_repr
     (Hinv : invGS_gen HasNoLc Σ)    
     s es Φs ex atr: iProp Σ :=
     let c1 := trace_last ex in 
@@ -1229,7 +1192,7 @@ Section StrongAdequacyHelpers.
   (δ'' : M)
   (ℓ : mlabel M):
       rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-      strong_adeq_tr_res Hinv s es Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') -∗
+      cur_tr_repr Hinv s es Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') -∗
       fupd_to_bupd ⊤ -∗
       ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
   Proof using.
@@ -1293,10 +1256,10 @@ Section StrongAdequacyHelpers.
   (Hextras : tr_extras es σ δ ex atr):
 
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-  strong_adeq_tr_res Hinv s es Φs ex atr ={⊤}=∗
+  cur_tr_repr Hinv s es Φs ex atr ={⊤}=∗
   ▷ ⌜ξ ex atr⌝ ∗
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ ∗
-  strong_adeq_tr_res Hinv s es Φs ex atr ∗
+  cur_tr_repr Hinv s es Φs ex atr ∗
   ⌜ ∀ e, e ∈ (trace_last ex).1 → s = NotStuck → not_stuck e (trace_last ex).2 ⌝.
   Proof using.
     iIntros "Hstep PRE". iDestruct "PRE" as "(HSI & HTI & Htp)".
@@ -1415,7 +1378,7 @@ Section StrongAdequacyHelpers.
   (Hextras : tr_extras es σ δ ex atr):
     config_wp -∗ 
     rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-    strong_adeq_tr_res _ s es Φs ex atr
+    cur_tr_repr _ s es Φs ex atr
     -∗
     |={⊤}=> fupd_to_bupd ⊤ -∗ Gsim Σ M s ξ ex atr.
   Proof using.
@@ -1495,7 +1458,7 @@ Section StrongAdequacyHelpers.
 
   iModIntro. iIntros "HFtB".
  
-  iAssert (strong_adeq_tr_res Hinv s es Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') ∗ fupd_to_bupd ⊤ ∗ rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ)%I
+  iAssert (cur_tr_repr Hinv s es Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') ∗ fupd_to_bupd ⊤ ∗ rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ)%I
     with "[Hstep HSI HTI Hback HFtB]" as "(PRE' & HFtB & Hstep)".
   { iPoseProof (ref_preserved' with "[$] [HSI HTI Hback] [$]") as "#Hextend"; eauto.
     { by rewrite -Hc1 in Htake. } 
@@ -2112,98 +2075,3 @@ Proof.
   iIntros (?). iMod Hwp as (? ? ? ?) "(?&?&?&?&?)".
   iModIntro. iExists _, _, _, _. iFrame.
 Qed.
-
-(* Corollary wp_adequacy Λ M Σ `{!invGpreS Σ} s e σ δ φ : *)
-(*   (∀ `{Hinv : !invGS_gen HasNoLc Σ}, *)
-(*      ⊢ |={⊤}=> ∃ *)
-(*          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
-(*          (fork_post : locale Λ -> val Λ → iProp Σ), *)
-(*        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in *)
-(*        config_wp ∗ stateI (trace_singleton ([e], σ)) (trace_singleton δ) ∗ *)
-(*        WP e @ s; locale_of [] e; ⊤ {{ v, ⌜φ v⌝ }}) → *)
-(*   adequate s e σ (λ v _, φ v). *)
-(* Proof. *)
-(*   intros Hwp. *)
-(*   pose (ξ := λ ex aux, wp_adequacy_relation Λ M s φ ex aux). *)
-(*   eapply (wp_adequacy_relation_adequacy (M := M) _ _ _ δ φ ξ)=>//. *)
-(*   apply (wp_strong_adequacy Λ M Σ s). *)
-(*   { admit. } *)
-(*   iIntros (?) "". *)
-(*   iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp)". *)
-(*   iModIntro; iExists _, _, _; iFrame. *)
-(*   iIntros (ex atr c Hvlt Hexs Hatrs Hexe Hψ Hnst) "HSI Hposts". *)
-(*   iApply fupd_mask_intro_discard; first done. *)
-(*   (* iPureIntro. *) *)
-(*   (* iSplit. *) *)
-(*   (* {  *) *)
-(*   (* admit.  *) *)
-(*   (* iSplit. *) *)
-(*   (* { *) *)
-(*   iIntros (c' Hc'). *)
-(*   assert (c' = c) as -> by by eapply trace_ends_in_inj. *)
-(*   iSplit; last done. *)
-(*   iIntros (v2 t2 ->). rewrite /= to_of_val /=. *)
-(*   iDestruct "Hposts" as "[% ?]"; done. *)
-(* Qed. *)
-
-(* Local Definition wp_invariance_relation Λ M e1 σ1 t2 σ2 (φ : Prop) *)
-(*       (ex : execution_trace Λ) (atr : auxiliary_trace M) : Prop := *)
-(*   trace_starts_in ex ([e1], σ1) → trace_ends_in ex (t2, σ2) → φ. *)
-
-(* Local Lemma wp_invariance_relation_invariance {Λ M} e1 σ1 δ1 t2 σ2 φ : *)
-(*   continued_simulation *)
-(*     (wp_invariance_relation Λ M e1 σ1 t2 σ2 φ) *)
-(*     (trace_singleton ([e1], σ1)) *)
-(*     (trace_singleton δ1) → *)
-(*   ∀ ex, *)
-(*     valid_exec ex → *)
-(*     trace_starts_in ex ([e1], σ1) → *)
-(*     trace_ends_in ex (t2, σ2) → *)
-(*     φ. *)
-(* Proof. *)
-(*   intros Hsm ex Hex Hexstr Hexend. *)
-(*   eapply simulation_does_continue in Hsm as [atr [? Hatr]]; eauto. *)
-(*   rewrite -> continued_simulation_unfold in Hatr. *)
-(*   destruct Hatr as (Hψ & Hatr); auto. *)
-(* Qed. *)
-
-(* Corollary wp_invariance Λ M Σ `{!invGpreS Σ} s e1 σ1 δ1 t2 σ2 φ : *)
-(*   rel_finitary (wp_invariance_relation Λ M e1 σ1 t2 σ2 φ) → *)
-(*   (∀ `{Hinv : !invGS_gen HasNoLc Σ}, *)
-(*      ⊢ |={⊤}=> ∃ *)
-(*          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ) *)
-(*          (fork_post : locale Λ -> val Λ → iProp Σ), *)
-(*        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in *)
-(*        config_wp ∗ stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗ *)
-(*        WP e1 @ s; locale_of [] e1; ⊤ {{ _, True }} ∗ *)
-(*        (∀ ex atr, *)
-(*            ⌜valid_system_trace ex atr⌝ → *)
-(*            ⌜trace_starts_in ex ([e1], σ1)⌝ → *)
-(*            ⌜trace_starts_in atr δ1⌝ → *)
-(*            ⌜trace_ends_in ex (t2, σ2)⌝ → *)
-(*            stateI ex atr -∗ ∃ E, |={⊤,E}=> ⌜φ⌝)) → *)
-(*   ∀ ex, *)
-(*     valid_exec ex → *)
-(*     trace_starts_in ex ([e1], σ1) → *)
-(*     trace_ends_in ex (t2, σ2) → *)
-(*     φ. *)
-(* Proof. *)
-(*   intros ? Hwp. *)
-(*   apply (wp_invariance_relation_invariance _ _ δ1). *)
-(*   apply (wp_strong_adequacy Λ M Σ s); first done. *)
-(*   iIntros (?) "". *)
-(*   iMod Hwp as (stateI fork_post) "(config_wp & HSI & Hwp & Hφ)". *)
-(*   iModIntro; iExists _, _, _; iFrame. *)
-(*   iIntros (ex atr c Hvlt Hexs Hatrs Hexe Hψ Hnst) "HSI Hposts". *)
-(*   rewrite /wp_invariance_relation. *)
-(*   iAssert ((∀ _ : trace_starts_in ex ([e1], σ1) ∧ trace_ends_in ex (t2, σ2), *)
-(*                  |={⊤}=> ⌜φ⌝)%I) with "[HSI Hφ]" as "H". *)
-(*   { iIntros ([? ?]). *)
-(*     assert (c = (t2, σ2)) as -> by by eapply trace_ends_in_inj. *)
-(*     iDestruct ("Hφ" with "[] [] [] [] HSI") as (E) "Hφ"; [done|done|done|done|]. *)
-(*     iDestruct (fupd_plain_mask with "Hφ") as ">Hφ"; done. } *)
-(*   rewrite -fupd_plain_forall'. *)
-(*   iMod "H". *)
-(*   iApply fupd_mask_intro_discard; first done. *)
-(*   iIntros (Hexs' Hexe'); iApply "H"; done. *)
-(* Qed. *)
