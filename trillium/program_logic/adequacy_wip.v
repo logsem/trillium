@@ -318,6 +318,20 @@ Definition cur_posts_multiple `{irisG Λ M Σ} (tp: list (expr Λ)) es
   (Φs: list (val Λ → iProp Σ)): iProp Σ :=
   posts_of tp (all_posts tp es Φs).
 
+  Definition steps_from_ref {Λ: language} {M: Model}
+    (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+    ex atr := 
+    ∀ (ex' : finite_trace (list (expr Λ) * state Λ) (olocale Λ)) (atr' : auxiliary_trace M) 
+      (oζ : olocale Λ) (ℓ : mlabel M),
+      trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'.
+
+  Definition steps_from_inv `{!irisG Λ M Σ}
+    (trace_inv: execution_trace Λ → auxiliary_trace M → iProp Σ)
+    ex atr: iProp Σ := 
+    ∀ (ex' : finite_trace (list (expr Λ) * state Λ) (olocale Λ)) (atr' : auxiliary_trace M) 
+       (oζ : olocale Λ) (ℓ : mlabel M),
+      ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr'. 
+
 Definition rel_always_holds `{!irisG Λ M Σ}
            (s:stuckness) Φs
            (ξ : execution_trace Λ → auxiliary_trace M → Prop) (c1:cfg Λ)
@@ -327,7 +341,7 @@ Definition rel_always_holds `{!irisG Λ M Σ}
          ⌜trace_starts_in ex c1⌝ -∗
          ⌜trace_starts_in atr c2⌝ -∗
          ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜steps_from_ref ξ ex atr⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
          ⌜locales_equiv c1.1 (take (length c1.1) c.1)⌝ -∗
          state_interp ex atr -∗
@@ -344,13 +358,13 @@ Definition rel_always_holds_with_trace_inv `{!irisG Λ M Σ}
          ⌜trace_starts_in ex c1⌝ -∗
          ⌜trace_starts_in atr c2⌝ -∗
          ⌜trace_ends_in ex c⌝ -∗
-         ⌜∀ ex' atr' oζ ℓ, trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'⌝ -∗
+         ⌜steps_from_ref ξ ex atr ⌝ -∗
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
          ⌜locales_equiv c1.1 (take (length c1.1) c.1)⌝ -∗
          state_interp ex atr -∗
          cur_posts_multiple c.1 c1.1 Φs -∗
          □ (state_interp ex atr ∗
-             (∀ ex' atr' oζ ℓ, ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
+             steps_from_inv trace_inv ex atr
             ={⊤}=∗ state_interp ex atr ∗ trace_inv ex atr) ∗
          ((∀ ex' atr' oζ ℓ,
               ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
@@ -364,16 +378,6 @@ Section StrongAdequacyHelpers.
   Context `{invGpreS Σ}. 
   Context (stateI trace_inv: execution_trace Λ → auxiliary_trace M → iProp Σ). 
   Context (post : locale Λ → val Λ → iProp Σ). 
-
-  Definition steps_from_ref ex atr := 
-    ∀ (ex' : finite_trace (list (expr Λ) * state Λ) (olocale Λ)) (atr' : auxiliary_trace M) 
-      (oζ : olocale Λ) (ℓ : mlabel M),
-      trace_contract ex oζ ex' → trace_contract atr ℓ atr' → ξ ex' atr'.
-
-  Definition steps_from_inv ex atr: iProp Σ := 
-    ∀ (ex' : finite_trace (list (expr Λ) * state Λ) (olocale Λ)) (atr' : auxiliary_trace M) 
-       (oζ : olocale Λ) (ℓ : mlabel M),
-      ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr'. 
 
   Lemma init_st_into_trace 
     s es σ δ
@@ -394,7 +398,7 @@ Section StrongAdequacyHelpers.
       ⌜{tr[ (es, σ) ]} = ex⌝ ∗ ⌜{tr[ δ ]} = atr⌝ ∗
     ⌜(es, σ) = c1⌝ ∗ ⌜δ = δ1⌝ ∗ ⌜length c1.1 ≥ 1⌝ ∗
     stateI ex atr ∗
-    steps_from_inv ex atr ∗
+    steps_from_inv trace_inv ex atr ∗
     wptp s c1.1 (all_posts c1.1 es Φs)
   .
   Proof using. 
@@ -449,10 +453,16 @@ Section StrongAdequacyHelpers.
 
   Definition cur_tr_repr
     (Hinv : invGS_gen HasNoLc Σ)    
+(i :=
+    {|
+      iris_invGS := Hinv;
+      state_interp := stateI;
+      fork_post := post
+    |} : irisG Λ M Σ)
     s es Φs ex atr: iProp Σ :=
     let c1 := trace_last ex in 
     stateI ex atr ∗
-    steps_from_inv ex atr ∗
+    steps_from_inv trace_inv ex atr ∗
     (let i := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ in
      wptp s c1.1 (all_posts c1.1 es Φs)).
 
@@ -537,7 +547,7 @@ Section StrongAdequacyHelpers.
     valid_system_trace ex atr
     ∧ trace_starts_in ex (es, σ)
         ∧ trace_starts_in atr δ
-          ∧ steps_from_ref ex atr
+          ∧ steps_from_ref ξ ex atr
             ∧ locales_equiv es (take (length es) c1.1)
               ∧ length es ≤ length c1.1.
 
@@ -600,7 +610,7 @@ Section StrongAdequacyHelpers.
       fork_post := post
     |} : irisG Λ M Σ):
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-  stateI ex atr -∗ steps_from_inv ex atr -∗
+  stateI ex atr -∗ steps_from_inv trace_inv ex atr -∗
   wptp s (trace_last ex).1 (all_posts (trace_last ex).1 es Φs)
     (* cur_tr_repr _ s es Φs ex atr *)
   ={⊤}=∗
@@ -617,7 +627,7 @@ Section StrongAdequacyHelpers.
     iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
     iDestruct ("Htp") as "(Hpost & Hback)".
     
-    iAssert (□ (stateI ex atr -∗ steps_from_inv ex atr
+    iAssert (□ (stateI ex atr -∗ steps_from_inv _ ex atr
                 ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I
       as "#HTIextend".
     { 
