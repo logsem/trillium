@@ -210,6 +210,10 @@ Section ltl_lemmas.
 
   (** trace_now lemmas *)
 
+  Lemma trace_nowI (P : S → Prop) tr :
+    (tr ⊩ ↓ λ s _, P s ) ↔ P (trfirst (L := L) tr).
+  Proof. rewrite /trace_now /ltl_sat /pred_at /=. destruct tr =>//. Qed.
+
   Definition trfirst_label (tr: trace S L) : option L :=
     match tr with
     | ⟨_⟩ => None
@@ -277,13 +281,6 @@ Section ltl_lemmas.
     (tr ⊩ ◊ P) → (s -[l]-> tr ⊩ ◊ P).
   Proof. intros. by constructor 2. Qed.
 
-  Lemma trace_eventually_idemp (P : trace S L → Prop) (tr : trace S L) :
-    (tr ⊩ ◊◊P) → (tr ⊩ ◊P).
-  Proof.
-    intros Htr. induction Htr using trace_eventually_ind; [done|].
-    apply trace_eventually_cons. done.
-  Qed.
-
   Lemma trace_eventuallyI_alt (P : trace S L → Prop) tr :
     (tr ⊩ ◊ P) ↔ (∃ tr', trace_suffix_of tr' tr ∧ (tr' ⊩ ◊ P)).
   Proof.
@@ -324,6 +321,10 @@ Section ltl_lemmas.
       apply trace_eventuallyI_alt. exists tr'. split=>//.
       by apply trace_eventually_intro.
   Qed.
+
+  Lemma trace_eventually_idemp (P : trace S L → Prop) (tr : trace S L) :
+    (tr ⊩ ◊◊P) ↔ (tr ⊩ ◊P).
+  Proof. rewrite trace_eventuallyI -trace_eventuallyI_alt //. Qed.
 
   Lemma trace_eventually_until (P : trace S L → Prop) (tr : trace S L) :
     (tr ⊩ ◊P) → (tr ⊩ trace_until (trace_not P) P).
@@ -386,13 +387,6 @@ Section ltl_lemmas.
     (s -[l]-> tr ⊩ □ P) → (tr ⊩ □ P).
   Proof.
     intros Htr Htr'. apply Htr. clear Htr. by apply trace_eventually_cons.
-  Qed.
-
-  Lemma trace_always_idemp P (tr : trace S L) :
-    (tr ⊩ □ P) → (tr ⊩ □ □ P).
-  Proof.
-    intros Htr Htr'. induction Htr'; [by apply H|].
-    apply IHHtr'. by apply trace_always_cons in Htr.
   Qed.
 
   Lemma trace_always_elim (P : trace S L → Prop) (tr : trace S L) :
@@ -564,6 +558,10 @@ Section ltl_lemmas.
       apply IHHalways.
       intros Heventually'. apply Heventually. by apply trace_eventually_cons.
   Qed.
+
+  Lemma trace_always_idemp P (tr : trace S L) :
+    (tr ⊩ □ P) ↔ (tr ⊩ □ □ P).
+  Proof. rewrite trace_alwaysI_alt -trace_alwaysI //. Qed.
 
   Lemma trace_eventually_not_not_always (P : trace S L → Prop) :
     (◊ ⫬ P) ⇔ (⫬ □ P).
