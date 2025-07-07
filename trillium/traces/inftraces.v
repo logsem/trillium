@@ -229,6 +229,53 @@ Notation "⟨ s ⟩" := (tr_singl s) : trace_scope.
 Notation "s -[ ℓ ]->  r" := (tr_cons s ℓ r) (at level 33) : trace_scope.
 Open Scope trace.
 
+Section execs_and_traces.
+  Context {S L: Type}.
+
+  CoInductive exec_trace_match: finite_trace S L -> inflist (L * S) -> trace S L -> Prop :=
+  | exec_trace_match_singl ft s: trace_last ft = s -> exec_trace_match ft infnil ⟨s⟩
+  | exec_trace_match_cons ft s ℓ ift tr:
+      exec_trace_match (trace_extend ft ℓ s) ift tr ->
+      exec_trace_match ft (infcons (ℓ, s) ift) (trace_last ft -[ℓ]-> tr).
+
+  CoFixpoint to_trace (s: S) (il: inflist (L * S)) : trace S L :=
+    match il with
+    | infnil => ⟨ s ⟩
+    | infcons (ℓ, s') rest => s -[ℓ]-> (to_trace s' rest)
+    end.
+
+  Lemma to_trace_spec (fl: finite_trace S L) (il: inflist (L * S)):
+    exec_trace_match fl il (to_trace (trace_last fl) il).
+  Proof.
+    revert fl il. cofix CH. intros s il.
+    rewrite (trace_unfold_fold (to_trace _ il)). destruct il as [| [ℓ x]?]; simpl in *.
+    - by econstructor.
+    - econstructor.
+      apply CH.
+  Qed.
+
+  Lemma to_trace_singleton s (il: inflist (L * S)):
+    exec_trace_match (trace_singleton s) il (to_trace s il).
+  Proof. apply to_trace_spec. Qed.
+
+  CoFixpoint from_trace (tr: trace S L): inflist (L * S) :=
+    match tr with
+    | ⟨ s ⟩ => infnil
+    | s -[ℓ]-> tr' => infcons (ℓ, trfirst tr') (from_trace tr')
+    end.
+
+  Lemma from_trace_spec (fl: finite_trace S L) (tr: trace S L):
+    trace_last fl = trfirst tr ->
+    exec_trace_match fl (from_trace tr) tr.
+  Proof.
+    revert fl tr. cofix CH. intros fl tr Heq.
+    rewrite (inflist_unfold_fold (from_trace tr)). destruct tr; simpl in *.
+    - by econstructor.
+    - rewrite -Heq. econstructor. apply CH; done.
+  Qed.
+
+End execs_and_traces.
+
 Section TraceValid.
   Context {St L: Type}.
   Context (trans: St -> L -> St -> Prop). 
@@ -415,54 +462,6 @@ Proof using.
   intros. inversion H. subst. inversion H0. subst.
   constructor; eauto.
 Qed.
-
-
-Section execs_and_traces.
-  Context {S L: Type}.
-
-  CoInductive exec_trace_match: finite_trace S L -> inflist (L * S) -> trace S L -> Prop :=
-  | exec_trace_match_singl ft s: trace_last ft = s -> exec_trace_match ft infnil ⟨s⟩
-  | exec_trace_match_cons ft s ℓ ift tr:
-      exec_trace_match (trace_extend ft ℓ s) ift tr ->
-      exec_trace_match ft (infcons (ℓ, s) ift) (trace_last ft -[ℓ]-> tr).
-
-  CoFixpoint to_trace (s: S) (il: inflist (L * S)) : trace S L :=
-    match il with
-    | infnil => ⟨ s ⟩
-    | infcons (ℓ, s') rest => s -[ℓ]-> (to_trace s' rest)
-    end.
-
-  Lemma to_trace_spec (fl: finite_trace S L) (il: inflist (L * S)):
-    exec_trace_match fl il (to_trace (trace_last fl) il).
-  Proof.
-    revert fl il. cofix CH. intros s il.
-    rewrite (trace_unfold_fold (to_trace _ il)). destruct il as [| [ℓ x]?]; simpl in *.
-    - by econstructor.
-    - econstructor.
-      apply CH.
-  Qed.
-
-  Lemma to_trace_singleton s (il: inflist (L * S)):
-    exec_trace_match (trace_singleton s) il (to_trace s il).
-  Proof. apply to_trace_spec. Qed.
-
-  CoFixpoint from_trace (tr: trace S L): inflist (L * S) :=
-    match tr with
-    | ⟨ s ⟩ => infnil
-    | s -[ℓ]-> tr' => infcons (ℓ, trfirst tr') (from_trace tr')
-    end.
-
-  Lemma from_trace_spec (fl: finite_trace S L) (tr: trace S L):
-    trace_last fl = trfirst tr ->
-    exec_trace_match fl (from_trace tr) tr.
-  Proof.
-    revert fl tr. cofix CH. intros fl tr Heq.
-    rewrite (inflist_unfold_fold (from_trace tr)). destruct tr; simpl in *.
-    - by econstructor.
-    - rewrite -Heq. econstructor. apply CH; done.
-  Qed.
-
-End execs_and_traces.
 
 Definition oleq (a b : option nat) : Prop :=
   match a, b with

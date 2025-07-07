@@ -1,4 +1,3 @@
-From iris.base_logic Require Export gen_heap.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre execution_model.
 
@@ -57,7 +56,6 @@ Section IEM.
   irisG Λ M Σ := {
     state_interp extr auxtr :=
       (⌜em_valid_state_evolution_fairness extr auxtr⌝ ∗
-       (* gen_heap_interp (trace_last extr).2.(heap) ∗ *)
        lgem_si (trace_last extr).2 (lgem_GS0 := iem_phys) ∗
        em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := iem_fairnessGS))%I ;
     fork_post tid := fun _ => em_thread_post tid (em_GS0 := iem_fairnessGS);
