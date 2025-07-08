@@ -247,14 +247,14 @@ Require Import Coq.Logic.Classical.
 Notation stenning_label := (stenning_role * option (action aneris_lang)) % type.
 Notation stenning_trace := (lts_trace stenning_model).
 
-Definition A_at (n : Z) : ltl_pred stenning_model stenning_label := ↓ λ s _, (stenning_get_n s).1 = n.
+Definition A_at (n : Z) : ltl_pred stenning_model (lts_label stenning_model) := ↓ λ s _, (stenning_get_n s).1 = n.
 Definition B_at (n : Z) : ltl_pred stenning_model (lts_label stenning_model) := ↓ λ s _, (stenning_get_n s).2 = n.
-Definition AB_at (n m : Z) : ltl_pred stenning_model stenning_label := A_at n ⋒ B_at m.
+Definition AB_at (n m : Z) : ltl_pred stenning_model (lts_label stenning_model) := A_at n ⋒ B_at m.
 
-Lemma A_at_iff (tr : stenning_trace) (n m : Z):
+Lemma A_at_iff (tr : stenning_trace) (n : Z):
   (tr ⊩ A_at n) ↔ stenning_get_n_A (trfirst tr).1 = n.
 Proof. rewrite trace_nowI //. Qed.
-Lemma B_at_iff (tr : stenning_trace) (n m : Z):
+Lemma B_at_iff (tr : stenning_trace) (n : Z):
   (tr ⊩ B_at n) ↔ stenning_get_n_B (trfirst tr).2 = n.
 Proof. rewrite trace_nowI //. Qed.
 
@@ -357,17 +357,87 @@ Proof.
     destruct stA; simplify_eq; simpl in Hinv; lia.
 Qed.
 
+Lemma A_eventually_sends_if_Sn (utr : stenning_trace) (n : nat) :
+  (utr ⊩ usr_trace_valid) → (trfirst utr) = initial_model_state → (utr ⊩ ◊ A_at (1 + n)) → (utr ⊩ ◊ ↓ λ s _, s.1 = ASending n).
+Proof.
+  intros Hval H0 HSn.
+  destruct (classic (utr ⊩ ◊ ↓ λ s _, s.1 = ASending n)) as [|Hnever]; first done.
+  rewrite -trace_notI -trace_always_not_not_eventually in Hnever.
+  exfalso.
+  have Ha : ¬ (utr ⊩ ⫬ ◊ A_at (1 + n)).
+  { rewrite trace_notI. naive_solver. }
+  trace_push_neg Ha. apply Ha. clear Ha HSn.
+  have Ha : (utr ⊩  □ (⫬ ↓ λ s _, s.1 = ASending n) ⋒ (usr_trans_valid aneris_lang (M := stenning_model))).
+  { rewrite !trace_always_and. split_and!; naive_solver. }
+
+  have Hnr: (utr ⊩ □ ⫬ ↓ λ s _, s.1 = AReceiving n).
+  { eapply trace_always_next.
+    - exact Ha.
+    - rewrite !trace_notI !trace_nowI H0 /=. naive_solver.
+    - intros tr Hst [Hns Hval']%trace_andI Hnf.
+      apply trace_next_elim_inv in Hnf as (s&l&tr'&->&_).
+      apply trace_next_intro.
+      destruct s as [a b] eqn:Heq.
+      destruct (trfirst tr') as [a' b'] eqn:Heq'.
+      rewrite !trace_notI in Hval' Hst *.
+
+      rewrite trace_notI !trace_nowI Heq' /= in Hst Hns *.
+
+      rewrite /trace_now /trace_label /ltl_sat /pred_at /usr_trans_valid Heq' /= in Hval'.
+      inversion Hval'; simplify_eq; naive_solver. }
+
+  clear Ha.
+  have Ha : (utr ⊩  □ (⫬ ↓ λ s _, s.1 = AReceiving n) ⋒ (usr_trans_valid aneris_lang (M := stenning_model))).
+  { rewrite !trace_always_and. split_and!; naive_solver. }
+
+  eapply trace_always_next.
+    - exact Ha.
+    - rewrite !trace_notI !trace_nowI H0 /=. lia.
+    - intros tr Hst [Hns Hval']%trace_andI Hnf.
+      apply trace_next_elim_inv in Hnf as (s&l&tr'&->&_).
+      apply trace_next_intro.
+      destruct s as [a b] eqn:Heq.
+      destruct (trfirst tr') as [a' b'] eqn:Heq'.
+      rewrite !trace_notI in Hval' Hst *.
+
+      rewrite trace_notI !trace_nowI Heq' /= in Hst Hns *.
+
+      rewrite /trace_now /trace_label /ltl_sat /pred_at /usr_trans_valid Heq' /= in Hval'.
+      rewrite /stenning_get_n_A.
+      inversion Hval'; simplify_eq; try naive_solver.
+      have ? : n0 ≠ n by naive_solver. lia.
+Qed.
+
 Lemma A_eventually_sends (utr : stenning_trace) (n : Z) :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
-  (utr ⊩ A_at n) → (utr ⊩ ◊ ℓ↓ usr_send_pred_filter (msg n)).
+  (utr ⊩ ↓ λ s _, s.1 = ASending n) → (utr ⊩ ◊ ℓ↓ usr_send_pred_filter (msg n)).
 Proof.
 Admitted.
+
+Lemma A_eventually_sends_alt (utr : stenning_trace) (n : Z) :
+  (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
+  (utr ⊩ ◊ ↓ λ s _, s.1 = ASending n) → (utr ⊩ ◊ ℓ↓ usr_send_pred_filter (msg n)).
+Proof.
+  intros Hval Hfair Hsend.
+  rewrite trace_eventuallyI in Hsend.
+  destruct Hsend as (tr&Htr&Hsend).
+  rewrite trace_eventuallyI_alt. exists tr. split; first exact Htr.
+  apply A_eventually_sends.
+  - rewrite trace_alwaysI_alt in Hval. naive_solver.
+  - rewrite mtrace_fair_always trace_alwaysI in Hfair. naive_solver.
+  - assumption.
+Qed.
 
 Lemma A_always_eventually_sends (utr : stenning_trace) (n : Z) :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
   (utr ⊩ □ A_at n) → (utr ⊩ □ ◊ ℓ↓ usr_send_pred_filter (msg n)).
 Proof.
-  (* Can we use the above lemma? *)
+  intros Hval Hfair HA.
+  rewrite trace_alwaysI.
+  intros tr1 Htr1.
+  have Hev : (tr1 ⊩ ↓ λ s _, s.1 = ASending n).
+  { admit. }
+  apply A_eventually_sends.
 Admitted.
 
 Lemma A_always_eventually_receives (utr : stenning_trace) :
@@ -568,25 +638,29 @@ Theorem stenning_fair_live (utr : stenning_trace) (i : Z) :
 Proof.
   intros Hi Hinit Hval Hfair Hinv.
 
-  pose i' := (Z.to_nat i : nat).
+  pose i' := (Z.to_nat (1 + i) : nat).
   have Hii: (utr ⊩ ◊ AB_at i' i').
   { apply eventually_n_n; try naive_solver. rewrite AB_at_iff Hinit //=. }
 
   rewrite /i' in Hii.
-  have Heq : (Z.of_nat (Z.to_nat i)) = i by lia.
+  have Heq : (Z.of_nat (Z.to_nat (1 + i))) = (1 + i)%Z by lia.
   rewrite Heq in Hii.
 
   rewrite trace_eventuallyI in Hii.
   destruct Hii as (tr'&Htr'&Hii).
   rewrite trace_andI in Hii.
   destruct Hii as [Hii _].
-  apply A_eventually_sends in Hii.
-  + rewrite /usr_send_pred_filter /msg in Hii.
-    rewrite trace_eventuallyI_alt. exists tr'. split; first naive_solver.
-    eapply trace_eventually_mono; last exact Hii.
-    intros tr.
-    apply trace_label_mono_strong.
-    naive_solver.
-  + rewrite trace_alwaysI_alt in Hval. naive_solver.
-  + rewrite mtrace_fair_always trace_alwaysI in Hfair. naive_solver.
+  suff H: (utr ⊩ ◊ ℓ↓ usr_send_pred_filter (msg i)).
+  { rewrite /usr_send_pred_filter /msg in H.
+    eapply trace_eventually_mono; last exact H.
+    intros tr. apply trace_label_mono_strong. naive_solver. }
+
+  apply A_eventually_sends_alt.
+  + naive_solver.
+  + naive_solver.
+  + have <- : (Z.of_nat (Z.to_nat i)) = i by lia.
+    apply A_eventually_sends_if_Sn; try naive_solver.
+    rewrite trace_eventuallyI. exists tr'. split; first naive_solver.
+    Set Printing Coercions.
+    have <- : (1 + i)%Z = (1 + Z.of_nat (Z.to_nat i))%Z by lia. done.
 Qed.
