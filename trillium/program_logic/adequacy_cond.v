@@ -244,9 +244,7 @@ Section adequacy_helper_lemmas.
     ⌜∀ e2, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
     ∃ δ' ℓ,
       state_interp (trace_extend ex oζ c') (trace_extend atr ℓ δ') ∗
-      posts_of  c'.1 (Φs ++ newposts c.1 c'.1) ∗
-      (posts_of c'.1 (Φs ++ newposts c.1 c'.1) -∗
-        wptp s  c'.1 (Φs ++ newposts c.1 c'.1)).
+      wptp s  c'.1 (Φs ++ newposts c.1 c'.1). 
   Proof.
     iIntros (Hexvalid Hexe Hstep) "config_wp HSI Hc1".
     inversion Hstep as
@@ -299,7 +297,7 @@ Section adequacy_helper_lemmas.
       list_simplifier.
       erewrite newposts_locales_equiv;
         [iFrame | apply locales_equiv_middle; erewrite <-locale_step_preserve =>//].
-      iIntros "H". iSpecialize ("Hc2back" with "H").
+      iDestruct ("Hc2back" with "[$]") as "X". iFrame. 
       rewrite prefixes_from_app //.
     - rewrite /= /config_wp.
       iDestruct ("config_wp" with "[] [] [] HSI") as "Hcfg"; [done|done|done|].
@@ -319,6 +317,7 @@ Section adequacy_helper_lemmas.
       iExists δ2, ℓ.
       rewrite newposts_same_empty. list_simplifier.
       iFrame.
+      by iApply "Hc1back". 
   Qed.
 
 End adequacy_helper_lemmas.
@@ -793,12 +792,11 @@ Section StrongAdequacyHelpers.
 
   iApply (f2b_helper with "[$]"). 
   iMod "Hstp" as "(% & H)".
-  iDestruct "H" as (δ'' ℓ) "(HSI & Hpost & Hback)"; simpl in *.
-  iSpecialize ("Hback" with "Hpost").
+  iDestruct "H" as (δ'' ℓ) "(HSI & Hpost)"; simpl in *.
 
   replace stateI with state_interp by done.
-  iPoseProof (wptp_of_val_post with "Hback") as "Hback".
-  iMod (pre_step_elim with "HSI Hback") as "[HSI Hback]".
+  iPoseProof (wptp_of_val_post with "Hpost") as "Hpost".
+  iMod (pre_step_elim with "HSI Hpost") as "[HSI Hback]".
 
   iModIntro. iIntros "HFtB".
  
