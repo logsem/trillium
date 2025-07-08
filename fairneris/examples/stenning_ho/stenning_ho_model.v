@@ -408,11 +408,82 @@ Proof.
       have ? : n0 ≠ n by naive_solver. lia.
 Qed.
 
+Lemma trace_transI s ℓ tr':
+  (s -[ ℓ ]-> tr' ⊩ usr_trans_valid aneris_lang) →
+  lts_trans stenning_model s ℓ (trfirst tr').
+Proof. rewrite /ltl_sat /trace_label /pred_at /after //. Qed.
+
+Lemma fair_transition_gen ρ (utr : stenning_trace) P :
+  (∀ s1 tr' ℓ, (s1 -[ℓ]-> tr' ⊩ P) → lts_trans stenning_model s1 ℓ (trfirst tr') → ℓ.1 ≠ ρ → (tr' ⊩ P)) →
+  (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) → (utr ⊩ P) →
+  (utr ⊩ ◊ P ⋒ usr_trans_valid aneris_lang ⋒ ℓ↓ λ ℓ, ℓ.1 = ρ).
+Proof.
+  intros HP Hvalid [_ Hfairs] Hn.
+  specialize (Hfairs ρ).
+  rewrite /usr_fair_scheduling_mtr in Hfairs.
+  unfold trace_always_eventually_implies_now in Hfairs.
+  unfold trace_always_eventually_implies in Hfairs.
+  apply trace_always_elim in Hfairs.
+
+  have Hlive : ∀ (s : stenning_model), ρ ∈ usr_live_roles s.
+  { rewrite /usr_live_roles /= /stenning_live_roles. destruct ρ; set_solver. }
+
+  rewrite trace_impliesI in Hfairs. ospecialize (Hfairs _).
+  { rewrite trace_nowI. naive_solver. }
+
+  apply trace_eventually_until in Hfairs.
+  induction Hfairs as [tr Hnow|s [ρ' α] tr Hlater Hh IH].
+  - apply trace_eventually_intro.
+    rewrite /trace_now /trace_label /pred_at /= in Hnow.
+    destruct tr; first naive_solver.
+    destruct Hnow as [Hnow|[α Hnow]]; first naive_solver.
+    simplify_eq. apply trace_always_elim in Hvalid.
+    apply trace_transI in Hvalid.
+    rewrite !trace_andI. split_and!=>//.
+  - apply trace_eventually_cons, IH=>//.
+    + by apply trace_always_cons in Hvalid.
+    + eapply HP=>//.
+      * by apply trace_always_elim, trace_transI in Hvalid.
+      * rewrite /trace_not /trace_now /trace_label /pred_at /= in Hlater. naive_solver.
+Qed.
+
+Lemma fair_transition ρ (utr : stenning_trace) P :
+  (∀ s1 s2 ℓ, P s1 → lts_trans stenning_model s1 ℓ s2 → ℓ.1 ≠ ρ → P s2) →
+  (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) → (utr ⊩ ↓ λ s _, P s) →
+  (utr ⊩ ◊ (↓ λ s _, P s) ⋒ usr_trans_valid aneris_lang ⋒ ℓ↓ λ ℓ, ℓ.1 = ρ).
+Proof.
+  intros HP Hval Hfair Hnow.
+  apply fair_transition_gen=>//.
+  rewrite /trace_now /pred_at /after.
+  intros s1 tr' ℓ Ha Hb Hc.
+  destruct tr'; naive_solver.
+Qed.
+
+Lemma fair_transition_always ρ (utr : stenning_trace) P :
+  (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) → (utr ⊩ □ P) →
+  (utr ⊩ ◊ ((□ P) ⋒ usr_trans_valid aneris_lang ⋒ ℓ↓ λ ℓ, ℓ.1 = ρ)).
+Proof.
+  intros Hval Hfair Hnow.
+  apply fair_transition_gen=>//.
+  intros s1 tr' ℓ Ha Hb Hc.
+  by eapply trace_always_cons.
+Qed.
+
 Lemma A_eventually_sends (utr : stenning_trace) (n : Z) :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
   (utr ⊩ ↓ λ s _, s.1 = ASending n) → (utr ⊩ ◊ ℓ↓ usr_send_pred_filter (msg n)).
 Proof.
-Admitted.
+  intros Hvalid Hfair Hn.
+  apply (fair_transition Arole) in Hn =>//; last first.
+  { move=> [??] [??] [??] /= ->. inversion 1; naive_solver. }
+  eapply trace_eventually_mono; last exact Hn.
+  intros tr [Hsend [Htrans Hrole]%trace_andI]%trace_andI.
+  destruct (trace_label_inv Hrole) as (s&ℓ&tr'&->&Hlab).
+  rewrite trace_labelI /usr_send_pred_filter /msg.
+  rewrite trace_nowI in Hsend.
+  apply trace_transI in Htrans.
+  inversion Htrans; simplify_eq; naive_solver.
+Qed.
 
 Lemma A_eventually_sends_alt (utr : stenning_trace) (n : Z) :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
@@ -433,12 +504,38 @@ Lemma A_always_eventually_sends (utr : stenning_trace) (n : Z) :
   (utr ⊩ □ A_at n) → (utr ⊩ □ ◊ ℓ↓ usr_send_pred_filter (msg n)).
 Proof.
   intros Hval Hfair HA.
-  rewrite trace_alwaysI.
+  rewrite mtrace_fair_always !trace_alwaysI in Hfair *.
+  rewrite !trace_alwaysI_alt in Hval HA.
   intros tr1 Htr1.
-  have Hev : (tr1 ⊩ ↓ λ s _, s.1 = ASending n).
-  { admit. }
-  apply A_eventually_sends.
-Admitted.
+  specialize (Hval _ Htr1).
+  specialize (HA _ Htr1).
+  specialize (Hfair _ Htr1).
+  have Hev : (tr1 ⊩ ◊ ↓ λ s _, s.1 = ASending n).
+  { apply (fair_transition_always Arole) in HA =>//.
+    rewrite trace_eventuallyI in HA.
+    destruct HA as (tr&Htr&HA).
+    rewrite !trace_andI in HA.
+    destruct HA as (HA&Htrans&Hrole).
+    destruct (trace_label_inv Hrole) as ([a b]&ℓ&tr'&->&Heq).
+
+    rewrite trace_alwaysI in HA.
+    have HA' := HA tr' ltac:(apply trace_suffix_of_cons_r').
+    specialize (HA _ ltac:(apply trace_suffix_of_refl)).
+    rewrite !A_at_iff /stenning_get_n_A in HA HA'.
+
+    destruct a as [m|m]; simplify_eq.
+    - rewrite trace_eventuallyI. eexists. split; first exact Htr.
+      rewrite trace_nowI //.
+    - apply trace_transI in Htrans.
+      rewrite trace_eventuallyI. exists tr'. split; first by eapply trace_suffix_of_cons_l.
+      rewrite trace_nowI.
+      inversion Htrans; simplify_eq; try naive_solver.
+      + rewrite -H3 //.
+      + rewrite -H3 /= in HA'. lia. }
+  apply A_eventually_sends_alt=>//.
+  (* - rewrite trace_alwaysI_alt in Hval. naive_solver. *)
+  (* - rewrite mtrace_fair_always trace_alwaysI in Hfair. naive_solver. *)
+Qed.
 
 Lemma A_always_eventually_receives (utr : stenning_trace) :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
@@ -485,8 +582,21 @@ Proof.
   destruct tr1 as [s|s ℓ tr2]; first naive_solver.
   rewrite trace_alwaysI in HB.
   specialize (HB tr2 (trace_suffix_of_cons_r' _ _ _)).
-  admit. (* should follow easily from the transition. *)
-Admitted.
+  apply trace_transI in Hval.
+  rewrite !B_at_iff in HB HB'.
+  rewrite trace_alwaysI in HA.
+  specialize (HA _ Hsuff).
+  rewrite A_at_iff /stenning_get_n_A in HA.
+  rewrite /stenning_get_n_B in HB HB'.
+  rewrite trace_labelI /usr_recv_pred_filter /msg in Htrans.
+  destruct Htrans as (?&?&?&?&?); simplify_eq.
+  simpl in *.
+
+  inversion Hval; simplify_eq; simpl in *; try naive_solver.
+  - unfold good_message in *.
+    naive_solver.
+  - rewrite <- H3 in *. simpl in *. lia.
+Qed.
 
 Lemma B_always_eventually_receives_n (utr : stenning_trace) n :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) → (utr ⊩ □ A_at n) →
@@ -562,13 +672,28 @@ Proof.
   destruct Ha as (tr1&Hsuff&Htrans).
   rewrite trace_alwaysI_alt in HA.
   specialize (HA tr1 Hsuff).
+  have HA' := HA.
   rewrite trace_alwaysI_alt in Hval.
   specialize (Hval tr1 Hsuff).
   destruct tr1 as [|s ℓ tr2]; first naive_solver.
-  rewrite trace_alwaysI in HA.
-  specialize (HA tr2 (trace_suffix_of_cons_r' _ _ _)).
-  admit. (* should follow easily from the transition. *)
-Admitted.
+  rewrite trace_alwaysI in HA'.
+  specialize (HA' tr2 (trace_suffix_of_cons_r' _ _ _)).
+  apply trace_always_elim in HA.
+
+  apply trace_always_elim, trace_transI in Hval.
+  rewrite !A_at_iff in HA HA'.
+  rewrite /stenning_get_n_A in HA HA'.
+  apply trace_always_elim in HB.
+  rewrite B_at_iff /stenning_get_n_B in HB.
+  rewrite trace_labelI /usr_recv_pred_filter /msg in Htrans.
+  destruct Htrans as (?&?&?&?&?); simplify_eq.
+  simpl in *.
+
+  inversion Hval; simplify_eq; simpl in *; try naive_solver.
+  - unfold good_message in *.
+    naive_solver.
+  - rewrite <- H3 in *. simpl in *. lia.
+Qed.
 
 Lemma eventually_increment (utr : stenning_trace) n :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) → (utr ⊩ □ ↓ λ s _, safety_inv s) → (utr ⊩ AB_at n n) →

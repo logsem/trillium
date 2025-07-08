@@ -229,6 +229,14 @@ Section ltl_lemmas.
     - rewrite /trace_now /pred_at /=. intros HPQ Htr. by apply HPQ.
   Qed.
 
+  Lemma trace_label_inv {P : L → Prop} {tr : trace S L} :
+    (tr ⊩ ℓ↓ P) → ∃ s ℓ tr', tr = s -[ℓ]-> tr' ∧ P ℓ.
+  Proof. rewrite /ltl_sat /trace_label /pred_at /after. destruct tr; naive_solver. Qed.
+
+  Lemma trace_labelI {P : L → Prop} {s ℓ} {tr' : trace S L} :
+    (s -[ℓ]-> tr' ⊩ ℓ↓ P) ↔ P ℓ.
+  Proof. rewrite /ltl_sat /trace_label /pred_at /after //. Qed.
+
   Lemma trace_label_mono_strong (P Q : L → Prop) tr :
     (∀ l, trfirst_label tr = Some l → P l → Q l) →
     (tr ⊩ ℓ↓ P) → (tr ⊩ ℓ↓Q).
