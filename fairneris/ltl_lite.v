@@ -182,7 +182,7 @@ Section ltl_lemmas.
   (** trace_or lemmas *)
 
   Lemma trace_orI (P Q : trace S L → Prop) (tr : trace S L) :
-    (tr ⊩ P ⋓ Q) ↔ P tr ∨ Q tr.
+    (tr ⊩ P ⋓ Q) ↔ (tr ⊩ P) ∨ (tr ⊩ Q).
   Proof. done. Qed.
 
   Lemma trace_or_l (P Q : trace S L → Prop) (tr : trace S L) :

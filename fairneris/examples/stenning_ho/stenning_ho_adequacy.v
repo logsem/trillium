@@ -169,7 +169,7 @@ Proof.
       { rewrite //=. lia. }
       { rewrite /locale_of /=. rewrite gset_to_gmap_singleton. iFrame "#∗".
         iDestruct "Hcc" as "[??]".
-        replace (1/2/2)%Qp with (1/4)%Qp by compute_done. iFrame.       
+        replace (1/2/2)%Qp with (1/4)%Qp by compute_done. iFrame.
       }
       iIntros "!>" (v) "H".
       rewrite /locale_of. iFrame.
@@ -186,7 +186,8 @@ Proof.
   eapply program_model_refinement_preserves_upward in Hcs =>//.
 Qed.
 
-Lemma stenning_fair_live_extr extr i :
+Theorem stenning_fair_live_extr extr i :
+  (0 ≤ i)%Z →
   trfirst extr = initial_state →
   extrace_valid extr →
   ex_fair extr →
@@ -195,5 +196,5 @@ Proof.
   intros.
   apply stenning_continued_simulation in H1 as (?&?&?&?&?&?); [|done..].
   eapply program_model_refinement_downward_eventually; [done|].
-  by apply stenning_fair_live.
+  apply stenning_fair_live; try naive_solver.
 Qed.
