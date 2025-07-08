@@ -639,6 +639,58 @@ Section primitive_laws.
     destruct mh. f_equal; set_solver.
   Qed.
 
+  Lemma wp_role_fork s n tid E e Φ (R1 R2 : gmap _ _) (Hdisj: R1 ##ₘ R2) (Hnemp: R1 ∪ R2 ≠ ∅):
+    (n,tid) ↦M++ (R1 ∪ R2) -∗
+    (∀ tid', ▷ ((n,tid') ↦M R2 -∗ WP mkExpr n e @ s; (n,tid'); ⊤ {{ _, (n,tid') ↦M ∅ }})) -∗
+    ▷ ((n,tid) ↦M R1 ={E}=∗ Φ (mkVal n (LitV LitUnit))) -∗
+    WP (mkExpr n (Fork e)) @ s; (n,tid) ; E {{ Φ }}.
+  Proof.
+    iIntros "Htid He HΦ". iApply wp_lift_atomic_head_step; [done|].
+    iIntros (extr auxtr K tp1 tp2 σ1 Hvalex Hexend Hloc) "Hsi".
+    iDestruct "Hsi" as "[Hsi [% Hmi]]".
+    iMod (update_fork_step R1 R2 _
+            (tp1 ++ ectx_language.fill K (mkExpr n (Val $ LitV LitUnit)) :: tp2 ++ [mkExpr n e])
+            _ _ _ (mkExpr _ e) _ σ1 with "Htid Hmi") as
+      (δ2 Hvse) "(Hfuels1 & Hfuels2 & Hmi)".
+    { done. }
+    { done. }
+    { rewrite /trace_ends_in in Hexend. rewrite Hexend. done. }
+    { rewrite -Hloc. rewrite -(language.locale_fill _ _ K).
+      rewrite /trace_ends_in in Hexend. rewrite Hexend.
+      econstructor 1 =>//.
+      apply fill_step, head_prim_step. simpl.
+      replace ([{| expr_n := n; expr_e := e |}]) with (map (mkExpr n) [e]) by done.
+      repeat econstructor. }
+    { done. }
+    { list_simplifier. exists (tp1 ++ fill K (mkExpr n (Val $ LitV LitUnit)) :: tp2).
+      rewrite /trace_ends_in in Hexend. rewrite Hexend.
+      split; first by list_simplifier.
+      apply locales_equiv_middle. simpl.
+      rewrite !ectx_language.locale_fill. simpl. done. }
+    iModIntro. iSplit.
+    { iPureIntro. eexists _, _, _, _. repeat econstructor. }
+    iIntros (α e2 σ2 efs Hstep).
+    have [-> [-> ->]] : σ2 = σ1 ∧ efs = [mkExpr n e] ∧ e2 = mkExpr n $ Val $ LitV LitUnit by inv_head_step.
+    inv_head_step.
+    iIntros "!>".
+    iDestruct "Hsi" as "[Hsi Hauth]".
+    iMod (steps_auth_update _ (S (trace_length extr)) with "Hauth")
+      as "[Hauth _]"; [by eauto|].
+    iMod ("HΦ" with "Hfuels1") as "HΦ". iModIntro. iExists δ2, (Silent_step (n,tid) None).
+    iFrame.
+    iSplitL "Hsi".
+    { iSplitL "Hsi".
+      { rewrite /aneris_state_interp_σ. simpl.
+        rewrite Hexend. simpl.
+        rewrite -message_history_evolution_id. iFrame. }
+      iPureIntro. done. }
+    iSplit; [|done]. iApply "He". list_simplifier.
+    rewrite Hexend. simpl. done.
+    (* ??? *)
+    Unshelve.
+    all: apply ∅.
+  Qed.
+
   Lemma sswp_pure_step s E ζ (e1 e2 : aneris_expr) (Φ : Prop) (Ψ : aneris_expr → option (action aneris_lang) → iProp Σ) :
     PureExec Φ 1 e1 e2 → Φ → ▷ (Ψ e2 None) -∗
     sswp s E ζ e1 Ψ.
