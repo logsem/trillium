@@ -9,9 +9,9 @@ mechanized in the [Coq proof assistant](https://coq.inria.fr/).
 
 - [`trillium/`](trillium/): The Trillium program logic framework
 
-- [`fairis/`](fairneris/): The Fairis instantiation of Trillium for reasoning
-  about fair termination of concurrent programs.
-  + [`aneris_lang/`](fairneris/heap_lang/): HeapLang instantiation with fuel model
+- [`fairneris/`](fairneris/): The Fairneris instantiation of Trillium for reasoning
+  about fair termination of distributed programs.
+  + [`aneris_lang/`](fairneris/aneris_lang/): HeapLang instantiation with fuel model
   + [`examples/`](fairneris/examples/): Examples and case studies
 
 - [`external/`](external/): External dependencies
