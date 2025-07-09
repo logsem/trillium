@@ -31,59 +31,6 @@ Section measure.
   Definition jm_fair_scheduling (mtr : jmtrace) : Prop :=
     ∀ ρ, (mtr ⊩ jm_fair_scheduling_mtr ρ).
 
-  Fixpoint env_steps_count (tr: jmtrace) (bound: nat) : option nat :=
-    match bound with
-    | 0 => None
-    | S bound =>
-        match tr with
-        | ⟨ s ⟩ => Some 0
-        | s -[ inl _ ]->  r => Some 0
-        | s -[ inr _ ]->  r => option_map (λ x, 1 + x) (env_steps_count r bound)
-        end
-    end.
-
-  Lemma env_steps_count_deterministic tr n1 n2 x y :
-    env_steps_count tr n1 = Some x →
-    env_steps_count tr n2 = Some y →
-    x = y.
-  Proof.
-    revert tr n2 x y. induction n1 as [|n1 IH]; first naive_solver.
-    intros tr n2 x y He1 He2.
-    destruct n2 as [|n2]=>//.
-    destruct tr as [|s ℓ tr] =>//; first naive_solver.
-    simpl in *. destruct ℓ; first naive_solver.
-    destruct (env_steps_count tr n1) eqn:Heq1; last naive_solver.
-    destruct (env_steps_count tr n2) eqn:Heq2; last naive_solver.
-    simpl in *. simplify_eq. f_equal. by eapply IH.
-  Qed.
-
-  Lemma env_steps_count_step n s ℓ tr :
-    env_steps_count (s -[ ℓ ]-> tr) (1+n) = Some (1+n) →
-    env_steps_count tr n = Some n.
-  Proof.
-    simpl. destruct ℓ. naive_solver. destruct (env_steps_count _ _) eqn:Heq=>//. naive_solver.
-  Qed.
-
-  Lemma env_steps_count_step_gt' bound n m s ℓ tr :
-    env_steps_count (s -[ inr ℓ ]-> tr) (S bound) = Some n →
-    env_steps_count tr bound = Some m →
-    n > m.
-  Proof.
-    simpl. destruct (env_steps_count _ _); naive_solver.
-  Qed.
-
-  Lemma env_steps_count_step_gt n1 n2 n m s ℓ tr :
-    env_steps_count (s -[ inr ℓ ]-> tr) n1 = Some n →
-    env_steps_count tr n2 = Some m →
-    n > m.
-  Proof.
-    destruct n1 as [|n1]; first naive_solver. simpl.
-    simpl. destruct (env_steps_count _ _) as [n0|] eqn:Heq; last naive_solver.
-    simpl. intros; simplify_eq.
-    have -> //: n0 = m; last lia.
-    by eapply env_steps_count_deterministic.
-  Qed.
-
   Definition is_usr_step (_ : JM) (ℓ : option $ fmlabel JM) : Prop :=
     match ℓ with
     | Some (inl _) => True
@@ -93,99 +40,6 @@ Section measure.
   Definition is_usr_step_or_disabled ρ (s : JM) (ℓ : option $ fmlabel JM) : Prop :=
     ρ ∉ live_roles _ s ∨ ∃ ℓ', ℓ = Some $ inl ℓ'.
 
-  Lemma env_steps_count_is_Some' n tr ρ:
-    (tr ⊩ jmtrace_valid) →
-    ρ ∈ live_roles _ (trfirst tr) →
-    pred_at tr n (is_usr_step_or_disabled ρ) →
-    ∃ m, env_steps_count tr (S n) = Some m ∧ pred_at tr m is_usr_step.
-  Proof.
-    revert tr. induction n as [|n IH]; intros tr Hval Hρ Henv.
-    { destruct tr; rewrite /pred_at /is_usr_step_or_disabled //= in Henv; naive_solver. }
-    destruct tr as [|s ℓ tr]=>//.
-    simpl. destruct ℓ.
-    { exists 0. split=>//. }
-    odestruct (IH tr _ _) as [m [HS Hpa]] =>//.
-    { unshelve eapply (trace_always_suffix_of _ _ _ _ Hval). by exists 1. }
-    { simpl in Hρ, Hval. rewrite /jmtrace_valid in Hval.
-      apply trace_always_elim in Hval.
-      destruct (trfirst tr) eqn:Heq.
-      inversion Hval; simplify_eq. simpl in *. congruence. }
-    exists (1+m). simpl. split=>//. destruct tr as [| ? ℓ ?]; first naive_solver.
-    destruct ℓ; first naive_solver. simpl in HS. rewrite HS //.
-  Qed.
-
-  Lemma env_steps_bound_exists ρ tr :
-    (tr ⊩ jm_fair_scheduling) →
-    ρ ∈ live_roles _ (trfirst tr) →
-    exists n, pred_at tr n (is_usr_step_or_disabled ρ).
-  Proof.
-    unfold jm_fair_scheduling, jm_fair_scheduling_mtr, trace_always_eventually_implies_now,
-      trace_always_eventually_implies.
-    intros Hf Hl. specialize (Hf ρ).
-    apply trace_always_elim in Hf.
-    rewrite trace_impliesI in Hf.
-    ospecialize (Hf _).
-    { rewrite /trace_now. destruct tr=>//. }
-    rewrite trace_eventuallyI in Hf. destruct Hf as [tr' [Hsuff Hlive]].
-    rewrite /trace_now in Hlive.
-    destruct Hsuff as [n Hafter].
-    exists n. rewrite /pred_at /is_usr_step_or_disabled Hafter. rewrite /pred_at ltl_sat_def in Hlive.
-    destruct tr'; simpl in Hlive; naive_solver.
-  Qed.
-
-  Definition env_steps_bound_get_bound ρ tr
-    (Hf: (tr ⊩ jm_fair_scheduling))
-    (Hlive: ρ ∈ live_roles _ (trfirst tr)):
-    nat := epsilon (env_steps_bound_exists _ _ Hf Hlive).
-
-  Lemma env_steps_bound_get_bound_correct ρ tr
-    (Hf: (tr ⊩ jm_fair_scheduling))
-    (Hlive: ρ ∈ live_roles _ (trfirst tr)):
-    pred_at tr (env_steps_bound_get_bound _ _ Hf Hlive) (is_usr_step_or_disabled ρ).
-  Proof. rewrite /env_steps_bound_get_bound. apply epsilon_correct. Qed.
-
-  Lemma env_steps_count_is_Some tr ρ
-    (Hval: (tr ⊩ jmtrace_valid))
-    (Hf: (tr ⊩ jm_fair_scheduling))
-    (Hlive: ρ ∈ live_roles _ (trfirst tr)):
-    ∃ m, env_steps_count tr (S $ env_steps_bound_get_bound _ _ Hf Hlive) = Some m ∧ pred_at tr m is_usr_step.
-  Proof.
-    eapply env_steps_count_is_Some' =>//.
-    apply env_steps_bound_get_bound_correct.
-  Qed.
-
-  Definition env_steps_count_good tr ρ
-    (Hval: (tr ⊩ jmtrace_valid))
-    (Hf: (tr ⊩ jm_fair_scheduling))
-    (Hlive: ρ ∈ live_roles _ (trfirst tr)):
-    nat
-    := epsilon (env_steps_count_is_Some _ _ Hval Hf Hlive).
-
-  Lemma env_steps_count_good_correct tr ρ
-    (Hval: (tr ⊩ jmtrace_valid))
-    (Hf: (tr ⊩ jm_fair_scheduling))
-    (Hlive: ρ ∈ live_roles _ (trfirst tr)):
-    env_steps_count tr (S $ env_steps_bound_get_bound _ _ Hf Hlive) = Some (env_steps_count_good _ _ Hval Hf Hlive)
-      ∧ pred_at tr (env_steps_count_good _ _ Hval Hf Hlive) is_usr_step.
-  Proof. rewrite /env_steps_count_good. apply epsilon_correct. Qed.
-
-  #[local] Instance live_dec (tr : jmtrace): Decision (∃ ρ : fmrole JM, ρ ∈ live_roles JM (trfirst tr)).
-  Proof. apply make_decision. Qed.
-  #[local] Instance valid_dec (tr: jmtrace) : Decision (jmtrace_valid tr ∧ jm_fair_scheduling tr).
-  Proof. apply make_decision. Qed.
-
-  Definition env_steps_count_total tr : nat :=
-    match decide (∃ ρ, ρ ∈ live_roles _ (trfirst tr)) with
-    | left Hin =>
-        let ρ := choose _ Hin in
-        match decide (jmtrace_valid tr ∧ jm_fair_scheduling tr) with
-        | left (conj Hval Hf) =>
-            S $ env_steps_count_good tr ρ Hval Hf (choose_correct (λ ρ, ρ ∈ live_roles _ (trfirst tr)) _)
-        | right _ => 0
-        end
-    | right _ =>
-        0
-    end.
 
   Definition trace_is_trimmed (tr: jmtrace) :=
     ∀ n, match after n tr with
@@ -193,6 +47,17 @@ Section measure.
              ∃ m, pred_at (s -[ℓ]-> tr') m is_usr_step
          | _ => True
         end.
+
+  Lemma trace_is_trimmed_suffix_of (tr1 tr2 : jmtrace) (Hsuff: trace_suffix_of tr1 tr2) :
+    trace_is_trimmed tr2 → trace_is_trimmed tr1.
+  Proof.
+    destruct Hsuff as [n Hafter].
+    unfold trace_is_trimmed.
+    intros Htrim m.
+    destruct (after m tr1) as [[|]|] eqn:Heq =>//.
+    specialize (Htrim (n+m)).
+    rewrite after_sum' Hafter Heq // in Htrim.
+  Qed.
 
   #[local] Instance decide_for_trimming tr:
     Decision (∃ m : nat, pred_at tr m is_usr_step).
@@ -475,11 +340,139 @@ Section measure.
     | _ => None
     end.
 
+  Fixpoint env_steps_count (tr: jmtrace) (bound: nat) : option nat :=
+    match bound with
+    | 0 => None
+    | S bound =>
+        match tr with
+        | ⟨ s ⟩ => Some 0
+        | s -[ inl _ ]->  r => Some 0
+        | s -[ inr _ ]->  r => option_map (λ x, 1 + x) (env_steps_count r bound)
+        end
+    end.
+
+  Lemma env_steps_count_deterministic tr n1 n2 x y :
+    env_steps_count tr n1 = Some x →
+    env_steps_count tr n2 = Some y →
+    x = y.
+  Proof.
+    revert tr n2 x y. induction n1 as [|n1 IH]; first naive_solver.
+    intros tr n2 x y He1 He2.
+    destruct n2 as [|n2]=>//.
+    destruct tr as [|s ℓ tr] =>//; first naive_solver.
+    simpl in *. destruct ℓ; first naive_solver.
+    destruct (env_steps_count tr n1) eqn:Heq1; last naive_solver.
+    destruct (env_steps_count tr n2) eqn:Heq2; last naive_solver.
+    simpl in *. simplify_eq. f_equal. by eapply IH.
+  Qed.
+
+  Lemma env_steps_count_step n s ℓ tr :
+    env_steps_count (s -[ ℓ ]-> tr) (1+n) = Some (1+n) →
+    env_steps_count tr n = Some n.
+  Proof.
+    simpl. destruct ℓ. naive_solver. destruct (env_steps_count _ _) eqn:Heq=>//. naive_solver.
+  Qed.
+
+  Lemma env_steps_count_step_gt' bound n m s ℓ tr :
+    env_steps_count (s -[ inr ℓ ]-> tr) (S bound) = Some n →
+    env_steps_count tr bound = Some m →
+    n > m.
+  Proof.
+    simpl. destruct (env_steps_count _ _); naive_solver.
+  Qed.
+
+  Lemma env_steps_count_step_gt n1 n2 n m s ℓ tr :
+    env_steps_count (s -[ inr ℓ ]-> tr) n1 = Some n →
+    env_steps_count tr n2 = Some m →
+    n > m.
+  Proof.
+    destruct n1 as [|n1]; first naive_solver. simpl.
+    simpl. destruct (env_steps_count _ _) as [n0|] eqn:Heq; last naive_solver.
+    simpl. intros; simplify_eq.
+    have -> //: n0 = m; last lia.
+    by eapply env_steps_count_deterministic.
+  Qed.
+
+  Lemma env_steps_count_is_Some' n tr :
+    (tr ⊩ jmtrace_valid) →
+    pred_at tr n is_usr_step →
+    ∃ m, env_steps_count tr (S n) = Some m ∧ pred_at tr m is_usr_step.
+  Proof.
+    revert tr. induction n as [|n IH]; intros tr Hval Henv.
+    { destruct tr; rewrite /pred_at /is_usr_step //= in Henv *. exists 0. simpl. destruct ℓ; naive_solver. }
+    destruct tr as [|s ℓ tr]=>//.
+    simpl. destruct ℓ.
+    { exists 0. split=>//. }
+    odestruct (IH tr _ _) as [m [HS Hpa]] =>//.
+    { unshelve eapply (trace_always_suffix_of _ _ _ _ Hval). by exists 1. }
+    exists (1+m). simpl. split=>//. destruct tr as [| ? ℓ ?]; first naive_solver.
+    destruct ℓ; first naive_solver. simpl in HS. rewrite HS //.
+  Qed.
+
+  Lemma env_steps_bound_exists tr :
+    trace_is_trimmed tr →
+    (∀ s, tr ≠ ⟨s⟩) →
+    exists n, pred_at tr n is_usr_step.
+  Proof.
+    intros Htrim Hns.
+    specialize (Htrim 0).
+    rewrite /after /= in Htrim.
+    unfold trace_is_trimmed in Htrim.
+    destruct tr; naive_solver.
+  Qed.
+
+  Definition env_steps_bound_get_bound tr
+    (Htrim : trace_is_trimmed tr)
+    (Hns : ∀ s, tr ≠ ⟨s⟩) :
+    nat := epsilon (env_steps_bound_exists tr Htrim Hns).
+
+  Lemma env_steps_bound_get_bound_correct tr
+    (Htrim : trace_is_trimmed tr)
+    (Hns : ∀ s, tr ≠ ⟨s⟩) :
+    pred_at tr (env_steps_bound_get_bound _ Htrim Hns) is_usr_step.
+  Proof. rewrite /env_steps_bound_get_bound. apply epsilon_correct. Qed.
+
+  Lemma env_steps_count_is_Some tr
+    (Hval: (tr ⊩ jmtrace_valid))
+    (Htrim : trace_is_trimmed tr)
+    (Hns : ∀ s, tr ≠ ⟨s⟩) :
+    ∃ m, env_steps_count tr (S $ env_steps_bound_get_bound _ Htrim Hns) = Some m ∧ pred_at tr m is_usr_step.
+  Proof.
+    eapply env_steps_count_is_Some' =>//.
+    apply env_steps_bound_get_bound_correct.
+  Qed.
+
+  Definition env_steps_count_good tr
+    (Hval: (tr ⊩ jmtrace_valid))
+    (Htrim : trace_is_trimmed tr)
+    (Hns : ∀ s, tr ≠ ⟨s⟩) :
+    nat
+    := epsilon (env_steps_count_is_Some _ Hval Htrim Hns).
+
+  Lemma env_steps_count_good_correct tr
+    (Hval: (tr ⊩ jmtrace_valid))
+    (Htrim : trace_is_trimmed tr)
+    (Hns : ∀ s, tr ≠ ⟨s⟩) :
+    env_steps_count tr (S $ env_steps_bound_get_bound _ Htrim Hns) = Some (env_steps_count_good _ Hval Htrim Hns)
+      ∧ pred_at tr (env_steps_count_good _ Hval Htrim Hns) is_usr_step.
+  Proof. rewrite /env_steps_count_good. apply epsilon_correct. Qed.
+
+  #[local] Instance live_dec (tr : jmtrace): Decision (∃ ρ : fmrole JM, ρ ∈ live_roles JM (trfirst tr)).
+  Proof. apply make_decision. Qed.
+  #[local] Instance valid_dec (tr: jmtrace) : Decision (jmtrace_valid tr ∧ trace_is_trimmed tr ∧ ∀ s : JM, tr ≠ ⟨ s ⟩).
+  Proof. apply make_decision. Qed.
+
+  Definition env_steps_count_total tr : nat :=
+    match decide (jmtrace_valid tr ∧ trace_is_trimmed tr ∧ ∀ s, tr ≠ ⟨s⟩) with
+    | left (conj Hval (conj Htrim Hns)) =>
+        S $ env_steps_count_good tr Hval Htrim Hns
+    | right _ => 0
+    end.
+
   Notation env_dec_unless := (dec_unless env_proj_st env_proj_lab env_steps_count_total).
 
   Lemma env_steps_dec_unless tr
     (Hval: (tr ⊩ jmtrace_valid))
-    (Hf: (tr ⊩ jm_fair_scheduling))
     (Htrim: trace_is_trimmed tr):
     env_dec_unless tr.
   Proof.
@@ -496,48 +489,31 @@ Section measure.
       by inversion Hval; simplify_eq. }
     rewrite /env_steps_count_total.
 
-    have Hlive1: ∃ ρ : fmrole JM, ρ ∈ live_roles JM s.
-    { apply trace_is_trimmed_equiv in Htrim=>//.
-      specialize (Htrim n). rewrite Heq // in Htrim. }
+    have ? : jmtrace_valid tr'.
+    { apply NNP_P. intros ?. by apply (trace_always_suffix_of _ _ _ Hsuff2) in Hval. }
+    have ? : trace_is_trimmed tr'.
+    { by eapply trace_is_trimmed_suffix_of. }
 
-    have ? : jmtrace_valid tr' ∧ jm_fair_scheduling tr'.
-    { apply NNP_P. intros ?.
-      have ?: jmtrace_valid tr' by apply (trace_always_suffix_of _ _ _ Hsuff2) in Hval.
-      have ?: jm_fair_scheduling tr'.
-      { intros ρ. eapply (trace_always_suffix_of _ _ _ Hsuff2) in Hf. apply Hf. }
-      naive_solver. }
+    have ? : jmtrace_valid (s -[ inr f ]-> tr').
+    { apply NNP_P. intros ?. by apply (trace_always_suffix_of _ _ _ Hsuff1) in Hval. }
+    have ? : trace_is_trimmed (s -[ inr f ]-> tr').
+    { by eapply trace_is_trimmed_suffix_of. }
 
-    have ? : jmtrace_valid (s -[ inr f ]-> tr') ∧ jm_fair_scheduling (s -[ inr f ]-> tr').
-    { apply NNP_P. intros ?.
-      have ?: jmtrace_valid (s -[ inr f ]-> tr') by apply (trace_always_suffix_of _ _ _ Hsuff1) in Hval.
-      have ?: jm_fair_scheduling (s -[ inr f ]-> tr').
-      { intros ρ. eapply (trace_always_suffix_of _ _ _ Hsuff1) in Hf. apply Hf. }
-      naive_solver. }
+    have ? : ∀ s', (s -[ inr f ]-> tr') ≠ ⟨s'⟩.
+    { naive_solver. }
 
-    destruct (decide _) as [Hin1|]; last first.
-    { destruct (decide _) as [|]; last done.
-      destruct (decide _) as [[??]|]; last done. lia. }
+    destruct (decide _) as [[Hval1 [Htrim1 Hns1]]|]; last first.
+    { destruct (decide _) as [Ha|].
+      - destruct Ha as (?&?&?). lia.
+      - naive_solver. }
 
-    destruct (decide _) as [[Hval1 Hfair1]|]; last done.
-    destruct (decide _) as [Hin2|]; last done.
-    destruct (decide _) as [[Hval2 Hfair2]|]; last done.
+    destruct (decide _) as [[Hval2 [Htrim2 Hns2]]|]; last first.
+    { naive_solver. }
 
     rewrite -Nat.succ_lt_mono.
 
-    generalize (choose_correct (λ ρ : fmrole JM, ρ ∈ live_roles JM (trfirst tr')) Hin1) as Hin1'.
-    intros Hin1'.
-    set (Hcc := choose_correct _).
-    generalize (Hcc Hin2).
-    intros Hin2'.
-
-    set (ρ1 := choose _ _).
-    set (ρ2 := choose _ _).
-
-    Notation esb := env_steps_bound_get_bound.
-    Notation esbg := env_steps_count_good.
-
-    have [? _] := env_steps_count_good_correct _ _ Hval1 Hfair1 Hin1'.
-    have [? _] := env_steps_count_good_correct _ _ Hval2 Hfair2 Hin2'.
+    have [? _] := env_steps_count_good_correct _ Hval1 Htrim1 Hns1.
+    have [? _] := env_steps_count_good_correct _ Hval2 Htrim2 Hns2.
 
     eapply env_steps_count_step_gt=>//.
   Qed.
@@ -575,11 +551,9 @@ Section measure.
 
     induction (Nat.lt_wf_0_projected id n) as [n ? IH].
     intros jmtr' Hn Hsuff Hval Htrim.
-    opose proof (env_steps_dec_unless jmtr' _ _ _ 0) as Hdec.
+    opose proof (env_steps_dec_unless jmtr' _ _ 0) as Hdec.
     { apply trace_alwaysI. intros ??. apply Hval'. eapply trace_suffix_of_trans=>//. }
-    { intros ?. eapply trace_always_suffix_of=>//. apply Hfair. }
-    { intros m. destruct Hsuff as [m' Hm']. specialize (Htrim (m' + m)).
-      rewrite after_sum' Hm' // in Htrim. }
+    { by eapply trace_is_trimmed_suffix_of. }
     rewrite /= in Hdec.
     rewrite /jm_trans_valid ltl_sat_def in Hval.
     destruct jmtr' as [js|[js1 js2] [jl|jl] jmtr'].
