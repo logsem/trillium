@@ -191,6 +191,18 @@ Proof. by inversion 1. Qed.
     inversion Hex; done.
   Qed.
 
+  Lemma vist_impl {Λ : language} {M: Model}
+    (R1 R2: execution_trace Λ → auxiliary_trace M → Prop)
+    (IMPL: forall etr atr, R1 etr atr -> R2 etr atr):
+    forall etr atr ietr iatr, 
+      valid_inf_system_trace R1 etr atr ietr iatr -> 
+      valid_inf_system_trace R2 etr atr ietr iatr.
+  Proof using.
+    cofix CIH. intros. inversion H; subst. 
+    { constructor. eauto. }
+    econstructor; eauto.
+  Qed.
+
   Definition trace_extend_uncurry {M: Model}
     (tr: auxiliary_trace M) xy := trace_extend tr xy.2 xy.1.
 
