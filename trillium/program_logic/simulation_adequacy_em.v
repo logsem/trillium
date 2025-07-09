@@ -91,7 +91,7 @@ Section adequacy.
     - eapply (strong_simulation_adequacy_general_multiple s) => //.
     - done.
   Qed.
-
+  
   Theorem strong_simulation_adequacy_traces_multiple Σ
     `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) 
     es σ1 (s1: M)
@@ -143,34 +143,23 @@ Section adequacy.
     split.
     2: { by rewrite to_trace_trfirst. }
 
-    pose proof MATCH as INF_REF. (** see remark below *)
+    eapply vist_impl in MATCH.
+    2: { apply continued_simulation_rel. }
+    
     eapply (valid_inf_system_trace_implies_traces_match
                        valid_step                       
                        state_rel
                        lbl_rel
                        ltac:(idtac)
                        ltac:(idtac)
-                       (continued_simulation R)) in MATCH; cycle 1.  
-    { intros ?? ?%continued_simulation_rel. eauto. }
-    { intros ?? ?%continued_simulation_rel. eauto. }
+                       R) in MATCH; cycle 1.
+    { intros ?? ?. eauto. }
+    { intros ?? ?. eauto. }
     { apply from_trace_spec. simpl.
       rewrite Hexfirst. done. }
     { apply to_trace_spec. }
     Unshelve. 2,3: by eauto.
     
-    assert (exists len, trace_len.trace_len_is extr len /\ trace_len.trace_len_is (to_trace s1 iatr) len) as LEN. (** see remark below *)
-    { simpl in MATCH.
-      pose proof (trace_has_len extr) as [len LEN]. 
-      pose proof (trace_has_len (to_trace s1 iatr)) as [len' LEN'].
-      eapply traces_match_same_length in MATCH; eauto. subst.  
-      eauto. }
-
-    (** INF_REF and LEN together give the traces mentioned in
-        the refinement section of Lawyer paper
-        (same length, related by infinite extension of refinement).       
-        However, our proofs proceed differency, 
-        using the notion of traces_match (MATCH hypothesis). *)
-
     apply MATCH. 
   Qed.
   
