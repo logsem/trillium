@@ -469,6 +469,20 @@ Proof.
   by eapply trace_always_cons.
 Qed.
 
+Lemma fair_transition_true ρ (utr : stenning_trace) :
+  (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
+  (utr ⊩ ◊ (usr_trans_valid aneris_lang ⋒ ℓ↓ λ ℓ, ℓ.1 = ρ)).
+Proof.
+  intros Hval Hfair.
+  have H := fair_transition_gen ρ utr (λ _, True) (ltac:(naive_solver)) Hval Hfair.
+  ospecialize (H _).
+  { by rewrite /ltl_sat. }
+  eapply trace_eventually_mono; last exact H.
+  intros ? Hh.
+  rewrite !trace_andI in Hh *.
+  naive_solver.
+Qed.
+
 Lemma A_eventually_sends (utr : stenning_trace) (n : Z) :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
   (utr ⊩ ↓ λ s _, s.1 = ASending n) → (utr ⊩ ◊ ℓ↓ usr_send_pred_filter (msg n)).
@@ -533,22 +547,141 @@ Proof.
       + rewrite -H3 //.
       + rewrite -H3 /= in HA'. lia. }
   apply A_eventually_sends_alt=>//.
-  (* - rewrite trace_alwaysI_alt in Hval. naive_solver. *)
-  (* - rewrite mtrace_fair_always trace_alwaysI in Hfair. naive_solver. *)
 Qed.
 
 Lemma A_always_eventually_receives (utr : stenning_trace) :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
   (utr ⊩ □ ◊ ℓ↓ usr_any_recv_filter saA).
 Proof.
-Admitted.
+  intros Hval Hfair.
+  rewrite trace_alwaysI.
+  intros tr1 Htr1.
+
+  rewrite mtrace_fair_always !trace_alwaysI in Hfair.
+  rewrite !trace_alwaysI_alt in Hval.
+  specialize (Hval _ Htr1).
+  specialize (Hfair _ Htr1).
+
+  have Hev : (tr1 ⊩ ◊ ↓ λ s _, ∃ n, s.1 = AReceiving n).
+  { destruct (trfirst tr1).1 as [m|] eqn:Heq; last first.
+    { apply trace_eventually_intro. rewrite trace_nowI. naive_solver. }
+    have HA : (tr1 ⊩ ↓ λ s _, s.1 = ASending m) by rewrite trace_nowI.
+
+    apply (fair_transition Arole) in HA =>//; last first.
+    { intros s1 s2 ℓ ? Hstep ?. inversion Hstep; simplify_eq; naive_solver. }
+
+    rewrite !trace_eventuallyI in HA *.
+    destruct HA as (tr&Htr&HA).
+    rewrite !trace_andI in HA.
+    destruct HA as (HA&Htrans&Hrole).
+    destruct (trace_label_inv Hrole) as ([a b]&ℓ&tr2&->&Heq').
+    rewrite trace_nowI /= in HA.
+
+    simplify_eq.
+
+    exists tr2; split.
+    { by apply trace_suffix_of_cons_l in Htr. }
+    rewrite trace_nowI.
+
+    apply trace_transI in Htrans.
+    inversion Htrans; simplify_eq.
+    rewrite -H. naive_solver. }
+
+  rewrite trace_eventuallyI in Hev.
+  destruct Hev as (tr2&Htr2&HA).
+
+  rewrite mtrace_fair_always !trace_alwaysI in Hfair.
+  rewrite !trace_alwaysI_alt in Hval.
+  specialize (Hval _ Htr2).
+  specialize (Hfair _ Htr2).
+
+
+  apply (fair_transition Arole) in HA =>//; last first.
+  { intros s1 s2 ℓ ? Hstep ?. inversion Hstep; simplify_eq; naive_solver. }
+
+  rewrite !trace_eventuallyI in HA *.
+  destruct HA as (tr&Htr&HA).
+  rewrite !trace_andI in HA.
+  destruct HA as (HA&Htrans&Hrole).
+  destruct (trace_label_inv Hrole) as ([a b]&ℓ&tr3&->&Heq').
+  rewrite trace_nowI /= in HA. destruct HA as [n HA].
+
+  simplify_eq.
+
+  exists ((AReceiving n, b) -[ ℓ ]-> tr3); split.
+  { by eapply trace_suffix_of_trans. }
+  rewrite trace_labelI /usr_any_recv_filter. exists Arole.
+
+  apply trace_transI in Htrans.
+  inversion Htrans; simplify_eq; naive_solver.
+Qed.
 
 Lemma B_always_eventually_receives (utr : stenning_trace) :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) →
   (utr ⊩ □ ◊ ℓ↓ usr_any_recv_filter saB).
 Proof.
-Admitted.
+  intros Hval Hfair.
+  rewrite trace_alwaysI.
+  intros tr1 Htr1.
 
+  rewrite mtrace_fair_always !trace_alwaysI in Hfair.
+  rewrite !trace_alwaysI_alt in Hval.
+  specialize (Hval _ Htr1).
+  specialize (Hfair _ Htr1).
+
+  have Hev : (tr1 ⊩ ◊ ↓ λ s _, ∃ n, s.2 = BReceiving n).
+  { destruct (trfirst tr1).2 as [m|] eqn:Heq; last first.
+    { apply trace_eventually_intro. rewrite trace_nowI. naive_solver. }
+    have HA : (tr1 ⊩ ↓ λ s _, s.2 = BSending m) by rewrite trace_nowI.
+
+    apply (fair_transition Brole) in HA =>//; last first.
+    { intros s1 s2 ℓ ? Hstep ?. inversion Hstep; simplify_eq; naive_solver. }
+
+    rewrite !trace_eventuallyI in HA *.
+    destruct HA as (tr&Htr&HA).
+    rewrite !trace_andI in HA.
+    destruct HA as (HA&Htrans&Hrole).
+    destruct (trace_label_inv Hrole) as ([a b]&ℓ&tr2&->&Heq').
+    rewrite trace_nowI /= in HA.
+
+    simplify_eq.
+
+    exists tr2; split.
+    { by apply trace_suffix_of_cons_l in Htr. }
+    rewrite trace_nowI.
+
+    apply trace_transI in Htrans.
+    inversion Htrans; simplify_eq.
+    rewrite -H. naive_solver. }
+
+  rewrite trace_eventuallyI in Hev.
+  destruct Hev as (tr2&Htr2&HA).
+
+  rewrite mtrace_fair_always !trace_alwaysI in Hfair.
+  rewrite !trace_alwaysI_alt in Hval.
+  specialize (Hval _ Htr2).
+  specialize (Hfair _ Htr2).
+
+
+  apply (fair_transition Brole) in HA =>//; last first.
+  { intros s1 s2 ℓ ? Hstep ?. inversion Hstep; simplify_eq; naive_solver. }
+
+  rewrite !trace_eventuallyI in HA *.
+  destruct HA as (tr&Htr&HA).
+  rewrite !trace_andI in HA.
+  destruct HA as (HA&Htrans&Hrole).
+  destruct (trace_label_inv Hrole) as ([a b]&ℓ&tr3&->&Heq').
+  rewrite trace_nowI /= in HA. destruct HA as [n HA].
+
+  simplify_eq.
+
+  exists ((a, BReceiving n) -[ ℓ ]-> tr3); split.
+  { by eapply trace_suffix_of_trans. }
+  rewrite trace_labelI /usr_any_recv_filter. exists Brole.
+
+  apply trace_transI in Htrans.
+  inversion Htrans; simplify_eq; naive_solver.
+Qed.
 
 Lemma B_eventually_receives_n (utr : stenning_trace) n :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) → (utr ⊩ □ A_at n) →
@@ -619,7 +752,51 @@ Lemma B_eventually_sends_n (utr : stenning_trace) n :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) → (utr ⊩ B_at (1 + n)) →
   (utr ⊩ ℓ↓ usr_recv_pred_filter (msg n)) →
   (utr ⊩ ◊ ℓ↓ usr_send_pred_filter (ack n)).
-Proof. Admitted.
+Proof.
+  intros Hval Hfair HB Hrecv.
+  destruct (trace_label_inv Hrecv) as (s&[ρ α]&tr'&->&Hmsg).
+  unfold usr_recv_pred_filter, msg in Hmsg.
+  destruct Hmsg as (ρ'&msg&?&c&?).
+  simplify_eq.
+
+  have Hstep := Hval. apply trace_always_elim in Hstep.
+  apply trace_transI in Hstep.
+
+  rewrite B_at_iff /stenning_get_n_B /= in HB.
+
+  have Hmid : (trfirst tr').2 = BSending (1 + n).
+  { inversion Hstep; simplify_eq; simpl in HB; simplify_eq; try naive_solver.
+    - rewrite -H2 //=.
+    - unfold good_message in *.
+      destruct H1 as (?&?&?&?).
+      simplify_eq.
+      apply prod_ser_str_inv in H.
+      destruct H as [Hn _].
+      apply StringOfZ_inv in Hn.
+      lia. }
+  have {}Hmid : (tr' ⊩ (↓ λ s _, s.2 = BSending (1 + n))) by rewrite trace_nowI.
+
+  apply (fair_transition Brole) in Hmid; last first.
+  { rewrite mtrace_fair_always in Hfair.
+    apply trace_always_cons in Hfair.
+    by apply trace_always_elim. }
+  { by eapply trace_always_cons. }
+  { intros s1 s2 [ρ α] Heq Htrans Hneq. inversion Htrans; simplify_eq; naive_solver. }
+
+  apply trace_eventually_cons.
+  eapply trace_eventually_mono; last exact Hmid.
+  intros tr. rewrite !trace_andI.
+  intros (Hs & Htrans & Hrole).
+  destruct (trace_label_inv Hrole) as (s1&[ρ1 α1]&tr1&->&Heq).
+  apply trace_transI in Htrans.
+  simpl in *; simplify_eq.
+  rewrite trace_labelI /usr_send_pred_filter /ack.
+  rewrite trace_nowI /= in Hs.
+  exists Brole.
+  inversion Htrans; simplify_eq; try naive_solver.
+  simpl in Hs. simplify_eq.
+  eexists; split=>//. eexists. f_equal. lia.
+Qed.
 
 Lemma B_always_eventually_sends_n (utr : stenning_trace) n :
   (utr ⊩ usr_trace_valid) → (utr ⊩ usr_fair) → (utr ⊩ □ A_at n) → (utr ⊩ □ B_at (1 + n)) →
