@@ -716,14 +716,157 @@ Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
 Proof. iIntros; iMod fupd_to_bupd_soundness_no_lc; done. Qed.
 
 
-  Lemma f2b_helper `{invGS_gen HasNoLc Σ} E1 E2 P
-    {PLAIN: Plain P}:
-    fupd_to_bupd E1 -∗ (|={E1, E2}=> fupd_to_bupd E2 -∗ ▷ P) -∗ ▷ P.
-  Proof using.
-    iIntros "FB X".
-    rewrite {1}fupd_to_bupd_unfold. rewrite /fupd_to_bupd_aux.
-    iApply except_0_later.
-    iApply bupd_elim.
-    iApply "FB".
-    done.
+Lemma f2b_helper `{invGS_gen HasNoLc Σ} E1 E2 P
+  {PLAIN: Plain P}:
+  fupd_to_bupd E1 -∗ (|={E1, E2}=> fupd_to_bupd E2 -∗ ▷ P) -∗ ▷ P.
+Proof using.
+  iIntros "FB X".
+  rewrite {1}fupd_to_bupd_unfold. rewrite /fupd_to_bupd_aux.
+  iApply except_0_later.
+  iApply bupd_elim.
+  iApply "FB".
+  done.
+Qed.
+
+
+Notation wptp_from t0 s t Φs := ([∗ list] tp1_e;Φ ∈ (prefixes_from t0 t);Φs, WP tp1_e.2 @ s; locale_of tp1_e.1 tp1_e.2; ⊤ {{ Φ }})%I.
+Notation wptp s t Φs := (wptp_from [] s t Φs).
+
+Section Wptp.
+  Context `{!irisG Λ M Σ}.
+
+  Lemma wptp_from_same_locales t0' t0 s tp Φs:
+    locales_equiv t0 t0' ->
+    wptp_from t0' s tp Φs -∗ wptp_from t0 s tp Φs.
+  Proof.
+    revert Φs t0 t0'. induction tp; intros Φs t0 t0'; iIntros (Hequiv) "H" =>//.
+    simpl.
+    iDestruct (big_sepL2_cons_inv_l with "H") as (Φ Φs' ->) "[??]".
+    rewrite big_sepL2_cons. simpl. erewrite <-locale_equiv =>//. iFrame.
+    iApply IHtp =>//. apply locales_equiv_snoc =>//.
+    apply locale_equiv =>//.
   Qed.
+
+  Lemma wptp_not_stuck ex atr σ tp t0 t0' trest s Φs :
+    Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0') ->
+    valid_exec ex →
+    trace_ends_in ex (t0 ++ tp ++ trest, σ) →
+    state_interp ex atr -∗ wptp_from t0' s tp Φs ={⊤}=∗
+    state_interp ex atr ∗ wptp_from t0 s tp Φs ∗
+    ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝.
+  Proof.
+    iIntros (Hsame Hexvalid Hex) "HSI Ht".
+    rewrite assoc.
+    iDestruct (wptp_from_same_locales t0' with "Ht") as "Ht"; first done.
+    iApply fupd_plain_keep_r; iFrame.
+    iIntros "[HSI Ht]".
+    iIntros (e He).
+    apply elem_of_list_split in He as (t1 & t2 & ->).
+    rewrite prefixes_from_app.
+    iDestruct (big_sepL2_app_inv_l with "Ht") as (Φs1 Φs2') "[-> [Ht1 Het2]]".
+    iDestruct (big_sepL2_cons_inv_l with "Het2") as (Φ Φs2) "[-> [He Ht2]]".
+    iMod (wp_not_stuck _ _ ectx_emp with "HSI He") as "(_ & _ & ?)";
+      [done| rewrite ectx_fill_emp // | |done].
+    - replace (t0 ++ (t1 ++ e :: t2) ++ trest) with ((t0 ++ t1) ++ e :: (t2 ++ trest)) in Hex.
+      + simpl. done.
+      + list_simplifier. done.
+    - done.
+  Qed.
+
+  Lemma wptp_not_stuck_same ex atr σ tp t0 trest s Φs :
+    valid_exec ex →
+    trace_ends_in ex (t0 ++ tp ++ trest, σ) →
+    state_interp ex atr -∗ wptp_from t0 s tp Φs ={⊤}=∗
+    state_interp ex atr ∗ wptp_from t0 s tp Φs ∗
+    ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝.
+  Proof.
+    iIntros (??) "??". iApply (wptp_not_stuck with "[$] [$]") =>//.
+    eapply Forall2_lookup. intros i. destruct (prefixes t0 !! i) as [[??]|]; by constructor.
+  Qed.
+
+  Lemma wptp_app s t0 t1 t0t1 Φs1 t2 Φs2 :
+    t0t1 = t0 ++ t1 ->
+    wptp_from t0 s t1 Φs1 -∗ wptp_from t0t1 s t2 Φs2 -∗ wptp_from t0 s (t1 ++ t2) (Φs1 ++ Φs2).
+  Proof.
+    iIntros (->) "H1 H2". rewrite prefixes_from_app.
+    iApply (big_sepL2_app with "[H1] [H2]"); eauto.
+  Qed.
+
+  Lemma wptp_cons_r s e Φ Φs t0 t1:
+    WP e @ s; locale_of (t0 ++ t1) e; ⊤ {{v, Φ v}} -∗ wptp_from t0 s t1 Φs
+                              -∗ wptp_from t0 s (t1 ++ [e]) (Φs ++ [Φ]).
+  Proof.
+    iIntros "H1 H2". rewrite !prefixes_from_app.
+    iApply (big_sepL2_app with "[H2] [H1]"); eauto.
+    rewrite big_sepL2_singleton. done.
+  Qed.
+
+  Lemma wptp_cons_l s e Φ t Φs t0:
+    WP e @ s; locale_of t0 e; ⊤ {{v, Φ v}} -∗
+    wptp_from (t0 ++[e]) s t Φs -∗
+    wptp_from t0 s (e :: t) (Φ :: Φs).
+  Proof. iIntros "? ?"; rewrite big_sepL2_cons; iFrame. Qed.
+
+  Lemma wptp_of_val_post t s Φs t0:
+    wptp_from t0 s t Φs -∗ |~{⊤}~|
+    posts_of t Φs ∗
+    (posts_of t Φs -∗ wptp_from t0 s t Φs).
+  Proof.
+    iIntros "Ht"; simpl.
+    iInduction t as [|e t IHt] "IH" forall (Φs t0); simpl.
+    { iDestruct (big_sepL2_nil_inv_l with "Ht") as %->; eauto.
+      iIntros "!>". eauto. }
+    iDestruct (big_sepL2_cons_inv_l with "Ht") as (Φ Φs') "[-> [He Ht]] /=".
+    iMod (wp_of_val_post with "He") as "[Hpost Hback]".
+    iMod ("IH" with "Ht") as "[Ht Htback]".
+    destruct (to_val e); simpl.
+    - iFrame.
+      iIntros "!>". iFrame.
+      iIntros "[Hpost Htpost]".
+      iSplitL "Hpost Hback"; [iApply "Hback"|iApply "Htback"]; iFrame.
+      by iIntros "!>".
+    - iIntros "!>".
+      iFrame.
+      iIntros "Hefspost".
+      iSplitL "Hback"; [iApply "Hback"|iApply "Htback"]; iFrame; done.
+  Qed.
+
+  Lemma new_threads_wptp_from s t efs:
+    (([∗ list] i ↦ ef ∈ efs,
+      WP ef @ s; locale_of (t ++ take i efs) ef ; ⊤
+      {{ v, fork_post (locale_of (t ++ take i efs) ef) v }})
+    ⊣⊢ wptp_from t s efs (newposts t (t ++ efs))).
+  Proof.
+    (* TODO: factorize the two halves *)
+    rewrite big_sepL2_alt; iSplit.
+    - iIntros "H". iSplit.
+      { rewrite /newposts /newelems. 
+        rewrite drop_app_length // map_length !prefixes_from_length //. }
+      iInduction efs as [|ef efs] "IH" forall (t); first done.
+      rewrite /newposts /newelems. rewrite /= !drop_app_length //=.
+      iDestruct "H" as "[H1 H]". rewrite (right_id [] (++)). iFrame.
+      replace (map (λ '(tnew, e), fork_post (locale_of tnew e))
+                   (prefixes_from (t ++ [ef]) efs))
+        with
+          (newposts (t ++[ef]) ((t ++ [ef]) ++ efs)).
+      + iApply "IH". iApply (big_sepL_impl with "H").
+        iIntros "!>" (k e Hin) "H". by list_simplifier.
+      + list_simplifier.
+        replace (t ++ ef :: efs) with ((t ++ [ef]) ++ efs); last by list_simplifier.
+        rewrite /newposts /newelems. rewrite drop_app_length //.
+    - iIntros "[_ H]".
+      iInduction efs as [|ef efs] "IH" forall (t); first done.
+      rewrite /newposts /newelems. rewrite /= !drop_app_length //=.
+      iDestruct "H" as "[H1 H]". rewrite (right_id [] (++)). iFrame.
+      replace (map (λ '(tnew, e), fork_post (locale_of tnew e))
+                   (prefixes_from (t ++ [ef]) efs))
+        with
+          (newposts (t ++[ef]) ((t ++ [ef]) ++ efs)).
+      + iSpecialize ("IH" with "H"). iApply (big_sepL_impl with "IH").
+        iIntros "!>" (k e Hin) "H". by list_simplifier.
+      + list_simplifier.
+        replace (t ++ ef :: efs) with ((t ++ [ef]) ++ efs); last by list_simplifier.
+        rewrite /newposts /newelems. rewrite drop_app_length //.
+  Qed.
+
+End Wptp.
