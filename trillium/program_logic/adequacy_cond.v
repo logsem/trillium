@@ -215,6 +215,41 @@ Definition tr_extras {Λ: language} {M: Model} (ξ : execution_trace Λ → auxi
   valid_system_trace ex atr ∧ trace_starts_in ex c ∧
   trace_starts_in atr δ ∧ steps_from_ref ξ ex atr.
 
+Lemma tr_extras_locales_equiv {Λ M} (ξ : execution_trace Λ → auxiliary_trace M → Prop) c δ ex atr
+  (EXTRAS: tr_extras ξ c δ ex atr):
+  locales_equiv c.1 (take (length c.1) (trace_last ex).1).
+Proof using.
+  destruct EXTRAS as (VALID&START&?&?).
+  apply valid_system_trace_valid_exec_trace in VALID.
+  clear dependent atr. 
+  red in START.
+  induction ex; simpl in START.
+  { subst. simpl.
+    rewrite firstn_all. apply locales_equiv_refl. }
+  inversion VALID. subst.  
+  ospecialize (IHex _ _); try done. 
+  simpl. eapply locales_equiv_prefix_from_trans; eauto.
+  erewrite last_eq_trace_ends_in; eauto.
+  red. eapply locale_step_equiv; eauto.
+Qed.
+
+Lemma tr_extras_length_le {Λ M} (ξ : execution_trace Λ → auxiliary_trace M → Prop) c δ ex atr
+  (EXTRAS: tr_extras ξ c δ ex atr):
+  length c.1 ≤ length (trace_last ex).1.
+Proof using.
+  destruct EXTRAS as (VALID&START&?&?).
+  apply valid_system_trace_valid_exec_trace in VALID.
+  clear dependent atr. 
+  red in START.
+  induction ex; simpl in START. 
+  { subst. simpl. done. }
+  inversion VALID. subst.
+  ospecialize (IHex _ _); try done.
+  etrans; [apply IHex| ]. 
+  erewrite last_eq_trace_ends_in; [| apply H2].
+  simpl. eapply step_tp_length; eauto.
+Qed.    
+
 
 Definition rel_always_holds `{!irisG Λ M Σ}
            (s:stuckness) Φs
@@ -411,43 +446,6 @@ Section StrongAdequacyHelpers.
       + iModIntro.
         iIntros "HFtB"; done.
   Qed.
-
-  Lemma tr_extras_locales_equiv c δ ex atr
-    (EXTRAS: tr_extras ξ c δ ex atr):
-    locales_equiv c.1 (take (length c.1) (trace_last ex).1).
-  Proof using.
-    destruct EXTRAS as (?&?&?&?).
-    apply valid_system_trace_valid_exec_trace in H0 as VALID.
-    clear dependent atr. 
-    red in H1. 
-    induction ex.
-    { simpl in H1. subst. simpl.
-      rewrite firstn_all. apply locales_equiv_refl. }
-    simpl in H1.
-    inversion VALID. subst.  
-    ospecialize (IHex _ _); try done. 
-    simpl. eapply locales_equiv_prefix_from_trans; eauto.
-    erewrite last_eq_trace_ends_in; eauto.
-    red. eapply locale_step_equiv; eauto.
-  Qed.    
-
-  Lemma tr_extras_length_le c δ ex atr
-    (EXTRAS: tr_extras ξ c δ ex atr):
-    length c.1 ≤ length (trace_last ex).1.
-  Proof using.
-    destruct EXTRAS as (?&?&?&?).
-    apply valid_system_trace_valid_exec_trace in H0 as VALID.
-    clear dependent atr. 
-    red in H1. 
-    induction ex.
-    { simpl in H1. subst. simpl. done. }
-    simpl in H1.
-    inversion VALID. subst.  
-    ospecialize (IHex _ _); try done.
-    etrans; [apply IHex| ]. 
-    erewrite last_eq_trace_ends_in; [| apply H4].
-    simpl. eapply step_tp_length; eauto.
-  Qed.    
 
   Lemma get_current_facts
     s es σ δ
