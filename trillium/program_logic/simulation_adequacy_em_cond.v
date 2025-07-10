@@ -4,6 +4,163 @@ From trillium.traces Require Export traces_match trace_utils exec_traces trace_l
 From trillium.program_logic Require Export weakestpre adequacy_cond iris_em.
 
 
+(* TODO: move *)
+Section TraceUtils.
+  Context {A B: Type}. 
+
+  Lemma from_trace_simpl (a: A):
+    from_trace (⟨ a ⟩: trace A B) = (infnil: inflist (B * A)).
+  Proof using.
+    by rewrite (inflist_unfold_fold (from_trace ⟨ a ⟩)).
+  Qed.
+
+  Fixpoint ft_prepend (ft: finite_trace A B) s ℓ :=
+    match ft with
+    | {tr[ a ]} => {tr[ s ]} :tr[ℓ]: a
+    | ft' :tr[ b ]: a => (ft_prepend ft' s ℓ) :tr[ b ]: a
+    end.
+
+  Fixpoint trace_take_fwd (n : nat) (tr : trace A B) : finite_trace A B :=
+    match tr with
+    | ⟨s⟩ => {tr[ s ]}
+    | s -[ℓ]-> r => match n with
+                  | 0 => {tr[s]}
+                  | S n => ft_prepend (trace_take_fwd n r) s ℓ
+                  end
+    end.
+
+  
+  Fixpoint ft_reverse (ft: finite_trace A B) :=
+    match ft with
+    | {tr[ a ]} => {tr[ a ]}
+    | ft' :tr[ ℓ ]: a => ft_prepend (ft_reverse ft') a ℓ
+    end.  
+
+  Lemma trace_take_0_first (tr: trace A B):
+    trace_take 0 tr = {tr[ trfirst tr ]}.
+  Proof using.
+    destruct tr; done.
+  Qed. 
+
+  Lemma trace_take_step (tr: trace A B) n a b:
+    trace_take (S n) (a -[ b ]-> tr) = (trace_take n tr) :tr[ b ]: a.
+  Proof. done. Qed. 
+
+  Lemma trace_take_fwd_0_first (tr: trace A B):
+    trace_take_fwd 0 tr = {tr[ trfirst tr ]}.
+  Proof using.
+    destruct tr; done.
+  Qed. 
+
+  Lemma trace_take_fwd_step (tr: trace A B) n a b:
+    trace_take_fwd (S n) (a -[ b ]-> tr) = ft_prepend (trace_take_fwd n tr) a b.
+  Proof. done. Qed. 
+
+  Lemma inflist_drop_0 (ietr: inflist (B * A)): inflist_drop 0 ietr = ietr.
+  Proof. done. Qed. 
+
+  Lemma ttf_inf_prepend_rewrite (tr: trace A B) (ietr: inflist (B * A)) a b n
+    (EQ: (infcons (b, a) ietr) = inflist_drop n (from_trace tr)):
+    trace_take_fwd (S n) tr = (trace_take_fwd n tr) :tr[ b ]: a.
+  Proof using.
+    generalize dependent a. generalize dependent b. generalize dependent tr. generalize dependent ietr.
+    induction n.
+    { intros. rewrite trace_take_fwd_0_first.
+      rewrite inflist_drop_0 in EQ.
+      destruct tr.
+      { rewrite from_trace_simpl in EQ. done. }
+      simpl in EQ.
+      rewrite (inflist_unfold_fold (from_trace (s -[ ℓ ]-> tr))) in EQ. simpl in EQ.
+      inversion EQ. subst.
+      rewrite trace_take_fwd_step. rewrite trace_take_fwd_0_first. done. }
+    intros.
+    destruct tr.
+    { rewrite (inflist_unfold_fold (from_trace ⟨ s ⟩)) in EQ. done. }
+    simpl in EQ. apply IHn in EQ.
+    rewrite !trace_take_fwd_step.
+    by rewrite EQ.
+  Qed.
+
+  Lemma inflist_drop_next (iex: inflist (B * A)) a b irest n
+    (DROP: infcons (b, a) irest = inflist_drop n iex):
+    inflist_drop (S n) iex = irest.
+  Proof using.
+    replace (S n) with (1 + n) by lia. 
+    rewrite inflist_drop_add. rewrite -DROP.
+    done.
+  Qed.
+
+  CoInductive inflist_equiv: inflist (B * A) -> inflist (B * A) -> Prop :=
+  | ie_nil: inflist_equiv infnil infnil
+  | ie_cons il1 il2 a b (EQ: inflist_equiv il1 il2):
+    inflist_equiv (infcons (b, a) il1) (infcons (b, a) il2)
+  .
+
+  Lemma from_to_trace_equiv (il: inflist (B * A)) a:
+    inflist_equiv il (from_trace (to_trace a il)).
+  Proof using. 
+    generalize dependent il. generalize dependent a.
+    cofix CIH.
+    intros. destruct il.
+    { clear CIH.
+      rewrite (inflist_unfold_fold (from_trace (to_trace a infnil))). simpl.
+      constructor. }
+    destruct x.
+    rewrite (trace_unfold_fold (to_trace a (infcons (b, a0) il))). simpl.
+    rewrite (inflist_unfold_fold (from_trace (a -[ b ]-> to_trace a0 il))). simpl.
+    destruct il.
+    { econstructor; eauto. }
+    destruct x. econstructor. eauto.
+  Qed.
+
+  Global Instance inflist_equiv_refl:
+    Reflexive inflist_equiv.
+  Proof using.
+    red. cofix CIH.
+    intros. destruct x; [by constructor| ].
+    destruct x. constructor. done.
+  Qed.
+
+  Lemma trfirst_to_trace a (itr: inflist (B * A)):
+    trfirst (to_trace a itr) = a.
+  Proof using.
+    destruct itr; try done. simpl.
+    by destruct x.
+  Qed.
+
+  Lemma traces_match_inflist_equiv_impl {U V: Type} (etr: trace U V) ST1 ST2 L1 L2 s1:
+    Proper (inflist_equiv ==> impl) (fun atr => @traces_match _ B _ A ST1 ST2 L1 L2 etr (to_trace s1 atr)).
+  Proof using.
+    generalize dependent etr. generalize dependent s1.
+    cofix CIH.
+    intros. red. intros ????.
+    inversion H0; subst.
+    { rewrite (trace_unfold_fold (to_trace s1 x)) in H1. 
+      destruct x; try done.
+      2: { destruct x. done. }
+      simpl in H1. inversion H1. subst. by inversion H. }
+    rewrite (trace_unfold_fold (to_trace s1 x)) in H1. 
+    destruct x; try done.
+    simpl in H1. destruct x. inversion H1. subst. 
+    inversion H. subst.
+    rewrite (trace_unfold_fold (to_trace s1 (infcons (b, a) il2))). simpl.
+    econstructor.
+    5: { eapply CIH; eauto. }
+    all: eauto.
+    rewrite trfirst_to_trace in H5. by rewrite trfirst_to_trace. 
+  Qed.
+
+  Global Instance inflist_equiv_sym:
+    Symmetric inflist_equiv. 
+  Proof using.
+    red. cofix CIH.
+    intros. inversion H; subst; try done.
+    constructor. by apply CIH. 
+  Qed. 
+
+End TraceUtils.
+
+
 Section adequacy.
   Context `{EM: ExecutionModel Λ M}.
   Context {LG_EM: LangEM Λ}.
@@ -96,193 +253,6 @@ Section adequacy.
     - eapply (strong_simulation_adequacy_general_multiple s) => //.
     - done.
   Qed.
-
-  Section TraceUtils.
-    Context {A B: Type}. 
-
-    Lemma from_trace_simpl (a: A):
-      from_trace (⟨ a ⟩: trace A B) = (infnil: inflist (B * A)).
-    Proof using.
-      by rewrite (inflist_unfold_fold (from_trace ⟨ a ⟩)).
-    Qed.
-
-    Fixpoint ft_prepend (ft: finite_trace A B) s ℓ :=
-      match ft with
-      | {tr[ a ]} => {tr[ s ]} :tr[ℓ]: a
-      | ft' :tr[ b ]: a => (ft_prepend ft' s ℓ) :tr[ b ]: a
-      end.
-
-    Fixpoint trace_take_fwd (n : nat) (tr : trace A B) : finite_trace A B :=
-      match tr with
-      | ⟨s⟩ => {tr[ s ]}
-      | s -[ℓ]-> r => match n with
-                    | 0 => {tr[s]}
-                    | S n => ft_prepend (trace_take_fwd n r) s ℓ
-                    end
-      end.
-
-    
-    Fixpoint ft_reverse (ft: finite_trace A B) :=
-      match ft with
-      | {tr[ a ]} => {tr[ a ]}
-      | ft' :tr[ ℓ ]: a => ft_prepend (ft_reverse ft') a ℓ
-      end.  
-
-    Lemma trace_take_0_first (tr: trace A B):
-      trace_take 0 tr = {tr[ trfirst tr ]}.
-    Proof using.
-      destruct tr; done.
-    Qed. 
-
-    Lemma trace_take_step (tr: trace A B) n a b:
-      trace_take (S n) (a -[ b ]-> tr) = (trace_take n tr) :tr[ b ]: a.
-    Proof. done. Qed. 
-
-    Lemma trace_take_fwd_0_first (tr: trace A B):
-      trace_take_fwd 0 tr = {tr[ trfirst tr ]}.
-    Proof using.
-      destruct tr; done.
-    Qed. 
-
-    Lemma trace_take_fwd_step (tr: trace A B) n a b:
-      trace_take_fwd (S n) (a -[ b ]-> tr) = ft_prepend (trace_take_fwd n tr) a b.
-    Proof. done. Qed. 
-
-    (* Lemma reverse_ext' (tr: trace A B) a b n: *)
-    (*   (* (ft_reverse ft) :tr[ b ]: a = ft_prepend *) *)
-    (*   (ft_prepend (ft_reverse (trace_take n tr)) a b) = ft_reverse (trace_take (S n) (a -[ b ]-> tr)). *)
-    (* Proof using. *)
-    (*   generalize dependent a. generalize dependent b. generalize dependent tr. *)
-    (*   induction n. *)
-    (*   { intros. rewrite trace_take_0_first. *)
-    (*     rewrite trace_take_step. rewrite trace_take_0_first. *)
-    (*     simpl. done. }     *)
-    (*   intros. *)
-    (*   clear IHn.  *)
-    (*   destruct tr. *)
-    (*   { simpl. done. } *)
-    (*   simpl. done. *)
-    (* Qed. *)
-
-    (* Lemma reverse_ext (tr: trace A B) a b n: *)
-    (*   (* (ft_reverse ft) :tr[ b ]: a = ft_prepend *) *)
-    (*   (ft_reverse ((trace_take n tr) :tr[b]: a)) = ft_reverse (trace_take (S n) (a -[ b ]-> tr)). *)
-    (* Proof using. *)
-    (*   generalize dependent a. generalize dependent b. generalize dependent tr. *)
-    (*   induction n. *)
-    (*   { intros. rewrite trace_take_0_first. *)
-    (*     rewrite trace_take_step. rewrite trace_take_0_first. *)
-    (*     simpl. done. } *)
-    (*   intros. *)
-    (*   clear IHn. *)
-    (*   destruct tr. *)
-    (*   { simpl. done. } *)
-    (*   simpl. done. *)
-    (* Qed. *)
-
-    Lemma inflist_drop_0 (ietr: inflist (B * A)): inflist_drop 0 ietr = ietr.
-    Proof. done. Qed. 
-
-    Lemma ttf_inf_prepend_rewrite (tr: trace A B) (ietr: inflist (B * A)) a b n
-      (EQ: (infcons (b, a) ietr) = inflist_drop n (from_trace tr)):
-      trace_take_fwd (S n) tr = (trace_take_fwd n tr) :tr[ b ]: a.
-    Proof using.
-      generalize dependent a. generalize dependent b. generalize dependent tr. generalize dependent ietr.
-      induction n.
-      { intros. rewrite trace_take_fwd_0_first.
-        rewrite inflist_drop_0 in EQ.
-        destruct tr.
-        { rewrite from_trace_simpl in EQ. done. }
-        simpl in EQ.
-        rewrite (inflist_unfold_fold (from_trace (s -[ ℓ ]-> tr))) in EQ. simpl in EQ.
-        inversion EQ. subst.
-        rewrite trace_take_fwd_step. rewrite trace_take_fwd_0_first. done. }
-      intros.
-      destruct tr.
-      { rewrite (inflist_unfold_fold (from_trace ⟨ s ⟩)) in EQ. done. }
-      simpl in EQ. apply IHn in EQ.
-      rewrite !trace_take_fwd_step.
-      by rewrite EQ.
-    Qed.
-
-    Lemma inflist_drop_next (iex: inflist (B * A)) a b irest n
-      (DROP: infcons (b, a) irest = inflist_drop n iex):
-      inflist_drop (S n) iex = irest.
-    Proof using.
-      replace (S n) with (1 + n) by lia. 
-      rewrite inflist_drop_add. rewrite -DROP.
-      done.
-    Qed.
-
-    CoInductive inflist_equiv: inflist (B * A) -> inflist (B * A) -> Prop :=
-    | ie_nil: inflist_equiv infnil infnil
-    | ie_cons il1 il2 a b (EQ: inflist_equiv il1 il2):
-      inflist_equiv (infcons (b, a) il1) (infcons (b, a) il2)
-    .
-
-    Lemma from_to_trace_equiv (il: inflist (B * A)) a:
-      inflist_equiv il (from_trace (to_trace a il)).
-    Proof using. 
-      generalize dependent il. generalize dependent a.
-      cofix CIH.
-      intros. destruct il.
-      { clear CIH.
-        rewrite (inflist_unfold_fold (from_trace (to_trace a infnil))). simpl.
-        constructor. }
-      destruct x.
-      rewrite (trace_unfold_fold (to_trace a (infcons (b, a0) il))). simpl.
-      rewrite (inflist_unfold_fold (from_trace (a -[ b ]-> to_trace a0 il))). simpl.
-      destruct il.
-      { econstructor; eauto. }
-      destruct x. econstructor. eauto.
-    Qed.
-
-    Lemma inflist_equiv_refl il:
-      inflist_equiv il il.
-    Proof using.
-      generalize dependent il. cofix CIH.
-      intros. destruct il; [by constructor| ].
-      destruct x. constructor. done.
-    Qed.
-
-    Lemma trfirst_to_trace a (itr: inflist (B * A)):
-      trfirst (to_trace a itr) = a.
-    Proof using.
-       destruct itr; try done. simpl.
-       by destruct x.
-    Qed.
-
-  Lemma traces_match_inflist_equiv_impl {U V: Type} (etr: trace U V) ST1 ST2 L1 L2 s1:
-    Proper (inflist_equiv ==> impl) (fun atr => @traces_match _ B _ A ST1 ST2 L1 L2 etr (to_trace s1 atr)).
-  Proof using.
-    generalize dependent etr. generalize dependent s1.
-    cofix CIH.
-    intros. red. intros ????.
-    inversion H0; subst.
-    { rewrite (trace_unfold_fold (to_trace s1 x)) in H1. 
-      destruct x; try done.
-      2: { destruct x. done. }
-      simpl in H1. inversion H1. subst. by inversion H. }
-    rewrite (trace_unfold_fold (to_trace s1 x)) in H1. 
-    destruct x; try done.
-    simpl in H1. destruct x. inversion H1. subst. 
-    inversion H. subst.
-    rewrite (trace_unfold_fold (to_trace s1 (infcons (b, a) il2))). simpl.
-    econstructor.
-    5: { eapply CIH; eauto. }
-    all: eauto.
-    rewrite trfirst_to_trace in H5. by rewrite trfirst_to_trace. 
-  Qed.
-
-  Instance inflist_equiv_sym:
-    Symmetric inflist_equiv. 
-  Proof using.
-    red. cofix CIH.
-    intros. inversion H; subst; try done.
-    constructor. by apply CIH. 
-  Qed. 
-
-  End TraceUtils.
 
   Lemma vist_equiv_impl X etr atr:
     Proper (inflist_equiv ==> inflist_equiv ==> impl) (@valid_inf_system_trace Λ M X etr atr). 
@@ -425,7 +395,7 @@ Section adequacy.
     rewrite trace_take_fwd_0_first in MATCH. rewrite H2 in MATCH.
     simpl in MATCH.
     eapply traces_match_inflist_equiv_impl; [| done].
-    apply inflist_equiv_sym, from_to_trace_equiv. 
-  Qed. 
+    symmetry. apply from_to_trace_equiv. 
+  Qed.
   
 End adequacy.
