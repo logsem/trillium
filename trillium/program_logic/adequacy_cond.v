@@ -274,8 +274,7 @@ Definition rel_always_holds_with_trace_inv `{!irisG Λ M Σ}
          ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
          state_interp ex atr -∗
          cur_posts_multiple c.1 c1.1 Φs -∗
-         □ (state_interp ex atr ∗
-             steps_from_inv trace_inv ex atr
+         □ (state_interp ex atr ∗ steps_from_inv trace_inv ex atr
             ={⊤}=∗ state_interp ex atr ∗ trace_inv ex atr) ∗
          (steps_from_inv trace_inv ex atr ={⊤, ∅}=∗ ⌜ξ ex atr⌝)).
 
@@ -402,16 +401,12 @@ Section StrongAdequacyHelpers.
   (Hatr : trace_starts_in atr δ)
   (tp : list (expr Λ))
   (σ1' : state Λ)
-  (Hc1 : (tp, σ1') = trace_last ex)
-  (Htake : locales_equiv es (take (length es) tp))
-  (Htakelen : length es ≤ length tp)
   (Hξ' : ξ ex atr)
   (c : cfg Λ)
   (oζ : olocale Λ)
   (c' : cfg Λ)
   (Hc : trace_ends_in ex c)
   (Hstep : locale_step c oζ c')
-  (H0 : c = (tp, σ1'))
   (H1 : ∀ e2 : expr Λ, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2)
   (δ'' : M)
   (ℓ : mlabel M):
@@ -437,8 +432,7 @@ Section StrongAdequacyHelpers.
       + by intros ? ? ? ? [-> ->]%trace_contract_of_extend [-> ->]%trace_contract_of_extend.
     - done.
     - done.
-    - subst c.
-      iApply (f2b_helper with "[$]"). 
+    - iApply (f2b_helper with "[$]"). 
       iDestruct ("H" with "POSTS") as "[? Hξ]".
       iMod ("Hξ" with "[HTI]") as "%".
       + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
@@ -500,10 +494,9 @@ Section StrongAdequacyHelpers.
   ={⊤}=∗
   trace_inv ex atr ∗   
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ ∗
-  stateI ex atr ∗ (* steps_from_inv ex atr ∗ *)
+  stateI ex atr ∗ 
   wptp s (trace_last ex).1 (all_posts (trace_last ex).1 es Φs).
   Proof using.
-    (* iIntros "Hstep (HSI & HTI & Htp)". *)
     iIntros "Hstep HSI HTI Htp".
     iPoseProof (wptp_of_val_post with "Htp") as "Htp".
     replace stateI with state_interp by done.
@@ -643,8 +636,6 @@ Section StrongAdequacyHelpers.
   { pose proof Hextras as Htake%tr_extras_locales_equiv.
     pose proof Hextras as Htakelen%tr_extras_length_le.
     iPoseProof (ref_preserved' with "[$] [HSI HTI Hback] [$]") as "#Hextend"; eauto.
-    { by rewrite -Hc1 in Htake. } 
-    { rewrite -Hc1 in Htakelen. simpl in *. lia. }
     { iFrame. iSplitL "HTI".
       { rewrite /steps_from_inv. 
         by iIntros "*" ([->->]%trace_contract_of_extend [->->]%trace_contract_of_extend). }        
