@@ -135,14 +135,95 @@ Proof.
   inversion Hm; simplify_eq. by eapply IHn.
 Qed.
 
-Fixpoint trace_take {S L} (n : nat) (tr : trace S L) : finite_trace S L :=
-  match tr with
-  | ⟨s⟩ => {tr[ s ]}
-  | s -[ℓ]-> r => match n with
+
+Section TraceTake.
+  Context {S L: Type}.
+          
+  Fixpoint trace_take (n : nat) (tr : trace S L) : finite_trace S L :=
+    match tr with
+    | ⟨s⟩ => {tr[ s ]}
+    | s -[ℓ]-> r => match n with
                   | 0 => {tr[s]}
-                  | S n => (trace_take n r) :tr[ℓ]: s
+                  | Datatypes.S n => (trace_take n r) :tr[ℓ]: s
                   end
-  end.
+    end.
+
+  Lemma trace_take_0_first (tr: trace S L):
+    trace_take 0 tr = {tr[ trfirst tr ]}.
+  Proof using.
+    destruct tr; done.
+  Qed. 
+
+  Lemma trace_take_step (tr: trace S L) n a b:
+    trace_take (Datatypes.S n) (a -[ b ]-> tr) = (trace_take n tr) :tr[ b ]: a.
+  Proof. done. Qed.
+
+  Fixpoint ft_prepend (ft: finite_trace S L) s ℓ :=
+    match ft with
+    | {tr[ a ]} => {tr[ s ]} :tr[ℓ]: a
+    | ft' :tr[ b ]: a => (ft_prepend ft' s ℓ) :tr[ b ]: a
+    end.
+
+  Fixpoint trace_take_fwd (n : nat) (tr : trace S L) : finite_trace S L :=
+    match tr with
+    | ⟨s⟩ => {tr[ s ]}
+    | s -[ℓ]-> r => match n with
+                  | 0 => {tr[s]}
+                  | Datatypes.S n => ft_prepend (trace_take_fwd n r) s ℓ
+                  end
+    end.
+
+  
+  Fixpoint ft_reverse (ft: finite_trace S L) :=
+    match ft with
+    | {tr[ a ]} => {tr[ a ]}
+    | ft' :tr[ ℓ ]: a => ft_prepend (ft_reverse ft') a ℓ
+    end.  
+
+  Lemma trace_take_fwd_0_first (tr: trace S L):
+    trace_take_fwd 0 tr = {tr[ trfirst tr ]}.
+  Proof using.
+    destruct tr; done.
+  Qed. 
+
+  Lemma trace_take_fwd_step (tr: trace S L) n a b:
+    trace_take_fwd (Datatypes.S n) (a -[ b ]-> tr) = ft_prepend (trace_take_fwd n tr) a b.
+  Proof. done. Qed. 
+
+  Lemma ttf_inf_prepend_rewrite (tr: trace S L) (ietr: inflist (L * S)) a b n
+    (EQ: (infcons (b, a) ietr) = inflist_drop n (from_trace tr)):
+    trace_take_fwd (Datatypes.S n) tr = (trace_take_fwd n tr) :tr[ b ]: a.
+  Proof using.
+    generalize dependent a. generalize dependent b. generalize dependent tr. generalize dependent ietr.
+    induction n.
+    { intros. rewrite trace_take_fwd_0_first.
+      rewrite inflist_drop_0 in EQ.
+      destruct tr.
+      { rewrite from_trace_simpl in EQ. done. }
+      simpl in EQ.
+      rewrite (inflist_unfold_fold (from_trace (s -[ ℓ ]-> tr))) in EQ. simpl in EQ.
+      inversion EQ. subst.
+      rewrite trace_take_fwd_step. rewrite trace_take_fwd_0_first. done. }
+    intros.
+    destruct tr.
+    { rewrite (inflist_unfold_fold (from_trace ⟨ s ⟩)) in EQ. done. }
+    simpl in EQ. apply IHn in EQ.
+    rewrite !trace_take_fwd_step.
+    by rewrite EQ.
+  Qed.
+
+  Lemma inflist_drop_next (iex: inflist (L * S)) a b irest n
+    (DROP: infcons (b, a) irest = inflist_drop n iex):
+    inflist_drop (Datatypes.S n) iex = irest.
+  Proof using.
+    replace (Datatypes.S n) with (1 + n) by lia. 
+    rewrite inflist_drop_add. rewrite -DROP.
+    done.
+  Qed.
+
+End TraceTake.
+
+
 
 Fixpoint trace_filter {S L} (f : S → L → Prop)
            `{∀ s l, Decision (f s l)}

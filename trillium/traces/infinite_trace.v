@@ -57,6 +57,9 @@ Section inflist.
       end
     end.
 
+  Lemma inflist_drop_0 (ietr: inflist A): inflist_drop 0 ietr = ietr.
+  Proof. done. Qed. 
+
   Lemma inflist_take_add n m il :
     inflist_take (n + m) il = inflist_take n il ++ (inflist_take m (inflist_drop n il)).
   Proof.
@@ -162,3 +165,31 @@ Proof.
   rewrite /= (IHk il il'); last done.
   rewrite -> inflist_same_length_cons in Hsl; done.
 Qed.
+
+
+Section InflistEquiv.
+  Context {A: Type}.
+
+  CoInductive inflist_equiv: inflist A -> inflist A -> Prop :=
+  | ie_nil: inflist_equiv infnil infnil
+  | ie_cons il1 il2 a (EQ: inflist_equiv il1 il2):
+    inflist_equiv (infcons a il1) (infcons a il2)
+  .
+
+  Global Instance inflist_equiv_refl:
+    Reflexive inflist_equiv.
+  Proof using.
+    red. cofix CIH.
+    intros. destruct x; [by constructor| ].
+    by constructor.
+  Qed.
+
+  Global Instance inflist_equiv_sym:
+    Symmetric inflist_equiv. 
+  Proof using.
+    red. cofix CIH.
+    intros. inversion H; subst; try done.
+    constructor. by apply CIH. 
+  Qed. 
+
+End InflistEquiv.

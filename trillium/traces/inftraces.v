@@ -1,7 +1,9 @@
 From stdpp Require Import option.
+From stdpp Require Import ssreflect.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.program_logic Require Import adequacy.
-From trillium.traces Require Import utils_logic.
+(* From trillium.program_logic Require Import adequacy. *)
+From trillium.traces Require Import utils_logic trace infinite_trace.
+From trillium.prelude Require Import classical.
 
 Require Import
         Coq.Relations.Relation_Definitions
@@ -274,6 +276,36 @@ Section execs_and_traces.
     - rewrite -Heq. econstructor. apply CH; done.
   Qed.
 
+  Lemma from_trace_simpl s:
+    from_trace ⟨ s ⟩ = (infnil: inflist (L * S)).
+  Proof using.
+    by rewrite (inflist_unfold_fold (from_trace ⟨ s ⟩)).
+  Qed.
+
+  Lemma trfirst_to_trace a (itr: inflist (L * S)):
+    trfirst (to_trace a itr) = a.
+  Proof using.
+    destruct itr; try done. simpl.
+    by destruct x.
+  Qed.
+
+  Lemma from_to_trace_equiv (il: inflist (L * S)) a:
+    inflist_equiv il (from_trace (to_trace a il)).
+  Proof using. 
+    generalize dependent il. generalize dependent a.
+    cofix CIH.
+    intros. destruct il.
+    { clear CIH.
+      rewrite (inflist_unfold_fold (from_trace (to_trace a infnil))). simpl.
+      constructor. }
+    destruct x.
+    rewrite (trace_unfold_fold (to_trace a (infcons (l, s) il))). simpl.
+    rewrite (inflist_unfold_fold (from_trace (a -[ l ]-> to_trace s il))). simpl.
+    destruct il.
+    { econstructor; eauto. }
+    destruct x. econstructor. eauto.
+  Qed.
+
 End execs_and_traces.
 
 Section TraceValid.
@@ -417,6 +449,28 @@ Section simulation.
     move=> /= Hm Ha. destruct tr1 as [|s ℓ tr1''] eqn:Heq; first done.
     destruct tr2; first by inversion Hm.
     inversion Hm; simplify_eq. by eapply IHn.
+  Qed.
+
+  Lemma traces_match_inflist_equiv_impl (etr: trace S1 L1) s1:
+    Proper (inflist_equiv ==> impl) (fun atr => traces_match etr (to_trace s1 atr)).
+  Proof using.
+    generalize dependent etr. generalize dependent s1.
+    cofix CIH.
+    intros. red. intros ????.
+    inversion H0; subst.
+    { rewrite (trace_unfold_fold (to_trace s1 x)) in H1. 
+      destruct x; try done.
+      2: { destruct x. done. }
+      simpl in H1. inversion H1. subst. by inversion H. }
+    rewrite (trace_unfold_fold (to_trace s1 x)) in H1. 
+    destruct x; try done.
+    simpl in H1. destruct x. inversion H1. subst. 
+    inversion H. subst.
+    rewrite (trace_unfold_fold (to_trace s1 (infcons (l, s) il2))). simpl.
+    econstructor.
+    5: { eapply CIH; eauto. }
+    all: eauto.
+    rewrite trfirst_to_trace in H5. by rewrite trfirst_to_trace. 
   Qed.
 
 End simulation.
@@ -899,6 +953,8 @@ Section lex_ind.
 
 End lex_ind.
 
+From iris.algebra Require Import monoid big_op.
+From stdpp Require Import countable.
 #[global] Program Instance add_monoid: Monoid Nat.add :=
   {| monoid_unit := 0 |}.
 

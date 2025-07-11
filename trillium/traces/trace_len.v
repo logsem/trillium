@@ -1,4 +1,4 @@
-From stdpp Require Import decidable option.
+From stdpp Require Import decidable option ssreflect.
 From Stdlib Require Import Arith.
 From trillium.traces Require Import my_omega inftraces utils_logic.
 Import numbers.
