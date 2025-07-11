@@ -175,22 +175,22 @@ Definition rel_always_holds_with_trace_inv `{!irisG Λ M Σ}
 
 (** "Progress Resource" - generalization of wptp *)
 (* TODO: do we need to expose stuckness, or it is local to wptp? *)
-Record ProgressResource {Λ} {M} {Σ}
+Record ProgressResource {Λ} {M} {Σ} {Hinv : invGS_gen HasNoLc Σ}
   (stateI: execution_trace Λ → auxiliary_trace M → iProp Σ)
   (post : locale Λ → val Λ → iProp Σ)
   := {  
   pr_pr :> stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ;
 
-  pr_irisG := fun {Hinv : invGS_gen HasNoLc Σ} => ({| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ);
-  pr_has_posts `{invGS_gen HasNoLc Σ}: forall s ex Φs,
+  pr_irisG := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ;
+  pr_has_posts: forall s ex Φs,
       let Ps := posts_of (trace_last ex).1 Φs in 
       pr_pr s ex Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr s ex Φs);
-  pr_not_stuck: forall `{invGS_gen HasNoLc Σ} s ex Φs σ atr tp t0 trest,
+  pr_not_stuck: forall s ex Φs σ atr tp t0 trest,
           valid_exec ex → trace_ends_in ex (t0 ++ tp ++ trest, σ) →
           state_interp ex atr -∗ pr_pr s ex Φs ={⊤}=∗
           state_interp ex atr ∗ pr_pr s ex Φs ∗
           ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝;
-  pr_take_step: forall `{invGS_gen HasNoLc Σ} s ex Φs c oζ c' atr,
+  pr_take_step: forall s ex Φs c oζ c' atr,
     valid_exec ex → trace_ends_in ex c → locale_step c oζ c' →
     config_wp -∗
     state_interp ex atr -∗

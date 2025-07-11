@@ -23,10 +23,35 @@ Section adequacy.
         ⊢ (lgem_init_resource (es, σ1) (lgem_GS0 := iem_phys _ _) ∗
              em_init_resource s1 p (em_GS0 := iem_fairnessGS _ _)
            ={⊤}=∗
-              let Φs := map (fun i _ => em_thread_post i%nat (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in
+              let Φs := map (em_thread_post (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in
               config_wp ∗
               wptp s es Φs ∗
               rel_always_holds s Φs R (es, σ1) s1)).
+  
+  Definition WptpPR {Σ} {Hinv : @IEMGS _ _ LG_EM EM Σ}
+    (iG := IEM_irisG LG_EM EM)
+    : ProgressResource state_interp fork_post.
+  Proof using.
+    clear R FILTER_PCL C C_DEC.
+    exists (fun s etr Φs => wptp s (trace_last etr).1 Φs).
+    - intros. apply wptp_of_val_post.
+    - intros. rewrite H0.
+      iIntros "? WPS".
+      iMod (wptp_not_stuck_same _ _ _ _ [] with "[$] [WPS]") as "(?&?&%NS)". 
+      3: by iFrame.
+      { eauto. }
+      { erewrite app_nil_l, app_nil_r. eauto. }
+      iModIntro. iFrame.
+      iPureIntro. intros. rewrite -H0.
+      eapply NS; eauto. simpl. set_solver.
+    - intros.
+      iIntros "???".
+      iMod (take_step with "[$] [$] [$]") as "X".
+      1, 2: by eauto.
+      { by rewrite H0. }
+      iModIntro.
+      by rewrite H0.
+  Defined.      
 
   Theorem strong_simulation_adequacy_general_multiple
     `{hPre: @IEMGpreS _ _ LG_EM EM Σ}
@@ -54,7 +79,7 @@ Section adequacy.
     set (iemG := {| iem_fairnessGS := fGS; iem_phys := pGS |}).
     iPoseProof (WPS iemG) as "Hwp". clear WPS.
     
-    iExists state_interp, (λ _ _, ⌜ True ⌝%I), _, (fun τ _ => em_thread_post τ).
+    iExists state_interp, (λ _ _, ⌜ True ⌝%I), _, em_thread_post, WptpPR. 
 
     iMod ("Hwp" with "[$PHYS $LM_INIT]") as "(CWP & WP & RAH)". 
     iModIntro. simpl. iFrame "INIT MSI WP CWP".
@@ -240,5 +265,5 @@ Section adequacy.
     eapply traces_match_inflist_equiv_impl; [| done].
     symmetry. apply from_to_trace_equiv. 
   Qed.
-  
+
 End adequacy.

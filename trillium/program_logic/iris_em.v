@@ -58,7 +58,7 @@ Section IEM.
       (⌜em_valid_state_evolution_fairness extr auxtr⌝ ∗
        lgem_si (trace_last extr).2 (lgem_GS0 := iem_phys) ∗
        em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := iem_fairnessGS))%I ;
-    fork_post tid := fun _ => em_thread_post tid (em_GS0 := iem_fairnessGS);
+    fork_post := em_thread_post (em_GS0 := iem_fairnessGS);
 }.
 
 End IEM.

@@ -17,7 +17,7 @@ Class ExecutionModel (Λ: language) (M: Model) := {
     em_valid_evolution_step:
       cfg Λ -> olocale Λ → cfg Λ → mstate M → mlabel M → mstate M → Prop;
 
-    em_thread_post {Σ} `{em_GS Σ}: locale Λ -> iProp Σ;
+    em_thread_post {Σ} `{em_GS Σ}: locale Λ -> val Λ -> iProp Σ;
 
     em_msi {Σ} `{em_GS Σ}: cfg Λ -> mstate M -> iProp Σ;
     

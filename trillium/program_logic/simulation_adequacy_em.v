@@ -19,7 +19,7 @@ Section adequacy.
         ⊢ (lgem_init_resource (es, σ1) (lgem_GS0 := iem_phys _ _) ∗
              em_init_resource s1 p (em_GS0 := iem_fairnessGS _ _)
            ={⊤}=∗
-              let Φs := map (fun i _ => em_thread_post i%nat (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in
+              let Φs := map (fun τ v => em_thread_post τ v (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in
               config_wp ∗
               wptp s es Φs ∗
               rel_always_holds s Φs R (es, σ1) s1)).
@@ -50,10 +50,13 @@ Section adequacy.
     set (iemG := {| iem_fairnessGS := fGS; iem_phys := pGS |}).
     iPoseProof (WPS iemG) as "Hwp". clear WPS.
     
-    iExists state_interp, (λ _ _, ⌜ True ⌝%I), _, (fun τ _ => em_thread_post τ).
+    iExists state_interp, (λ _ _, ⌜ True ⌝%I), _, (em_thread_post).
 
     iMod ("Hwp" with "[$PHYS $LM_INIT]") as "(CWP & WP & RAH)". 
-    iModIntro. simpl. iFrame "INIT MSI WP CWP".
+    iModIntro. simpl.
+    (* iFrame "INIT MSI WP CWP". *)
+
+    iFrame "INIT MSI CWP WP".
 
     (* TODO: make a lemma *)
     iIntros (??????????) "SI POSTS".
