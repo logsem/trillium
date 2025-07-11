@@ -184,28 +184,35 @@ Section StrongAdequacyHelpers.
   Context (C: execution_trace Λ → Prop).
   Hypothesis C_DEC: forall ex, Decision (C ex).
 
+  (* (** "Progress Resource" - generalization of wptp *) *)
+  (* (* TODO: do we need to expose stuckness, or it is local to wptp? *) *)
+  (* Context (PR: stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ).  *)
+
   Definition cur_tr_repr_impl
     (Hinv : invGS_gen HasNoLc Σ)    
 (i := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ)
-    s es Φs ex atr: iProp Σ :=
+    s Φs ex atr: iProp Σ :=
     (
+    let c0 := trace_first ex in 
     let c1 := trace_last ex in 
     stateI ex atr ∗
     steps_from_inv trace_inv ex atr ∗
     (let i := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ in
-     wptp s c1.1 (all_posts c1.1 es Φs))). 
+     wptp s c1.1 (all_posts c1.1 c0.1 Φs)
+    (* PR s ex Φs *)
+    ) ).
 
   Definition cur_tr_repr
     (Hinv : invGS_gen HasNoLc Σ)    
 (i := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ)
-    s es Φs ex atr: iProp Σ :=
-    ⌜ C ex ⌝ → cur_tr_repr_impl _ s es Φs ex atr.
+    s Φs ex atr: iProp Σ :=
+    ⌜ C ex ⌝ → cur_tr_repr_impl _ s Φs ex atr.
 
   Lemma init_st_into_trace
     s es σ δ
     (Hes : length es ≥ 1)
     (Hinv : invGS_gen HasNoLc Σ)
-    (Φs : list (val Λ → iProp Σ))    
+    (Φs : list (val Λ → iProp Σ))
     (i :=
        {|
          iris_invGS := Hinv;
@@ -219,7 +226,7 @@ Section StrongAdequacyHelpers.
       (c1 : list (expr Λ) * state Λ) (δ1 : M),
       ⌜{tr[ (es, σ) ]} = ex⌝ ∗ ⌜{tr[ δ ]} = atr⌝ ∗
     ⌜(es, σ) = c1⌝ ∗ ⌜δ = δ1⌝ ∗ ⌜length c1.1 ≥ 1⌝ ∗
-    cur_tr_repr _ s es Φs ex atr
+    cur_tr_repr _ s Φs ex atr
   .
   Proof using.
     iIntros "? ?". 
@@ -290,7 +297,7 @@ Section StrongAdequacyHelpers.
   (δ'' : M)
   (ℓ : mlabel M):
       rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-      cur_tr_repr_impl Hinv s es Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') -∗
+      cur_tr_repr_impl Hinv s Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') -∗
       fupd_to_bupd ⊤ -∗
       ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
   Proof using.
@@ -312,7 +319,9 @@ Section StrongAdequacyHelpers.
     - done.
     - done.
     - iApply (f2b_helper with "[$]"). 
-      iDestruct ("H" with "POSTS") as "[? Hξ]".
+      iDestruct ("H" with "[POSTS]") as "[? Hξ]".
+      { simpl. rewrite /cur_posts_multiple.
+        erewrite first_eq_trace_starts_in; eauto. done. }
       iMod ("Hξ" with "[HTI]") as "%".
       + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
                  [-> ->]%trace_contract_of_extend); done.
@@ -330,10 +339,10 @@ Section StrongAdequacyHelpers.
   (Hextras : tr_extras ξ (es, σ) δ ex atr):
 
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-  cur_tr_repr_impl Hinv s es Φs ex atr ={⊤}=∗
+  cur_tr_repr_impl Hinv s Φs ex atr ={⊤}=∗
   ⌜ξ ex atr⌝ ∗
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ ∗
-  cur_tr_repr_impl Hinv s es Φs ex atr ∗
+  cur_tr_repr_impl Hinv s Φs ex atr ∗
   ⌜ ∀ e, e ∈ (trace_last ex).1 → s = NotStuck → not_stuck e (trace_last ex).2 ⌝.
   Proof using.
     iIntros "Hstep PRE". iDestruct "PRE" as "(HSI & HTI & Htp)".
@@ -356,7 +365,8 @@ Section StrongAdequacyHelpers.
     iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
     iDestruct ("Htp") as "(Hpost & Hback)".
     
-    iDestruct ("Hstep" with "[] [] [] HSI Hpost") as "[_ Hξ]"; eauto.
+    iDestruct ("Hstep" with "[] [] [] HSI [Hpost]") as "[_ Hξ]"; eauto.
+    { erewrite first_eq_trace_starts_in; eauto. }
     iApply fupd_plain_mask.
     iMod ("Hξ" with "HTI") as "%"; auto.
   Qed.
@@ -423,7 +433,7 @@ Section StrongAdequacyHelpers.
   (Hextras : tr_extras ξ (es, σ) δ ex atr):
     config_wp -∗ 
     rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-    cur_tr_repr _ s es Φs ex atr
+    cur_tr_repr _ s Φs ex atr
     -∗
     |={⊤}=> fupd_to_bupd ⊤ -∗ Gsim_cond Σ M s ξ C ex atr.
   Proof using C_DEC.
@@ -454,6 +464,7 @@ Section StrongAdequacyHelpers.
     rewrite {2}/Gsim_cond (fixpoint_unfold (Gsim_cond_pre _ _ _ _ _) _ _).
     destruct c1 as [tp σ1'].
 
+    erewrite first_eq_trace_starts_in; eauto.
     iMod (get_trace_inv with "[$] [$] [$] [$]") as "(HTI & Hstep & HSI & Htp)"; eauto.
     
     iModIntro. 
@@ -510,7 +521,7 @@ Section StrongAdequacyHelpers.
 
   iModIntro. iIntros "HFtB".
  
-  iAssert (cur_tr_repr Hinv s es Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') ∗ fupd_to_bupd ⊤ ∗ rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ)%I
+  iAssert (cur_tr_repr Hinv s Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') ∗ fupd_to_bupd ⊤ ∗ rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ)%I
     with "[Hstep HSI HTI Hback HFtB]" as "(PRE' & HFtB & Hstep)".
   { pose proof Hextras as Htake%tr_extras_locales_equiv.
     pose proof Hextras as Htakelen%tr_extras_length_le.
@@ -528,6 +539,7 @@ Section StrongAdequacyHelpers.
       simpl.
       rewrite -app_assoc.
       rewrite -Hc1 in Hlocales.
+      erewrite first_eq_trace_starts_in; eauto. 
       by rewrite Hlocales. }
     
     iFrame "#∗". iIntros "%PASS'".
@@ -539,7 +551,9 @@ Section StrongAdequacyHelpers.
       rewrite -Hc1 in Hlocales.
       subst c. 
       rewrite -app_assoc Hlocales //.
-      iDestruct "Hback" as "(Hpost & Hwptp)". by iApply "Hwptp". }
+      iDestruct "Hback" as "(Hpost & Hwptp)".
+      erewrite first_eq_trace_starts_in; eauto.
+      by iApply "Hwptp". }
  
   iExists _, _.
   iApply (f2b_helper with "[$]"). 
