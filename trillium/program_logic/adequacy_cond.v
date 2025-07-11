@@ -178,6 +178,7 @@ Definition rel_always_holds_with_trace_inv `{!irisG Λ M Σ}
 Record ProgressResource {Λ} {M} {Σ} {Hinv : invGS_gen HasNoLc Σ}
   (stateI: execution_trace Λ → auxiliary_trace M → iProp Σ)
   (post : locale Λ → val Λ → iProp Σ)
+  (C: execution_trace Λ → Prop)
   := {  
   pr_pr :> stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ;
 
@@ -194,7 +195,8 @@ Record ProgressResource {Λ} {M} {Σ} {Hinv : invGS_gen HasNoLc Σ}
     valid_exec ex → trace_ends_in ex c → locale_step c oζ c' →
     config_wp -∗
     state_interp ex atr -∗
-    pr_pr s ex Φs
+    pr_pr s ex Φs -∗
+    ⌜ C (ex :tr[ oζ ]: c') ⌝
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length ex)) |={∅,⊤}=>
     ⌜∀ e2, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
     ∃ δ' ℓ,
@@ -223,7 +225,7 @@ Section StrongAdequacyHelpers.
   Context (C: execution_trace Λ → Prop).
   Hypothesis C_DEC: forall ex, Decision (C ex).
 
-  Context (PR: ProgressResource stateI post). 
+  Context (PR: ProgressResource stateI post C).
 
   Definition cur_tr_repr_impl s Φs ex atr: iProp Σ :=
     let c0 := trace_first ex in 
@@ -369,7 +371,7 @@ Section StrongAdequacyHelpers.
     (* { list_simplifier. rewrite <- surjective_pairing. apply trace_ends_in_last. } *)
     (* iMod ("Htp") as "(HSI & Htp & %Hnstk)". *)
 
-    iMod (pr_not_stuck _ _ _ _ _ _ _ [] with "[$HSI] Htp") as "(HSI & Htp & %Htp)". 
+    iMod (pr_not_stuck _ _ _ _ _ _ _ _ [] with "[$HSI] Htp") as "(HSI & Htp & %Htp)". 
     { by eapply valid_system_trace_valid_exec_trace. }
     { list_simplifier. erewrite app_nil_r. rewrite <- surjective_pairing.
       apply trace_ends_in_last. }
@@ -449,7 +451,8 @@ Section StrongAdequacyHelpers.
   (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ))
   (atr : auxiliary_trace M)
   (c1 := trace_last ex)
-  (Hextras : tr_extras ξ (es, σ) δ ex atr):
+  (Hextras : tr_extras ξ (es, σ) δ ex atr)
+  {ML_INH: Inhabited (mlabel M)}:
     config_wp -∗ 
     rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
     cur_tr_repr s Φs ex atr
@@ -496,7 +499,13 @@ Section StrongAdequacyHelpers.
   opose proof (trace_ends_in_inj ex c (tp, σ1') Hc _).
   { rewrite Hc1. apply trace_ends_in_last. }
 
-  iPoseProof (pr_take_step with "config_wp HSI [$]") as "Hstp"; [done|done| ..].
+  destruct (decide (C (ex :tr[ oζ ]: c'))).
+  2: { iIntros "!> !> !>".
+       iExists (trace_last atr), inhabitant.
+       rewrite (fixpoint_unfold (Gsim_cond_pre _ _ _ _ _) _ _).
+       rewrite /Gsim_cond_pre. by iIntros "!> %". }  
+
+  iPoseProof (pr_take_step with "config_wp HSI [$] [//]") as "Hstp"; [done|done| ..].
   { done. }
 
   assert (∃ n, n = trace_length ex) as [n Hn] by eauto.
@@ -594,6 +603,7 @@ Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
         (C: execution_trace Λ → Prop)
         (* (PR: stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ) *)
         `{forall ex, Decision (C ex)}
+        {ML_INH: Inhabited (mlabel M)}
         es σ δ:
   length es ≥ 1 →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
@@ -602,7 +612,7 @@ Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ)
-         (PR: ProgressResource stateI fork_post),
+         (PR: ProgressResource stateI fork_post C),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
@@ -748,7 +758,7 @@ Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ)
-         (PR: ProgressResource stateI fork_post),
+         (PR: ProgressResource stateI fork_post C),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
@@ -778,7 +788,7 @@ Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
          (fork_post : locale Λ → val Λ → iProp Σ)
-         (PR: ProgressResource stateI fork_post),
+         (PR: ProgressResource stateI fork_post C),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗

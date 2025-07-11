@@ -30,9 +30,9 @@ Section adequacy.
   
   Definition WptpPR {Σ} {Hinv : @IEMGS _ _ LG_EM EM Σ}
     (iG := IEM_irisG LG_EM EM)
-    : ProgressResource state_interp fork_post.
+    : ProgressResource state_interp fork_post C.
   Proof using.
-    clear R FILTER_PCL C C_DEC.
+    clear R FILTER_PCL C_DEC.
     exists (fun s etr Φs => wptp s (trace_last etr).1 Φs).
     - intros. apply wptp_of_val_post.
     - intros. rewrite H0.
@@ -45,7 +45,7 @@ Section adequacy.
       iPureIntro. intros. rewrite -H0.
       eapply NS; eauto. simpl. set_solver.
     - intros.
-      iIntros "???".
+      iIntros "??? _". (** for usual wptp with the same TI, trace condition doesn't matter *)
       iMod (take_step with "[$] [$] [$]") as "X".
       1, 2: by eauto.
       { by rewrite H0. }
