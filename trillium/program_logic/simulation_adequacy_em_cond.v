@@ -217,8 +217,8 @@ Section adequacy.
     iModIntro. simpl. iFrame "INIT MSI WP CWP".
 
     (* TODO: make a lemma *)
-    iIntros (??????????) "SI POSTS".
-    rewrite /rel_always_holds. iDestruct ("RAH" with "[][][][][][][] SI POSTS") as "R".
+    iIntros (??????) "SI POSTS".
+    rewrite /rel_always_holds. iDestruct ("RAH" with "[][][]SI POSTS") as "R".
     all: try by done.
     iSplit. 
     - iModIntro; iIntros "[$ ?]"; done.

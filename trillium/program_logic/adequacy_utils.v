@@ -732,6 +732,20 @@ Qed.
 Notation wptp_from t0 s t Φs := ([∗ list] tp1_e;Φ ∈ (prefixes_from t0 t);Φs, WP tp1_e.2 @ s; locale_of tp1_e.1 tp1_e.2; ⊤ {{ Φ }})%I.
 Notation wptp s t Φs := (wptp_from [] s t Φs).
 
+Definition config_wp `{!irisG Λ M Σ} : iProp Σ :=
+  □ ∀ ex atr c1 σ2 ,
+      ⌜valid_exec ex⌝ →
+      ⌜trace_ends_in ex c1⌝ →
+      ⌜config_step c1.2 σ2⌝ →
+      state_interp ex atr ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex) |={∅,⊤}=>
+         ∃ δ2 ℓ, state_interp (trace_extend ex None (c1.1, σ2))
+                              (trace_extend atr ℓ δ2).
+
+#[global] Instance config_wp_persistent `{!irisG Λ M Σ} : Persistent config_wp.
+Proof. apply _. Qed.
+
+#[global] Typeclasses Opaque config_wp.
+
 Section Wptp.
   Context `{!irisG Λ M Σ}.
 
@@ -868,5 +882,92 @@ Section Wptp.
         replace (t ++ ef :: efs) with ((t ++ [ef]) ++ efs); last by list_simplifier.
         rewrite /newposts /newelems. rewrite drop_app_length //.
   Qed.
+
+  Lemma take_step s Φs ex atr c c' oζ:
+    valid_exec ex →
+    trace_ends_in ex c →
+    locale_step c oζ c' →
+    config_wp -∗
+    state_interp ex atr -∗
+    wptp s c.1 Φs ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length ex))
+                                             |={∅,⊤}=>
+    ⌜∀ e2, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
+    ∃ δ' ℓ,
+      state_interp (trace_extend ex oζ c') (trace_extend atr ℓ δ') ∗
+      wptp s  c'.1 (Φs ++ newposts c.1 c'.1). 
+  Proof.
+    iIntros (Hexvalid Hexe Hstep) "config_wp HSI Hc1".
+    inversion Hstep as
+        [ρ1 ρ2 e1 σ1 e2 σ2 efs t1 t2 -> -> Hpstep | ρ1 ρ2 σ1 σ2 t -> -> Hcfgstep].
+    - rewrite /= !prefixes_from_app.
+      iDestruct (big_sepL2_app_inv_l with "Hc1") as
+          (Φs1 Φs2') "[-> [Ht1 Het2]]".
+      iDestruct (big_sepL2_cons_inv_l with "Het2") as (Φ Φs2) "[-> [He Ht2]]".
+      iDestruct (wp_take_step with "HSI He") as "He"; [done|done|done|done|].
+      iMod "He" as "He". iModIntro. iMod "He" as "He". iModIntro. iNext.
+      iMod "He" as "He". iModIntro.
+      iApply (step_fupdN_wand with "[He]"); first by iApply "He".
+      iIntros "He".
+      iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs) /=".
+      have Heq: forall a b c d, a ++ e1 :: c ++ d = (a ++ e1 :: c) ++ d.
+      { intros **. by list_simplifier. }
+      iAssert (wptp_from (t1 ++ e2 :: t2) s efs (newposts (t1 ++ e2 :: t2) ((t1 ++ e2 :: t2) ++ efs)))
+        with "[Hefs]" as "Hefs".
+      { rewrite -new_threads_wptp_from. iApply (big_sepL_impl with "Hefs").
+        iIntros "!#" (i e Hin) "Hwp". list_simplifier.
+        erewrite locale_equiv; first by iFrame.
+        apply locales_equiv_middle. erewrite locale_step_preserve =>//. }
+      assert (valid_exec (ex :tr[Some (locale_of t1 e1)]: (t1 ++ e2 :: t2 ++ efs, σ2))).
+      { econstructor; eauto. }
+      iMod (wptp_not_stuck_same _ _ σ2 _ _ [] with "HSI Hefs") as "[HSI [Hefs %]]"; [done| | ].
+      { list_simplifier. done. }
+      iMod (wptp_not_stuck_same _ _ σ2 _ _ (e2 :: (t2 ++ efs)) with "HSI Ht1") as "[HSI [Ht1 %]]"; [done|  |].
+      {  list_simplifier. done. }
+      iMod (wptp_not_stuck _ _ σ2 _ (t1 ++ [e2]) _ efs with "HSI Ht2") as "[HSI [Ht2 %]]"; [| done | |].
+      { rewrite !prefixes_from_app. apply Forall2_app.
+        - apply locales_equiv_refl.
+        - constructor; last constructor. list_simplifier. erewrite <-locale_step_preserve =>//. }
+      { list_simplifier. done. }
+      iMod (wp_not_stuck _ _ ectx_emp with "HSI He2") as "[HSI [He2 %]]";
+        [done|by rewrite ectx_fill_emp|by erewrite <-locale_step_preserve|].
+
+      iDestruct (wptp_app with "Ht2 Hefs") as "Ht2efs".
+      { by list_simplifier. }
+      erewrite (locale_step_preserve e1 e2) =>//.
+      iDestruct (wptp_cons_l with "He2 Ht2efs") as "He2t2efs".
+      iDestruct (wptp_app with "Ht1 He2t2efs") as "Hc2"; [by list_simplifier|].
+      iDestruct (wptp_of_val_post with "Hc2") as "Hc2".
+      iMod (pre_step_elim with "HSI Hc2") as "[HSI [Hc2posts Hc2back]]".
+      iModIntro; simpl in *.
+      iSplit.
+      { iPureIntro; set_solver. }
+      iExists δ', ℓ.
+      rewrite -!app_assoc.
+      iFrame.
+      list_simplifier.
+      erewrite newposts_locales_equiv;
+        [iFrame | apply locales_equiv_middle; erewrite <-locale_step_preserve =>//].
+      iDestruct ("Hc2back" with "[$]") as "X". iFrame. 
+      rewrite prefixes_from_app //.
+    - rewrite /= /config_wp.
+      iDestruct ("config_wp" with "[] [] [] HSI") as "Hcfg"; [done|done|done|].
+      iMod "Hcfg". iModIntro. iMod "Hcfg". iModIntro.
+      iNext. iMod "Hcfg". iModIntro.
+      iApply (step_fupdN_wand with "[Hcfg]"); first by iApply "Hcfg".
+      iIntros "Hcfg".
+      iMod "Hcfg" as (δ2 ℓ) "HSI".
+      assert (valid_exec (ex :tr[None]: ((t, σ1).1, σ2))).
+      { econstructor; eauto. }
+      iMod (wptp_not_stuck _ _ σ2 _ _ _ [] with "HSI Hc1") as "[HSI [Hc1 %]]";
+        [apply locales_equiv_refl|done|by list_simplifier|].
+      iDestruct (wptp_of_val_post with "Hc1") as "Hc1".
+      iMod (pre_step_elim with "HSI Hc1") as "[HSI [Hc1posts Hc1back]]".
+      iModIntro.
+      iSplit; first by auto.
+      iExists δ2, ℓ.
+      rewrite newposts_same_empty. list_simplifier.
+      iFrame.
+      by iApply "Hc1back". 
+  Qed.  
 
 End Wptp.
