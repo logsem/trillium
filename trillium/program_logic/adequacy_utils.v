@@ -971,3 +971,33 @@ Section Wptp.
   Qed.  
 
 End Wptp.
+
+
+Definition rel_finitary {A B C D}
+           (ξ : finite_trace A B → finite_trace C D → Prop) :=
+  ∀ (ex : finite_trace A B) (atr : finite_trace C D) c' oζ,
+    smaller_card (sig (λ '(δ', ℓ), ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'))) nat.
+
+Section finitary_lemma.
+  Lemma rel_finitary_impl {A B C D} `{EqDecision C, EqDecision D}
+        (ξ ξ' : finite_trace A B -> finite_trace C D -> Prop):
+    (∀ ex aux, ξ ex aux -> ξ' ex aux) ->
+    rel_finitary ξ' ->
+    rel_finitary ξ.
+  Proof.
+    intros Himpl Hξ' ex aux c' oζ.
+    assert (
+        ∀ ξ x, ProofIrrel
+                 (match x return Prop with (δ', ℓ) =>
+                    ξ (ex :tr[ oζ ]: c') (aux :tr[ ℓ ]: δ')
+                  end)).
+    { intros ?[??]. apply make_proof_irrel. }
+    apply finite_smaller_card_nat.
+    specialize (Hξ' ex aux c' oζ). apply smaller_card_nat_finite in Hξ'.
+    eapply (in_list_finite (map proj1_sig (@enum _ _ Hξ'))).
+    intros [δ' ℓ] ?. apply elem_of_list_fmap.
+    assert ((λ '(δ', ℓ), ξ' (ex :tr[ oζ ]: c') (aux :tr[ ℓ ]: δ')) (δ', ℓ)) by eauto.
+    exists ((δ', ℓ) ↾ ltac:(eauto)). split =>//.
+    apply elem_of_enum.
+  Qed.
+End finitary_lemma.

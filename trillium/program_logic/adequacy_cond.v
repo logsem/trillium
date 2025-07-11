@@ -173,6 +173,39 @@ Definition rel_always_holds_with_trace_inv `{!irisG Λ M Σ}
          (steps_from_inv trace_inv ex atr ={⊤, ∅}=∗ ⌜ξ ex atr⌝)).
 
 
+(** "Progress Resource" - generalization of wptp *)
+(* TODO: do we need to expose stuckness, or it is local to wptp? *)
+Record ProgressResource {Λ} {M} {Σ}
+  (stateI: execution_trace Λ → auxiliary_trace M → iProp Σ)
+  (post : locale Λ → val Λ → iProp Σ)
+  := {  
+  pr_pr :> stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ;
+
+  pr_irisG := fun {Hinv : invGS_gen HasNoLc Σ} => ({| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ);
+  pr_has_posts `{invGS_gen HasNoLc Σ}: forall s ex Φs,
+      let Ps := posts_of (trace_last ex).1 Φs in 
+      pr_pr s ex Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr s ex Φs);
+  pr_not_stuck: forall `{invGS_gen HasNoLc Σ} s ex Φs σ atr tp t0 trest,
+          valid_exec ex → trace_ends_in ex (t0 ++ tp ++ trest, σ) →
+          state_interp ex atr -∗ pr_pr s ex Φs ={⊤}=∗
+          state_interp ex atr ∗ pr_pr s ex Φs ∗
+          ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝;
+  pr_take_step: forall `{invGS_gen HasNoLc Σ} s ex Φs c oζ c' atr,
+    valid_exec ex → trace_ends_in ex c → locale_step c oζ c' →
+    config_wp -∗
+    state_interp ex atr -∗
+    pr_pr s ex Φs
+    ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length ex)) |={∅,⊤}=>
+    ⌜∀ e2, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
+    ∃ δ' ℓ,
+      state_interp (trace_extend ex oζ c') (trace_extend atr ℓ δ') ∗
+      pr_pr s (trace_extend ex oζ c') (Φs ++ newposts c.1 c'.1);
+}.
+Arguments pr_has_posts {_ _ _ _ _}.
+Arguments pr_not_stuck {_ _ _ _ _} _ {_}.
+Arguments pr_take_step {_ _ _ _ _} _ {_}.
+
+
 Section StrongAdequacyHelpers.
   Context {Λ: language} {M: Model}. 
   Context (ξ : execution_trace Λ → auxiliary_trace M → Prop).
@@ -190,16 +223,14 @@ Section StrongAdequacyHelpers.
   Context (C: execution_trace Λ → Prop).
   Hypothesis C_DEC: forall ex, Decision (C ex).
 
-  (* (** "Progress Resource" - generalization of wptp *) *)
-  (* (* TODO: do we need to expose stuckness, or it is local to wptp? *) *)
-  (* Context (PR: stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ).  *)
+  Context (PR: ProgressResource stateI post). 
 
   Definition cur_tr_repr_impl s Φs ex atr: iProp Σ :=
     let c0 := trace_first ex in 
     let c1 := trace_last ex in 
     stateI ex atr ∗ 
     steps_from_inv trace_inv ex atr ∗ 
-    wptp s c1.1 (all_posts c1.1 c0.1 Φs).
+    PR s ex (all_posts c1.1 c0.1 Φs).
 
   Definition cur_tr_repr s Φs ex atr: iProp Σ :=
     ⌜ C ex ⌝ → cur_tr_repr_impl s Φs ex atr.
@@ -208,7 +239,7 @@ Section StrongAdequacyHelpers.
     s es σ δ
     (Hes : length es ≥ 1)
     (Φs : list (val Λ → iProp Σ)):
-    stateI {tr[ (es, σ) ]} {tr[ δ ]} -∗ wptp s es Φs -∗
+    stateI {tr[ (es, σ) ]} {tr[ δ ]} -∗ PR s {tr[ (es, σ) ]} Φs -∗
     ∃ (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ)) (atr : auxiliary_trace M)
       (c1 : list (expr Λ) * state Λ) (δ1 : M),
       ⌜{tr[ (es, σ) ]} = ex⌝ ∗ ⌜{tr[ δ ]} = atr⌝ ∗
@@ -220,12 +251,15 @@ Section StrongAdequacyHelpers.
     iExists (trace_singleton (es, σ)), (trace_singleton δ), (es, σ), δ; simpl.
     rewrite /cur_tr_repr /cur_tr_repr_impl.
     rewrite /all_posts. 
-    rewrite drop_ge.
-    2: { simpl. lia. }
-    rewrite right_id.
+    (* rewrite drop_ge. *)
+    (* 2: { simpl. lia. } *)
+    (* rewrite right_id. *)
     iFrame.
-    repeat (iSplit; first by auto).
-    iIntros (????? ?%not_trace_contract_singleton); done.
+    repeat (iSplit; try done).
+    iIntros (PASS0).
+    iSplitR.
+    { iIntros (????? ?%not_trace_contract_singleton); done. }
+    simpl. rewrite drop_all. by list_simplifier. 
   Qed.
 
   (* TODO: better name *)
@@ -260,6 +294,7 @@ Section StrongAdequacyHelpers.
     eauto.
   Qed.
 
+
   Lemma ref_preserved'
     (s : stuckness) (es : list (expr Λ)) (σ : state Λ) (δ : M)    
     (Φs : list (val Λ → iProp Σ))    
@@ -284,15 +319,15 @@ Section StrongAdequacyHelpers.
       ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
   Proof using.
     iIntros "Hstep (HSI & HTI & WPS) FB". simpl. 
-    iPoseProof (wptp_of_val_post with "WPS") as "WPS".
-    replace stateI with state_interp by done.
-    iPoseProof (pre_step_elim with "HSI WPS") as "foo".
+    iPoseProof (pr_has_posts with "WPS") as "WPS".
+    (* replace stateI with state_interp by done. *)
+    iPoseProof (pre_step_elim with "[$HSI] WPS") as "foo".
     rewrite /steps_from_inv. simpl.
     iSpecialize ("HTI" with "[] []").
     1, 2: by iPureIntro; red; eauto.
 
-    iApply (f2b_helper with "[$]"). 
-    iMod "foo" as "[HSI [POSTS WPS']]". iModIntro. iIntros "FB".     
+    iApply (f2b_helper with "[$]").
+    iMod "foo" as "[HSI [POSTS WPS']]". iModIntro. iIntros "FB".
 
     iDestruct ("Hstep" with "[] [] [] HSI") as "H"; [iPureIntro..|].
     - repeat split; eauto. 
@@ -328,11 +363,16 @@ Section StrongAdequacyHelpers.
     iIntros "Hstep PRE". iDestruct "PRE" as "(HSI & HTI & Htp)".
     pose proof Hextras as (Hv & Hex & Hatr & Hξ).
 
-    iPoseProof (wptp_not_stuck _ _ _ _ _ _ [] with "[$HSI] Htp") as "Htp";
-      [apply locales_equiv_refl| | |].
+    (* iPoseProof (wptp_not_stuck _same _ _ _ _ _ _ [] with "[$HSI] Htp") as "Htp"; *)
+    (*   [apply locales_equiv_refl| | |]. *)
+    (* { by eapply valid_system_trace_valid_exec_trace. } *)
+    (* { list_simplifier. rewrite <- surjective_pairing. apply trace_ends_in_last. } *)
+    (* iMod ("Htp") as "(HSI & Htp & %Hnstk)". *)
+
+    iMod (pr_not_stuck _ _ _ _ _ _ _ [] with "[$HSI] Htp") as "(HSI & Htp & %Htp)". 
     { by eapply valid_system_trace_valid_exec_trace. }
-    { list_simplifier. rewrite <- surjective_pairing. apply trace_ends_in_last. }
-    iMod ("Htp") as "(HSI & Htp & %Hnstk)".
+    { list_simplifier. erewrite app_nil_r. rewrite <- surjective_pairing.
+      apply trace_ends_in_last. }
 
     iApply fupd_plain_keep_l. iSplitR.
     2: { by iFrame. }
@@ -340,9 +380,9 @@ Section StrongAdequacyHelpers.
     iIntros "(Hstep & PRE & _)".
     iDestruct "PRE" as "(HSI & HTI & Htp)".
       
-    iPoseProof (wptp_of_val_post with "Htp") as "Htp".
+    iPoseProof (pr_has_posts with "Htp") as "Htp".
     replace stateI with state_interp by done.
-    iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
+    iMod (pre_step_elim with "[$HSI] Htp") as "[HSI Htp]".
     iDestruct ("Htp") as "(Hpost & Hback)".
     
     iDestruct ("Hstep" with "[] [] [] HSI [Hpost]") as "[_ Hξ]"; eauto.
@@ -357,24 +397,27 @@ Section StrongAdequacyHelpers.
     (NSTUCK: ∀ e, e ∈ (trace_last ex).1 → s = NotStuck → not_stuck e (trace_last ex).2):
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
   stateI ex atr -∗ steps_from_inv trace_inv ex atr -∗
-  wptp s (trace_last ex).1 (all_posts (trace_last ex).1 es Φs)
+  (* wptp s (trace_last ex).1 (all_posts (trace_last ex).1 es Φs) *)
+  PR s ex (all_posts (trace_last ex).1 (trace_first ex).1 Φs)
   ={⊤}=∗
   trace_inv ex atr ∗   
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ ∗
   stateI ex atr ∗ 
-  wptp s (trace_last ex).1 (all_posts (trace_last ex).1 es Φs).
+  (* wptp s (trace_last ex).1 (all_posts (trace_last ex).1 es Φs). *)
+  PR s ex (all_posts (trace_last ex).1 (trace_first ex).1 Φs). 
   Proof using.
     iIntros "Hstep HSI HTI Htp".
-    iPoseProof (wptp_of_val_post with "Htp") as "Htp".
+    iPoseProof (pr_has_posts with "Htp") as "Htp".
     replace stateI with state_interp by done.
-    iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
+    iMod (pre_step_elim with "[$HSI] Htp") as "[HSI Htp]".
     iDestruct ("Htp") as "(Hpost & Hback)".
     
     iAssert (□ (stateI ex atr -∗ steps_from_inv _ ex atr
                 ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr))%I
       as "#HTIextend".
-    { iDestruct ("Hstep" with "[] [] [] HSI Hpost") as "[#Hext _]";
+    { iDestruct ("Hstep" with "[] [] [] HSI [Hpost]") as "[#Hext _]";
         auto.
+      { erewrite first_eq_trace_starts_in; eauto. apply EXTRAS. } 
       iModIntro.
       iIntros "HSI HTI".
       iApply ("Hext" with "[$HSI $HTI]"). }
@@ -441,7 +484,8 @@ Section StrongAdequacyHelpers.
     destruct c1 as [tp σ1'].
 
     erewrite first_eq_trace_starts_in; eauto.
-    iMod (get_trace_inv with "[$] [$] [$] [$]") as "(HTI & Hstep & HSI & Htp)"; eauto.
+    iMod (get_trace_inv with "[$] [$] [$] [Htp]") as "(HTI & Hstep & HSI & Htp)"; eauto.
+    { erewrite first_eq_trace_starts_in; eauto. } 
     
     iModIntro. 
     iIntros "HFtB".
@@ -452,11 +496,8 @@ Section StrongAdequacyHelpers.
   opose proof (trace_ends_in_inj ex c (tp, σ1') Hc _).
   { rewrite Hc1. apply trace_ends_in_last. }
 
-  iPoseProof (take_step with "config_wp HSI [Htp]") as "Hstp"; [done|done| ..].
+  iPoseProof (pr_take_step with "config_wp HSI [$]") as "Hstp"; [done|done| ..].
   { done. }
-  { rewrite -Hc1.
-    simpl. rewrite H. simpl.
-    subst. eauto. }
 
   assert (∃ n, n = trace_length ex) as [n Hn] by eauto.
   rewrite -Hn. clear Hn.
@@ -492,8 +533,8 @@ Section StrongAdequacyHelpers.
   iDestruct "H" as (δ'' ℓ) "(HSI & Hpost)"; simpl in *.
 
   replace stateI with state_interp by done.
-  iPoseProof (wptp_of_val_post with "Hpost") as "Hpost".
-  iMod (pre_step_elim with "HSI Hpost") as "[HSI Hback]".
+  iPoseProof (pr_has_posts with "Hpost") as "Hpost".
+  iMod (pre_step_elim with "[$HSI] Hpost") as "[HSI Hback]".
 
   iModIntro. iIntros "HFtB".
  
@@ -515,8 +556,8 @@ Section StrongAdequacyHelpers.
       simpl.
       rewrite -app_assoc.
       rewrite -Hc1 in Hlocales.
-      erewrite first_eq_trace_starts_in; eauto. 
-      by rewrite Hlocales. }
+      erewrite first_eq_trace_starts_in; eauto.
+      rewrite Hc. by rewrite Hlocales. }
     
     iFrame "#∗". iIntros "%PASS'".
     iSplitL "HTI". 
@@ -525,11 +566,16 @@ Section StrongAdequacyHelpers.
     + unshelve opose proof (locales_rewrite _ _ _ Htake Htakelen _ _ _) as Hlocales.
       4: { rewrite <- surjective_pairing. rewrite -Hc1 -H. eauto. }
       rewrite -Hc1 in Hlocales.
-      subst c. 
-      rewrite -app_assoc Hlocales //.
+      (* subst c. *)
+      (* rewrite Hc. *)
       iDestruct "Hback" as "(Hpost & Hwptp)".
+      iSpecialize ("Hwptp" with "[$]").
+      rewrite Hc. simpl.
+      simpl in Hlocales. 
+      rewrite -app_assoc.
       erewrite first_eq_trace_starts_in; eauto.
-      by iApply "Hwptp". }
+      subst c. 
+      rewrite Hlocales //. }
  
   iExists _, _.
   iApply (f2b_helper with "[$]"). 
@@ -546,6 +592,7 @@ End StrongAdequacyHelpers.
 Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
         (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         (C: execution_trace Λ → Prop)
+        (* (PR: stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ) *)
         `{forall ex, Decision (C ex)}
         es σ δ:
   length es ≥ 1 →
@@ -554,11 +601,13 @@ Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
-         (fork_post : locale Λ → val Λ → iProp Σ),
+         (fork_post : locale Λ → val Λ → iProp Σ)
+         (PR: ProgressResource stateI fork_post),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       wptp s es Φs ∗
+       (* wptp s es Φs ∗ *)
+       PR s (trace_singleton (es, σ)) Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ
   ) →
   ⊢ Gsim_cond Σ M s ξ C (trace_singleton (es, σ)) (trace_singleton δ).
@@ -570,11 +619,10 @@ Proof.
   rewrite fupd_to_bupd_unfold /fupd_to_bupd_aux.
   iApply bupd_elim.
   iApply "HFtB".
-  iPoseProof (Hwp Hinv) as "Hwp".
-  iMod "Hwp" as (stateI trace_inv Φs fork_post)
+  iPoseProof (Hwp Hinv) as "Hwp". clear Hwp.
+  iMod "Hwp" as (stateI trace_inv Φs fork_post PR)
                   "(#config_wp & HSI & Hwp & Hstep)".
-  clear Hwp.
-  set (IrisG Λ M Σ Hinv stateI fork_post).
+  (* set (IrisG Λ M Σ Hinv stateI fork_post). *)
 
   iDestruct (init_st_into_trace _ _ _ C with "HSI Hwp") as (ex atr c1 δ1 Hexsing Hatrsing Hc1 Hδ1 Hlen) "PRE"; [done| ].
 
@@ -602,86 +650,6 @@ Proof.
   3: { iFrame "#∗". done. }
   all: tauto. 
 Qed.
-
-Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
-        (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
-        (C: execution_trace Λ → Prop)
-        `{forall ex, Decision (C ex)}
-        e1 σ1 δ:
-  (∀ `{Hinv : !invGS_gen HasNoLc Σ},
-    ⊢ |={⊤}=> ∃
-         (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
-         (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
-         (Φ : val Λ → iProp Σ)
-         (fork_post : locale Λ → val Λ → iProp Σ),
-       let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
-       config_wp ∗
-       stateI (trace_singleton ([e1], σ1)) (trace_singleton δ) ∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
-       (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
-         ⌜valid_system_trace ex atr⌝ -∗
-         ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
-         ⌜trace_starts_in atr δ⌝ -∗
-         ⌜trace_ends_in ex c⌝ -∗
-         ⌜steps_from_ref ξ ex atr⌝ -∗
-         ⌜∀ e2, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
-         ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
-         stateI ex atr -∗
-         posts_of c.1 (Φ :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> (prefixes_from [e1] (drop (length [e1]) c.1)))) -∗
-         □ (stateI ex atr ∗
-             steps_from_inv trace_inv ex atr
-            ={⊤}=∗ stateI ex atr ∗ trace_inv ex atr) ∗
-         ((∀ ex' atr' oζ ℓ,
-              ⌜trace_contract ex oζ ex'⌝ → ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr')
-          ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
-  ⊢ Gsim_cond Σ M s ξ C (trace_singleton ([e1], σ1)) (trace_singleton δ).
-Proof.
-  intros Hwp. apply wp_strong_adequacy_multiple_helper; [done| ..].
-  { done. }
-  { simpl; lia. }
-  iIntros (Hinv).
-  iMod (Hwp Hinv) as (stateI trace_inv Φs fork_post)
-                       "(#config_wp & HSI & Hwp & Hstep)".
-  iIntros "!>". iExists stateI, trace_inv, [Φs], fork_post.
-  iFrame "#∗". iSplitR.
-  { done. }
-  rewrite /rel_always_holds_with_trace_inv. iIntros "**".
-  iApply ("Hstep" with "[][][][][][][] [$][$]").
-  all: try by (iPureIntro; apply H0 || done).
-  iPureIntro.
-  apply last_eq_trace_ends_in in H1. rewrite -H1.
-  replace [e1] with ([e1], σ1).1 by done. 
-  eapply tr_extras_locales_equiv; eauto. 
-Qed.
-
-Definition rel_finitary {A B C D}
-           (ξ : finite_trace A B → finite_trace C D → Prop) :=
-  ∀ (ex : finite_trace A B) (atr : finite_trace C D) c' oζ,
-    smaller_card (sig (λ '(δ', ℓ), ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'))) nat.
-
-Section finitary_lemma.
-  Lemma rel_finitary_impl {A B C D} `{EqDecision C, EqDecision D}
-        (ξ ξ' : finite_trace A B -> finite_trace C D -> Prop):
-    (∀ ex aux, ξ ex aux -> ξ' ex aux) ->
-    rel_finitary ξ' ->
-    rel_finitary ξ.
-  Proof.
-    intros Himpl Hξ' ex aux c' oζ.
-    assert (
-        ∀ ξ x, ProofIrrel
-                 (match x return Prop with (δ', ℓ) =>
-                    ξ (ex :tr[ oζ ]: c') (aux :tr[ ℓ ]: δ')
-                  end)).
-    { intros ?[??]. apply make_proof_irrel. }
-    apply finite_smaller_card_nat.
-    specialize (Hξ' ex aux c' oζ). apply smaller_card_nat_finite in Hξ'.
-    eapply (in_list_finite (map proj1_sig (@enum _ _ Hξ'))).
-    intros [δ' ℓ] ?. apply elem_of_list_fmap.
-    assert ((λ '(δ', ℓ), ξ' (ex :tr[ oζ ]: c') (aux :tr[ ℓ ]: δ')) (δ', ℓ)) by eauto.
-    exists ((δ', ℓ) ↾ ltac:(eauto)). split =>//.
-    apply elem_of_enum.
-  Qed.
-End finitary_lemma.
 
 (** We can extract the simulation correspondence in the meta-logic
     from a proof of the simulation correspondence in the object-logic. *)
@@ -779,11 +747,12 @@ Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (trace_inv : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
-         (fork_post : locale Λ → val Λ → iProp Σ),
+         (fork_post : locale Λ → val Λ → iProp Σ)
+         (PR: ProgressResource stateI fork_post),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       wptp s es Φs ∗
+       PR s (trace_singleton (es, σ)) Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ) δ) →
   continued_simulation_cond ξ C (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
@@ -808,18 +777,19 @@ Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
     ⊢ |={⊤}=> ∃
          (stateI : execution_trace Λ → auxiliary_trace M → iProp Σ)
          (Φs : list (val Λ → iProp Σ))
-         (fork_post : locale Λ → val Λ → iProp Σ),
+         (fork_post : locale Λ → val Λ → iProp Σ)
+         (PR: ProgressResource stateI fork_post),
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       wptp s es Φs ∗
+       PR s (trace_singleton (es, σ)) Φs ∗
        rel_always_holds s Φs ξ (es, σ) δ) →
   continued_simulation_cond ξ C (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
   intros Hlen Hsc Hwptp.
   eapply wp_strong_adequacy_multiple_with_trace_inv; try done. 
   iIntros (Hinv) "".
-  iMod (Hwptp Hinv) as (stateI Φ fork_post) "(Hwpcfg & HSI & Hwp & Hstep)".
+  iMod (Hwptp Hinv) as (stateI Φ fork_post PR) "(Hwpcfg & HSI & Hwp & Hstep)".
   iModIntro.
   iExists stateI, (λ _ _, True)%I, Φ, fork_post; iFrame "Hwpcfg HSI Hwp".
   iIntros (ex atr c ? ? ?) "HSI Hposts".
