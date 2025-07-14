@@ -136,11 +136,10 @@ Section adequacy.
     eapply CIH; eauto.
   Qed.
 
-  Definition test_trace: trace nat nat :=
-    0 -[ 0 ]-> (1 -[ 1 ]-> (2 -[ 2 ]-> (3 -[ 3 ]-> ⟨ 4 ⟩))).
-  Compute (trace_take 3 test_trace).
-  Compute (trace_take_fwd 3 test_trace).
-
+  (* Definition test_trace: trace nat nat := *)
+  (*   0 -[ 0 ]-> (1 -[ 1 ]-> (2 -[ 2 ]-> (3 -[ 3 ]-> ⟨ 4 ⟩))). *)
+  (* Compute (trace_take 3 test_trace). *)
+  (* Compute (trace_take_fwd 3 test_trace). *)
 
   Lemma vist_strenghten extr atr
   (PASS: ∀ x, C (trace_take_fwd x extr))
