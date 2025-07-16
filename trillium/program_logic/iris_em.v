@@ -9,7 +9,9 @@ Class LangEM (Λ: language) := {
     lgem_Σ: gFunctors;
     lgem_Σ_subG: forall Σ, subG lgem_Σ Σ -> lgem_GpreS Σ;
 
-    lgem_si {Σ} `{lgem_GS Σ}: state Λ -> iProp Σ;
+    (** as opposed to the models used,
+        so far we only need the interpretation for the current physical state *)
+    lgem_si {Σ} `{lgem_GS Σ}: state Λ -> iProp Σ; 
 
     lgem_init_resource {Σ: gFunctors} `{lgem_GS Σ}: cfg Λ → iProp Σ;
     lgem_initialization Σ `{lgem_GpreS Σ}: 
@@ -57,7 +59,7 @@ Section IEM.
     state_interp extr auxtr :=
       (⌜em_valid_state_evolution_fairness extr auxtr⌝ ∗
        lgem_si (trace_last extr).2 (lgem_GS0 := iem_phys) ∗
-       em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := iem_fairnessGS))%I ;
+       em_mti extr auxtr (em_GS0 := iem_fairnessGS))%I ;
     fork_post := em_thread_post (em_GS0 := iem_fairnessGS);
 }.
 

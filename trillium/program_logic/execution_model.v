@@ -2,7 +2,7 @@ From stdpp Require Import fin_maps.
 From iris.proofmode Require Import tactics.
 From trillium Require Import language.
 From trillium.program_logic Require Import traces weakestpre.
-From trillium.traces Require Import inftraces.
+From trillium.traces Require Import inftraces exec_traces.
 
 
 Class ExecutionModel (Λ: language) (M: Model) := {
@@ -19,7 +19,7 @@ Class ExecutionModel (Λ: language) (M: Model) := {
 
     em_thread_post {Σ} `{em_GS Σ}: locale Λ -> val Λ -> iProp Σ;
 
-    em_msi {Σ} `{em_GS Σ}: cfg Λ -> mstate M -> iProp Σ;
+    em_mti {Σ} `{em_GS Σ}: execution_trace Λ -> auxiliary_trace M -> iProp Σ;
     
     em_init_param: Type; 
     em_init_resource {Σ: gFunctors} `{em_GS Σ}: mstate M → em_init_param -> iProp Σ;
@@ -28,7 +28,8 @@ Class ExecutionModel (Λ: language) (M: Model) := {
     em_initialization Σ `{ePreGS: em_preGS Σ}: 
     forall (s1: mstate M) (σ: cfg Λ) (p: em_init_param)
       (INIT_ST: em_is_init_st σ s1),
-      ⊢ (|==> ∃ eGS: em_GS Σ, @em_init_resource _ eGS s1 p ∗ @em_msi _ eGS σ s1)
+      ⊢ |==> ∃ eGS: em_GS Σ, @em_init_resource _ eGS s1 p ∗ 
+                              @em_mti _ eGS {tr[ σ ]} {tr[ s1 ]}
 }.
 
 Section EMDefinitions.
