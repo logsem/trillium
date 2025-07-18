@@ -23,11 +23,26 @@ Section AdequacyGen.
         ⊢ (lgem_init_resource (es, σ1) (lgem_GS0 := iem_phys _ _) ∗
              em_init_resource s1 p (em_GS0 := iem_fairnessGS _ _)
            ={⊤}=∗
-              let Φs := map (em_thread_post (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in
-              ∃ (PR: ProgressResource state_interp fork_post C),
+              let Φs := map (em_thread_post (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in              
+              ∃ trace_inv
+                (PR: ProgressResource state_interp trace_inv fork_post C),
               config_wp ∗
               PR s (trace_singleton (es, σ1)) Φs ∗
-              rel_always_holds s Φs R (es, σ1) s1)).
+              trace_inv {tr[ (es, σ1) ]} {tr[ s1 ]} ∗
+              rel_always_holds_with_trace_inv s trace_inv Φs R (es, σ1) s1)).
+
+  (* TODO: move *)
+  Lemma trace_always_holds_with_True `{Hinv : @IEMGS _ _ LG_EM EM Σ}
+    s Φs c δ:
+    rel_always_holds_with_trace_inv s (fun _ _ => ⌜ True ⌝) Φs R c δ ⊣⊢ 
+    rel_always_holds s Φs R c δ.
+  Proof using.
+    clear. 
+    rewrite /rel_always_holds /rel_always_holds_with_trace_inv.
+    repeat (iApply bi.forall_proper; red; intros).
+    repeat (iApply bi.wand_proper; [done| ]).
+    iSplit; [| set_solver]. iIntros "X". by iApply "X". 
+  Qed.
 
   (* TODO: ? move this and PR_premise_multiple to adequacy_cond *)
   Theorem PR_strong_simulation_adequacy_general_multiple
@@ -56,18 +71,12 @@ Section AdequacyGen.
     set (iemG := {| iem_fairnessGS := fGS; iem_phys := pGS |}).
     iPoseProof (PRP iemG) as "PRP". clear PRP.
     
-    iExists state_interp, (λ _ _, ⌜ True ⌝%I).
+    iMod ("PRP" with "[$PHYS $LM_INIT]") as (ti PR) "(CWP & PR & TI & RAH)".
+    iModIntro.
+    iExists state_interp, ti.
     iExists (map em_thread_post (locales_of_list es)), em_thread_post.
-    iMod ("PRP" with "[$PHYS $LM_INIT]") as (PR) "(CWP & PR & RAH)". 
-    iModIntro. simpl. iFrame "INIT MSI PR CWP".
-
-    (* TODO: make a lemma *)
-    iIntros (??????) "SI POSTS".
-    rewrite /rel_always_holds. iDestruct ("RAH" with "[][][]SI POSTS") as "R".
-    all: try by done.
-    iSplit. 
-    - iModIntro; iIntros "[$ ?]"; done.
-    - eauto. 
+    simpl. iFrame "INIT MSI PR CWP TI".
+    done. 
   Qed.
 
   Theorem strong_simulation_adequacy_inftraces_multiple Σ
@@ -272,7 +281,7 @@ Section adequacy.
   
   Program Definition WptpPR {Σ} {Hinv : @IEMGS _ _ LG_EM EM Σ}
     (iG := IEM_irisG LG_EM EM)
-    : ProgressResource state_interp fork_post C :=
+    : ProgressResource state_interp (fun _ _ => ⌜ True ⌝%I) fork_post C :=
     {| pr_pr := (fun s etr Φs => wptp s (trace_last etr).1 Φs) |}. 
   Next Obligation. 
     intros. apply wptp_of_val_post.
@@ -293,12 +302,13 @@ Section adequacy.
   Qed.
   Final Obligation. 
     intros.
-    iIntros "??? _". (** for usual wptp with the same TI, trace condition doesn't matter *)
+    iIntros "?? _ ? _". (** for usual wptp with the same TI, trivial trace invariant and any trace condition don't matter *)
     iMod (take_step with "[$] [$] [$]") as "X".
     1, 2: by eauto.
     { by rewrite H0. }
-    iModIntro.
-    by rewrite H0.
+    iModIntro. iApply (step_fupdN_mono with "[$]").
+    iIntros "X". iMod "X" as "(?&?)". iModIntro. iFrame. 
+    setoid_rewrite bi.True_sep'. by rewrite H0.
   Qed.
 
   Lemma wp_PR_premise Σ s es σ1 s1 p:
@@ -307,7 +317,9 @@ Section adequacy.
     rewrite /wp_premise_multiple /PR_premise_multiple.
     iIntros (WPS ?) "(?&?)".
     iMod (WPS with "[-]") as "(?&?&?)"; [by iFrame| ].
-    iModIntro. iExists WptpPR. iFrame.
+    iModIntro. iExists _, WptpPR. iFrame.
+    iSplit; [done| ].
+    by iDestruct (trace_always_holds_with_True with "[$]") as "foo".
   Qed.
 
   Theorem strong_simulation_adequacy_traces_multiple Σ
