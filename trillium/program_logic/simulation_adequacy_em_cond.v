@@ -4,7 +4,7 @@ From trillium.traces Require Export traces_match trace_utils exec_traces trace_l
 From trillium.program_logic Require Export weakestpre adequacy_cond iris_em.
 
 
-Section adequacy.
+Section AdequacyGen.
   Context `{EM: ExecutionModel Λ M}.
   Context {LG_EM: LangEM Λ}.
   Context (R: execution_trace Λ → auxiliary_trace M → Prop). 
@@ -13,7 +13,7 @@ Section adequacy.
   Context {C_DEC: ∀ ex, Decision (C ex)} {ML_INH: Inhabited (mlabel M)}.
   Context (FILTER_PCL: filter_pref_closed C). 
                        
-  Definition wp_premise_multiple
+  Definition PR_premise_multiple
     (Σ: gFunctors)
     (s: stuckness) es σ1 (s1: mstate M)
     (p: em_init_param)
@@ -24,36 +24,13 @@ Section adequacy.
              em_init_resource s1 p (em_GS0 := iem_fairnessGS _ _)
            ={⊤}=∗
               let Φs := map (em_thread_post (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in
+              ∃ (PR: ProgressResource state_interp fork_post C),
               config_wp ∗
-              wptp s es Φs ∗
+              PR s (trace_singleton (es, σ1)) Φs ∗
               rel_always_holds s Φs R (es, σ1) s1)).
-  
-  Definition WptpPR {Σ} {Hinv : @IEMGS _ _ LG_EM EM Σ}
-    (iG := IEM_irisG LG_EM EM)
-    : ProgressResource state_interp fork_post C.
-  Proof using.
-    clear R FILTER_PCL C_DEC.
-    exists (fun s etr Φs => wptp s (trace_last etr).1 Φs).
-    - intros. apply wptp_of_val_post.
-    - intros. rewrite H0.
-      iIntros "? WPS".
-      iMod (wptp_not_stuck_same _ _ _ _ [] with "[$] [WPS]") as "(?&?&%NS)". 
-      3: by iFrame.
-      { eauto. }
-      { erewrite app_nil_l, app_nil_r. eauto. }
-      iModIntro. iFrame.
-      iPureIntro. intros. rewrite -H0.
-      eapply NS; eauto. simpl. set_solver.
-    - intros.
-      iIntros "??? _". (** for usual wptp with the same TI, trace condition doesn't matter *)
-      iMod (take_step with "[$] [$] [$]") as "X".
-      1, 2: by eauto.
-      { by rewrite H0. }
-      iModIntro.
-      by rewrite H0.
-  Defined.      
 
-  Theorem strong_simulation_adequacy_general_multiple
+  (* TODO: ? move this and PR_premise_multiple to adequacy_cond *)
+  Theorem PR_strong_simulation_adequacy_general_multiple
     `{hPre: @IEMGpreS _ _ LG_EM EM Σ}
     (s: stuckness) es σ1 (s1: M)
     (p: em_init_param)    
@@ -62,10 +39,10 @@ Section adequacy.
     rel_finitary R →
     em_is_init_st (es, σ1) s1 ->
     em_valid_state_evolution_fairness {tr[ (es, σ1) ]} {tr[ s1 ]} ->
-    (wp_premise_multiple Σ s es σ1 s1 p) ->
+    (PR_premise_multiple Σ s es σ1 s1 p) ->
     continued_simulation_cond R C (trace_singleton (es, σ1)) (trace_singleton s1).
   Proof.
-    intros LEN Hfin INIT VALID1 WPS.
+    intros LEN Hfin INIT VALID1 PRP.
     apply (wp_strong_adequacy_multiple_with_trace_inv Λ M Σ s); try done.
 
     iIntros (?) "".
@@ -77,12 +54,12 @@ Section adequacy.
     Unshelve. 2: by apply hPre. 
 
     set (iemG := {| iem_fairnessGS := fGS; iem_phys := pGS |}).
-    iPoseProof (WPS iemG) as "Hwp". clear WPS.
+    iPoseProof (PRP iemG) as "PRP". clear PRP.
     
-    iExists state_interp, (λ _ _, ⌜ True ⌝%I), _, em_thread_post, WptpPR. 
-
-    iMod ("Hwp" with "[$PHYS $LM_INIT]") as "(CWP & WP & RAH)". 
-    iModIntro. simpl. iFrame "INIT MSI WP CWP".
+    iExists state_interp, (λ _ _, ⌜ True ⌝%I).
+    iExists (map em_thread_post (locales_of_list es)), em_thread_post.
+    iMod ("PRP" with "[$PHYS $LM_INIT]") as (PR) "(CWP & PR & RAH)". 
+    iModIntro. simpl. iFrame "INIT MSI PR CWP".
 
     (* TODO: make a lemma *)
     iIntros (??????) "SI POSTS".
@@ -103,7 +80,7 @@ Section adequacy.
     length es ≥ 1 ->
     rel_finitary R →
     em_is_init_st (es, σ1) s1 ->
-    (wp_premise_multiple Σ s es σ1 s1 p) ->
+    (PR_premise_multiple Σ s es σ1 s1 p) ->
     exists iatr,
       @valid_inf_system_trace _ M
         (@continued_simulation_cond Λ M R C)
@@ -118,7 +95,7 @@ Section adequacy.
     Unshelve.
     - econstructor.
     - apply FILTER_PCL. 
-    - eapply (strong_simulation_adequacy_general_multiple s) => //.
+    - eapply (PR_strong_simulation_adequacy_general_multiple s) => //.
     - done.
   Qed.
 
@@ -141,6 +118,7 @@ Section adequacy.
   (* Compute (trace_take 3 test_trace). *)
   (* Compute (trace_take_fwd 3 test_trace). *)
 
+  (* TODO: move *)
   Lemma vist_strenghten extr atr
   (PASS: ∀ x, C (trace_take_fwd x extr))
   (MATCH :
@@ -174,7 +152,7 @@ Section adequacy.
     do 2 (erewrite inflist_drop_next in CIH; eauto).
   Qed.
 
-  Theorem strong_simulation_adequacy_traces_multiple Σ
+  Theorem PR_strong_simulation_adequacy_traces_multiple Σ
     `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) 
     es σ1 (s1: M)
     (p: em_init_param)
@@ -199,7 +177,7 @@ Section adequacy.
     length es ≥ 1 ->
     rel_finitary R →
     em_is_init_st (es, σ1) s1 ->
-    (wp_premise_multiple Σ s es σ1 s1 p) ->
+    (PR_premise_multiple Σ s es σ1 s1 p) ->
     (∃ (mtr : trace (mstate M) (mlabel M)), 
       traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ trfirst mtr = s1) \/
     exists k, ¬ C (trace_take_fwd k extr). 
@@ -263,6 +241,107 @@ Section adequacy.
     simpl in MATCH.
     eapply traces_match_inflist_equiv_impl; [| done].
     symmetry. apply from_to_trace_equiv. 
+  Qed.
+
+End AdequacyGen.
+
+
+Section adequacy.
+  Context `{EM: ExecutionModel Λ M}.
+  Context {LG_EM: LangEM Λ}.
+  Context (R: execution_trace Λ → auxiliary_trace M → Prop). 
+
+  Context (C: execution_trace Λ -> Prop).
+  Context {C_DEC: ∀ ex, Decision (C ex)} {ML_INH: Inhabited (mlabel M)}.
+  Context (FILTER_PCL: filter_pref_closed C). 
+                       
+  Definition wp_premise_multiple
+    (Σ: gFunctors)
+    (s: stuckness) es σ1 (s1: mstate M)
+    (p: em_init_param)
+    := 
+    (∀ `{Hinv : @IEMGS _ _ LG_EM EM Σ},
+        let _ := IEM_irisG LG_EM EM in
+        ⊢ (lgem_init_resource (es, σ1) (lgem_GS0 := iem_phys _ _) ∗
+             em_init_resource s1 p (em_GS0 := iem_fairnessGS _ _)
+           ={⊤}=∗
+              let Φs := map (em_thread_post (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in
+              config_wp ∗
+              wptp s es Φs ∗
+              rel_always_holds s Φs R (es, σ1) s1)).
+  
+  Program Definition WptpPR {Σ} {Hinv : @IEMGS _ _ LG_EM EM Σ}
+    (iG := IEM_irisG LG_EM EM)
+    : ProgressResource state_interp fork_post C :=
+    {| pr_pr := (fun s etr Φs => wptp s (trace_last etr).1 Φs) |}. 
+  Next Obligation. 
+    intros. apply wptp_of_val_post.
+  Qed.
+  Next Obligation. 
+    clear R FILTER_PCL C_DEC.
+    intros. rewrite H0.
+    iIntros "? WPS".
+    iMod (wptp_not_stuck_same _ _ _ _ [] with "[$] [WPS]") as "(?&?&%NS)". 
+    3: by iFrame.
+    { eauto. }
+    { erewrite app_nil_l, app_nil_r.
+      erewrite <- surjective_pairing. apply trace_ends_in_last. }
+    iModIntro. iFrame.
+    iPureIntro. intros. subst. rewrite -H0.
+    eapply NS; eauto.
+    apply last_eq_trace_ends_in in H0. rewrite H0. simpl. set_solver.
+  Qed.
+  Final Obligation. 
+    intros.
+    iIntros "??? _". (** for usual wptp with the same TI, trace condition doesn't matter *)
+    iMod (take_step with "[$] [$] [$]") as "X".
+    1, 2: by eauto.
+    { by rewrite H0. }
+    iModIntro.
+    by rewrite H0.
+  Qed.
+
+  Lemma wp_PR_premise Σ s es σ1 s1 p:
+    wp_premise_multiple Σ s es σ1 s1 p -> PR_premise_multiple R C Σ s es σ1 s1 p.
+  Proof using.
+    rewrite /wp_premise_multiple /PR_premise_multiple.
+    iIntros (WPS ?) "(?&?)".
+    iMod (WPS with "[-]") as "(?&?&?)"; [by iFrame| ].
+    iModIntro. iExists WptpPR. iFrame.
+  Qed.
+
+  Theorem strong_simulation_adequacy_traces_multiple Σ
+    `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) 
+    es σ1 (s1: M)
+    (p: em_init_param)
+    extr
+    (Hvex : extrace_valid extr)
+    (Hexfirst : trfirst extr = (es, σ1))
+
+    (valid_step: cfg Λ -> olocale Λ → cfg Λ → 
+                 mstate M → mlabel M → mstate M -> Prop)
+    (state_rel: cfg Λ -> mstate M -> Prop)
+    (lbl_rel: olocale Λ -> mlabel M -> Prop)
+    (STEP_LBL_REL: forall c1 oζ c2 δ1 ℓ δ2,
+                 valid_step c1 oζ c2 δ1 ℓ δ2 ->
+                 lbl_rel oζ ℓ)
+    (STEP_MTRANS: forall c1 oζ c2 δ1 ℓ δ2,
+                 valid_step c1 oζ c2 δ1 ℓ δ2 ->
+                 mtrans δ1 ℓ δ2)
+    (R_ST: forall extr mtr, R extr mtr -> state_rel (trace_last extr) (trace_last mtr))
+    (R_STEP: forall extr mtr, R extr mtr -> valid_state_evolution_fairness valid_step extr mtr)
+
+    :
+    length es ≥ 1 ->
+    rel_finitary R →
+    em_is_init_st (es, σ1) s1 ->
+    (wp_premise_multiple Σ s es σ1 s1 p) ->
+    (∃ (mtr : trace (mstate M) (mlabel M)), 
+      traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ trfirst mtr = s1) \/
+    exists k, ¬ C (trace_take_fwd k extr). 
+  Proof.
+    intros. apply wp_PR_premise in H2.
+    eapply PR_strong_simulation_adequacy_traces_multiple; eauto.
   Qed.
 
 End adequacy.
