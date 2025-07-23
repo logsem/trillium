@@ -32,10 +32,37 @@ Proof.
       rewrite ->Hends in Hlen. simpl in Hlen. lia.
 Qed.
 
-Notation posts_of t Φs :=
+(* Notation posts_of t Φs := *)
+(*   ([∗ list] vΦ ∈ *)
+(*     (omap (λ x, (λ v, (v, x.2)) <$> to_val x.1) *)
+(*           (zip_with (λ x y, (x, y)) t Φs)), vΦ.2 vΦ.1)%I. *)
+Definition posts_of {Λ: language} {Σ: gFunctors} (t: list (expr Λ)) (Φs: list (val Λ -> iProp Σ)): iProp Σ :=
   ([∗ list] vΦ ∈
     (omap (λ x, (λ v, (v, x.2)) <$> to_val x.1)
           (zip_with (λ x y, (x, y)) t Φs)), vΦ.2 vΦ.1)%I.
+
+Lemma posts_of_app {Λ Σ} (t1 t2: list (language.expr Λ)) (Φs1 Φs2: list (val Λ -> iProp Σ))
+  (MATCH1: length t1 = length Φs1):
+  posts_of t1 Φs1 ∗ posts_of t2 Φs2 ⊣⊢ posts_of (t1 ++ t2) (Φs1 ++ Φs2).
+Proof using.
+  rewrite /posts_of.
+  rewrite zip_with_app; [| done].
+  rewrite omap_app. rewrite big_sepL_app. done.
+Qed.
+
+Lemma zip_with_cons_both {A B C: Type} (F: A -> B -> C) a b (la: list A) (lb: list B):
+  zip_with F (a :: la) (b :: lb) = F a b :: zip_with F la lb.
+Proof using. done. Qed.
+
+Lemma posts_of_cons {Λ Σ} e (t: list (language.expr Λ)) Φ (Φs: list (val Λ -> iProp Σ)):
+  from_option Φ ⌜ True ⌝ (to_val e) ∗ posts_of t Φs ⊣⊢ posts_of (e :: t) (Φ :: Φs).
+Proof using.
+  rewrite /posts_of. rewrite zip_with_cons_both.
+  rewrite (omap_app _ [(e, Φ)]). rewrite big_sepL_app.
+  iApply sep_proper; [| done].
+  simpl. destruct (to_val e); try set_solver.
+  simpl. by rewrite sep_emp.
+Qed.
 
 Notation locales_equiv_from t0 t0' t1 t1' :=
   (Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e')
@@ -544,6 +571,39 @@ Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
 Section adequacy_helper_lemmas.
   Context `{!irisG Λ M Σ}.
 
+  Lemma wp_ctx_take_step s Φ ex atr tp1 K e1 tp2 σ1 e2 σ2 efs ζ:
+    let (E1, E2) := (ectx_fill K e1, ectx_fill K e2) in
+    valid_exec ex →
+    prim_step e1 σ1 e2 σ2 efs →
+    trace_ends_in ex (tp1 ++ E1 :: tp2, σ1) →
+    locale_of tp1 E1 = ζ ->
+    state_interp ex atr -∗
+    WP e1 @ s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
+                                             |={∅,⊤}=>
+    ∃ δ' ℓ,
+      state_interp (trace_extend ex (Some ζ) (tp1 ++ E2 :: tp2 ++ efs, σ2))
+                   (trace_extend atr ℓ δ') ∗
+      WP e2 @ s; ζ; ⊤ {{ v, Φ v } } ∗
+      ([∗ list] i↦ef ∈ efs,
+        WP ef @ s; locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef; ⊤
+        {{ v, fork_post (locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef) v }}).
+  Proof.
+    iIntros (Hex Hstp Hei Hlocale) "HSI Hwp".
+    rewrite wp_unfold /wp_pre.
+    destruct (to_val e1) eqn:He1.
+    { erewrite val_stuck in He1; done. }
+    iMod ("Hwp" $! _ _ K with "[//] [] [] HSI") as "[Hs Hwp]".
+    1, 2: done. 
+    iDestruct ("Hwp" with "[]") as "Hwp"; first done.
+    iModIntro.
+    iApply (step_fupdN_wand with "[Hwp]"); first by iApply "Hwp".
+    iIntros "Hwp".
+    (* rewrite !ectx_fill_emp. *)
+    iMod "Hwp" as (δ' ℓ) "(? & ? & ?)".
+    iModIntro; iExists _, _; iFrame; done.
+  Qed.    
+
+
   Lemma wp_take_step s Φ ex atr tp1 e1 tp2 σ1 e2 σ2 efs ζ:
     valid_exec ex →
     prim_step e1 σ1 e2 σ2 efs →
@@ -560,19 +620,9 @@ Section adequacy_helper_lemmas.
         WP ef @ s; locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef; ⊤
         {{ v, fork_post (locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef) v }}).
   Proof.
-    iIntros (Hex Hstp Hei Hlocale) "HSI Hwp".
-    rewrite wp_unfold /wp_pre.
-    destruct (to_val e1) eqn:He1.
-    { erewrite val_stuck in He1; done. }
-    iMod ("Hwp" $! _ _ ectx_emp with "[//] [] [] HSI") as "[Hs Hwp]";
-      [by rewrite locale_fill|by rewrite ectx_fill_emp|].
-    iDestruct ("Hwp" with "[]") as "Hwp"; first done.
-    iModIntro.
-    iApply (step_fupdN_wand with "[Hwp]"); first by iApply "Hwp".
-    iIntros "Hwp".
-    rewrite !ectx_fill_emp.
-    iMod "Hwp" as (δ' ℓ) "(? & ? & ?)".
-    iModIntro; iExists _, _; iFrame; done.
+    iIntros "**".
+    iPoseProof (wp_ctx_take_step _ _ _ _ _ ectx_emp with "[$] [$]") as "STEP".
+    all: rewrite ?ectx_fill_emp; eauto.
   Qed.
 
   Lemma wp_not_stuck ex atr K tp1 tp2 σ e s Φ ζ :
@@ -798,6 +848,16 @@ Section Wptp.
     eapply Forall2_lookup. intros i. destruct (prefixes t0 !! i) as [[??]|]; by constructor.
   Qed.
 
+  Lemma wptp_app' s t0 t1 Φs1 t2 Φs2
+    (MATCH1: length t1 = length Φs1):
+    wptp_from t0 s (t1 ++ t2) (Φs1 ++ Φs2) ⊢ wptp_from t0 s t1 Φs1 ∗ wptp_from (t0 ++ t1) s t2 Φs2. 
+  Proof.
+    rewrite prefixes_from_app.
+    iIntros. iDestruct (big_sepL2_app_inv with "[$]") as "(?&?)".
+    2: { iFrame. }
+    rewrite prefixes_from_length. tauto.  
+  Qed.
+
   Lemma wptp_app s t0 t1 t0t1 Φs1 t2 Φs2 :
     t0t1 = t0 ++ t1 ->
     wptp_from t0 s t1 Φs1 -∗ wptp_from t0t1 s t2 Φs2 -∗ wptp_from t0 s (t1 ++ t2) (Φs1 ++ Φs2).
@@ -833,15 +893,20 @@ Section Wptp.
     iDestruct (big_sepL2_cons_inv_l with "Ht") as (Φ Φs') "[-> [He Ht]] /=".
     iMod (wp_of_val_post with "He") as "[Hpost Hback]".
     iMod ("IH" with "Ht") as "[Ht Htback]".
+    rewrite -posts_of_cons.
+    rewrite -bi.sep_assoc.
+    (* TODO: implement Frame instance for pre_step *)
     destruct (to_val e); simpl.
-    - iFrame.
-      iIntros "!>". iFrame.
+    - iApply (pre_step_comm with "[$]").
+      iApply (pre_step_comm with "[Ht]").
+      { by iModIntro. }
+      iIntros "!>".
       iIntros "[Hpost Htpost]".
       iSplitL "Hpost Hback"; [iApply "Hback"|iApply "Htback"]; iFrame.
       by iIntros "!>".
     - iIntros "!>".
       iFrame.
-      iIntros "Hefspost".
+      iIntros "[_ Hefspost]".
       iSplitL "Hback"; [iApply "Hback"|iApply "Htback"]; iFrame; done.
   Qed.
 
@@ -904,13 +969,12 @@ Section Wptp.
           (Φs1 Φs2') "[-> [Ht1 Het2]]".
       iDestruct (big_sepL2_cons_inv_l with "Het2") as (Φ Φs2) "[-> [He Ht2]]".
       iDestruct (wp_take_step with "HSI He") as "He"; [done|done|done|done|].
+      simpl. 
       iMod "He" as "He". iModIntro. iMod "He" as "He". iModIntro. iNext.
       iMod "He" as "He". iModIntro.
       iApply (step_fupdN_wand with "[He]"); first by iApply "He".
       iIntros "He".
       iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs) /=".
-      have Heq: forall a b c d, a ++ e1 :: c ++ d = (a ++ e1 :: c) ++ d.
-      { intros **. by list_simplifier. }
       iAssert (wptp_from (t1 ++ e2 :: t2) s efs (newposts (t1 ++ e2 :: t2) ((t1 ++ e2 :: t2) ++ efs)))
         with "[Hefs]" as "Hefs".
       { rewrite -new_threads_wptp_from. iApply (big_sepL_impl with "Hefs").
@@ -930,7 +994,7 @@ Section Wptp.
       { list_simplifier. done. }
       iMod (wp_not_stuck _ _ ectx_emp with "HSI He2") as "[HSI [He2 %]]";
         [done|by rewrite ectx_fill_emp|by erewrite <-locale_step_preserve|].
-
+      
       iDestruct (wptp_app with "Ht2 Hefs") as "Ht2efs".
       { by list_simplifier. }
       erewrite (locale_step_preserve e1 e2) =>//.
