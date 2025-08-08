@@ -601,8 +601,7 @@ Section adequacy_helper_lemmas.
     (* rewrite !ectx_fill_emp. *)
     iMod "Hwp" as (δ' ℓ) "(? & ? & ?)".
     iModIntro; iExists _, _; iFrame; done.
-  Qed.    
-
+  Qed.
 
   Lemma wp_take_step s Φ ex atr tp1 e1 tp2 σ1 e2 σ2 efs ζ:
     valid_exec ex →
