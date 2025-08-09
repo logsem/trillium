@@ -1,5 +1,7 @@
 From trillium.traces Require Export trace.
 From iris.algebra Require Export ofe cmra local_updates.
+(* OBS: Should split file into two, or move to trillium/bi *)
+From iris.bi Require Import interface derived_connectives.
 
 Inductive trace_alg (A L : Type) : Type :=
 | trace_alg_trace (ft : finite_trace A L)

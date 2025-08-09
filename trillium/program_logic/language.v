@@ -1,4 +1,6 @@
 From iris.algebra Require Export ofe.
+From trillium.bi Require Export weakestpre.
+(* From iris.prelude Require Import options. *)
 
 Section prefixes.
   Context {A : Type}.
@@ -141,7 +143,7 @@ Arguments ectx_comp {_} _ _.
 Arguments ectx_emp {_}.
 Arguments ectx_fill {_} _ _.
 Arguments locale_of {_} _ _.
-
+ 
 Notation locales_equiv t0 t0' :=
   (Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0')).
 
@@ -152,6 +154,9 @@ Canonical Structure exprO Λ := leibnizO (expr Λ).
 Definition cfg (Λ : language) := (list (expr Λ) * state Λ)%type.
 
 Inductive atomicity := StronglyAtomic | WeaklyAtomic.
+
+Definition stuckness_to_atomicity (s : stuckness) : atomicity :=
+  if s is MaybeStuck then StronglyAtomic else WeaklyAtomic.
 
 Record is_an_eval_ctx {Λ : language} (K : expr Λ → expr Λ) := {
   is_an_eval_ctx_fill_not_val e :
@@ -509,3 +514,5 @@ Section language.
 End language.
 
 Notation pure_steps_tp := (Forall2 (rtc pure_step)).
+
+ 

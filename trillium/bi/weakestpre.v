@@ -1,7 +1,13 @@
 From stdpp Require Export coPset.
 From iris.bi Require Import interface derived_connectives.
-From trillium.program_logic Require Import language.
+(* From trillium.program_logic Require Import language. *)
 From iris.prelude Require Import options.
+
+Declare Scope expr_scope.
+Delimit Scope expr_scope with E.
+
+Declare Scope val_scope.
+Delimit Scope val_scope with V.
 
 Inductive stuckness := NotStuck | MaybeStuck.
 
@@ -14,8 +20,8 @@ Definition stuckness_leb (s1 s2 : stuckness) : bool :=
 #[global] Instance stuckness_le_po : PreOrder stuckness_le.
 Proof. split; by repeat intros []. Qed.
 
-Definition stuckness_to_atomicity (s : stuckness) : atomicity :=
-  if s is MaybeStuck then StronglyAtomic else WeaklyAtomic.
+(* Definition stuckness_to_atomicity (s : stuckness) : atomicity := *)
+(*   if s is MaybeStuck then StronglyAtomic else WeaklyAtomic. *)
 
 (** Weakest preconditions [WP e @ s ; E {{ Φ }}] have an additional argument [s]
 of arbitrary type [A], that can be chosen by the one instantiating the [Wp] type
@@ -28,15 +34,14 @@ and [s] to be [NotStuck] or [MaybeStuck].  This will fail to typecheck if [A] is
 not [stuckness].  If we ever want to use the notation [WP e @ E {{ Φ }}] with a
 different [A], the plan is to generalize the notation to use [Inhabited] instead
 to pick a default value depending on [A]. *)
-Class Wp (Λ : language) (PROP A : Type) :=
-  wp : A → coPset -> locale Λ -> expr Λ → (val Λ → PROP) → PROP.
-Arguments wp {_ _ _ _} _ _ _ _%E _%I.
-#[global] Instance: Params (@wp) 8 := {}.
+Class Wp (PROP LOCALE EXPR VAL A : Type) :=
+  wp : A → coPset → LOCALE → EXPR → (VAL → PROP) → PROP.
+Global Arguments wp {_ _ _ _ _ _} _ _ _%_E _%_I.
+Global Instance: Params (@wp) 9 := {}.
 
 (** Notations for partial weakest preconditions *)
 (** Notations without binder -- only parsing because they overlap with the
 notations with binder. *)
-
 
 Notation "'WP' e @ s ; tid ; E {{ Φ } }" := (wp s E tid e%E Φ)
   (at level 20, e, Φ at level 200, only parsing) : bi_scope.

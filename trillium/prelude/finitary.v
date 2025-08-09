@@ -390,7 +390,7 @@ Section finite_range_gmap.
     revert l D m.
     induction l; intros D m.
 
-    { simpl. intros (Hel&Hl&?). eapply list.Permutation_nil_r in Hel. apply elements_empty_inv in Hel.
+    { simpl. intros (Hel&Hl&?). eapply Permutation_nil_r in Hel. apply elements_empty_inv in Hel.
       rewrite leibniz_equiv_iff in Hel. rewrite Hel in *.
       apply dom_empty_inv_L in Hl as ->. set_solver. }
     simpl. intros (Hel & Hl & Hbound).
@@ -453,7 +453,7 @@ Section finite_range_gmap.
     ); last first.
     { rewrite Forall_forall. setoid_rewrite Forall_forall in Hok. by apply Hok. }
     induction l.
-    { intros ? Hp. eapply list.Permutation_nil_r in Hp. eauto. apply elements_empty_inv in Hp.
+    { intros ? Hp. eapply Permutation_nil_r in Hp. eauto. apply elements_empty_inv in Hp.
       rewrite leibniz_equiv_iff in Hp. rewrite Hp. simpl. by rewrite Forall_singleton, dom_empty_L. }
     clear D. intros D Hel. simpl. rewrite Forall_forall. intros m Hin.
     apply elem_of_list_bind in Hin as (m'&Hin&Hin').
@@ -510,7 +510,7 @@ Section finite_range_gmap.
     revert l D m.
     induction l; intros D m.
 
-    { simpl. intros (Hel&Hl&?). eapply list.Permutation_nil_r in Hel. apply elements_empty_inv in Hel.
+    { simpl. intros (Hel&Hl&?). eapply Permutation_nil_r in Hel. apply elements_empty_inv in Hel.
       rewrite leibniz_equiv_iff in Hel. rewrite Hel in *.
       apply dom_empty_inv_L in Hl as ->. set_solver. }
     simpl. intros (Hel & Hl & Hbound).
@@ -572,7 +572,7 @@ Section finite_range_gmap.
     ); last first.
     { rewrite Forall_forall. setoid_rewrite Forall_forall in Hok. by apply Hok. }
     induction l.
-    { intros ? Hp. eapply list.Permutation_nil_r in Hp. eauto. apply elements_empty_inv in Hp.
+    { intros ? Hp. eapply Permutation_nil_r in Hp. eauto. apply elements_empty_inv in Hp.
       rewrite leibniz_equiv_iff in Hp. rewrite Hp. simpl. by rewrite Forall_singleton, dom_empty_L. }
     clear D. intros D Hel. simpl. rewrite Forall_forall. intros m Hin.
     apply elem_of_list_bind in Hin as (m'&Hin&Hin').
@@ -633,7 +633,7 @@ Section enumerate_gsets.
     revert l D m.
     induction l; intros D m.
 
-    { simpl. intros (Hel&Hl). eapply list.Permutation_nil_r in Hel. apply elements_empty_inv in Hel.
+    { simpl. intros (Hel&Hl). eapply Permutation_nil_r in Hel. apply elements_empty_inv in Hel.
       rewrite leibniz_equiv_iff in Hel. rewrite Hel in *. assert (m = ∅); set_solver. }
     simpl. intros (Hel & Hl).
 
