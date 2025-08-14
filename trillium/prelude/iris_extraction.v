@@ -145,6 +145,8 @@ Section extraction.
         eauto using ucmra_unit_validN, ucmra_unit_leastN.
     - destruct n; [|apply HP]; auto using cmra_validN_S.
   Qed.
+  Lemma extract_laterN n (P : uPred M) : (⊢ ▷^n P) ↔ (⊢ P).
+  Proof. induction n; [done|]; rewrite /= extract_later //. Qed.
 
   Lemma extract_except_0 (P : uPred M) : (⊢ ◇ P) ↔ (⊢ P).
   Proof.

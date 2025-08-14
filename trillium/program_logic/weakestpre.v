@@ -1,11 +1,11 @@
 From iris.proofmode Require Import base proofmode classes.
-From iris.base_logic.lib Require Export fancy_updates time_receipts physical_step.
+From iris.base_logic.lib Require Export fancy_updates time_receipts physical_step logical_step.
 From trillium.program_logic Require Export language traces.
 From trillium.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 
 Class irisG (Λ : language) (M : Model) (Σ : gFunctors) := IrisG {
-  iris_invGS :> invGS_gen HasNoLc Σ;
+  #[global] iris_invGS :: invGS_gen HasNoLc Σ;
 
   #[global] iris_trGS :: trGS Σ;
   #[global] iris_trGen :: tr_generation;
