@@ -15,16 +15,16 @@ Implicit Types δ : mstate M.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
 
-Lemma wp_lift_step_fupdN s E Φ e1 ζ:
+Lemma wp_lift_step_physical_step s E Φ e1 ζ :
   to_val e1 = None →
   (∀ (extr : execution_trace Λ) (atr : auxiliary_trace M) K tp1 tp2 σ1,
     ⌜valid_exec extr⌝ -∗
     ⌜trace_ends_in extr (tp1 ++ ectx_fill K e1 :: tp2, σ1)⌝ →
     ⌜locale_of tp1 (ectx_fill K e1) = ζ⌝ -∗
-    state_interp extr atr ={E,∅}=∗
-    ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
-    ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ ={∅}▷=∗^(S $ trace_length extr) |={∅,E}=>
-     ∃ δ2 ℓ,
+    state_interp extr atr -∗
+    (|={E,∅}=> ⌜if s is NotStuck then reducible e1 σ1 else True⌝) ∧
+    ∀ e2 σ2 efs, ⌜prim_step e1 σ1 e2 σ2 efs⌝ -∗ |={E}⧗=>
+      ∃ δ2 ℓ,
        state_interp
          (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
          (trace_extend atr ℓ δ2) ∗
@@ -34,12 +34,12 @@ Lemma wp_lift_step_fupdN s E Φ e1 ζ:
   ⊢ WP e1 @ s; ζ; E {{ Φ }}.
 Proof.
   rewrite wp_unfold /wp_pre=>->.
-  iIntros "H" (exre atr K tp1 tp2 σ1 Hexvald Hlocale Hexe) "Hsi".
-  iMod ("H" with "[//] [//] [//] Hsi") as "[$ H]".
-  iIntros "!#" (e2 σ2 efs Hstep).
-  iMod ("H" with "[//]") as "H".
-  iModIntro; iNext.
-  iApply "H".
+  iIntros "H" (?????????) "Hstate". iSplit.
+  - by iDestruct ("H" with "[//] [//] [//] [$]") as "[>$ _]".
+  - iIntros (????).
+    iDestruct ("H" with "[//] [//] [//] [$] [//]") as "H".
+    iApply (physical_step_wand with "[$]").
+    iIntros "$".
 Qed.
 
 Lemma wp_lift_step_fupd s E Φ e1 ζ:
@@ -60,8 +60,16 @@ Lemma wp_lift_step_fupd s E Φ e1 ζ:
            {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }})
   ⊢ WP e1 @ s; ζ; E {{ Φ }}.
 Proof.
-    intros ?. rewrite -wp_lift_step_fupdN; [|done]. simpl. do 26 f_equiv.
-    rewrite -step_fupdN_intro; [|done]. rewrite -bi.laterN_intro. auto.
+  iIntros (?) "Hwp". rewrite -wp_lift_step_physical_step; [|done].
+  iIntros (?????????) "Hσ". iSplit.
+  { by iDestruct ("Hwp" with "[//] [//] [//] [$]") as ">[$ _]". }
+  iIntros (????). iApply (physical_step_step). iSplit.
+  { iMod (tr_persistent_zero) as "$". iApply (fupd_mask_intro); [set_solver|iIntros]. done. }
+  iIntros "H£ H⧗".
+  iMod ("Hwp" with "[//] [//] [//] Hσ") as "[% Hwp]".
+  iMod ("Hwp" with "[//]") as "Hwp".
+  iModIntro. rewrite f_zero.
+  iIntros "!>!>!>". done.
 Qed.
 
 Lemma wp_lift_stuck E Φ e ζ:
@@ -75,7 +83,7 @@ Proof.
   rewrite wp_unfold /wp_pre=>->.
   iIntros "H" (ex atr K tp1 tp2 σ Hexvalid Hlocale  Hex) "Hsi".
   iMod ("H" with "[//] [//] Hsi") as %[? Hirr].
-  iModIntro. iSplit; first done.
+  iSplit; first done.
   iIntros (e2 σ2 efs ?). by case: (Hirr e2 σ2 efs).
  Qed.
 

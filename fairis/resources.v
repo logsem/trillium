@@ -7,15 +7,15 @@ Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
 Class fairnessGpreS `{Countable (locale Λ)} `(LM: LiveModel Λ M) Σ := {
-  fairnessGpreS_model :> inG Σ (authUR (optionUR (exclR (ModelO M))));
-  fairnessGpreS_model_fuel_mapping :>
+  fairnessGpreS_model :: inG Σ (authUR (optionUR (exclR (ModelO M))));
+  fairnessGpreS_model_fuel_mapping ::
     inG Σ (authUR (gmapUR (localeO Λ)
                           (exclR $ gmapUR (RoleO M) natO)));
-  fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
+  fairnessGpreS_model_free_roles :: inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
 Class fairnessGS `{Countable (locale Λ)} `(LM : LiveModel Λ M) Σ := FairnessGS {
-  fairness_inG :> fairnessGpreS LM Σ;
+  fairness_inG :: fairnessGpreS LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
   (** Mapping of threads to roles with fuel *)
@@ -1866,7 +1866,7 @@ Section model_state_lemmas.
                   (λ '(i, _),
                      i ∈ dom fs2 ∧ (i ∈ live_roles M δ1 ∨ i ∈ dom fs1 ∪ dom fs2))
                   (S <$> fs1') = ∅) as Hfs1'.
-        { apply map_filter_empty_iff.
+        { apply map_empty_filter.
           intros ρ f Hρ [HP1 HP2].
           apply elem_of_dom_2 in Hρ.
           rewrite dom_fmap_L in Hρ. set_solver. }
@@ -1874,7 +1874,7 @@ Section model_state_lemmas.
                   (λ '(i, _),
                      i ∈ dom fs2 ∧ (i ∈ live_roles M δ1 ∨ i ∈ dom fs1 ∪ dom fs2))
                   fsf' = ∅) as Hfsf'.
-        { apply map_filter_empty_iff.
+        { apply map_empty_filter.
           intros ρ f Hρ [HP1 HP2].
           apply elem_of_dom_2 in Hρ. set_solver. }
         rewrite Hfs1' Hfsf'.
@@ -1905,7 +1905,7 @@ Section model_state_lemmas.
              (λ '(i, _),
                 (i ∉ dom fs2) ∧ (i ∈ live_roles M δ1 ∨ i ∈ dom fs1 ∪ dom fs2))
              (S <$> fs2') = ∅) as Hfs2'.
-      { apply map_filter_empty_iff.
+      { apply map_empty_filter.
         intros ρ f Hρ [HP1 HP2].
         apply elem_of_dom_2 in Hρ.
         rewrite dom_fmap_L in Hρ. set_solver. }
@@ -1913,7 +1913,7 @@ Section model_state_lemmas.
                 (λ '(i, _),
                    (i ∉ dom fs2) ∧ (i ∈ live_roles M δ1 ∨ i ∈ dom fs1 ∪ dom fs2))
                 fsf' = ∅) as Hfsf'.
-      { apply map_filter_empty_iff.
+      { apply map_empty_filter.
         intros ρ f Hρ [HP1 HP2].
         apply elem_of_dom_2 in Hρ.
         rewrite Hle2 in HP1.

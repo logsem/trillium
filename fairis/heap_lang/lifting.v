@@ -14,20 +14,27 @@ Canonical Structure ModelO (M : FairModel) := leibnizO M.
 Canonical Structure RoleO (M : FairModel) := leibnizO (M.(fmrole)).
 
 Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG {
-  heapGpreS_inv :> invGpreS Σ;
-  heapGpreS_gen_heap :> gen_heapGpreS loc val Σ;
-  heapGpreS_fairness :> fairnessGpreS LM Σ;
+  #[global] heapGpreS_inv :: invGpreS Σ;
+  #[global] heapGpreS_trGS :: trGpreS Σ;
+  #[global] heapGpreS_gen_heap :: gen_heapGpreS loc val Σ;
+  #[global] heapGpreS_fairness :: fairnessGpreS LM Σ;
 }.
 
 Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG {
-  heap_inG :> heapGpreS Σ LM;
   heap_invGS : invGS_gen HasNoLc Σ;
-  heap_gen_heapGS :> gen_heapGS loc val Σ;
-  heap_fairnessGS :> fairnessGS LM Σ;
+  heap_trGS : trGS Σ;
+  #[global] heap_inG :: heapGpreS Σ LM;
+  #[global] heap_gen_heapGS :: gen_heapGS loc val Σ;
+  #[global] heap_fairnessGS :: fairnessGS LM Σ;
 }.
 
+Program Definition heap_trGen : tr_generation := {|
+  f x := x;
+|}.
+Final Obligation. intros; simpl; lia. Qed.
+
 Definition heapΣ (M : FairModel) : gFunctors :=
-  #[ invΣ; gen_heapΣ loc val; fairnessΣ heap_lang M ].
+  #[ invΣ; gen_heapΣ loc val; fairnessΣ heap_lang M; trΣ ].
 
 Global Instance subG_heapPreG {Σ} `{LM : LiveModel heap_lang M} :
   subG (heapΣ M) Σ → heapGpreS Σ LM.
@@ -35,6 +42,8 @@ Proof. solve_inG. Qed.
 
 #[global] Instance heapG_irisG `{LM:LiveModel heap_lang M} `{!heapGS Σ LM} : irisG heap_lang LM Σ := {
     iris_invGS := heap_invGS;
+    iris_trGS := heap_trGS;
+    iris_trGen := heap_trGen;
     state_interp extr auxtr :=
       (⌜valid_state_evolution_fairness extr auxtr⌝ ∗
        gen_heap_interp (trace_last extr).2.(heap) ∗
@@ -288,11 +297,11 @@ Proof.
   rewrite wp_unfold /wp_pre.
   rewrite /sswp. simpl. rewrite Hval.
   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hexend) "(% & Hsi & Hmi)".
-  iMod ("Hwp" with "Hsi") as (Hred) "Hwp". iIntros "!>".
+  iMod ("Hwp" with "Hsi") as (Hred) "Hwp".
   iSplitR; [by rewrite Hexend in Hred|]. iIntros (????). rewrite Hexend.
-  iMod ("Hwp" with "[//]") as "Hwp". iIntros "!>!>". iMod "Hwp". iIntros "!>".
-  iApply step_fupdN_intro; [done|]. iIntros "!>".
-  iMod "Hwp" as "[Hσ [Hwp ->]]".
+  iMod ("Hwp" with "[//]") as "Hwp".
+  iApply physical_step_intro.
+  iIntros "!>". iMod "Hwp". iMod "Hwp" as "[Hσ [Hwp ->]]".
   iDestruct (model_agree' with "Hmi Hst") as %Hmeq. iFrame.
   rewrite /trace_ends_in in Hexend. rewrite -Hexend.
   iMod (update_model_step with "Hfuel1 Hst Hmi") as
@@ -332,11 +341,11 @@ Proof.
     iDestruct ("Hwp" with "Hfuel") as "Hwp".
     iDestruct (wp_value_inv with "Hwp") as "Hwp". by iMod "Hwp". }
   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hloc Hends) "(%Hvalid' & Hsi & Hmi)".
-  rewrite Hends. iMod ("Hwp" with "Hsi") as (Hred) "Hwp". iModIntro.
+  rewrite Hends. iMod ("Hwp" with "Hsi") as (Hred) "Hwp".
   iSplit; [done|]. iIntros (e2 σ2 efs Hstep).
   iMod ("Hwp" with "[//]") as "Hwp".
-  iIntros "!>!>". iMod "Hwp". iIntros "!>".
-  iApply step_fupdN_intro; [done|]. iIntros "!>". iMod "Hwp". rewrite -Hends.
+  iApply physical_step_intro.
+  iIntros "!>". iMod "Hwp". iMod "Hwp". rewrite -Hends.
   iMod (update_fuel_step with "HfuelS Hmi") as (δ2) "(%Hvse & Hfuel & Hmod)" =>//.
   { rewrite Hends -Hloc. eapply locale_step_atomic; eauto. by apply fill_step. }
   iIntros "!>". iDestruct "Hwp" as "[Hsi [Hwp ->]]".
@@ -465,14 +474,14 @@ Proof.
   iMod (gen_heap_alloc_big _ (heap_array l (replicate (Z.to_nat n) v)) with "Hσ")
     as "(Hσ & Hl & Hm)".
   { apply heap_array_map_disjoint.
-    rewrite replicate_length Z2Nat.id ?Hexend; auto with lia. }
+    rewrite length_replicate Z2Nat.id ?Hexend; auto with lia. }
   iFrame.
   iModIntro.
   iSplit; [|done].
   iApply "HΦ".
   iApply big_sepL_sep. iSplitL "Hl".
   + by iApply heap_array_to_seq_mapsto.
-  + iApply (heap_array_to_seq_meta with "Hm"). by rewrite replicate_length.
+  + iApply (heap_array_to_seq_meta with "Hm"). by rewrite length_replicate.
 Qed.
 
 Lemma wp_alloc s E v (Φ : expr → iProp Σ) :

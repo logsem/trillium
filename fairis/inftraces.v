@@ -205,9 +205,8 @@ Section execs_and_traces.
   Proof.
     revert fl il. cofix CH. intros s il.
     rewrite (trace_unfold_fold (to_trace _ il)). destruct il as [| [ℓ x]?]; simpl in *.
-    - by econstructor.
-    - econstructor. have ->: x = trace_last (trace_extend s ℓ x) by done.
-      apply CH.
+    - simpl. by econstructor.
+    - econstructor. apply CH.
   Qed.
 
   Lemma to_trace_singleton s (il: inflist (L * S)):

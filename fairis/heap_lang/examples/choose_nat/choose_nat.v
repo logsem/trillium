@@ -142,7 +142,7 @@ Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
 (** Verify that the program refines the model *)
 
 (* Set up necessary RA constructions *)
-Class choose_natG Σ := ChooseNatG { choose_nat_G :> inG Σ (excl_authR ZO) }.
+Class choose_natG Σ := ChooseNatG { choose_nat_G :: inG Σ (excl_authR ZO) }.
 
 Definition choose_natΣ : gFunctors :=
   #[ heapΣ cn_fair_model; GFunctor (excl_authR ZO) ].

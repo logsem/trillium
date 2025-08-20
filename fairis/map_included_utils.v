@@ -1,6 +1,9 @@
 From Coq Require Import ssreflect.
 From stdpp Require Import gmap.
 
+(* Notation overload for backwards compatibility *)
+Notation map_included R m1 m2 := (map_included (λ k a b, R a b) m1 m2).
+
 (* TODO: Make context, and generalise lemmas to canonical representation *)
 Lemma map_included_spec `{∀ A, Lookup K A (MAP A)} {A}
       (R : relation A) (m1 m2 : MAP A) :
@@ -8,14 +11,14 @@ Lemma map_included_spec `{∀ A, Lookup K A (MAP A)} {A}
   (∀ k v1, m1 !! k = Some v1 → ∃ v2, m2 !! k = Some v2 ∧ R v1 v2).
 Proof.
   split.
-  - rewrite /map_included /map_relation /option_relation.
+  - rewrite /fin_maps.map_included /map_relation /option_relation.
     intros HR.
     intros k v1 Hv1.
     specialize (HR k). rewrite Hv1 in HR.
     destruct (m2 !! k) eqn:Heqn; [|done].
     exists a. done.
   - intros HR.
-    rewrite /map_included /map_relation /option_relation.
+    rewrite /fin_maps.map_included /map_relation /option_relation.
     intros k.
     destruct (m1 !! k) eqn:Heqn.
     + apply HR in Heqn as [v2 [Hv2 HR']].
@@ -30,7 +33,7 @@ Lemma map_included_insert `{Countable K} {A}
   map_included R (<[i:=x]>m1) (<[i:=y]>m2).
 Proof.
   intros HR Hle.
-  rewrite /map_included /map_relation /option_relation.
+  rewrite /fin_maps.map_included /map_relation /option_relation.
   intros k.
   destruct (decide (i=k)) as [<-|Hneq].
   - rewrite !lookup_insert. done.
@@ -65,7 +68,7 @@ Lemma map_included_subseteq_inv `{Countable K} {V}
       (R : relation V) (m1 m2 : gmap K V) :
   map_included R m1 m2 → (dom m1) ⊆ (dom m2).
 Proof.
-  rewrite /map_included /map_relation /option_relation.
+  rewrite /fin_maps.map_included /map_relation /option_relation.
   intros Hle k. rewrite !elem_of_dom. specialize (Hle k).
   intros [? Heq]. rewrite Heq in Hle.
   by destruct (m2 !! k).
@@ -167,6 +170,9 @@ Proof.
   by subst.
 Qed.
 
+Notation map_relation R P Q m1 m2 :=
+  (map_relation (λ k a b, R a b) (λ _ a, P a) (λ _ b, Q b) m1 m2).
+
 Definition map_agree_R `{∀ A, Lookup K A (MAP A)} {A B}
            (R : A → B → Prop) (m1 : MAP A) (m2 : MAP B) :=
   map_relation R (λ _, False) (λ _, False) m1 m2.
@@ -177,7 +183,7 @@ Lemma map_agree_R_spec `{∀ A, Lookup K A (MAP A)} {A}
   (∀ k v1, m1 !! k = Some v1 → ∃ v2, m2 !! k = Some v2 ∧ R v1 v2) ∧
   (∀ k v2, m2 !! k = Some v2 → ∃ v1, m1 !! k = Some v1 ∧ R v1 v2).
 Proof.
-  rewrite /map_agree_R /map_relation /option_relation. split.
+  rewrite /map_agree_R /fin_maps.map_relation /option_relation. split.
   - intros HR. split.
     + intros k v HSome. specialize (HR k). rewrite HSome in HR.
       destruct (m2 !! k); [by eauto|done].

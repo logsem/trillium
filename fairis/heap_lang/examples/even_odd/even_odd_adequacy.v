@@ -462,7 +462,7 @@ Proof.
       rewrite Hv. destruct k; [done|]. destruct es; [done|].
       simpl in *. rewrite drop_0. rewrite list_lookup_fmap.
       erewrite prefixes_from_lookup; [|done].
-      simpl. rewrite /locale_of. rewrite take_length.
+      simpl. rewrite /locale_of. rewrite length_take.
       assert (k < length es).
       { apply lookup_lt_is_Some_1. by eauto. }
       by replace (k `min` length es) with k by lia. }
