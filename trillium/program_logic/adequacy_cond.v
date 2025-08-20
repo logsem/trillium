@@ -185,6 +185,7 @@ Record ProgressResource {Λ} {M} {Σ} {Hinv : invGS_gen HasNoLc Σ}
 
   pr_irisG := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ;
   pr_has_posts: forall s ex Φs,
+      C ex ->      
       let Ps := posts_of (trace_last ex).1 Φs in 
       pr_pr s ex Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr s ex Φs);
   pr_not_stuck: forall s ex Φs σ atr tp trest,
@@ -324,14 +325,15 @@ Section StrongAdequacyHelpers.
   (Hstep : locale_step c oζ c')
   (H1 : ∀ e2 : expr Λ, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2)
   (δ'' : M)
-  (ℓ : mlabel M):
+  (ℓ : mlabel M)
+  (FIT: C (ex :tr[ oζ ]: c')):
       rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
       cur_tr_repr_impl s Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') -∗
       fupd_to_bupd ⊤ -∗
       ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
   Proof using.
     iIntros "Hstep (HSI & HTI & WPS) FB". simpl. 
-    iPoseProof (pr_has_posts with "WPS") as "WPS".
+    iPoseProof (pr_has_posts with "WPS") as "WPS"; [done| ].
     (* replace stateI with state_interp by done. *)
     iPoseProof (pre_step_elim with "[$HSI] WPS") as "foo".
     (* rewrite /steps_from_inv. simpl. *)
@@ -392,7 +394,7 @@ Section StrongAdequacyHelpers.
     iIntros "(Hstep & PRE & _)".
     iDestruct "PRE" as "(HSI & HTI & Htp)".
       
-    iPoseProof (pr_has_posts with "Htp") as "Htp".
+    iPoseProof (pr_has_posts with "Htp") as "Htp"; [done| ]. 
     replace stateI with state_interp by done.
     iMod (pre_step_elim with "[$HSI] Htp") as "[HSI Htp]".
     iDestruct ("Htp") as "(Hpost & Hback)".
@@ -554,7 +556,7 @@ Section StrongAdequacyHelpers.
   iDestruct "H" as (δ'' ℓ) "(HSI & #HTI' & Hpost)"; simpl in *.
 
   replace stateI with state_interp by done.
-  iPoseProof (pr_has_posts with "Hpost") as "Hpost".
+  iPoseProof (pr_has_posts with "Hpost") as "Hpost"; [done| ].
   iMod (pre_step_elim with "[$HSI] Hpost") as "[HSI Hback]".
 
   iModIntro. iIntros "HFtB".
