@@ -187,8 +187,9 @@ Record ProgressResource {Λ} {M} {Σ} {Hinv : invGS_gen HasNoLc Σ}
   pr_has_posts: forall s ex Φs,
       let Ps := posts_of (trace_last ex).1 Φs in 
       pr_pr s ex Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr s ex Φs);
-  pr_not_stuck: forall s ex Φs σ atr tp t0 trest,
-          valid_exec ex → trace_ends_in ex (t0 ++ tp ++ trest, σ) →
+  pr_not_stuck: forall s ex Φs σ atr tp trest,
+          valid_exec ex → trace_ends_in ex (tp ++ trest, σ) →
+          C ex ->
           state_interp ex atr -∗ pr_pr s ex Φs ={⊤}=∗
           state_interp ex atr ∗ pr_pr s ex Φs ∗
           ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝;
@@ -361,8 +362,8 @@ Section StrongAdequacyHelpers.
     (Φs : list (val Λ → iProp Σ))    
   (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ))
   (atr : auxiliary_trace M)
-  (Hextras : tr_extras ξ (es, σ) δ ex atr):
-
+  (Hextras : tr_extras ξ (es, σ) δ ex atr)
+  (FITS: C ex):
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
   cur_tr_repr_impl s Φs ex atr ={⊤}=∗
   ⌜ξ ex atr⌝ ∗
@@ -379,10 +380,11 @@ Section StrongAdequacyHelpers.
     (* { list_simplifier. rewrite <- surjective_pairing. apply trace_ends_in_last. } *)
     (* iMod ("Htp") as "(HSI & Htp & %Hnstk)". *)
 
-    iMod (pr_not_stuck _ _ _ _ _ _ _ _ _ [] with "[$HSI] Htp") as "(HSI & Htp & %Htp)". 
+    iMod (pr_not_stuck _ _ _ _ _ _ _ _ _ with "[$HSI] Htp") as "(HSI & Htp & %Htp)". 
     { by eapply valid_system_trace_valid_exec_trace. }
     { list_simplifier. erewrite app_nil_r. rewrite <- surjective_pairing.
       apply trace_ends_in_last. }
+    { eauto. }
 
     iApply fupd_plain_keep_l. iSplitR.
     2: { by iFrame. }
@@ -486,6 +488,7 @@ Section StrongAdequacyHelpers.
 
     iMod (get_current_facts with "[$] [$]") as "(Hξ & Hstep & PRE & %NSTUCK)".
     { repeat split; auto. }
+    { done. }
 
     pose proof (pr_trace_inv_pers _ _ _ _ PR) as PTI.
     iDestruct "PRE" as "(HSI & #HTI & Htp)". 
