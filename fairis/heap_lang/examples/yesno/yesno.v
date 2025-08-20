@@ -92,12 +92,12 @@ Definition the_model: LiveModel heap_lang the_fair_model :=
 Class yesnoG Σ := YesnoG {
   yes_name: gname;
   no_name: gname;
-  yesno_n_G :> inG Σ (excl_authR natO);
-  yesno_f_G :> inG Σ (excl_authR boolO);
+  yesno_n_G :: inG Σ (excl_authR natO);
+  yesno_f_G :: inG Σ (excl_authR boolO);
  }.
 Class yesnoPreG Σ := {
-  yesno_PreG :> inG Σ (excl_authR natO);
-  yesno_f_PreG :> inG Σ (excl_authR boolO);
+  yesno_PreG :: inG Σ (excl_authR natO);
+  yesno_f_PreG :: inG Σ (excl_authR boolO);
  }.
 Definition yesnoΣ : gFunctors :=
   #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].

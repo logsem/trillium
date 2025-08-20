@@ -33,7 +33,7 @@ Proof.
     rewrite list_lookup_fmap fmap_Some. simpl in Hsome.
     exists (e1 :: take tid tp, e). rewrite drop_0. split.
     + erewrite prefixes_from_lookup =>//.
-    + rewrite /locale_of /= take_length_le //.
+    + rewrite /locale_of /= length_take_le //.
       assert (tid < length tp)%nat; last lia. by eapply lookup_lt_Some.
 Qed.
 
@@ -125,8 +125,8 @@ Theorem strong_simulation_adequacy Σ `(LM:LiveModel heap_lang M)
   continued_simulation (sim_rel_with_user LM ξ) (trace_singleton ([e1], σ1)) (trace_singleton (initial_ls (LM := LM) s1 0%nat)).
 Proof.
   intros Hfin Hfevol H.
-  apply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
-  iIntros (?) "".
+  eapply (wp_strong_adequacy heap_lang LM Σ s); first by eauto.
+  iIntros (??) "".
   iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".
   iMod (model_state_init s1) as (γmod) "[Hmoda Hmodf]".
   iMod (model_fuel_mapping_init s1) as (γmap) "[Hmapa Hmapf]".
@@ -148,7 +148,7 @@ Proof.
     rewrite /has_fuels /frag_fuel_mapping_is.
     rewrite fmap_insert fmap_empty. iFrame. }
   iDestruct "Hwp" as ">[Hwp H]".
-  iModIntro. iFrame "Hwp".
+  iModIntro. simpl. iFrame "Hwp".
   iSplitL "Hgen Hmoda Hmapa HFR".
   { unfold state_interp. simpl. iFrame.
     iExists (ls_map (initial_ls s1 0%nat)).
@@ -172,8 +172,7 @@ Proof.
                 :: ((λ '(tnew, e), fork_post (language.locale_of tnew e)) <$>
                     prefixes_from [e1] (drop (length [e1]) c.1))))%I with "[Hsi H Hposts]" as "H".
   { iApply fupd_plain_keep_l. iFrame. iIntros "[Hsi Hposts]".
-    iSpecialize ("H" with "[//] Hsi Hposts").
-    by iApply fupd_plain_mask_empty. }
+    iSpecialize ("H" with "[//] Hsi Hposts"). iApply "H". }
   iMod "H" as "[H1 [Hsi Hposts]]".
   destruct ex as [c'|ex' tid (e, σ)].
   - (* We need to prove that the initial state satisfies the property *)

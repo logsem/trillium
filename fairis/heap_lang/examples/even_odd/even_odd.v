@@ -80,10 +80,10 @@ Definition the_model: LiveModel heap_lang the_fair_model :=
 Class evenoddG Σ := EvenoddG {
   even_name: gname;
   odd_name: gname;
-  evenodd_n_G :> inG Σ (excl_authR natO);
+  evenodd_n_G :: inG Σ (excl_authR natO);
  }.
 Class evenoddPreG Σ := {
-  evenodd_PreG :> inG Σ (excl_authR natO);
+  evenodd_PreG :: inG Σ (excl_authR natO);
  }.
 Definition evenoddΣ : gFunctors :=
   #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].
