@@ -994,14 +994,13 @@ Theorem wp_strong_adequacy_multiple_helper Σ Λ M  `{!invGpreS Σ} `{trGpreS Σ
   ⊢ Gsim Σ M s ξ (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
   intros Hes Hwp.
-  iApply bupd_elim.
-  iApply (physical_step_to_laters_soundness_no_lc).
-  iIntros (Hinv Htr) "HFtB HStepToLaters".
+  iApply (physical_step_to_laters_soundness).
+  iIntros (Hinv Htr) "HFtB Hle HStepToLaters".
   iPoseProof (Hwp Hinv) as "Hwp".
-  iApply (fupd_to_bupd_except0_plain ⊤ ⊤ with "HFtB").
+  iApply (fupd_to_bupd_except0_plain ⊤ ⊤ with "HFtB Hle").
   iMod "Hwp" as (stateI trace_inv Φs fork_post)
                   "(#config_wp & HSI & Hwp & Hstep)".
-  clear Hwp.
+  clear Hwp. iIntros "!> %k Hle HFtB".
   set (IrisG Λ M Σ Hinv _ _ stateI fork_post).
   iAssert (∃ ex atr c1 δ1,
               ⌜trace_singleton (es, σ) = ex⌝ ∗
@@ -1042,7 +1041,7 @@ Proof.
   }
   clear Hc1 Hδ1.
   rewrite Hexsing Hatrsing; clear Hexsing Hatrsing.
-  iLöb as "IH" forall (ex atr c1 Hextras Hlen) "HSI HTI Htp".
+  iLöb as "IH" forall (ex atr c1 Hextras Hlen k) "HSI HTI Htp".
   destruct Hextras as (Hv & Hex & Hc1 & Hatr & Hξ & Htake & Htakelen).
   rewrite Gsim_unfold.
   destruct c1 as [tp σ1'].
@@ -1050,6 +1049,7 @@ Proof.
   { by eapply valid_system_trace_valid_exec_trace. }
   iPoseProof (wptp_not_stuck _ _ _ _ _ _ [] with "[$HSI] Htp") as "Htp";
     [apply locales_equiv_refl|done|by list_simplifier|].
+  iApply (fupd_to_bupd_except0_plain ⊤ ⊤ with "HFtB Hle").
   iMod ("Htp") as "(HSI & Htp & %Hnstk)".
   rewrite (last_eq_trace_ends_in _ (tp, σ1')) in Hnstk; last done.
   iPoseProof (wptp_of_val_post with "Htp") as "Htp".
@@ -1077,14 +1077,13 @@ Proof.
     iApply ("Hext" with "[$HSI $HTI]"). }
   iMod ("HTIextend" with "HSI HTI") as "[HSI HTI]".
   iDestruct ("Hback" with "Hpost") as "Htp".
-  iModIntro.
-  iIntros "HFtB".
+  iIntros "!> %k' Hle HFtB".
   iSplit; first done.
   iIntros (c oζ c' Hc Hstep).
   pose proof (trace_ends_in_inj ex c (tp, σ1') Hc Hc1); simplify_eq.
   iPoseProof (take_step with "config_wp HSI Htp") as "Hstp"; [done|done|done|].
-  rewrite -bi.later_laterN bi.laterN_later.
-  iApply (physical_step_to_laters_except0_plain with "[$] [$]").
+  rewrite -bi.later_laterN bi.laterN_later -bi.laterN_add (comm _ k').
+  iApply (physical_step_to_laters_except0_plain with "[$] [$] [$]").
   iApply physical_step_fupd.
   iApply (physical_step_wand with "Hstp").
   iIntros "(% & H)".
@@ -1093,7 +1092,9 @@ Proof.
   replace stateI with state_interp by done.
   iPoseProof (wptp_of_val_post with "Hback") as "Hback".
   iMod (pre_step_elim with "HSI Hback") as "[HSI Hback]".
-  iIntros "!> HFtB HStepToLaters !>".
+  clear k'. iIntros "!> %k' Hle HFtB HStepToLaters".
+  rewrite -bi.laterN_later bi.later_laterN.
+  iNext.
   iDestruct "Hξ" as %Hξ'.
   (* TODO: Generalise this as its own lemma *)
   assert (Hlocales: ((λ '(tnew, e), weakestpre.fork_post (locale_of tnew e)) <$>
@@ -1112,34 +1113,10 @@ Proof.
     f_equiv.
     rewrite -fmap_app -prefixes_from_app -locales_of_list_equiv.
     by apply locales_equiv_from_comm, locales_equiv_prefix_from_drop. }
-  iAssert (▷ ⌜ξ (ex :tr[oζ]: c') (atr :tr[ℓ]: δ'')⌝)%I as "#Hextend'".
-  { iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI") as "H"; [iPureIntro..|].
-    - eapply valid_system_trace_extend; eauto.
-    - eapply trace_extend_starts_in; eauto.
-    - eapply trace_extend_starts_in; eauto.
-    - eapply trace_extend_ends_in; eauto.
-    - by intros ? ? ? ? [-> ->]%trace_contract_of_extend [-> ->]%trace_contract_of_extend.
-    - done.
-    - eapply locales_equiv_from_transitive;
-        [by apply locales_equiv_refl|by apply locales_equiv_refl|done|].
-      apply locale_step_equiv in Hstep.
-      eapply (locales_equiv_from_take _ _ _ _ (length es)) in Hstep.
-      rewrite !firstn_firstn in Hstep.
-      rewrite !min_l in Hstep; [done|simpl; lia].
-    - rewrite -app_assoc Hlocales.
-      iApply except_0_later.
-      iApply bupd_elim.
-      iApply (fupd_to_bupd_except0_plain _ ∅ with "[$]").
-      iDestruct "Hback" as "(Hpost & Hwptp)".
-      iDestruct ("H" with "Hpost") as "[? Hξ]".
-      iMod ("Hξ" with "[HTI]") as "%".
-      + iIntros (? ? ? ? [-> ->]%trace_contract_of_extend
-                 [-> ->]%trace_contract_of_extend); done.
-      + iModIntro.
-        iIntros "HFtB"; done. }
+
   iExists _, _.
-  iApply (fupd_to_bupd_except0_plain _ ⊤ with "[$]").
-  iMod ("IH" with "[] [] Hstep [HStepToLaters] HSI [HTI] [Hback]") as "IH'".
+
+  iApply ("IH" with "[] [] Hstep [$] [$] [HStepToLaters] HSI [HTI] [Hback]").
   - iPureIntro; split_and!.
     + eapply valid_system_trace_extend; eauto.
     + eapply trace_extend_starts_in; eauto.
@@ -1160,7 +1137,6 @@ Proof.
                   [-> ->]%trace_contract_of_extend); done.
   - rewrite -app_assoc Hlocales //.
     iDestruct "Hback" as "(Hpost & Hwptp)". by iApply "Hwptp".
-  - iModIntro. iIntros "HFtB". iApply "IH'"; done.
 Qed.
 
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ} `{trGpreS Σ} `{tr_generation}
