@@ -7,3 +7,9 @@
 [submodule "external/paco"]
 	path = external/paco
 	url = https://github.com/snu-sf/paco.git
+[submodule "external/record-update"]
+	path = external/record-update
+	url = https://github.com/tchajed/coq-record-update
+[submodule "external/actris"]
+	path = external/actris
+	url = https://gitlab.mpi-sws.org/iris/actris.git

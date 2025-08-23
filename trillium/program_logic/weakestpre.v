@@ -824,6 +824,76 @@ Proof.
   iIntros (v) "HΦ". by iApply "HΦ".
 Qed.
 
+Lemma wp_step_update_strong E1 E2 ζ P e s Φ :
+  TCEq (to_val e) None → E2 ⊆ E1 →
+  (|~{E1, E2}~> P) -∗
+  WP e @ s; ζ; E2 {{ v, P -∗ Φ v }} -∗
+  WP e @ s; ζ; E1 {{ v, Φ v}}.
+Proof.
+  rewrite !wp_unfold /wp_pre. iIntros (-> ?) "Hlb Hwp".
+  iIntros (extr atr K tp1 tp2 σ1 ???) "Hσ".
+  iSplit.
+  { iDestruct ("Hwp" with "[//] [//] [//] [$]") as "[H _]".
+    iMod fupd_mask_subseteq; [done|]. done. }
+  iIntros.
+  iDestruct ("Hwp" with "[//] [//] [//] [$]") as "[_ H]".
+  iMod "Hlb" as "_".
+  iDestruct ("H" with "[//]") as "H".
+  iApply (physical_step_wand with "H").
+  iDestruct 1 as (??) "(Hσ & Hwp & H)". iIntros "HP".
+  iExists _, _. iFrame.
+  iApply (wp_strong_mono with "Hwp"); [done|set_solver|].
+  iIntros (v) "HΦ". iApply ("HΦ" with "HP").
+Qed.
+Lemma wp_step_update s E1 E2 ζ e P Φ :
+  TCEq (to_val e) None → E2 ⊆ E1 →
+  (|~{E1∖E2}~> P) -∗
+  WP e @ s; ζ; E2 {{ v, P -∗ Φ v }} -∗
+  WP e @ s; ζ; E1 {{ Φ }}.
+Proof.
+  iIntros (Hval HE) "Hstep Hwp".
+  iDestruct (step_update_frame (E1∖E2) ∅ (E2) with "Hstep") as "Hstep";
+    [set_solver|set_solver|].
+  replace (E1 ∖ E2 ∪ E2) with E1; last first.
+  { rewrite difference_union_L. set_solver. }
+  replace (∅ ∪ E2) with E2 by set_solver.
+  by iApply (wp_step_update_strong with "[$] [$]").
+Qed.
+Lemma wp_step_update_emp s E1 ζ e P Φ :
+  TCEq (to_val e) None →
+  (|~~> P) -∗
+  WP e @ s; ζ; E1 {{ v, P -∗ Φ v }} -∗
+  WP e @ s; ζ; E1 {{ Φ }}.
+Proof.
+  iIntros (Hval) "Hstep Hwp".
+  iApply (wp_step_update with "[Hstep] Hwp"); [done|].
+  by rewrite difference_diag_L.
+Qed.
+
+Lemma wp_trp_update s n E ζ e Φ :
+  TCEq (to_val e) None →
+  ⧖ n -∗
+  WP e @ s; ζ; E {{ v, ⧖ (f $ S $ n) -∗ Φ v }} -∗
+  WP e @ s; ζ; E {{ Φ }}.
+Proof.
+  iIntros (He) "H⧖ Hwp".
+  iApply (wp_step_update_emp with "[H⧖] Hwp").
+  iApply (step_update_lb_update with "[$]").
+Qed.
+
+Lemma wp_tr_use s n E ζ e Φ :
+  TCEq (to_val e) None →
+  ⧗ n -∗
+  WP e @ s; ζ; E {{ v, ⧗ (f n) -∗ £ (f n) -∗ Φ v }} -∗
+  WP e @ s; ζ; E {{ Φ }}.
+Proof.
+  iIntros (He) "H⧗ Hwp".
+  iDestruct (step_update_tr_use with "[$]") as "H".
+  iApply (wp_step_update_emp with "H").
+  iApply (wp_mono with "[$]").
+  iIntros (v) "H [A B]". iApply ("H" with "A B").
+Qed.
+
 End wp.
 
 #[global] Arguments AllowsStuttering {_} _ _ {_}.
@@ -926,6 +996,30 @@ Section proofmode_classes.
       iApply pre_step_wp. iMod "HP". iModIntro. by iApply "HPQ".
     - rewrite /ElimModal. iIntros (_) "[HP HPQ]".
       iApply pre_step_wp. iMod "HP". iModIntro. by iApply "HPQ".
+  Qed.
+
+  Global Instance elim_modal_step_upd_wp_1 E1 E2 P s ζ e Φ :
+    TCEq (to_val e) None →
+    ElimModal (E2 ⊆ E1) false false (|~{E1, E2}~> P) emp (WP e @ s ; ζ ; E1 {{ Φ }}) (WP e @ s ; ζ ; E2 {{ v, P -∗ Φ v }})%I.
+  Proof.
+    rewrite /ElimModal /=. iIntros (??) "[HP HPQ]".
+    by iApply (wp_step_update_strong with "[$] (HPQ [//])").
+  Qed.
+  Global Instance elim_modal_step_upd_step_upd_2 E1 E2 P s ζ e Φ :
+    TCEq (to_val e) None →
+    ElimModal (E1 ⊆ E2) false false (|~{E1}~> P) emp (WP e @ s ; ζ ; E2 {{ Φ }}) (WP e @ s ; ζ ; E2∖E1 {{ v, P -∗ Φ v }})%I.
+  Proof.
+    rewrite /ElimModal /=. iIntros (? Hle) "[Hupd HPQ]".
+    iDestruct (step_update_frame _ _ (E2 ∖ E1) with "Hupd") as "Hupd"; [set_solver..|].
+    rewrite <-union_difference_L, (left_id_L ∅ (∪)); try done.
+    iMod "Hupd" as "_". by iApply "HPQ".
+  Qed.
+  Global Instance elim_modal_step_upd_step_upd_3 E P s ζ e Φ :
+    TCEq (to_val e) None →
+    ElimModal True false false (|~~> P) emp (WP e @ s ; ζ ; E {{ Φ }}) (WP e @ s ; ζ ; E {{ v, P -∗ Φ v }})%I.
+  Proof.
+    rewrite /ElimModal /=. iIntros (? Hle) "[Hupd HPQ]".
+    iMod "Hupd" as "_". rewrite difference_empty_L. by iApply "HPQ".
   Qed.
 
 End proofmode_classes.
