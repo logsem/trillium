@@ -43,105 +43,105 @@ Global Instance: Params (@wp) 9 := {}.
 (** Notations without binder -- only parsing because they overlap with the
 notations with binder. *)
 
-Notation "'WP' e @ s ; tid ; E {{ Φ } }" := (wp s E tid e%E Φ)
+Notation "'WP' e @ s ; tid ; E {{ Φ } }" := (wp s E tid%type e%E Φ)
   (at level 20, e, Φ at level 200, only parsing) : bi_scope.
-Notation "'WP' e @ tid ; E {{ Φ } }" := (wp NotStuck E tid e%E Φ)
+Notation "'WP' e @ tid ; E {{ Φ } }" := (wp NotStuck E tid%type e%E Φ)
   (at level 20, e, Φ at level 200, only parsing) : bi_scope.
-Notation "'WP' e @ tid ; E ? {{ Φ } }" := (wp MaybeStuck E tid e%E Φ)
+Notation "'WP' e @ tid ; E ? {{ Φ } }" := (wp MaybeStuck E tid%type e%E Φ)
   (at level 20, e, Φ at level 200, only parsing) : bi_scope.
-Notation "'WP' e @ tid {{ Φ } }" := (wp NotStuck ⊤ tid e%E Φ)
+Notation "'WP' e @ tid {{ Φ } }" := (wp NotStuck ⊤ tid%type e%E Φ)
   (at level 20, e, Φ at level 200, only parsing) : bi_scope.
-Notation "'WP' e @ tid ? {{ Φ } }" := (wp MaybeStuck ⊤ tid e%E Φ)
+Notation "'WP' e @ tid ? {{ Φ } }" := (wp MaybeStuck ⊤ tid%type e%E Φ)
   (at level 20, e, Φ at level 200, only parsing) : bi_scope.
 
 (** Notations with binder.  The indentation for the inner format block is chosen
 such that *if* one has a single-character mask (e.g. [E]), the second line
 should align with the binder(s) on the first line. *)
-Notation "'WP' e @ s ; tid ; E {{ v , Q } }" := (wp s E tid e%E (λ v, Q))
+Notation "'WP' e @ s ; tid ; E {{ v , Q } }" := (wp s E tid%type e%E (λ v, Q))
   (at level 20, e, Q at level 200,
    format "'[' 'WP'  e  '/' '[          ' @  s ;  tid ;  E  {{  v ,  Q  } } ']' ']'") : bi_scope.
-Notation "'WP' e @ tid ; E {{ v , Q } }" := (wp NotStuck E tid e%E (λ v, Q))
+Notation "'WP' e @ tid ; E {{ v , Q } }" := (wp NotStuck E tid%type e%E (λ v, Q))
   (at level 20, e, Q at level 200,
    format "'[' 'WP'  e  '/' '[       ' @  tid ;  E  {{  v ,  Q  } } ']' ']'") : bi_scope.
-Notation "'WP' e @ tid ; E ? {{ v , Q } }" := (wp MaybeStuck E tid e%E (λ v, Q))
+Notation "'WP' e @ tid ; E ? {{ v , Q } }" := (wp MaybeStuck E tid%type e%E (λ v, Q))
   (at level 20, e, Q at level 200,
    format "'[' 'WP'  e  '/' '[        ' @  tid ;  E  ? {{  v ,  Q  } } ']' ']'") : bi_scope.
-Notation "'WP' e @ tid {{ v , Q } }" := (wp NotStuck ⊤ tid e%E (λ v, Q))
+Notation "'WP' e @ tid {{ v , Q } }" := (wp NotStuck ⊤ tid%type e%E (λ v, Q))
   (at level 20, e, Q at level 200,
    format "'[' 'WP'  e  @ tid  '/' '[   ' {{  v ,  Q  } } ']' ']'") : bi_scope.
-Notation "'WP' e @ tid ? {{ v , Q } }" := (wp MaybeStuck ⊤ tid e%E (λ v, Q))
+Notation "'WP' e @ tid ? {{ v , Q } }" := (wp MaybeStuck ⊤ tid%type e%E (λ v, Q))
   (at level 20, e, Q at level 200,
    format "'[' 'WP'  e  @ tid  '/' '[    ' ? {{  v ,  Q  } } ']' ']'") : bi_scope.
 
 (* Texan triples *)
 Notation "'{{{' P } } } e @ tid ; s ; E {{{ x .. y , 'RET' pat ; Q } } }" :=
   (□ ∀ Φ,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid ; s; E {{ Φ }})%I
+      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type ; s; E {{ Φ }})%I
     (at level 20, x closed binder, y closed binder,
      format "'[hv' {{{  P  } } }  '/  ' e  '/' @ tid ;  s ;  E  {{{  x  ..  y ,  RET  pat ;  Q  } } } ']'") : bi_scope.
 Notation "'{{{' P } } } e @ tid ; E {{{ x .. y , 'RET' pat ; Q } } }" :=
   (□ ∀ Φ,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid ; E {{ Φ }})%I
+      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type ; E {{ Φ }})%I
     (at level 20, x closed binder, y closed binder,
      format "'[hv' {{{  P  } } }  '/  ' e  '/' @ tid ;  E  {{{  x  ..  y ,  RET  pat ;  Q  } } } ']'") : bi_scope.
 Notation "'{{{' P } } } e @ tid ; E ? {{{ x .. y , 'RET' pat ; Q } } }" :=
   (□ ∀ Φ,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid ; E ?{{ Φ }})%I
+      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type ; E ?{{ Φ }})%I
     (at level 20, x closed binder, y closed binder,
      format "'[hv' {{{  P  } } }  '/  ' e  '/' @ tid ;  E  ? {{{  x  ..  y ,  RET  pat ;  Q  } } } ']'") : bi_scope.
 Notation "'{{{' P } } } e @ tid {{{ x .. y , 'RET' pat ; Q } } }" :=
   (□ ∀ Φ,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid {{ Φ }})%I
+      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type {{ Φ }})%I
     (at level 20, x closed binder, y closed binder,
      format "'[hv' {{{  P  } } }  '/  ' e @ tid '/' {{{  x  ..  y ,  RET  pat ;  Q  } } } ']'") : bi_scope.
 Notation "'{{{' P } } } e @ tid ? {{{ x .. y , 'RET' pat ; Q } } }" :=
   (□ ∀ Φ,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid ?{{ Φ }})%I
+      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type ?{{ Φ }})%I
     (at level 20, x closed binder, y closed binder,
      format "'[hv' {{{  P  } } }  '/  ' e  @ tid '/' ? {{{  x  ..  y ,   RET  pat ;  Q  } } } ']'") : bi_scope.
 
 Notation "'{{{' P } } } e @ s ; tid ; E {{{ 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ s; tid ; E {{ Φ }})%I
+  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ s; tid%type ; E {{ Φ }})%I
     (at level 20,
      format "'[hv' {{{  P  } } }  '/  ' e  '/' @ s ; tid  ; E  {{{  RET  pat ;  Q  } } } ']'") : bi_scope.
 Notation "'{{{' P } } } e @ tid ; E {{{ 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid ; E {{ Φ }})%I
+  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid%type ; E {{ Φ }})%I
     (at level 20,
      format "'[hv' {{{  P  } } }  '/  ' e  '/' @ tid ; E  {{{  RET  pat ;  Q  } } } ']'") : bi_scope.
 Notation "'{{{' P } } } e @ tid ; E ? {{{ 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid ; E ?{{ Φ }})%I
+  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid%type ; E ?{{ Φ }})%I
     (at level 20,
      format "'[hv' {{{  P  } } }  '/  ' e  '/' @ tid ; E  ? {{{  RET  pat ;  Q  } } } ']'") : bi_scope.
 Notation "'{{{' P } } } e @ tid {{{ 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid {{ Φ }})%I
+  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid%type {{ Φ }})%I
     (at level 20,
      format "'[hv' {{{  P  } } }  '/  ' e @ tid '/' {{{  RET  pat ;  Q  } } } ']'") : bi_scope.
 Notation "'{{{' P } } } e @ tid ? {{{ 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid ?{{ Φ }})%I
+  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid%type ?{{ Φ }})%I
     (at level 20,
      format "'[hv' {{{  P  } } }  '/  ' e @ tid '/' ? {{{  RET  pat ;  Q  } } } ']'") : bi_scope.
 
 (** Aliases for stdpp scope -- they inherit the levels and format from above. *)
 Notation "'{{{' P } } } e @ s ; tid ; E {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ s; tid ; E {{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ s; tid%type ; E {{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ tid ; E {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid ; E {{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type ; E {{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ tid ; E ? {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid ; E ?{{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type ; E ?{{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ tid {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid {{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type {{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ tid ? {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid ?{{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ tid%type ?{{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ s ; tid ; E {{{ 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ s; tid; E {{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ s; tid%type; E {{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ tid ; E {{{ 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid; E {{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid%type; E {{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ tid ; E ? {{{ 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid; E ?{{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid%type; E ?{{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ tid {{{ 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid {{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid%type {{ Φ }}) : stdpp_scope.
 Notation "'{{{' P } } } e @ tid ? {{{ 'RET' pat ; Q } } }" :=
-  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid ?{{ Φ }}) : stdpp_scope.
+  (∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ tid%type ?{{ Φ }}) : stdpp_scope.
 
 
 
