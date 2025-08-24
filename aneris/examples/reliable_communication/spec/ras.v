@@ -18,17 +18,17 @@ Notation socket_addressO := (leibnizO socket_address).
 Definition oneShotR := csumR (exclR unitO) (agreeR unitO).
 
 Class SpecChanG Σ := {
-    SpecChanG_session_escrow :> session_escrowG Σ val;
-    SpecChanG_ids :> mono_natG Σ;
-    SpecChanG_cookie :> inG Σ (frac_authR natR);
-    SpecChanG_session_names_map :>
+    SpecChanG_session_escrow :: session_escrowG Σ val;
+    SpecChanG_ids :: mono_natG Σ;
+    SpecChanG_cookie :: inG Σ (frac_authR natR);
+    SpecChanG_session_names_map ::
       inG Σ (authR (gmapUR socket_address (agreeR (leibnizO (session_name)))));
-    SpecChanG_address :> inG Σ (agreeR (prodO socket_addressO socket_addressO));
-    SpecChanG_side :> inG Σ (agreeR (leibnizO side));
-    SpecChanG_idxs :> inG Σ (agreeR (prodO locO locO));
-    SpecChanG_mhst :> inG Σ (authUR (gsetUR message));
-    SpecChanG_status :> inG Σ oneShotR;
-    SpecChanG_lock :> lockG Σ;
+    SpecChanG_address :: inG Σ (agreeR (prodO socket_addressO socket_addressO));
+    SpecChanG_side :: inG Σ (agreeR (leibnizO side));
+    SpecChanG_idxs :: inG Σ (agreeR (prodO locO locO));
+    SpecChanG_mhst :: inG Σ (authUR (gsetUR message));
+    SpecChanG_status :: inG Σ oneShotR;
+    SpecChanG_lock :: lockG Σ;
    }.
 
 Definition SpecChanΣ : gFunctors :=
