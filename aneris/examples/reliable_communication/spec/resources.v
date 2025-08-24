@@ -17,9 +17,9 @@ Section Chan_Mapsto_Resources.
   Class Chan_mapsto_resource := {
       chan_mapsto : val → iProto Σ → ip_address → serialization → iProp Σ
       where "c ↣{ ip , ser } p" := (chan_mapsto c p ip ser);
-      chan_mapsto_contractive c ip ser :> Contractive (λ p, chan_mapsto c p ip ser);
-      chan_mapsto_nonExpansive c ip ser :> NonExpansive (λ p, chan_mapsto c p ip ser);
-      chan_mapsto_proper c ip ser :> Proper ((≡) ==> (≡)) (λ p, chan_mapsto c p ip ser);
+      chan_mapsto_contractive c ip ser :: Contractive (λ p, chan_mapsto c p ip ser);
+      chan_mapsto_nonExpansive c ip ser :: NonExpansive (λ p, chan_mapsto c p ip ser);
+      chan_mapsto_proper c ip ser :: Proper ((≡) ==> (≡)) (λ p, chan_mapsto c p ip ser);
       chan_mapsto_le c ip ser p1 p2 : c ↣{ ip, ser } p1 -∗ ▷ (p1 ⊑ p2) -∗ c ↣{ ip, ser } p2;
     }.
 
