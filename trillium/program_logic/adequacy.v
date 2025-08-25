@@ -947,14 +947,49 @@ Section adequacy_helper_lemmas.
       iFrame.
   Qed.
 
+  (* OBS: make sure this holds *)
+  Lemma locales_equiv_from' (t0 t0' t1 t1': list (expr Λ)):
+    locales_equiv t0 t0' ->
+    locales_equiv t1 t1' ->
+    locales_equiv_from t0 t0' t1 t1'.
+  Proof. Admitted.
+
   (* Need some conditions here. *)
-  Lemma newposts_app c1 c2 c3 :
-    newposts c1 c2 ++ newposts c2 c3 = newposts c1 c3.
+  Lemma newposts_app (c0 c1 c2 : _) :
+    locales_equiv_prefix_from c0 c1 c2 →
+    newposts c0 c1 ++ newposts c1 c2 = newposts c0 c2.
   Proof.
-    unfold newposts. rewrite -fmap_app.
-    f_equal.
-    Search prefixes_from.
-    Search "newelems".
+    intros H.
+    assert (∃ c0' c1', c1 = c0' ++ c1' ∧ locales_equiv c0' c0) as (c0'&c1'&->&Hc1).
+    { admit. }
+    assert (length c0' = length c0) as Hlen0.
+    { by eapply locales_equiv_from_length. }
+    rewrite -!Hlen0.
+    rewrite !drop_app_length.
+    assert (∃ c2' c0'' c1'', c2 = c0'' ++ c1'' ++ c2' ∧ locales_equiv c0' c0'' ∧ locales_equiv c1' c1'' ∧ locales_equiv c2 c2') as (c2'&c0''&c1''&->&Hc0&Hc1'&Hc2).
+    { admit. }
+    rewrite !(assoc (++)).    
+    assert (length c0' = length c0'') as Hlen0'.
+    { admit. }
+    assert (length (c0' ++ c1') = length (c0'' ++ c1'')) as Hlen1.
+    { admit. }
+    rewrite Hlen1.
+    rewrite drop_app_length.
+    rewrite Hlen0'.
+    rewrite -!(assoc (++)).    
+    rewrite drop_app_length.
+    rewrite (forkposts_locales_equiv c0 c0' c1' c1'); last first.
+    { apply locales_equiv_from'.
+      - by apply locales_equiv_from_comm.
+      - apply locales_equiv_refl. }
+    rewrite -fmap_app.
+    rewrite -prefixes_from_app.
+    eapply forkposts_locales_equiv.
+    apply locales_equiv_from_app.
+    - by apply locales_equiv_from'.
+    - apply locales_equiv_from_refl. 
+      apply locales_equiv_from_app; [done|].
+      simpl. by apply locales_equiv_from'. 
   Admitted.
 
   Lemma take_stepN s Φs ex atr c0 c1 :
@@ -990,8 +1025,27 @@ Section adequacy_helper_lemmas.
       iDestruct (take_step with "[$] [$] [$]") as "H"; try done.
       iApply (physical_step_wand with "[$]").
       iIntros "(%&%&$&Hposts&H)".
-      rewrite -!(assoc (++)) newposts_app.
-      by iApply "H".
+      rewrite -!(assoc (++)).
+      iDestruct ("H" with "Hposts") as "H".
+      rewrite newposts_app; [done|].
+      destruct c0, c, c1.
+      simpl.
+      inversion Hstep; last first.
+      { simplify_eq.
+        rewrite /locales_equiv_prefix_from take_ge; [|done].
+        apply locales_equiv_from_refl. by apply locales_equiv_from_refl. }
+      simplify_eq.
+      assert (length (t1 ++ e1 :: t2) = length (t1 ++ e2 :: t2)) as Hlen.
+      { repeat rewrite length_app /=. lia. }
+      rewrite /locales_equiv_prefix_from.
+      rewrite Hlen.
+      replace (t1 ++ e2 :: t2 ++ efs) with ((t1 ++ e2 :: t2) ++ efs); last first.
+      { list_simplifier. done. }
+      rewrite take_app_length.
+      apply locales_equiv_from'.
+      + by apply locales_equiv_from_refl.
+      + eapply locale_step_preserve in H1.
+        by apply locales_equiv_middle.
   Qed.
 
 End adequacy_helper_lemmas.
