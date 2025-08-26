@@ -7,7 +7,7 @@ From aneris.aneris_lang Require Import ast.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.aneris_lang.lib Require Import assert_proof lock_proof monitor_proof queue_proof.
-From aneris.aneris_lang.program_logic Require Import aneris_lifting step_update.
+From aneris.aneris_lang.program_logic Require Import aneris_lifting.
 From aneris.aneris_lang Require Import proofmode.
 From stdpp Require Import base tactics telescopes.
 From aneris.examples.reliable_communication Require Import client_server_code.
