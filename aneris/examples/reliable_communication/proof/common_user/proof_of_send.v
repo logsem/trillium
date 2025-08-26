@@ -9,7 +9,7 @@ From aneris.aneris_lang.lib Require Import network_util_code.
 From aneris.aneris_lang.lib Require Import assert_proof.
 From aneris.aneris_lang.lib Require Import pers_socket_proto lock_proof monitor_proof queue_proof.
 From aneris.aneris_lang.program_logic Require Import
-     aneris_weakestpre aneris_adequacy aneris_lifting step_update.
+     aneris_weakestpre aneris_adequacy aneris_lifting .
 From aneris.aneris_lang Require Import proofmode.
 From stdpp Require Import base tactics telescopes.
 From aneris.examples.reliable_communication Require Import client_server_code.

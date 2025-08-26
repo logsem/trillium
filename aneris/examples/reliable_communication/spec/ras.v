@@ -6,7 +6,6 @@ From aneris.aneris_lang Require Import lang.
 From aneris.aneris_lang.lib Require Import lock_proof.
 From actris.channel Require Import proto.
 From aneris.examples.reliable_communication.spec Require Import prelude.
-From aneris.examples.reliable_communication.resources Require Import session_escrow.
 
 Definition session_names_mapUR : ucmra :=
   gmapUR socket_address (agreeR (leibnizO (session_name))).
