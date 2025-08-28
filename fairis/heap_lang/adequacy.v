@@ -167,13 +167,6 @@ Proof.
   { intros ex' atr' oζ ℓ H1 H2. cut (sim_rel_with_user LM ξ ex' atr'); eauto. rewrite /sim_rel_with_user. intros [??]. done. }
   iSpecialize ("H" $! ex atr c Hvalex Hstartex Hstartatr Hendex Hcontr' Hstuck).
   unfold sim_rel_with_user.
-  iAssert (|={⊤}=> ⌜ξ ex (map_underlying_trace atr)⌝ ∗ state_interp ex atr ∗ posts_of c.1
-               ((λ _ : language.val heap_lang, 0%nat ↦M ∅)
-                :: ((λ '(tnew, e), fork_post (language.locale_of tnew e)) <$>
-                    prefixes_from [e1] (drop (length [e1]) c.1))))%I with "[Hsi H Hposts]" as "H".
-  { iApply fupd_plain_keep_l. iFrame. iIntros "[Hsi Hposts]".
-    iSpecialize ("H" with "[//] Hsi Hposts"). iApply "H". }
-  iMod "H" as "[H1 [Hsi Hposts]]".
   destruct ex as [c'|ex' tid (e, σ)].
   - (* We need to prove that the initial state satisfies the property *)
     destruct atr as [δ|???]; last by inversion Hvalex. simpl.
@@ -182,39 +175,45 @@ Proof.
     have Heq4 := trace_singleton_starts_in_inv _ _ Hstartex.
     pose proof (trace_singleton_starts_in_inv _ _ Hstartatr). simpl.
     simplify_eq.
-    iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
-    iSplit; last done. iClear "H1".
-    iSplit; first done.
     destruct (to_val e1) as [v1|] eqn:Heq.
-    + iSplit.
-      { iPureIntro. intros ρ tid Hinit.
+    + iAssert (0%nat ↦M ∅)%I with "[Hposts]" as "Hem".
+      { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
+      iDestruct "Hsi" as "(_&Hsi'&Hsi)".
+      iDestruct "Hsi" as (fm Hfmle Hfmdead Hmapinv) "(Hm & Hfm)".
+      iDestruct (has_fuels_agree with "Hfm Hem") as "%Hagree".
+      iMod ("H" with "[//] [Hsi' Hm Hfm] [Hem]") as %Hξ.
+      { iFrame "Hsi' Hm Hfm". done. }
+      { rewrite /= Heq /fmap /=. by iFrame. }
+      iModIntro. iSplit; [|done].
+      iPureIntro.
+      split; [done|].
+      split.
+      * intros ρ tid Hinit.
         apply ls_mapping_data_inv in Hinit.
         destruct Hinit as [fs [HSome Hfs]].
         assert (tid = 0%nat).
         { simpl in *. rewrite lookup_insert_Some in HSome. by set_solver. }
-        rewrite /from_locale //. simpl in *. set_solver. }
-      iIntros (tid e Hsome Hnoval ρ). destruct tid; last done.
-      simpl in Hsome. compute in Hsome. simplify_eq.
-      iAssert (0%nat ↦M ∅)%I with "[Hposts]" as "Hem".
-      { rewrite /= Heq /fmap /=. by iDestruct "Hposts" as "[??]". }
-      iDestruct "Hsi" as "(_&_&Hsi)".
-      iDestruct "Hsi" as (fm Hfmle Hfmdead Hmapinv) "(Hm & Hfm)".
-      iDestruct (has_fuels_agree with "Hfm Hem") as "%Hagree".
-      iPureIntro.
-      intros HSome. apply ls_mapping_data_inv in HSome.
-      destruct HSome as [fs [HSome Hfs]].
-      destruct Hfmle as [Hfmle1 Hfmle2].
-      rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
-      pose proof Hagree as HSome'.
-      apply Hfmle1 in Hagree as (fs''&HSome''&Hfs''). simpl in *. clear Hfmle1.
-      simplify_eq. rewrite lookup_insert in HSome''. simplify_eq.
-      rewrite dom_gset_to_gmap in Hfs.
-      apply Hfmdead in Hfs as (tid''&fs'''&HSome'''&Hfs''').
-      rewrite dom_singleton_L in Hfmle2.
-      assert (tid'' = 0%nat).
-      { apply elem_of_dom_2 in HSome'''. rewrite Hfmle2 in HSome'''. set_solver. }
-      simplify_eq. by set_solver.
-    + iSplit; iPureIntro.
+        rewrite /from_locale //. simpl in *. set_solver.
+      * intros tid e Hsome Hnoval ρ. destruct tid; last done.
+        simpl in Hsome. compute in Hsome. simplify_eq.
+        intros HSome. apply ls_mapping_data_inv in HSome.
+        destruct HSome as [fs [HSome Hfs]].
+        destruct Hfmle as [Hfmle1 Hfmle2].
+        rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
+        pose proof Hagree as HSome'.
+        apply Hfmle1 in Hagree as (fs''&HSome''&Hfs''). simpl in *. clear Hfmle1.
+        simplify_eq. rewrite lookup_insert in HSome''. simplify_eq.
+        rewrite dom_gset_to_gmap in Hfs.
+        apply Hfmdead in Hfs as (tid''&fs'''&HSome'''&Hfs''').
+        rewrite dom_singleton_L in Hfmle2.
+        assert (tid'' = 0%nat).
+        { apply elem_of_dom_2 in HSome'''. rewrite Hfmle2 in HSome'''. set_solver. }
+        simplify_eq. by set_solver.
+    + iMod ("H" with "[//] Hsi Hposts") as %Hξ.
+      iModIntro. iPureIntro.
+      split; [|done].
+      split; [done|].
+      split.
       { intros ρ tid Hinit.
         apply ls_mapping_data_inv in Hinit.
         destruct Hinit as [fs [HSome Hfs]].
@@ -231,11 +230,25 @@ Proof.
     specialize (Hcontr H H') as Hvs. clear H H' Hcontr.
     have H: trace_ends_in ex' (trace_last ex') by eexists.
     have H': trace_ends_in atr' (trace_last atr') by eexists.
-    iApply (fupd_mask_weaken ∅); first set_solver. iIntros "_ !>".
     apply (trace_singleton_ends_in_inv (L := unit)) in Hendex.
     simpl in *. simplify_eq.
-    iDestruct "Hsi" as "((%&%&%Htids)&_&Hsi)".
-      iDestruct "Hsi" as (fm Hfmle Hfmdead Hmapinv) "(Hm & Hfm)".
+    iDestruct "Hsi" as "((%&%&%Htids)&Hsi'&Hsi)".
+    iDestruct "Hsi" as (fm Hfmle Hfmdead Hmapinv) "(Hm & Hfm)".
+    iAssert (⌜∀ tid' e',
+               from_locale (trace_last (ex' :tr[ tid ]: (e, σ))).1 tid' = Some e' ->
+               language.to_val e' ≠ None ->
+               fm !! tid' = Some ∅⌝)%I with "[Hfm Hposts]" as %Hlk.
+    { iIntros (tid' e' Hsome Hnoval). simpl.
+      iAssert (tid' ↦M ∅)%I with "[Hposts]" as "H".
+      { destruct (to_val e') as [?|] eqn:Heq; last done.
+        iApply posts_of_empty_mapping => //.
+        apply from_locale_lookup =>//. }
+      iDestruct (has_fuels_agree with "Hfm H") as "%Hlk".
+      done. }
+    iMod ("H" with "[//] [Hsi' Hm Hfm] [Hposts]") as %Hξ.
+    { iFrame "Hsi' Hm Hfm". done. }
+    { rewrite /= /fmap /=. by iFrame. }
+    iModIntro.
     iSplit; [|done].
     iSplit; [done|].
     iSplit.
@@ -245,11 +258,7 @@ Proof.
       destruct Hsome as [fs [HSome Hfs]].
       simpl in *. apply elem_of_dom. set_solver.
     + iIntros (tid' e' Hsome Hnoval ρ HSome). simpl.
-      iAssert (tid' ↦M ∅)%I with "[Hposts]" as "H".
-      { destruct (to_val e') as [?|] eqn:Heq; last done.
-        iApply posts_of_empty_mapping => //.
-        apply from_locale_lookup =>//. }
-      iDestruct (has_fuels_agree with "Hfm H") as "%Hlk".
+      specialize (Hlk tid' e' Hsome Hnoval).
       iPureIntro.
       intros Hlive.
       apply ls_mapping_data_inv in HSome.
@@ -258,7 +267,6 @@ Proof.
       rewrite /fuel_map_le_inner map_included_spec in Hfmle1.
       pose proof Hlk as HSome'.
       apply Hfmle1 in Hlk as (fs'&HSomefs&Hfs'). simpl in *.
-      simplify_eq.
       apply Hfmdead in Hlive as (tid''&fs''&HSome''&Hfs'').
       assert (tid'' = tid').
       { apply Hfmle1 in HSome'' as (fs'''&HSome'''&Hfs''').
