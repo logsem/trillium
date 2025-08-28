@@ -21,7 +21,7 @@ Class heapGpreS Σ `(LM: LiveModel heap_lang M) := HeapPreG {
 }.
 
 Class heapGS Σ `(LM:LiveModel heap_lang M) := HeapG {
-  heap_invGS : invGS_gen HasNoLc Σ;
+  heap_invGS : invGS_gen HasLc Σ;
   heap_trGS : trGS Σ;
   #[global] heap_inG :: heapGpreS Σ LM;
   #[global] heap_gen_heapGS :: gen_heapGS loc val Σ;

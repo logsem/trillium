@@ -1176,18 +1176,14 @@ Proof.
   destruct c1 as [tp σ1'].
   assert (valid_exec ex) as Hexv.
   { by eapply valid_system_trace_valid_exec_trace. }
-  iPoseProof (wptp_from_change _ _ _ _ _ _ [] with "[$HSI] Htp") as "Htp";
-    [apply locales_equiv_refl|done|by list_simplifier|].
+  iAssert (state_interp ex atr)%I with "HSI" as "HSI".
   iApply (fupd_to_bupd_except0_plain ⊤ ⊤ with "HFtB Hle").
-  iMod ("Htp") as "(HSI & Htp)".
-  (* rewrite (last_eq_trace_ends_in _ (tp, σ1')) in Hc1; last done. *)
   iPoseProof (wptp_of_val_post with "Htp") as "Htp".
   iMod (pre_step_elim with "HSI Htp") as "[HSI Htp]".
   iDestruct ("Htp") as "(Hpost & Hback)".
   assert (∀ e2 : expr Λ, s = NotStuck → e2 ∈ (tp, σ1').1 → not_stuck e2 (tp, σ1').2).
   { eapply wp_strong_progress_multiple_helper; [done..|].
-    iIntros. by iMod Hwp as (????) "($&$&$&?)".
-  }
+    iIntros. by iMod Hwp as (????) "($&$&$&?)". }
   iIntros "!> %k' Hle HFtB".
   rewrite /Gsim_pre.
   eassert (⌜ξ ex atr⌝ ∧ (⌜ ξ ex atr ⌝ -∗ _) ⊢ ⌜ _ ⌝ ∧ _) as <-.
@@ -1195,10 +1191,8 @@ Proof.
   iSplit.
   { iDestruct ("Hstep" with "[] [] [] [] [] [] [] HSI Hpost") as "[_ Hξ]"; auto.
     iApply (fupd_to_bupd_except0_plain ⊤ ⊤ with "HFtB Hle").
-    iMod ("Hξ" with "HTI") as "%"; eauto.
-  }
+    iMod ("Hξ" with "HTI") as "%"; eauto. }
   iApply (fupd_to_bupd_except0_plain ⊤ ⊤ with "HFtB Hle").
-
   (* iAssert (|={⊤}=> ▷ ⌜ξ ex atr⌝ ∗ (_ ∗ _ ∗ _ ∗ _))%I with "[Hstep HTI HSI Hpost]"
     as ">[Hξ (HSI & Hpost & HTI & Hstep)]".
   { iCombine "HTI" "Hstep" as "HS".
