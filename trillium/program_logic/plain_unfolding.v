@@ -65,7 +65,7 @@ Section plain_unfolding.
 
   Definition le_upd_to_bupd_aux `{!lcGS Σ}
       (rec : nat → iProp Σ) (n : nat) : iProp Σ :=
-    ∀ (P : iProp Σ) `(!Plain P) `(!IsExcept0 P) m, ((£ m -∗ |==£> ∀ k, rec k -∗ ▷^k P) -∗ ▷^(n+m) P).
+    ∀ (P : iProp Σ) `(!Plain P) m, ((£ m -∗ |==£> ∀ k, rec k -∗ ▷^k P) -∗ ▷^(n+m) P).
   
   Definition le_upd_to_bupd `{!lcGS Σ} n :=
     bi_greatest_fixpoint le_upd_to_bupd_aux n.
@@ -74,7 +74,7 @@ Section plain_unfolding.
     BiMonoPred (le_upd_to_bupd_aux).
   Proof.
     split.
-    - iIntros (Φ Ψ HΦne HΨne) "#H". iIntros (n) "Hn". iIntros (P ? ? m) "HP /=".
+    - iIntros (Φ Ψ HΦne HΨne) "#H". iIntros (n) "Hn". iIntros (P ? m) "HP /=".
       iApply "Hn"; try (iPureIntro; tc_solve). iIntros "?".
       iMod ("HP" with "[$]") as "HP". iIntros "!> %k HΦ"; iApply "HP"; by iApply "H".
     - iIntros (Φ HΦne). by intros ??? ->.
@@ -85,27 +85,27 @@ Section plain_unfolding.
   Proof. by rewrite /le_upd_to_bupd greatest_fixpoint_unfold. Qed.
 
 
-  Definition le_upd_to_bupd_use `{!lcGS Σ} n m P `{!IsExcept0 P} `{!Plain P} :
+  Definition le_upd_to_bupd_use `{!lcGS Σ} n m P `{!Plain P} :
     le_upd_to_bupd n -∗ (£ m -∗ |==£> ∀ k, le_upd_to_bupd k -∗ ▷^k P) -∗ ▷^(n + m) P.
   Proof.
     iIntros "Hn HP". rewrite le_upd_to_bupd_unfold.
-    iApply ("Hn" with "[] [] HP"); try (iPureIntro; tc_solve).
+    iApply ("Hn" with "[] HP"); try (iPureIntro; tc_solve).
   Qed.
   
-  Lemma le_upd_to_bupd_soundness_lc `{!lcGpreS Σ} P `{!IsExcept0 P} `{!Plain P} :
+  Lemma le_upd_to_bupd_soundness_lc `{!lcGpreS Σ} P `{!Plain P} :
     (∀ `{Hlc: !lcGS Σ}, le_upd_to_bupd 0 -∗ P) → ⊢ P.
   Proof.
     iIntros (Hfupd).
     iMod (later_credits.le_upd.lc_alloc 0) as (Hc) "[H _]".
     iApply (Hfupd _). generalize 0 => n.
     iApply (greatest_fixpoint_coiter _ later_credits.lc_supply with "[] [$H]").
-    iIntros "!> % Hsup %Q % % %m HQ". iApply bupd_elim.
+    iIntros "!> % Hsup %Q % %m HQ". iApply bupd_elim.
     iMod (lc_incr_supply _ m with "Hsup") as "[Hsup Hlc]".
     iSpecialize ("HQ" with "Hlc"). clear n. generalize (y + m) => n. clear y m.
     iLöb as "IH" forall (n).
     iEval (rewrite later_credits.le_upd.le_upd_unfold) in "HQ".
     iMod ("HQ" with "[$]") as "[[Hsup Hrest]|(%m&%Hmle&Hsup&Hnext)]".
-    - iModIntro. iApply is_except_0.
+    - iModIntro.
       iDestruct ("Hrest" with "[$]") as "$".
     - destruct n as [|n]; [lia|simpl].
       do 2 iModIntro.
