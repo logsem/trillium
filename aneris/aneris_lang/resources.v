@@ -81,7 +81,7 @@ Canonical Structure traceO := leibnizO (list val).
 (** The system CMRA *)
 Class anerisG (Mdl : Model) Σ :=
   AnerisG {
-      aneris_invG :: invGS_gen HasNoLc Σ; (* Potentially problematic use of :: *)
+      aneris_invG :: invGS_gen HasLc Σ; (* Potentially problematic use of :: *)
       aneris_trGS : trGS Σ;      
       (** global tracking of the ghost names of node-local heaps *)
       aneris_node_gnames_mapG :: inG Σ (authR node_gnames_mapUR);
