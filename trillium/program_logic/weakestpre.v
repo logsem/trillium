@@ -5,7 +5,7 @@ From trillium.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 
 Class irisG (Λ : language) (M : Model) (Σ : gFunctors) := IrisG {
-  #[global] iris_invGS :: invGS_gen HasNoLc Σ;
+  #[global] iris_invGS :: invGS_gen HasLc Σ;
 
   #[global] iris_trGS :: trGS Σ;
   #[global] iris_trGen :: tr_generation;
@@ -369,24 +369,22 @@ Proof.
   destruct (to_val e) as [v|] eqn:He.
   { iMod "H". iMod "H". iMod "H". by iIntros "!>". }
   iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hlocale Hexe) "Hsi".
-  iAssert ((|={E1}=> ⌜match s with
+  (* iAssert ((|={E1, ∅}=> ⌜match s with
                       | NotStuck => reducible e σ1
                       | MaybeStuck => True
                       end⌝ ∗
             state_interp extr atr ∗ _)%I) with "[H Hsi]" as
       ">(Hnstuck & Hsi & H)".
-  { iApply fupd_plain_keep_l.
-    iSplitR; last (iFrame "Hsi"; iExact "H").
-    iIntros "[Hsi H]".
-    iApply fupd_plain_mask.
-    iMod "H".
+  { iMod "H".
     iDestruct ("H" with "[//] [//] [//] Hsi") as "[H _]".
-    iMod "H".
-    iModIntro; done. }
+    iMod "H". iModIntro. done. 
+    iModIntro; done. } *)
   iPoseProof (fupd_mask_intro_subseteq E1 ∅ True%I with "[]") as "Hmsk";
     [set_solver|done|].
   iSplit.
-  { by iMod "Hmsk". }
+  { iMod "H".
+    iDestruct ("H" with "[//] [//] [//] Hsi") as "[H _]".
+    iMod "H". iModIntro. done. }
   iIntros (e2 σ2 efs Hstep).
   destruct (stutteringatomic _ _ _ _ Hstep) as [(?&?&?)|Hs]; simplify_eq/=.
   - iDestruct (allows_stuttering with "Hsi") as "Hsi"; [done|done|done| |].
@@ -450,24 +448,11 @@ Proof.
   iLöb as "IH".
   rewrite {2}wp_unfold /wp_pre He.
   iIntros (extr atr K tp1 tp2 σ1 Hexvalid Hlocale Hexe) "Hsi".
-  iAssert ((|={E1}=> ⌜match s with
-                      | NotStuck => reducible e σ1
-                      | MaybeStuck => True
-                      end⌝ ∗
-            state_interp extr atr ∗ _)%I) with "[H Hsi]" as
-      ">(Hnstuck & Hsi & H)".
-  { iApply fupd_plain_keep_l.
-    iSplitR; last (iFrame "Hsi"; iExact "H").
-    iIntros "[Hsi H]".
-    iApply fupd_plain_mask.
-    iMod "H".
+  iSplit.
+  { iMod "H".
     iMod ("H" with "[//] [//] [//] Hsi") as (Q R) "[Hsi (_&_&H)]".
     rewrite !wp_unfold /wp_pre He.
     iDestruct ("H" with "[] [] [] Hsi") as "[? _]"; done. }
-  iSplit.
-  { iMod (fupd_mask_intro_subseteq E1 ∅ True%I with "[]") as "Hmsk";
-      [set_solver|done|].
-    iModIntro. done. }
   iIntros (e2 σ2 efs Hstep).
   pose proof Hstep as  [(?&?&?)|HSA]%stutteringatomic; simplify_eq/=.
   - iMod (allows_stuttering with "Hsi") as "Hsi"; [done|done|done| |].
