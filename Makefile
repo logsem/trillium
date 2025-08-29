@@ -1,9 +1,7 @@
 TRILLIUM_DIR := 'trillium'
-LOCAL_SRC_DIRS := $(TRILLIUM_DIR)
-SRC_DIRS := $(LOCAL_SRC_DIRS)
+SRC_DIRS := $(TRILLIUM_DIR)
 
-ALL_VFILES := $(shell find $(SRC_DIRS) -name "*.v")
-VFILES := $(shell find $(LOCAL_SRC_DIRS) -name "*.v")
+VFILES := $(shell find $(SRC_DIRS) -name "*.v")
 
 COQC := coqc
 Q:=@
@@ -13,9 +11,9 @@ COQPROJECT_ARGS := $(shell sed -E -e '/^\#/d' -e 's/-arg ([^ ]*)/\1/g' _CoqProje
 
 all: $(VFILES:.v=.vo)
 
-.coqdeps.d: $(ALL_VFILES) _CoqProject
+.coqdeps.d: $(VFILES) _CoqProject
 	@echo "COQDEP $@"
-	$(Q)coqdep -vos -f _CoqProject $(ALL_VFILES) > $@
+	$(Q)coqdep -vos -f _CoqProject $(VFILES) > $@
 
 # do not try to build dependencies if cleaning or just building _CoqProject
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
@@ -44,7 +42,7 @@ clean:
 # project-specific targets
 .PHONY: build clean-trillium trillium
 
-VPATH= $(TRILLIUM_DIR) $(FAIRIS_DIR)
+VPATH= $(TRILLIUM_DIR)
 VPATH_FILES := $(shell find $(VPATH) -name "*.v")
 
 build: $(VPATH_FILES:.v=.vo)
@@ -52,10 +50,5 @@ build: $(VPATH_FILES:.v=.vo)
 trillium :
 	@$(MAKE) build VPATH=$(TRILLIUM_DIR)
 
-clean-local:
-	@echo "CLEAN vo glob aux"
-	$(Q)find $(LOCAL_SRC_DIRS) \( -name "*.vo" -o -name "*.vo[sk]" \
-		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
-
 clean-trillium:
-	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(TRILLIUM_DIR)
+	@$(MAKE) clean SRC_DIRS=$(TRILLIUM_DIR)
