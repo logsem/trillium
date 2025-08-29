@@ -1,4 +1,6 @@
 -Q trillium trillium
+-Q heap_lang heap_lang
+-Q fairness fairness
 
 -arg -w -arg -notation-overridden
 -arg -w -arg -redundant-canonical-projection
