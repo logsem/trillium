@@ -1,7 +1,8 @@
 TRILLIUM_DIR := 'trillium'
 HL_DIR := 'heap_lang'
 FAIRNESS_DIR := 'fairness'
-SRC_DIRS := $(TRILLIUM_DIR) $(FAIRNESS_DIR) $(HL_DIR)
+FAIRIS_DIR := 'fairis'
+SRC_DIRS := $(TRILLIUM_DIR) $(FAIRNESS_DIR) $(HL_DIR) $(FAIRIS_DIR)
 
 VFILES := $(shell find $(SRC_DIRS) -name "*.v")
 
@@ -42,9 +43,9 @@ clean:
 	rm -f .coqdeps.d
 
 # project-specific targets
-.PHONY: build clean-trillium trillium clean-fairness fairness clean-heap-lang heap-lang
+.PHONY: build clean-trillium trillium clean-fairness fairness clean-heap-lang heap-lang clean-fairis fairis
 
-VPATH= $(TRILLIUM_DIR) $(FAIRNESS_DIR) $(HL_DIR)
+VPATH= $(TRILLIUM_DIR) $(FAIRNESS_DIR) $(HL_DIR) $(FAIRIS_DIR)
 VPATH_FILES := $(shell find $(VPATH) -name "*.v")
 
 build: $(VPATH_FILES:.v=.vo)
@@ -58,6 +59,9 @@ fairness :
 heap-lang :
 	@$(MAKE) build VPATH=$(HL_DIR)
 
+fairis :
+	@$(MAKE) build VPATH=$(FAIRIS_DIR)
+
 clean-trillium:
 	@$(MAKE) clean SRC_DIRS=$(TRILLIUM_DIR)
 
@@ -66,3 +70,6 @@ clean-fairness:
 
 clean-heap-lang:
 	@$(MAKE) clean SRC_DIRS=$(HL_DIR)
+
+clean-fairis:
+	@$(MAKE) clean SRC_DIRS=$(FAIRIS_DIR)
