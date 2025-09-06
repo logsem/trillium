@@ -2,69 +2,44 @@ From iris.base_logic Require Export gen_heap.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
 From heap_lang Require Export lang.
-From fairness Require Export execution_model.
 From heap_lang Require Import tactics notation.
 
 
-(* TODO: the missing fact of em_GS etc. being typeclasses
-   hardens automatic resolution of their instances *)
-Class heapGpreS Σ `(EM: ExecutionModel heap_lang M) := HeapPreG {
-  heapGpreS_inv :: invGpreS Σ;
-  heapGpreS_gen_heap :: gen_heapGpreS loc val Σ;
-  heapGpreS_em :: em_preGS Σ;
+Class heap1GpreS Σ := Heap1PreG {
+  heap1GpreS_gen_heap :: gen_heapGpreS loc val Σ;
 }.
 
 
-Class heapGS Σ `(EM: ExecutionModel heap_lang M) := HeapG {
-  heap_inG :: heapGpreS Σ EM;
-
-  heap_invGS :: invGS_gen HasNoLc Σ;
-  heap_gen_heapGS :: gen_heapGS loc val Σ;
-
-  heap_fairnessGS :: em_GS Σ;
+Class heap1GS Σ := Heap1G {
+  heap1_inG :: heap1GpreS Σ;
+  heap1_gen_heapGS :: gen_heapGS loc val Σ;
 }.
 
-Definition heapΣ `(EM: ExecutionModel heap_lang M) : gFunctors :=
-  #[ invΣ; gen_heapΣ loc val; em_Σ ].
+Definition heap1Σ : gFunctors :=
+  #[ gen_heapΣ loc val ].
 
 
-(* TODO: automatize *)
-Global Instance subG_heapPreG {Σ} `{EM: ExecutionModel heap_lang M}:
-  subG (heapΣ EM) Σ → heapGpreS Σ EM.
-Proof. 
-  intros. 
-  enough (em_preGS Σ); [solve_inG| ].
-  apply em_Σ_subG. solve_inG.
-Qed. 
+Global Instance subG_heap1PreG {Σ}: subG heap1Σ Σ → heap1GpreS Σ.
+Proof. solve_inG. Qed.  
 
-#[global] Instance heapG_irisG `{EM: ExecutionModel heap_lang M} `{HGS: !heapGS Σ EM}:
-  irisG heap_lang M Σ := {
-    state_interp extr auxtr :=
-      (⌜em_valid_state_evolution_fairness extr auxtr⌝ ∗
-       gen_heap_interp (trace_last extr).2.(heap) ∗
-       em_msi (trace_last extr) (trace_last auxtr) (em_GS0 := heap_fairnessGS))%I ;
-    fork_post tid := fun _ => em_thread_post tid (em_GS0 := heap_fairnessGS);
-}.
 
 Section GeneralProperties.
-  Context `{EM: ExecutionModel heap_lang M}. 
-  Context `{HGS: @heapGS Σ _ EM}.
-  Let eGS := heap_fairnessGS. 
+  (* Context `{HGS: @heap1GS Σ}. *)
+  Context `{irisG heap_lang M Σ}. 
 
-  Lemma posts_of_empty_mapping_multiple  (es e: expr) v (tid : nat) (tp : list expr):
+  Lemma posts_of_empty_mapping_multiple 
+    (es e: expr) v (tid : locale heap_lang) (tp : list expr):
     tp !! tid = Some e ->
     to_val e = Some v ->
-    (* cur_posts tp e1 (fun _ => em_thread_post 0%nat (em_GS0 := eGS)) -∗ *)
-    (let Φs := map (fun τ _ => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM _) τ) (seq 0 (length tp)) in
-      posts_of tp Φs) -∗
-    em_thread_post tid (em_GS0 := eGS).
+    (let Φs := map fork_post (seq 0 (length tp)) in posts_of tp Φs) -∗
+    fork_post tid v.
   Proof.
     intros Hsome Hval. simpl.
     
-    rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (fun _ => em_thread_post tid)) _) //.
+    rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, fork_post tid) _) //.
     { eauto. } 
     apply elem_of_list_omap.
-    exists (e, (fun _ => em_thread_post tid (em_GS0 := eGS))); split; last first.
+    exists (e, (fun v => fork_post tid v)); split; last first.
     - simpl. apply fmap_Some. exists v. split; done.
     - destruct tp as [|e1' tp]; first set_solver. simpl.
       apply elem_of_cons.
@@ -82,16 +57,15 @@ Section GeneralProperties.
   Lemma posts_of_empty_mapping  (e1 e: expr) v (tid : nat) (tp : list expr):
     tp !! tid = Some e ->
     to_val e = Some v ->
-    cur_posts tp e1 (fun _ => em_thread_post 0%nat (em_GS0 := eGS)) -∗
-    em_thread_post tid (em_GS0 := eGS).
+    cur_posts tp e1 (fun v => fork_post 0%nat v) -∗
+    fork_post tid v.
   Proof.
     intros Hsome Hval. simpl.
-    
     rewrite /cur_posts. 
-    rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (fun _ => em_thread_post tid)) _) //.
+    rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, fork_post tid) _) //.
     { eauto. } 
     apply elem_of_list_omap.
-    exists (e, (fun _ => em_thread_post tid (em_GS0 := eGS))); split; last first.
+    exists (e, (fun v => fork_post tid v)); split; last first.
     - simpl. apply fmap_Some. exists v. split; done.
     - destruct tp as [|e1' tp]; first set_solver. simpl.
       apply elem_of_cons.
@@ -131,20 +105,20 @@ Ltac inv_head_step :=
      inversion H; subst; clear H
   end.
 
-Local Hint Extern 0 (head_reducible _ _) => eexists _, _, _; simpl : core.
+Global Hint Extern 0 (head_reducible _ _) => eexists _, _, _; simpl : core.
 
 (* [simpl apply] is too stupid, so we need extern hints here. *)
-Local Hint Extern 1 (head_step _ _ _ _ _) => econstructor : core.
-Local Hint Extern 0 (head_step (CmpXchg _ _ _) _ _ _ _) => eapply CmpXchgS : core.
-Local Hint Extern 0 (head_step (AllocN _ _) _ _ _ _) => apply alloc_fresh : core.
-Local Hint Resolve to_of_val : core.
+Global Hint Extern 1 (head_step _ _ _ _ _) => econstructor : core.
+Global Hint Extern 0 (head_step (CmpXchg _ _ _) _ _ _ _) => eapply CmpXchgS : core.
+Global Hint Extern 0 (head_step (AllocN _ _) _ _ _ _) => apply alloc_fresh : core.
+Global Hint Resolve to_of_val : core.
 
 #[global] Instance into_val_val v : IntoVal (Val v) v.
 Proof. done. Qed.
 #[global] Instance as_val_val v : AsVal (Val v).
 Proof. by eexists. Qed.
 
-Local Ltac solve_atomic :=
+Global Ltac solve_atomic :=
   apply strongly_atomic_atomic, ectx_language_atomic;
     [inversion 1; naive_solver
     |apply ectxi_language_sub_redexes_are_values; intros [] **; naive_solver].
@@ -187,9 +161,9 @@ Proof. solve_atomic. Qed.
 #[global] Instance faa_atomic s v1 v2 : Atomic s (FAA (Val v1) (Val v2)).
 Proof. solve_atomic. Qed.
 
-Local Ltac solve_exec_safe := intros; subst; do 3 eexists; econstructor; eauto.
-Local Ltac solve_exec_puredet := simpl; intros; by inv_head_step.
-Local Ltac solve_pure_exec :=
+Global Ltac solve_exec_safe := intros; subst; do 3 eexists; econstructor; eauto.
+Global Ltac solve_exec_puredet := simpl; intros; by inv_head_step.
+Global Ltac solve_pure_exec :=
   subst; intros ?; apply nsteps_once, pure_head_step_pure_step;
     constructor; [solve_exec_safe | solve_exec_puredet].
 
@@ -274,8 +248,7 @@ Proof. solve_pure_exec. Qed.
 
 
 Section Heap.
-  Context `{EM: ExecutionModel heap_lang M}. 
-  Context `{HGS: @heapGS Σ _ EM}.
+  Context `{HGS: @heap1GS Σ}.
 
   (** Heap *)
   (** The usable rules for [allocN] stated in terms of the [array] proposition

@@ -8,11 +8,9 @@ From heap_lang Require Import tactics notation.
 Section SSWP.
   Set Default Proof Using "Type".
 
-  Context `{EM: ExecutionModel heap_lang M}.   
-  Context `{hGS: @heapGS Σ _ EM}.
+  Context `{hGS: @heap1GS Σ}.
+  Context {iGS: invGS_gen HasNoLc Σ}. 
   
-  Let eGS := heap_fairnessGS. 
-
   Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
     match to_val e1 with
     | Some v => |={E}=> (Φ (of_val v))
@@ -67,16 +65,16 @@ Section SSWP.
     apply Hstep' in Hstep as [-> [-> ->]]. by iFrame.
   Qed.
   
-  Local Hint Extern 0 (head_reducible _ _) => eexists _, _, _; simpl : core.
-  Local Hint Extern 1 (head_step _ _ _ _ _) => econstructor : core.
-  Local Hint Extern 0 (head_step (CmpXchg _ _ _) _ _ _ _) => eapply CmpXchgS : core.
-  Local Hint Extern 0 (head_step (AllocN _ _) _ _ _ _) => apply alloc_fresh : core.
-  Local Hint Resolve to_of_val : core.
+  (* Local Hint Extern 0 (head_reducible _ _) => eexists _, _, _; simpl : core. *)
+  (* Local Hint Extern 1 (head_step _ _ _ _ _) => econstructor : core. *)
+  (* Local Hint Extern 0 (head_step (CmpXchg _ _ _) _ _ _ _) => eapply CmpXchgS : core. *)
+  (* Local Hint Extern 0 (head_step (AllocN _ _) _ _ _ _) => apply alloc_fresh : core. *)
+  (* Local Hint Resolve to_of_val : core. *)
   
-  #[global] Instance into_val_val v : IntoVal (Val v) v.
-  Proof. done. Qed.
-  #[global] Instance as_val_val v : AsVal (Val v).
-  Proof. by eexists. Qed.
+  (* #[global] Instance into_val_val v : IntoVal (Val v) v. *)
+  (* Proof. done. Qed. *)
+  (* #[global] Instance as_val_val v : AsVal (Val v). *)
+  (* Proof. by eexists. Qed. *)
   
   Lemma wp_allocN_seq s E v n (Φ : expr → iProp Σ) :
     0 < n →
