@@ -8,7 +8,6 @@ From trillium.prelude Require Export finitary quantifiers sigma classical_instan
 From trillium.program_logic Require Export weakestpre.
 From fairness Require Import fairness. 
 From fairis Require Import fuel lifting fair_termination proofmode heap_lang_lm. 
-(* From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode  notation. *)
 
 Import derived_laws_later.bi.
 
