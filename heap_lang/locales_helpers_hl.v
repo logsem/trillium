@@ -121,3 +121,23 @@ Proof using.
   apply gset_pick_Some in FORK.
   eapply locale_step_fresh_exact in FORK; eauto.
 Qed.
+
+
+(* TODO: found in Fairis, might have duplicates somewhere above/around *)
+(****************)
+
+Lemma heap_lang_locales_equiv_from_length (es10 es1 es20 es2 : list expr) :
+  length es10 = length es20 → length es1 = length es2 →
+  locales_equiv_from es10 es20 es1 es2.
+Proof.
+  revert es10 es20 es2.
+  induction es1 as [|e es1 IHes1]; intros es10 es20 es2 Hlen; [by destruct es2|].
+  destruct es2; [done|]=> /=. constructor; [done|].
+  apply IHes1; [by rewrite !app_length=> /=;f_equiv|lia].
+Qed.
+
+Lemma heap_lang_locales_equiv_length (es1 es2 : list expr) :
+  length es1 = length es2 → locales_equiv es1 es2.
+Proof. intros Hlen. by apply heap_lang_locales_equiv_from_length. Qed.  
+
+(****************)
