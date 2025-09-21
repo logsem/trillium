@@ -1,10 +1,10 @@
-From Coq Require Import ssreflect.
+From Stdlib Require Import ssreflect.
 From stdpp Require Import gmap.
 
 (* TODO: Make context, and generalise lemmas to canonical representation *)
 Lemma map_included_spec `{∀ A, Lookup K A (MAP A)} {A}
       (R : relation A) (m1 m2 : MAP A) :
-  map_included R m1 m2 ↔
+  map_included (fun _ => R) m1 m2 ↔
   (∀ k v1, m1 !! k = Some v1 → ∃ v2, m2 !! k = Some v2 ∧ R v1 v2).
 Proof.
   split.
@@ -26,8 +26,8 @@ Qed.
 Lemma map_included_insert `{Countable K} {A}
       (R : relation A) (m1 m2 : gmap K A) i x y :
   R x y →
-  map_included R m1 m2 →
-  map_included R (<[i:=x]>m1) (<[i:=y]>m2).
+  map_included (fun _ => R) m1 m2 →
+  map_included (fun _ => R) (<[i:=x]>m1) (<[i:=y]>m2).
 Proof.
   intros HR Hle.
   rewrite /map_included /map_relation /option_relation.
@@ -42,14 +42,14 @@ Qed.
 
 Lemma map_included_refl `{∀ A, Lookup K A (MAP A)} {A}
       `{!Reflexive R} (m : MAP A) :
-  map_included R m m.
+  map_included (fun _ => R) m m.
 Proof. rewrite map_included_spec. intros. by eauto. Qed.
 
 (* TODO: Move *)
 (* TODO: Generalise to map_included instead of subseteq? *)
 Lemma map_included_subseteq `{∀ A, Lookup K A (MAP A)} {A}
       (R : relation A) (m1 m2 m3 : MAP A) :
-  m1 ⊆ m2 → map_included R m2 m3 → map_included R m1 m3.
+  m1 ⊆ m2 → map_included (fun _ => R) m2 m3 → map_included (fun _ => R) m1 m3.
 Proof.
   rewrite /subseteq /map_subseteq !map_included_spec.
   intros Hle1 Hle2.
@@ -63,7 +63,7 @@ Qed.
 (* TODO: Generalise to better typeclasses *)
 Lemma map_included_subseteq_inv `{Countable K} {V}
       (R : relation V) (m1 m2 : gmap K V) :
-  map_included R m1 m2 → (dom m1) ⊆ (dom m2).
+  map_included (fun _ => R) m1 m2 → (dom m1) ⊆ (dom m2).
 Proof.
   rewrite /map_included /map_relation /option_relation.
   intros Hle k. rewrite !elem_of_dom. specialize (Hle k).
@@ -73,7 +73,7 @@ Qed.
 
 Lemma map_included_transitivity `{∀ A, Lookup K A (MAP A)} {A}
       `{!Transitive R} (m1 m2 m3 : MAP A) :
-  map_included R m1 m2 → map_included R m2 m3 → map_included R m1 m3.
+  map_included (fun _ => R) m1 m2 → map_included (fun _ => R) m2 m3 → map_included (fun _ => R) m1 m3.
 Proof.
   rewrite !map_included_spec.
   intros Hle1 Hle2.
@@ -87,7 +87,7 @@ Qed.
 (* TODO: Generalize types *)
 Lemma map_included_fmap `{Countable K} {A}
       (R : relation A) (m : gmap K A) (f : A → A) :
-  (∀ x:A, R x (f x)) → map_included R m (f <$> m).
+  (∀ x:A, R x (f x)) → map_included (fun _ => R) m (f <$> m).
 Proof.
   intros Hf. intros k. rewrite lookup_fmap.
   destruct (m !! k); [by apply Hf|done].
@@ -96,8 +96,8 @@ Qed.
 Lemma map_included_mono `{Countable K} {A}
       (R : relation A) (m1 m2 : gmap K A) (f : A → A) :
   (∀ x1 x2 : A, R x1 x2 → R (f x1) (f x2)) →
-  map_included R m1 m2 →
-  map_included R (f <$> m1) (f <$> m2).
+  map_included (fun _ => R) m1 m2 →
+  map_included (fun _ => R) (f <$> m1) (f <$> m2).
 Proof.
   rewrite !map_included_spec.
   intros Hf Hle. intros k v1.  
@@ -116,8 +116,8 @@ Lemma map_included_mono_strong `{Countable K} {A}
      m1 !! k = Some x1 → m2 !! k = Some x2 →
      (f1 m1) !! k = Some y1 → (f2 m2) !! k = Some y2 →
      R x1 x2 → R y1 y2) →
-  map_included R m1 m2 →
-  map_included R (f1 m1) (f2 m2).
+  map_included (fun _ => R) m1 m2 →
+  map_included (fun _ => R) (f1 m1) (f2 m2).
 Proof.
   rewrite !map_included_spec.
   intros Hle1 Hle2 Hf HR. intros k v1.  
@@ -139,8 +139,8 @@ Lemma map_included_filter `{Countable K} {A}
       `{∀ x, Decision (P x)} :
   (∀ k x1 x2,
      m1 !! k = Some x1 → m2 !! k = Some x2 → P (k,x1) → P (k,x2)) →
-  map_included R m1 m2 →
-  map_included R (filter P m1) (filter P m2).
+  map_included (fun _ => R) m1 m2 →
+  map_included (fun _ => R) (filter P m1) (filter P m2).
 Proof.
   rewrite !map_included_spec.
   intros HP Hle k v1 HSome1.
@@ -156,7 +156,7 @@ Qed.
 
 Lemma map_included_subseteq_r `{∀ A, Lookup K A (MAP A)} {A}
       (R : relation A) (m1 m2 m3 : MAP A) :
-  m2 ⊆ m3 → map_included R m1 m2 → map_included R m1 m3.
+  m2 ⊆ m3 → map_included (fun _ => R) m1 m2 → map_included (fun _ => R) m1 m3.
 Proof.
   rewrite /subseteq /map_subseteq !map_included_spec.
   intros Hle1 Hle2.
@@ -169,7 +169,7 @@ Qed.
 
 Definition map_agree_R `{∀ A, Lookup K A (MAP A)} {A B}
            (R : A → B → Prop) (m1 : MAP A) (m2 : MAP B) :=
-  map_relation R (λ _, False) (λ _, False) m1 m2.
+  map_relation (fun _ => R) (λ _ _ , False) (λ _ _, False) m1 m2.
 
 Lemma map_agree_R_spec `{∀ A, Lookup K A (MAP A)} {A}
       (R : relation A) (m1 m2 : MAP A) :
@@ -193,8 +193,8 @@ Qed.
 
 Lemma map_included_delete `{Countable K} {V}
       (R : relation V) (m1 m2 : gmap K V) k :
-  map_included R m1 m2 →
-  map_included R (delete k m1) (delete k m2).
+  map_included (fun _ => R) m1 m2 →
+  map_included (fun _ => R) (delete k m1) (delete k m2).
 Proof.
   rewrite !map_included_spec.
   intros Hle k' v HSome.
@@ -285,7 +285,7 @@ Qed.
 Lemma map_included_R_agree `{Countable K} {V}
       (R : relation V) (m1 m2 : gmap K V) k v1 v2 :
   m1 !! k = Some v1 → m2 !! k = Some v2 →
-  map_included R m1 m2 →
+  map_included (fun _ => R) m1 m2 →
   R v1 v2.
 Proof.
   rewrite map_included_spec.
@@ -296,7 +296,7 @@ Qed.
 
 Lemma map_included_map_agree_R `{Countable K} {V}
       (R : relation V) (m1 m2 : gmap K V) :
-  map_included R m1 m2 →
+  map_included (fun _ => R) m1 m2 →
   ∃ m21 m22,
     m2 = m21 ∪ m22 ∧
     m21 ##ₘ m22 ∧
@@ -347,7 +347,7 @@ Qed.
 
 Lemma map_agree_R_map_included `{Countable K} {V}
       (R : relation V) (m1 m2 : gmap K V) :
-  map_agree_R R m1 m2 → map_included R m1 m2.
+  map_agree_R R m1 m2 → map_included (fun _ => R) m1 m2.
 Proof.
   rewrite map_included_spec map_agree_R_spec.
   by intros [Hle _].
@@ -482,4 +482,3 @@ Proof.
     apply Hf in HR.
     by eauto.
 Qed.
-

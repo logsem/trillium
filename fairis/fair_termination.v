@@ -1,18 +1,14 @@
-From trillium.fairness Require Export fairness.
+From fairness Require Export fairness.
 From stdpp Require Import option.
 From Paco Require Import pacotac.
+From iris.proofmode Require Import tactics.
+
 
 (* TODO: See if we can generalise the notion of fair terminating traces *)
 Definition mtrace_fairly_terminating {Mdl : FairModel} (mtr : mtrace Mdl) :=
   mtrace_valid mtr →
   (∀ ρ, fair_model_trace ρ mtr) →
   terminating_trace mtr.
-
-Definition extrace_fairly_terminating {Λ} `{Countable (locale Λ)}
-           (extr : extrace Λ) :=
-  extrace_valid extr →
-  (∀ tid, fair_ex tid extr) →
-  terminating_trace extr.
 
 Class FairTerminatingModel (Mdl: FairModel) := {
   ftm_leq: relation Mdl;
@@ -73,15 +69,27 @@ Proof.
     first by rewrite /pred_at /=; destruct mtr.
   revert mtr Hval Hleq Hfair Hlive IH Hev Htrdec. induction n as [| n IHn];
     intros mtr Hval Hleq Hfair Hlive IH Hev Htrdec.
-  - simpl in *. rewrite /pred_at /= in Hev.
-    destruct Hev as [Hev|Hev]; first by destruct mtr; done.
-    destruct mtr; first done. injection Hev => ->.
+  - simpl in *.
+    
+    (* replace (fairness_sat role_enabled_model role_match *)
+    (*      (ftm_decreasing_role (trfirst mtr))) with ((fun c => fairness_sat role_enabled_model role_match *)
+    (*      (ftm_decreasing_role c)) (trfirst mtr)) in Hev. *)
+    
+    rewrite /pred_at /= in Hev.
+    (* destruct Hev as [Hev|Hev]; first by destruct mtr; done. *)
+    destruct mtr.
+    { exists 1. done. }
+    destruct Hev as [Hev|Hev]; [done| ].
+    rewrite /role_match in Hev.
+    destruct Hev as (? & [=<-] & EQ). simpl in EQ. 
+    simpl. 
     apply terminating_trace_cons.
     eapply IH =>//; eauto.
     + eapply ftm_trans' =>//. apply Htrdec.
       punfold Hval. inversion Hval; simplify_eq; simpl in *; simplify_eq; done.
     + punfold Hval. inversion Hval; simplify_eq.
       destruct H4; done.
+    + eapply fair_by_cons_forall; eauto.  
   - simpl in *. destruct mtr; first (exists 1; done).
     rewrite -> !pred_at_S in Hev.
     punfold Hval; inversion Hval as [|??? Htrans Hval']; simplify_eq.
@@ -89,11 +97,13 @@ Proof.
     destruct (decide (ℓ = Some (ftm_decreasing_role s))) as [-> | Hnoteq].
     + apply terminating_trace_cons. eapply IH=>//; eauto.
       eapply ftm_trans' =>//; apply Htrdec. simpl. destruct Hval;done.
+      eapply fair_by_cons_forall; eauto. 
     + destruct mtr as [|s' ℓ' mtr''] eqn:Heq; first by eexists 2.
       destruct (ftm_decr (trfirst mtr)) as (Hlive' & Htrdec').
       { exists ℓ', (trfirst mtr''). punfold Hval'; inversion Hval'; subst; done. }
       apply terminating_trace_cons. eapply IHn=>//; eauto.
       * etransitivity; eauto. eapply ftm_notinc =>//.
+      * eapply fair_by_cons_forall; eauto. 
       * simplify_eq. eapply Hlive'.
       * erewrite <- ftm_decreasing_role_preserved =>//.
       * intros s'' Htrans''. eapply ftm_decr; eauto.

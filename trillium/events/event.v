@@ -128,7 +128,7 @@ Section properties.
     { simpl.
       assert (length tp1' < length tp1 + S (length tp2)); last lia.
       pose proof (f_equal length Heq1) as Heq'.
-      rewrite !app_length //= in Heq'; lia. }
+      rewrite !length_app //= in Heq'; lia. }
     destruct (length tp1' - length tp1); last first.
     { simpl in *.
       rewrite Heq1' in Heq2'; simplify_eq.
@@ -329,7 +329,7 @@ Section properties.
     rewrite Hevs2 in Hevs'2; rewrite Hevs'2.
     rewrite -app_assoc.
     eexists; split_and!; [|done|].
-    { rewrite !app_length /=; lia. }
+    { rewrite !length_app /=; lia. }
     intros ev oζ1 oζ2 [Hev|Hev]%elem_of_app.
     - destruct (Hevs3 ev oζ1 oζ2 Hev) as (i & c1 & c2 & oζ1' & oζ2' & Hc1 & Hc2 & Htrg).
       exists i, c1, c2, oζ1', oζ2'.

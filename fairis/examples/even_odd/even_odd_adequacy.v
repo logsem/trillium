@@ -4,9 +4,9 @@ From iris.algebra Require Import excl_auth.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination fairness_finiteness trace_utils.
-From trillium.fairness.heap_lang Require Export lang lifting tactics notation adequacy.
-From trillium.fairness.heap_lang.examples.even_odd Require Import even_odd.
+From fairness Require Import trace_utils.
+From fairis Require Import lifting adequacy fair_termination fairness_finiteness destuttering map_included_utils.
+From fairis.examples.even_odd Require Import even_odd.
 From stdpp Require Import finite.
 
 (** Helper lemmas for working with even and odd *)
@@ -74,10 +74,12 @@ Lemma evenodd_mdl_always_eventually_scheduled ρ (mtr : evenodd_mtrace) :
 Proof.
   intros Hinf Hfair n.
   apply (evenodd_mdl_always_live ρ n mtr) in Hinf.
-  specialize (Hfair n Hinf) as [m [Hfair | Hfair]].
+  specialize (Hfair n Hinf) as [m Hfair].
+  rewrite -pred_at_or in Hfair. destruct Hfair as [Hfair | Hfair].  
   - rewrite /pred_at in Hfair. destruct (after (n + m) mtr); [|done].
     rewrite /role_enabled_model in Hfair. destruct t; destruct ρ; set_solver.
-  - by exists m.
+  - eexists. eapply pred_at_impl; [| exact Hfair].
+    simpl. intros ? ? (?&->&[=]). congruence. 
 Qed.
 
 Lemma evenodd_mdl_noprogress_Even i n (mtr : evenodd_mtrace) :
@@ -97,7 +99,7 @@ Proof.
   rewrite after_sum'. rewrite Hafter. specialize (Hinf (n+1)).
   rewrite after_sum' in Hinf. rewrite Hafter in Hinf.
   destruct mtr'; [by apply is_Some_None in Hinf|].
-  eapply mtrace_valid_after in Hvalid; [|done].
+  eapply trace_valid_after in Hvalid; [|done].
   assert (ℓ ≠ Some ρEven) as Hneq.
   { assert (n < S n) by lia. specialize (Hne n H). rewrite /pred_at in Hne.
     rewrite Hafter in Hne. intros ->. apply Hne. done. }
@@ -123,7 +125,7 @@ Proof.
   rewrite after_sum'. rewrite Hafter. specialize (Hinf (n+1)).
   rewrite after_sum' in Hinf. rewrite Hafter in Hinf.
   destruct mtr'; [by apply is_Some_None in Hinf|].
-  eapply mtrace_valid_after in Hvalid; [|done].
+  eapply trace_valid_after in Hvalid; [|done].
   assert (ℓ ≠ Some ρOdd) as Hneq.
   { assert (n < S n) by lia. specialize (Hne n H). rewrite /pred_at in Hne.
     rewrite Hafter in Hne. intros ->. apply Hne. done. }
@@ -150,7 +152,7 @@ Proof.
   assert (s = trfirst mtr) as ->.
   { eapply evenodd_mdl_noprogress_Even in Hschedne; [|done..].
     rewrite /pred_at in Hschedne. rewrite Hafter in Hschedne. done. }
-  eapply mtrace_valid_after in Hvalid; [|done].
+  eapply trace_valid_after in Hvalid; [|done].
   pinversion Hvalid; simplify_eq. inversion H1; simplify_eq.
   - exists (m + 1).
     rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl.
@@ -176,7 +178,7 @@ Proof.
   assert (s = trfirst mtr) as ->.
   { eapply evenodd_mdl_noprogress_Odd in Hschedne; [|done..].
     rewrite /pred_at in Hschedne. rewrite Hafter in Hschedne. done. }
-  eapply mtrace_valid_after in Hvalid; [|done].
+  eapply trace_valid_after in Hvalid; [|done].
   pinversion Hvalid; simplify_eq. inversion H1; simplify_eq.
   - exists (m + 1).
     rewrite /pred_at. rewrite !after_sum'. rewrite Hafter. simpl.
@@ -197,10 +199,10 @@ Proof.
   rewrite /pred_at in Hpred.
   destruct (after n mtr) as [mtr'|] eqn:Hafter; [|done].
   eapply infinite_trace_after'' in Hinf; [|done].
-  eapply mtrace_valid_after in Hvalid; [|done].
+  eapply trace_valid_after in Hvalid; [|done].
   destruct (Nat.even i) eqn:Heqn.
   - assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ mtr') as Hfair'.
-    { intros. by eapply fair_model_trace_after. }
+    { intros. eapply fair_by_after; eauto. apply Hfair. }
     assert (trfirst mtr' = i) as Hfirst'.
     { rewrite /trfirst. destruct mtr'; done. }
     pose proof (evenodd_mdl_progresses_Even i mtr' Hinf Hvalid Hfair' Hfirst')
@@ -208,7 +210,7 @@ Proof.
     exists (n + m).
     rewrite pred_at_sum. rewrite Hafter. done.
   - assert (∀ ρ : fmrole the_fair_model, fair_model_trace ρ mtr') as Hfair'.
-    { intros. by eapply fair_model_trace_after. }
+    { intros. eapply fair_by_after; eauto. apply Hfair. }
     assert (trfirst mtr' = i) as Hfirst'.
     { rewrite /trfirst. destruct mtr'; done. }
     pose proof (evenodd_mdl_progresses_Odd i mtr' Hinf Hvalid Hfair' Hfirst')
@@ -233,7 +235,7 @@ Proof.
   split; [done|].
   replace (S n) with (n + 1) by lia.
   rewrite after_sum'. rewrite Hafter. simpl.
-  eapply mtrace_valid_after in Hvalid; [|done].
+  eapply trace_valid_after in Hvalid; [|done].
   punfold Hvalid. inversion Hvalid as [|??? Htrans]. simplify_eq.
   inversion Htrans; simplify_eq.
   - destruct mtr'.
@@ -256,6 +258,39 @@ Qed.
 Definition evenodd_aux_progress (auxtr : auxtrace the_model) :=
   ∀ i, ∃ n, pred_at auxtr n (λ s l, (λ s' _, s' = i)
                                       (ls_under s) (l ≫= Ul)).
+
+(* TODO: move to fairness/trace_utils *)
+Lemma trace_eventually_stutter_preserves 
+      {St S' L L': Type} (Us: St -> S') (Ul: L -> option L')
+      tr1 tr2 P :
+  upto_stutter Us Ul tr1 tr2 →
+  trace_eventually tr2 P →
+  trace_eventually tr1 (λ s l, P (Us s) (l ≫= Ul)).
+Proof.
+  intros Hstutter [n Heventually].
+  revert tr1 tr2 Hstutter Heventually.
+  induction n as [|n IHn]; intros tr1 tr2 Hstutter Heventually.
+  - punfold Hstutter; [|apply upto_stutter_mono].
+    induction Hstutter.
+    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl in *. done.
+    + destruct (IHHstutter Heventually) as [n Heventually'].
+      exists (1 + n). rewrite /pred_at. rewrite after_sum'. simpl.
+      done.
+    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl.
+      simplify_eq. rewrite H0. done.
+  - punfold Hstutter; [|apply upto_stutter_mono].
+    induction Hstutter.
+    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl in *. done.
+    + destruct (IHHstutter Heventually) as [n' Heventually'].
+      exists (1 + n'). rewrite /pred_at. rewrite after_sum'. simpl.
+      done.
+    + apply trace_eventually_cons.
+      assert (pred_at str n P) as Heventually'.
+      { rewrite /pred_at in Heventually.
+        simpl in *. done. }
+      eapply IHn; [|done].
+      rewrite /upaco2 in H1. destruct H1; [done|done].
+Qed.
 
 Lemma evenodd_mtr_aux_progress_preserved
       (mtr : mtrace the_fair_model)
@@ -462,7 +497,7 @@ Proof.
       rewrite Hv. destruct k; [done|]. destruct es; [done|].
       simpl in *. rewrite drop_0. rewrite list_lookup_fmap.
       erewrite prefixes_from_lookup; [|done].
-      simpl. rewrite /locale_of. rewrite take_length.
+      simpl. rewrite /locale_of. rewrite length_take.
       assert (k < length es).
       { apply lookup_lt_is_Some_1. by eauto. }
       by replace (k `min` length es) with k by lia. }

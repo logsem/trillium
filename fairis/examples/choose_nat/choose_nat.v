@@ -5,10 +5,8 @@ From iris.bi Require Import bi.
 From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From trillium.fairness Require Import fairness fair_termination.
-From trillium.program_logic Require Export weakestpre.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode.
-From trillium.fairness.heap_lang Require Import notation.
+From fairness Require Import fairness. 
+From fairis Require Import fuel lifting fair_termination proofmode heap_lang_lm. 
 
 Import derived_laws_later.bi.
 
@@ -142,7 +140,7 @@ Definition ξ_cn (l:loc) (extr : execution_trace heap_lang)
 (** Verify that the program refines the model *)
 
 (* Set up necessary RA constructions *)
-Class choose_natG Σ := ChooseNatG { choose_nat_G :> inG Σ (excl_authR ZO) }.
+Class choose_natG Σ := ChooseNatG { choose_nat_G :: inG Σ (excl_authR ZO) }.
 
 Definition choose_natΣ : gFunctors :=
   #[ heapΣ cn_fair_model; GFunctor (excl_authR ZO) ].

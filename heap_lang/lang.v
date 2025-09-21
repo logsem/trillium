@@ -1,8 +1,8 @@
 From stdpp Require Export binders strings.
 From stdpp Require Import gmap.
 From iris.algebra Require Export ofe.
-From trillium.program_logic Require Export language ectx_language ectxi_language adequacy.
-From trillium.fairness.heap_lang Require Export locations.
+From trillium Require Export language ectx_language ectxi_language adequacy.
+From heap_lang Require Export locations.
 Set Default Proof Using "Type".
 
 (** heap_lang.  A fairly simple language used for common Iris examples.
@@ -695,7 +695,7 @@ Lemma heap_locale_injective tp0 e0 tp1 tp e :
   locale_of tp0 e0 ≠ locale_of tp e.
 Proof.
   intros (?&?&->&?)%prefixes_from_spec.
-  rewrite /locale_of !app_length /=. lia.
+  rewrite /locale_of !length_app /=. lia.
 Qed.
 
 Lemma heap_lang_mixin : EctxiLanguageMixin of_val to_val fill_item head_step locale_of.

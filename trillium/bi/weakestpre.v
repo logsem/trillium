@@ -30,7 +30,7 @@ different [A], the plan is to generalize the notation to use [Inhabited] instead
 to pick a default value depending on [A]. *)
 Class Wp (Λ : language) (PROP A : Type) :=
   wp : A → coPset -> locale Λ -> expr Λ → (val Λ → PROP) → PROP.
-Arguments wp {_ _ _ _} _ _ _ _%E _%I.
+Arguments wp {_ _ _ _} _ _ _ %_E %_I.
 #[global] Instance: Params (@wp) 8 := {}.
 
 (** Notations for partial weakest preconditions *)

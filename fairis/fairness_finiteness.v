@@ -1,6 +1,7 @@
 From stdpp Require Import finite.
 From trillium.prelude Require Import finitary quantifiers classical_instances.
-From trillium.fairness Require Import fairness fuel.
+From fairness Require Import fairness.
+From fairis Require Import fuel.
 
 Section gmap.
   Context `{!EqDecision K, !Countable K}.

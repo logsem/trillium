@@ -1,4 +1,4 @@
-From Coq.ssr Require Import ssreflect.
+From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import prelude.
 
 Set Default Proof Using "Type".
@@ -12,7 +12,7 @@ CoInductive inflist (A : Type) : Type :=
 Bind Scope inflist_scope with inflist.
 
 Arguments infnil {_}, _.
-Arguments infcons {_} _ _%inflist.
+Arguments infcons {_} _ %_inflist.
 
 Module InfListNotations.
 Notation "[ ]" := infnil (format "[ ]") : inflist_scope.
@@ -131,7 +131,7 @@ Global Instance ilist_fmap : FMap inflist :=
 Section inflist_fmap.
   Context {A B} (f : A → B).
 
-  Lemma inflist_fmap_length (il : inflist A) : inflist_same_length il (f <$> il).
+  Lemma inflist_flength_map (il : inflist A) : inflist_same_length il (f <$> il).
   Proof.
     intros n; revert il; induction n; intros il.
     - rewrite (inflist_unfold_fold (f <$> il)).

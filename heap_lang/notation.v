@@ -1,5 +1,5 @@
 From trillium.program_logic Require Import language.
-From trillium.fairness.heap_lang Require Export lang.
+From heap_lang Require Export lang.
 Set Default Proof Using "Type".
 
 Delimit Scope expr_scope with E.

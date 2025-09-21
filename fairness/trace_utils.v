@@ -1,6 +1,8 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.fairness Require Export inftraces.
+From fairness Require Export inftraces.
+Import stdpp.ssreflect.
+From trillium Require Import traces.
 
 Definition trace_implies {S L} (P Q : S → option L → Prop) (tr : trace S L) : Prop :=
   ∀ n, pred_at tr n P → ∃ m, pred_at tr (n+m) Q.
@@ -10,8 +12,8 @@ Lemma trace_implies_after {S L : Type} (P Q : S → option L → Prop) tr tr' k 
   trace_implies P Q tr → trace_implies P Q tr'.
 Proof.
   intros Haf Hf n Hp.
-  have Hh:= Hf (k+n).
-  have Hp': pred_at tr (k + n) P.
+  set (Hh:= Hf (k+n)).
+  assert (Hp': pred_at tr (k + n) P).
   { rewrite (pred_at_sum _ k) Haf /= //. }
   have [m Hm] := Hh Hp'. exists m.
   by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
@@ -20,47 +22,6 @@ Qed.
 Lemma trace_implies_cons {S L : Type} (P Q : S → option L → Prop) s l tr :
   trace_implies P Q (s -[l]-> tr) → trace_implies P Q tr.
 Proof. intros H. by eapply (trace_implies_after _ _ (s -[l]-> tr) tr 1). Qed.
-
-Lemma pred_at_or {S L : Type} (P1 P2 : S → option L → Prop) tr n :
-  pred_at tr n (λ s l, P1 s l ∨ P2 s l) ↔
-  pred_at tr n P1 ∨
-  pred_at tr n P2.
-Proof.
-  split.
-  - revert tr.
-    induction n as [|n IHn]; intros tr Htr.
-    + destruct tr; [done|].
-      rewrite !pred_at_0. rewrite !pred_at_0 in Htr.
-      destruct Htr as [Htr | Htr]; [by left|by right].
-    + destruct tr; [done|by apply IHn].
-  - revert tr.
-    induction n as [|n IHn]; intros tr Htr.
-    + destruct tr; [done|].
-      rewrite !pred_at_0 in Htr. rewrite !pred_at_0.
-      destruct Htr as [Htr | Htr]; [by left|by right].
-    + by destruct tr; [by destruct Htr as [Htr|Htr]|apply IHn].
-Qed.
-
-Lemma traces_match_flip {S1 S2 L1 L2}
-      (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
-      (trans1: S1 -> L1 -> S1 -> Prop)
-      (trans2: S2 -> L2 -> S2 -> Prop)
-      tr1 tr2 :
-  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ↔
-  traces_match (flip Rℓ) (flip Rs) trans2 trans1 tr2 tr1.
-Proof.
-  split.
-  - revert tr1 tr2. cofix CH.
-    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
-    { by constructor. }
-    constructor; [done..|].
-    by apply CH.
-  - revert tr1 tr2. cofix CH.
-    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
-    { by constructor. }
-    constructor; [done..|].
-    by apply CH.
-Qed.
 
 Lemma traces_match_impl {S1 S2 L1 L2}
       (Rℓ1: L1 -> L2 -> Prop) (Rs1: S1 -> S2 -> Prop)
@@ -176,7 +137,7 @@ Qed.
 
 Fixpoint trace_take {S L} (n : nat) (tr : trace S L) : finite_trace S L :=
   match tr with
-  | ⟨s⟩ => {tr[s]}
+  | ⟨s⟩ => {tr[ s ]}
   | s -[ℓ]-> r => match n with
                   | 0 => {tr[s]}
                   | S n => (trace_take n r) :tr[ℓ]: s
@@ -213,14 +174,6 @@ Proof.
   case_bool_decide.
   - simpl. f_equiv. by apply IHn.
   - by apply IHn.
-Qed.
-
-Lemma pred_at_impl {S L} (tr:trace S L) n (P Q : S → option L → Prop) :
-  (∀ s l, P s l → Q s l) → pred_at tr n P → pred_at tr n Q.
-Proof.
-  rewrite /pred_at. intros HPQ HP.
-  destruct (after n tr); [|done].
-  by destruct t; apply HPQ.
 Qed.
 
 Lemma pred_at_neg {S L} (tr:trace S L) n (P : S → option L → Prop) :
@@ -314,34 +267,9 @@ Lemma trace_eventually_cons {S T} s l (tr : trace S T) P :
   trace_eventually tr P → trace_eventually (s -[l]-> tr) P.
 Proof. intros [n HP]. by exists (Datatypes.S n). Qed.
 
-Lemma trace_eventually_stutter_preserves 
-      {St S' L L': Type} (Us: St -> S') (Ul: L -> option L')
-      tr1 tr2 P :
-  upto_stutter Us Ul tr1 tr2 →
-  trace_eventually tr2 P →
-  trace_eventually tr1 (λ s l, P (Us s) (l ≫= Ul)).
-Proof.
-  intros Hstutter [n Heventually].
-  revert tr1 tr2 Hstutter Heventually.
-  induction n as [|n IHn]; intros tr1 tr2 Hstutter Heventually.
-  - punfold Hstutter; [|apply upto_stutter_mono].
-    induction Hstutter.
-    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl in *. done.
-    + destruct (IHHstutter Heventually) as [n Heventually'].
-      exists (1 + n). rewrite /pred_at. rewrite after_sum'. simpl.
-      done.
-    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl.
-      simplify_eq. rewrite H0. done.
-  - punfold Hstutter; [|apply upto_stutter_mono].
-    induction Hstutter.
-    + rewrite /pred_at in Heventually. simpl in *. exists 0. rewrite /pred_at. simpl in *. done.
-    + destruct (IHHstutter Heventually) as [n' Heventually'].
-      exists (1 + n'). rewrite /pred_at. rewrite after_sum'. simpl.
-      done.
-    + apply trace_eventually_cons.
-      assert (pred_at str n P) as Heventually'.
-      { rewrite /pred_at in Heventually.
-        simpl in *. done. }
-      eapply IHn; [|done].
-      rewrite /upaco2 in H1. destruct H1; [done|done].
-Qed.
+Definition to_trace_trfirst {S L : Type}
+  (s: S) (il: inflist (L * S)):
+  trfirst (to_trace s il) = s.
+Proof. 
+  destruct il as [| [??]]; done.
+Qed. 

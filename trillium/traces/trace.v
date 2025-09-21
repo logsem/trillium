@@ -274,7 +274,7 @@ Section finite_trace.
     ((oζ, trace_last ft) :: l) !! length l = Some (oζ', trace_last (ft +trl+ l)).
   Proof.
     induction l as [|[a ?] l IHl] using rev_ind; first by eexists.
-    rewrite app_length /= trace_append_list_snoc /=.
+    rewrite length_app /= trace_append_list_snoc /=.
     rewrite (lookup_app_r (_ :: _)) /=; last by simpl; lia.
     replace (length l + 1 - S (length l)) with 0 by lia.
     eexists. done.
@@ -284,9 +284,9 @@ Section finite_trace.
     ((trace_last ft) :: map snd l) !! length l = Some (trace_last (ft +trl+ l)).
   Proof.
     induction l as [|[a ?] l IHl] using rev_ind; first by eexists.
-    rewrite app_length /= trace_append_list_snoc /=.
-    rewrite map_app (lookup_app_r (_ :: _)) /=; last by rewrite map_length /=; lia.
-    rewrite map_length.
+    rewrite length_app /= trace_append_list_snoc /=.
+    rewrite map_app (lookup_app_r (_ :: _)) /=; last by rewrite length_map /=; lia.
+    rewrite length_map.
     replace (length l + 1 - S (length l)) with 0 by lia.
     done.
   Qed.

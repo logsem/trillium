@@ -1,8 +1,8 @@
 From iris.proofmode Require Import coq_tactics reduction spec_patterns.
 From iris.proofmode Require Export tactics.
 From trillium.program_logic Require Import atomic.
-From trillium.fairness.heap_lang Require Export tactics lifting. (* derived_laws. *)
-From trillium.fairness.heap_lang Require Import notation.
+From fairis Require Import fuel heap_lang_lm resources lifting.
+(* From trillium.fairness.heap_lang Require Import notation. *)
 From iris.prelude Require Import options.
 Import uPred.
 

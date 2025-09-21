@@ -1,6 +1,7 @@
 From stdpp Require Import option.
 From Paco Require Import pacotac.
-From trillium.fairness Require Export fairness fair_termination fuel.
+From fairness Require Export fairness.
+From fairis Require Import fair_termination fuel.
 
 Definition auxtrace_fairly_terminating {Λ} `{Countable (locale Λ)} {Mdl : FairModel}
            {LM : LiveModel Λ Mdl} (auxtr : auxtrace LM) :=

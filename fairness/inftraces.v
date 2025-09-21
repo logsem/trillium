@@ -1,11 +1,10 @@
-From trillium.program_logic Require Export adequacy.
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
+From trillium.program_logic Require Import adequacy.
+From fairness Require Import utils_logic.
 
-Require Import
-        Coq.Relations.Relation_Definitions
-        Coq.Relations.Relation_Operators.
-Require Import Coq.Arith.Wf_nat.
+From Stdlib Require Import Relations.Relation_Definitions Relations.Relation_Operators.
+From Stdlib Require Import Arith.Wf_nat.
 
 Section traces.
 
@@ -17,7 +16,7 @@ Section traces.
   Bind Scope trace_scope with trace.
 
   Arguments tr_singl {_} {_}, _.
-  Arguments tr_cons {_} {_} _ _ _%trace.
+  Arguments tr_cons {_} {_} _ _ _ %_trace.
   Notation "⟨ s ⟩" := (tr_singl s) : trace_scope.
   Notation "s -[ ℓ ]->  r" := (tr_cons s ℓ r) (at level 33) : trace_scope.
   Open Scope trace.
@@ -54,6 +53,10 @@ Section traces.
         end
       end.
 
+    Lemma after_0_id (tr : trace St L):
+      after 0 tr = Some tr.
+    Proof. done. Qed.
+
     Definition pred_at (tr: trace St L) (n: nat) (P: St -> option L -> Prop): Prop :=
       match after n tr with
       | None => False
@@ -82,6 +85,13 @@ Section traces.
         | Some tr' => after m tr'
         end.
     Proof. intros. rewrite Nat.add_comm. apply after_sum. Qed.
+
+    Lemma after_S_tr_cons (tr: trace St L) n s ℓ atr
+      (AFTER: after n tr = Some (s -[ℓ]-> atr)):
+      after (S n) tr = Some atr.
+    Proof. 
+      by rewrite -Nat.add_1_r after_sum' AFTER.
+    Qed.
 
     Lemma pred_at_sum P n m tr:
       pred_at tr (n + m) P <->
@@ -113,6 +123,54 @@ Section traces.
       pred_at (s -[ℓ]-> r) (S n) P <-> pred_at r n P.
     Proof. by unfold pred_at. Qed.
 
+    Lemma pred_at_state_trfirst (tr: trace St L) (P : St → Prop):
+      pred_at tr 0 (fun st _ => P st) ↔ P (trfirst tr).
+    Proof. 
+      rewrite /pred_at. destruct tr; eauto.
+    Qed.
+
+    Lemma pred_at_dec (P: St → option L → Prop)
+      (DEC: forall st ro, Decision (P st ro)):
+      forall tr i, Decision (pred_at tr i P).
+    Proof using.
+      intros tr i. unfold pred_at.
+      destruct (after i tr); [destruct t| ]; auto.
+      solve_decision.
+    Qed.
+    
+    Lemma pred_at_or
+      P1 P2 (tr: trace St L) i: 
+      pred_at tr i P1 \/ pred_at tr i P2 <-> pred_at tr i (fun x y => P1 x y \/ P2 x y).
+    Proof using.
+      unfold pred_at. destruct (after i tr); [destruct t| ]; tauto.
+    Qed.
+    
+    Lemma pred_at_ex {T: Type} (P : T -> St → option L → Prop) tr n:
+      pred_at tr n (fun s ol => exists t, P t s ol) <-> exists t, pred_at tr n (P t).
+    Proof.
+      rewrite /pred_at. destruct after.
+      2: { intuition. by destruct H. }
+      destruct t; eauto.
+    Qed.
+    
+    Lemma pred_at_impl (P Q: St -> option L -> Prop)
+      (IMPL: forall s ol, P s ol -> Q s ol):
+      forall tr i, pred_at tr i P -> pred_at tr i Q.
+    Proof.
+      rewrite /pred_at. intros. 
+      destruct after; intuition; destruct t.
+      all: by apply IMPL.
+    Qed.
+
+    Lemma pred_at_iff (P Q: St -> option L -> Prop)
+      (IFF: forall s ol, P s ol <-> Q s ol):
+      forall tr i, pred_at tr i P <-> pred_at tr i Q.
+    Proof.
+      intros. rewrite /pred_at.
+      destruct after; intuition; destruct t.
+      all: by apply IFF.
+    Qed.
+
     Definition infinite_trace tr :=
       forall n, is_Some (after n tr).
 
@@ -140,16 +198,85 @@ Section traces.
       intros Hinf n. specialize (Hinf (1+n)).
       rewrite (after_sum' _ 1) // in Hinf.
     Qed.
+
+    Lemma infinite_neg_finite (tr : trace St L):
+      terminating_trace tr <-> ¬ infinite_trace tr.
+    Proof.
+      rewrite /terminating_trace /infinite_trace. split.
+      - intros [n A]. intros A'. specialize (A' n). rewrite A in A'. by destruct A'.
+      - intros [n A%eq_None_not_Some]%not_forall_exists_not. eexists; eauto.
+    Qed. 
+
+    Lemma terminating_trace_after (tr atr: trace St L) i
+      (AFTER: after i tr = Some atr)
+      (FIN_ATR: terminating_trace atr):
+      terminating_trace tr.
+    Proof.
+      destruct FIN_ATR as [n FIN].
+      exists (i + n). by rewrite after_sum' AFTER.
+    Qed. 
+
   End after.
 
 End traces.
 
 Delimit Scope trace_scope with trace.
 Arguments tr_singl {_} {_}, _.
-Arguments tr_cons {_} {_} _ _ _%trace.
+Arguments tr_cons {_} {_} _ _ _ %_trace.
 Notation "⟨ s ⟩" := (tr_singl s) : trace_scope.
 Notation "s -[ ℓ ]->  r" := (tr_cons s ℓ r) (at level 33) : trace_scope.
 Open Scope trace.
+
+Section TraceValid.
+  Context {St L: Type}.
+  Context (trans: St -> L -> St -> Prop). 
+
+  Let traceM := trace St L. 
+
+  Inductive trace_valid_ind (trace_valid_coind: traceM -> Prop) :
+    traceM -> Prop :=
+  | trace_valid_singleton δ: trace_valid_ind _ ⟨δ⟩
+  | trace_valid_cons δ ℓ tr:
+      trans δ ℓ (trfirst tr) ->
+      trace_valid_coind tr →
+      trace_valid_ind _ (δ -[ℓ]-> tr).
+
+  Definition trace_valid := paco1 trace_valid_ind bot1.
+
+  Lemma trace_valid_mono :
+    monotone1 trace_valid_ind.
+  Proof.
+    unfold monotone1. intros x0 r r' IN LE.
+    induction IN; try (econstructor; eauto; done).
+  Qed.
+  Hint Resolve trace_valid_mono : paco.
+
+  Lemma trace_valid_after (mtr mtr' : traceM) k :
+    after k mtr = Some mtr' → trace_valid mtr → trace_valid mtr'.
+  Proof.
+    revert mtr mtr'.
+    induction k; intros mtr mtr' Hafter Hvalid.
+    { destruct mtr'; simpl in *; by simplify_eq. }
+    punfold Hvalid.
+    inversion Hvalid as [|??? Htrans Hval']; simplify_eq.
+    eapply IHk; [done|].
+    by inversion Hval'.
+  Qed.
+
+  Lemma trace_valid_tail s l (tr: traceM)
+    (VALID': trace_valid (s -[l]-> tr)):
+    trace_valid tr.
+  Proof. by eapply trace_valid_after with (k := 1); eauto. Qed.
+
+  Lemma trace_valid_cons_inv (tr: trace St L) s l
+    (VALID: trace_valid (s -[l]-> tr)):
+    trace_valid tr /\ trans s l (trfirst tr). 
+  Proof using.
+    punfold VALID. inversion VALID. subst.
+    pclearbot. done. 
+  Qed.
+
+End TraceValid.
 
 Section simulation.
   Context {L1 L2 S1 S2: Type}.
@@ -183,7 +310,110 @@ Section simulation.
     Rs (trfirst tr1) (trfirst tr2).
   Proof. intros Hm. inversion Hm; done. Qed.
 
+  Lemma traces_match_preserves_termination tr1 tr2 :
+    traces_match tr1 tr2 ->
+    terminating_trace tr2 ->
+    terminating_trace tr1.
+  Proof.
+    intros Hmatch [n HNone].
+    revert tr1 tr2 Hmatch HNone. induction n as [|n IHn]; first done.
+    intros tr1 tr2 Hmatch HNone.
+    replace (S n) with (1 + n) in HNone =>//.
+    rewrite (after_sum' _ 1) in HNone.
+    destruct tr2 as [s| s ℓ tr2'];
+      first by inversion Hmatch; simplify_eq; exists 1.
+    simpl in HNone.
+    inversion Hmatch; simplify_eq.
+    apply terminating_trace_cons.
+    eapply IHn =>//.
+  Qed.
+
+  Lemma traces_match_valid1
+    (tr1: trace S1 L1) (tr2: trace S2 L2):
+    traces_match tr1 tr2 ->
+    trace_valid trans1 tr1. 
+  Proof.
+    revert tr1 tr2. pcofix CH. intros tr1 tr2 Hmatch.
+    pfold. 
+    inversion Hmatch; [by econstructor| ].
+    constructor =>//.
+    specialize (CH _ _ H3).
+    eauto.   
+  Qed.
+  
+  Lemma traces_match_valid2
+    (tr1: trace S1 L1) (tr2: trace S2 L2):
+    traces_match tr1 tr2 ->
+    trace_valid trans2 tr2. 
+  Proof.
+    revert tr1 tr2. pcofix CH. intros tr1 tr2 Hmatch.
+    pfold. 
+    inversion Hmatch; [by econstructor| ].
+    constructor =>//.
+    specialize (CH _ _ H3).
+    eauto.   
+  Qed.  
+  
+  Lemma traces_match_after'
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (n : nat) 
+    (tr1' : trace S1 L1):
+    traces_match tr1 tr2
+    → after n tr1 = Some tr1'
+    → ∃ tr2' : trace S2 L2,
+        after n tr2 = Some tr2' ∧ traces_match tr1' tr2'.
+  Proof.
+    revert tr1 tr2.
+    induction n; intros tr1 tr2.
+    { simpl. intros. exists tr2. simplify_eq. done. }
+    move=> /= Hm Ha. destruct tr1 as [|s ℓ tr1''] eqn:Heq; first done.
+    destruct tr2; first by inversion Hm.
+    inversion Hm; simplify_eq. by eapply IHn.
+  Qed.
+
 End simulation.
+
+Lemma traces_match_flip {S1 S2 L1 L2}
+  (Rℓ: L1 -> L2 -> Prop) (Rs: S1 -> S2 -> Prop)
+  (trans1: S1 -> L1 -> S1 -> Prop)
+  (trans2: S2 -> L2 -> S2 -> Prop)
+  tr1 tr2 :
+  traces_match Rℓ Rs trans1 trans2 tr1 tr2 ↔
+    traces_match (flip Rℓ) (flip Rs) trans2 trans1 tr2 tr1.
+Proof.
+  split.
+  - revert tr1 tr2. cofix CH.
+    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
+    { by constructor. }
+    constructor; [done..|].
+    by apply CH.
+  - revert tr1 tr2. cofix CH.
+    intros tr1 tr2 Hmatch. inversion Hmatch; simplify_eq.
+    { by constructor. }
+    constructor; [done..|].
+    by apply CH.
+Qed.
+
+Lemma traces_match_compose {L1 L2 L3 S1 S2 S3: Type}
+    {Rℓ12 Rs12 Rℓ23 Rs23 trans1 trans2 trans3}
+    (tr1 : trace S1 L1) (tr2 : trace S2 L2) (tr3 : trace S3 L3):
+    traces_match Rℓ12 Rs12 trans1 trans2 tr1 tr2 →
+    traces_match Rℓ23 Rs23 trans2 trans3 tr2 tr3 →
+    traces_match 
+      (fun l1 l3 => exists l2, Rℓ12 l1 l2 /\ Rℓ23 l2 l3)
+      (fun s1 s3 => exists s2, Rs12 s1 s2 /\ Rs23 s2 s3)
+      trans1 trans3
+      tr1 tr3
+  .
+Proof using.
+  intros *. revert tr1 tr2 tr3.
+  cofix CIH.
+  intros tr1. destruct tr1. 
+  { simpl. intros. inversion H. subst. inversion H0. subst.
+    constructor. eauto. }
+  intros. inversion H. subst. inversion H0. subst.
+  constructor; eauto.
+Qed.
+
 
 Section execs_and_traces.
   Context {S L: Type}.
@@ -206,7 +436,7 @@ Section execs_and_traces.
     revert fl il. cofix CH. intros s il.
     rewrite (trace_unfold_fold (to_trace _ il)). destruct il as [| [ℓ x]?]; simpl in *.
     - by econstructor.
-    - econstructor. have ->: x = trace_last (trace_extend s ℓ x) by done.
+    - econstructor.
       apply CH.
   Qed.
 
@@ -247,237 +477,19 @@ Definition oless (a b : option nat) : Prop :=
 Lemma oleq_oless a b : oless a b -> oleq a b.
 Proof. destruct a; destruct b=>//. unfold oless, oleq. lia. Qed.
 
+Global Instance oless_dec: forall x y, Decision (oless x y). 
+Proof. 
+  destruct x, y; simpl; solve_decision. 
+Qed. 
 
-Section dec_unless.
-  Context {St S' L L': Type}.
-  Context (Us: St -> S').
-  Context (Ul: L -> option L').
+Global Instance oleq_dec: forall x y, Decision (oleq x y). 
+Proof. 
+  destruct x, y; simpl; solve_decision. 
+Qed. 
 
-  Definition dec_unless Ψ (tr: trace St L) :=
-    ∀ n, match after n tr with
-         | Some ⟨ _ ⟩ | None => True
-         | Some (s -[ℓ]-> tr') =>
-           (∃ ℓ', Ul ℓ = Some ℓ') ∨
-           (Ψ (trfirst tr') < Ψ s ∧ Us s = Us (trfirst tr'))
-         end.
-
-  Lemma dec_unless_next Ψ s ℓ tr (Hdec: dec_unless Ψ (s -[ℓ]-> tr)): dec_unless Ψ tr.
-  Proof.
-    intros n. specialize (Hdec (n+1)). rewrite (after_sum 1) // in Hdec.
-  Qed.
-
-End dec_unless.
-
-Section destuttering.
-  Context {St S' L L': Type}.
-  Context (Us: St -> S').
-  Context (Ul: L -> option L').
-
-  Inductive upto_stutter_ind (upto_stutter_coind: trace St L -> trace S' L' -> Prop):
-    trace St L -> trace S' L' -> Prop :=
-  | upto_stutter_singleton s:
-      upto_stutter_ind upto_stutter_coind ⟨s⟩ ⟨Us s⟩
-  | upto_stutter_stutter btr str s ℓ:
-      Ul ℓ = None ->
-      (* (Us s = Us (trfirst btr) -> (or something like this...?) *)
-      Us s = Us (trfirst btr) ->
-      Us s = trfirst str ->
-      upto_stutter_ind upto_stutter_coind btr str ->
-      upto_stutter_ind upto_stutter_coind (s -[ℓ]-> btr) str
-  | upto_stutter_step btr str s ℓ s' ℓ':
-      Us s = s' ->
-      Ul ℓ = Some ℓ' ->
-      upto_stutter_coind btr str ->
-      upto_stutter_ind upto_stutter_coind (s -[ℓ]-> btr) (s' -[ℓ']-> str).
-
-  Definition upto_stutter := paco2 upto_stutter_ind bot2.
-
-  Lemma upto_stutter_mono :
-    monotone2 (upto_stutter_ind).
-  Proof.
-    unfold monotone2. intros x0 x1 r r' IN LE.
-    induction IN; try (econstructor; eauto; done).
-  Qed.
-  Hint Resolve upto_stutter_mono : paco.
-
-  Lemma upto_stutter_after {btr str} n {str'}:
-    upto_stutter btr str ->
-    after n str = Some str' ->
-    ∃ n' btr', after n' btr = Some btr' ∧ upto_stutter btr' str'.
-  Proof.
-    have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
-    { intros P [x ?]. by exists (S x). }
-    revert btr str str'. induction n as [|n IH]; intros btr str str' Hupto Hafter.
-    { injection Hafter => <-. clear Hafter. exists 0, btr. done. }
-    revert str' Hafter. punfold Hupto. induction Hupto as
-        [s|btr str s ℓ HUl HUs1 HUs2 Hind IHH|btr str s ℓ s' ℓ' ?? Hind].
-    - intros str' Hafter. done.
-    - intros str' Hafter.
-      apply Hw. simpl. by apply IHH.
-    - intros str' Hafter. simpl in Hafter.
-      apply Hw. simpl. eapply IH =>//.
-      by destruct Hind.
-  Qed.
-
-  Lemma upto_stutter_after_None {btr str} n:
-    upto_stutter btr str ->
-    after n str = None ->
-    ∃ n', after n' btr = None.
-  Proof.
-    have Hw: ∀ (P: nat -> Prop), (∃ n, P (S n)) -> (∃ n, P n).
-    { intros P [x ?]. by exists (S x). }
-    revert btr str. induction n as [|n IH]; intros btr str Hupto Hafter.
-    { exists 0. done. }
-    revert Hafter. punfold Hupto. induction Hupto as
-        [s|btr str s ℓ HUl HUs1 HUs2 Hind IHH|btr str s ℓ s' ℓ' ?? Hind].
-    - intros Hafter. by exists 1.
-    - intros Hafter.
-      apply Hw. simpl. by apply IHH.
-    - intros Hafter. simpl in Hafter.
-      apply Hw. simpl. eapply IH =>//.
-      by destruct Hind.
-  Qed.
-
-  Lemma upto_stutter_infinite_trace tr1 tr2 :
-    upto_stutter tr1 tr2 → infinite_trace tr1 → infinite_trace tr2.
-  Proof.
-    intros Hstutter Hinf n.
-    revert tr1 tr2 Hstutter Hinf.
-    induction n as [|n IHn]; intros tr1 tr2 Hstutter Hinf.
-    - punfold Hstutter.
-    - punfold Hstutter.
-      induction Hstutter.
-      + specialize (Hinf (1 + n)).
-        rewrite after_sum' in Hinf. simpl in *. apply is_Some_None in Hinf. done.
-      + apply IHHstutter.
-        intros m. specialize (Hinf (1 + m)).
-        rewrite after_sum' in Hinf. simpl in *. done.
-      + simpl. eapply (IHn btr str); [by destruct H1|].
-        intros m. specialize (Hinf (1 + m)).
-        rewrite after_sum' in Hinf. simpl in *. done.
-  Qed.
-
-  Program Fixpoint destutter_once_step N Ψ (btr: trace St L) :
-    Ψ (trfirst btr) < N →
-    dec_unless Us Ul Ψ btr →
-    S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) :=
-    match N as n return
-          Ψ (trfirst btr) < n →
-          dec_unless Us Ul Ψ btr →
-          S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'})
-    with
-    | O => λ Hlt _, False_rect _ (Nat.nlt_0_r _ Hlt)
-    | S N' =>
-      λ Hlt Hdec,
-      match btr as z return btr = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) with
-      | tr_singl s => λ _, inl (Us s)
-      | tr_cons s l btr' =>
-        λ Hbtreq,
-        match Ul l as z return Ul l = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) with
-        | Some l' => λ _, inr (Us s, l', exist _ btr' _)
-        | None => λ HUll, destutter_once_step N' Ψ btr' _ _
-        end eq_refl
-      end eq_refl
-    end.
-  Next Obligation.
-  Proof.
-    intros _ Ψ btr N' Hlt Hdec s l btr' -> l' HUll; simpl.
-    eapply dec_unless_next; done.
-  Qed.
-  Next Obligation.
-  Proof.
-    intros _ Ψ btr N' Hlt Hdec s l btr' -> HUll; simpl in *.
-    pose proof (Hdec 0) as [[? ?]|[? ?]]; [congruence|lia].
-  Qed.
-  Next Obligation.
-  Proof.
-    intros _ Ψ btr N' Hlt Hdec s l btr' -> HUll; simpl.
-    eapply dec_unless_next; done.
-  Qed.
-
-  CoFixpoint destutter_gen Ψ N (btr: trace St L) :
-    Ψ (trfirst btr) < N ->
-    dec_unless Us Ul Ψ btr → trace S' L' :=
-    λ Hlt Hdec,
-    match destutter_once_step N Ψ btr Hlt Hdec with
-    | inl s' => tr_singl s'
-    | inr (s', l', z) => tr_cons s' l' (destutter_gen Ψ  (S (Ψ (trfirst $ proj1_sig z)))
-                                                 (proj1_sig z) (Nat.lt_succ_diag_r _) (proj2_sig z))
-    end.
-
-  Definition destutter Ψ (btr: trace St L) :
-    dec_unless Us Ul Ψ btr → trace S' L' :=
-    λ Hdec,
-    destutter_gen Ψ (S (Ψ (trfirst btr))) btr (Nat.lt_succ_diag_r _) Hdec.
-
-  Lemma destutter_same_Us N Ψ btr Hlt Hdec:
-    match destutter_once_step N Ψ btr Hlt Hdec with
-    | inl s' | inr (s', _, _) => Us (trfirst btr) = s'
-    end.
-  Proof.
-    revert btr Hlt Hdec. induction N as [|N]; first lia.
-    intros btr Hlt Hdec. simpl.
-    destruct btr as [s|s ℓ btr']; first done.
-    generalize (destutter_once_step_obligation_1 Ψ (s -[ ℓ ]-> btr') N
-                Hlt Hdec s ℓ btr' eq_refl).
-    generalize (destutter_once_step_obligation_2 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
-    generalize (destutter_once_step_obligation_3 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
-    intros HunlessNone HltNone HdecSome.
-    destruct (Ul ℓ) as [ℓ'|] eqn:Heq; cbn; first done.
-    unfold dec_unless in Hdec.
-    destruct (Hdec 0) as [[??]|[? Hsame]]; first congruence.
-    rewrite Hsame. apply IHN.
-  Qed.
-
-  Lemma destutter_spec_ind N Ψ (btr: trace St L) (Hdec: dec_unless Us Ul Ψ btr)
-    (Hlt: Ψ (trfirst btr) < N):
-    upto_stutter btr (destutter_gen Ψ N btr Hlt Hdec).
-  Proof.
-    revert N btr Hlt Hdec.
-    pcofix CH. pfold.
-    induction N.
-    { intros; lia. }
-    intros btr Hlt Hdec.
-    rewrite (trace_unfold_fold (destutter_gen _ _ _ _ _)).
-    destruct btr as [s|s ℓ btr'].
-    { simpl in *. econstructor. }
-    cbn.
-    generalize (destutter_once_step_obligation_1 Ψ (s -[ ℓ ]-> btr') N
-                Hlt Hdec s ℓ btr' eq_refl).
-    generalize (destutter_once_step_obligation_2 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
-    generalize (destutter_once_step_obligation_3 Ψ (s -[ ℓ ]-> btr') N Hlt Hdec s ℓ btr' eq_refl).
-    intros HunlessNone HltNone HdecSome.
-    destruct (Ul ℓ) as [ℓ'|] eqn:Heq; cbn.
-    - econstructor 3 =>//. right. apply (CH (S (Ψ $ trfirst btr'))).
-    - econstructor 2=>//.
-      + destruct (Hdec 0) as [[??]|[??]];congruence.
-      + have ?: Us s = Us (trfirst btr').
-        { destruct (Hdec 0) as [[??]|[? Hsame]]; congruence. }
-        have HH := destutter_same_Us N Ψ btr' (HltNone eq_refl) (HunlessNone eq_refl).
-        destruct (destutter_once_step N Ψ btr' (HltNone eq_refl) (HunlessNone eq_refl)) as
-            [|[[??][??]]]eqn:Heq'; simpl in *; congruence.
-      + rewrite -trace_unfold_fold.
-        specialize (IHN btr' (HltNone eq_refl) (HunlessNone eq_refl)).
-        match goal with
-          [H : context[upto_stutter_ind]  |- ?Y] => let X := type of H in
-                          suffices <-: X <-> Y; first done
-        end.
-        f_equiv.
-        rewrite {1}(trace_unfold_fold (destutter_gen _ _ _ _ _)) /= -trace_unfold_fold //.
-  Qed.
-
-  Lemma destutter_spec Ψ (btr: trace St L) (Hdec: dec_unless Us Ul Ψ btr):
-    upto_stutter btr (destutter Ψ btr Hdec).
-  Proof. eapply destutter_spec_ind. Qed.
-
-  Lemma can_destutter Ψ (btr: trace St L) (Hdec: dec_unless Us Ul Ψ btr):
-    ∃ str, upto_stutter btr str.
-  Proof. exists (destutter Ψ btr Hdec). apply destutter_spec. Qed.
-
-End destuttering.
 
 (* TODO: Does this belong here? *)
-(* Adapted from Arthur Azevedo De Amorim *)
+(** Adapted from Arthur Azevedo De Amorim *)
 Section lex_ind.
   Section Lexicographic.
 
@@ -578,9 +590,11 @@ Section addition_monoid.
   Qed.
 End addition_monoid.
 
-(* Classical *)
+(** Classical *)
 
-Require Import Coq.Logic.Classical.
+From Stdlib Require Import Logic.Classical_Prop.
+
+
 Section infinite_or_finite.
   Context {St L: Type}.
 
@@ -589,7 +603,7 @@ Section infinite_or_finite.
   Proof.
     destruct (classic (infinite_trace tr)) as [|Hni]; first by eauto.
     rewrite /infinite_trace in Hni.
-    apply not_all_ex_not in Hni. destruct Hni as [n Hni%eq_None_not_Some].
+    apply not_forall_exists_not in Hni. destruct Hni as [n Hni%eq_None_not_Some].
     by right; exists n.
   Qed.
 

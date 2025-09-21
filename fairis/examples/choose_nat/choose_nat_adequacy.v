@@ -5,10 +5,9 @@ From iris.bi Require Import bi.
 From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
-From trillium.fairness Require Import fairness fair_termination fairness_finiteness.
-From trillium.program_logic Require Export weakestpre.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode notation adequacy.
-From trillium.fairness.heap_lang.examples Require Import choose_nat.
+From fairness Require Import fairness. 
+From fairis Require Import fuel lifting fair_termination fairness_finiteness proofmode heap_lang_lm adequacy. 
+From fairis.examples.choose_nat Require Import choose_nat.
 
 Import derived_laws_later.bi.
 

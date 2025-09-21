@@ -1,7 +1,9 @@
-From stdpp Require Import option.
+From stdpp Require Import option gmap.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Export inftraces fairness.
+From fairness Require Export inftraces fairness.
+From fairis Require Import destuttering.
+
 
 Section fairness.
   Context {Λ : language}.
@@ -759,6 +761,17 @@ Section fairness_preserved.
       ∃ M, pred_at auxtr M (λ δ _, ¬role_enabled ρ δ)
            ∨ pred_at auxtr M (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0))).
 
+  Local Lemma pred_at_step_helper extr' p ζ':
+    pred_at extr' p (fairness_sat locale_enabled tid_match ζ') <->
+    pred_at extr' p (λ x y, ¬ locale_enabled ζ' x ∨ y = Some (Some ζ')).
+  Proof using.
+    apply pred_at_iff. intros ??. 
+    rewrite /fairness_sat. apply Morphisms_Prop.or_iff_morphism; [done| ].
+    rewrite /tid_match. split.
+    - by intros (?&->&[=->]).
+    - intros ->. eauto.  
+  Qed.
+
   Local Lemma case1 ρ f m (extr' : extrace Λ) (auxtr' : auxtrace LM) δ ℓ :
     (∀ m0 : nat * nat,
          strict lt_lex m0 (f, m)
@@ -792,7 +805,10 @@ Section fairness_preserved.
         have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ (δ0 : LiveState Λ M) _, ¬ role_enabled ρ δ0)
                                   ∨ pred_at auxtr' M0 (λ (_ : LiveState Λ M) ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
         { eapply (IH _ _ _ p _ extr'); eauto.
-          Unshelve. unfold strict, lt_lex. specialize (Hdec ltac:(by eapply elem_of_dom_2)). lia. }
+          rewrite pred_at_or. eapply pred_at_step_helper; eauto.
+          Unshelve.
+          unfold strict, lt_lex. specialize (Hdec ltac:(by eapply elem_of_dom_2)).
+          lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
       - exists 1. left. rewrite /pred_at /=. rewrite /role_enabled.
         destruct auxtr' =>/=.
@@ -809,7 +825,7 @@ Section fairness_preserved.
     destruct extr as [|c ζ' extr'] eqn:Heq.
     { have [??] := Hexinfin 1. done. }
     have Hfair': (forall ζ, fair_ex ζ extr').
-    { intros. by eapply fair_ex_cons. }
+    { intros. eapply fair_by_cons. apply Hfair. }
     destruct auxtr as [|δ ℓ auxtr']; first by inversion Htm.
     destruct (decide (ρ ∈ live_roles M δ)) as [Hρlive|]; last first.
     { exists 0. left. unfold pred_at. simpl. intros contra. eauto. }
@@ -924,8 +940,12 @@ Section fairness_preserved.
         have [p Hp] := (Hfair' ζ'' 0 Hζ'en).
         have [P Hind] : ∃ M0 : nat, pred_at auxtr' M0 (λ δ0 _, ¬ role_enabled ρ δ0)
                         ∨ pred_at auxtr' M0 (λ _ ℓ, ∃ ζ0, ℓ = Some (Take_step ρ ζ0)).
-        { eapply (IH _ _ _ p _ extr'); eauto. by eapply infinite_cons. by inversion Htm.
-          Unshelve. unfold strict, lt_lex. lia. }
+        { eapply (IH _ _ _ p _ extr'); eauto.
+          { by eapply infinite_cons. }
+          { by inversion Htm. }
+          rewrite pred_at_or. eapply pred_at_step_helper; eauto.
+          Unshelve.
+          unfold strict, lt_lex. lia. }
         exists (1+P). rewrite !pred_at_sum. simpl. done.
   Qed.
 
@@ -957,7 +977,9 @@ Section fairness_preserved.
     have ?: infinite_trace tr1'.
     { have Hinf := infinite_trace_after n extr Hinfin. by rewrite Heq' in Hinf. }
     eapply (fairness_preserved_ind ρ _ f m ζ _ tr); eauto.
-    intros ?. by eapply fair_ex_after.
+    intros ?. eapply fair_by_after; eauto. 
+    { apply Hex. }
+    rewrite pred_at_or. eapply pred_at_step_helper; eauto.     
   Qed.
 
   Tactic Notation "inv" open_constr(P) := match goal with
@@ -1246,6 +1268,10 @@ Section upto_stutter_preserves_fairness_and_termination.
     { rewrite /pred_at /=. destruct auxtr'; done. }
     destruct (upto_stutter_fairness_0 ρ auxtr' mtr' Hupto' (Hfa' Hpredat)) as (m&Hres).
     exists m. rewrite !(pred_at_sum _ n) Heq //.
+    rewrite pred_at_or in Hres. 
+    eapply pred_at_impl; [| by apply Hres].
+    simpl. rewrite /fairness_sat. intros ?? [? | ->]; eauto.
+    right. eexists. split; done.
   Qed.
 
   Lemma upto_stutter_finiteness auxtr (mtr: mtrace M):

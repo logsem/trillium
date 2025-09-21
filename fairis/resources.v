@@ -1,21 +1,22 @@
 From iris.algebra Require Import auth gmap gset excl.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import fairness fuel map_included_utils.
+From fairness Require Import fairness.
+From fairis Require Import fuel map_included_utils.
 
 Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
 Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 Canonical Structure localeO (Λ : language) := leibnizO (locale Λ).
 
 Class fairnessGpreS `{Countable (locale Λ)} `(LM: LiveModel Λ M) Σ := {
-  fairnessGpreS_model :> inG Σ (authUR (optionUR (exclR (ModelO M))));
-  fairnessGpreS_model_fuel_mapping :>
+  fairnessGpreS_model :: inG Σ (authUR (optionUR (exclR (ModelO M))));
+  fairnessGpreS_model_fuel_mapping ::
     inG Σ (authUR (gmapUR (localeO Λ)
                           (exclR $ gmapUR (RoleO M) natO)));
-  fairnessGpreS_model_free_roles :> inG Σ (authUR (gset_disjUR (RoleO M)));
+  fairnessGpreS_model_free_roles :: inG Σ (authUR (gset_disjUR (RoleO M)));
 }.
 
 Class fairnessGS `{Countable (locale Λ)} `(LM : LiveModel Λ M) Σ := FairnessGS {
-  fairness_inG :> fairnessGpreS LM Σ;
+  fairness_inG :: fairnessGpreS LM Σ;
   (** Underlying model *)
   fairness_model_name : gname;
   (** Mapping of threads to roles with fuel *)
@@ -197,8 +198,8 @@ Section model_state_interp.
     own (fairness_model_free_roles_name fG) (◯ (GSet FR)).
 
   Definition fuel_map_le_inner (m1 m2 : gmap (locale Λ) (gmap Role nat)) :=
-    map_included (λ (fs1 fs2 : gmap Role nat),
-                    map_included (≤) fs1 fs2) m1 m2.
+    map_included (λ _ (fs1 fs2 : gmap Role nat),
+                    map_included (fun _ => (≤)) fs1 fs2) m1 m2.
 
   Definition fuel_map_le (m1 m2 : gmap (locale Λ) (gmap Role nat)) :=
     fuel_map_le_inner m1 m2 ∧
@@ -516,7 +517,7 @@ Section model_state_lemmas.
         (fs fs' : gmap _ nat) ζ :
     δ.(ls_map) !! ζ = Some fs →
     fs ≠ ∅ →
-    map_included (<) fs' fs →
+    map_included (fun _ => (<)) fs' fs →
     (dom fs ∖ dom fs') ∩ M.(live_roles) δ = ∅ →
     ∃ δ', δ'.(ls_data) =
           {| ls_under := δ;
@@ -537,7 +538,7 @@ Section model_state_lemmas.
     δ.(ls_map) !! ζ = Some fs →
     δ'.(ls_map) = <[ζ := fs']>δ.(ls_map) →
     fs ≠ ∅ →
-    map_included (<) fs' fs →
+    map_included (fun _ => (<)) fs' fs →
     (dom fs ∖ dom fs') ∩ M.(live_roles) δ = ∅ →
     ls_trans fl δ (Silent_step ζ) δ'.
   Proof.
@@ -556,7 +557,7 @@ Section model_state_lemmas.
       δ1.(ls_map) !! ζ = Some fs1 ∧
       δ2.(ls_map) = <[ζ := fs2]>δ1.(ls_map) ∧
       fs1 ≠ ∅ ∧
-      map_included (<) fs2 fs1 ∧
+      map_included (fun _ => (<)) fs2 fs1 ∧
       (dom fs1 ∖ dom fs2) ∩ M.(live_roles) δ1 = ∅.
 
   Lemma model_can_fuel_step_trans fl ζ (δ δ' : LiveState Λ M) :
@@ -568,7 +569,7 @@ Section model_state_lemmas.
   Definition decr_fuel_map (fs : gmap (fmrole M) nat) : gmap (fmrole M) nat :=
     (λ f, f - 1) <$> fs.
 
-  Lemma decr_fuel_map_included fs : map_included (≤) (decr_fuel_map fs) fs.
+  Lemma decr_fuel_map_included fs : map_included (fun _ => (≤)) (decr_fuel_map fs) fs.
   Proof.
     apply map_included_spec. intros k v1 Hm.
     apply lookup_fmap_Some in Hm as [v2 [Hv2 Hm]].
@@ -581,7 +582,7 @@ Section model_state_lemmas.
     (filter (λ ρf, ρf.1 ∈ M.(live_roles) δ.(ls_under) ∨ ρf.1 ∈ ρs)) fs.
 
   Lemma filter_fuel_map_included δ ρs fs :
-    map_included (≤) (filter_fuel_map δ ρs fs) fs.
+    map_included (fun _ => (≤)) (filter_fuel_map δ ρs fs) fs.
   Proof.
     apply map_included_spec.
     intros k v1 Hm.
@@ -598,7 +599,7 @@ Section model_state_lemmas.
     decr_fuel_map ∘ filter_fuel_map δ ρs.
 
   Lemma model_update_locale_role_map_map_included δ ρs fs :
-    map_included (≤) (model_update_locale_role_map δ ρs fs) fs.
+    map_included (fun _ => (≤)) (model_update_locale_role_map δ ρs fs) fs.
   Proof.
     rewrite /model_update_locale_role_map.
     eapply map_included_transitivity;
@@ -621,7 +622,7 @@ Section model_state_lemmas.
     intros ζ δ ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2.
     simpl in *.
     pose proof δ.(ls_map_disj) as Hdisj.
-    assert (∃ fs1', map_included (≤) fs1 fs1' ∧ ls_map δ !!! ζ1 = fs1')
+    assert (∃ fs1', map_included (fun _ => (≤)) fs1 fs1' ∧ ls_map δ !!! ζ1 = fs1')
       as (fs1' & Hle1 & Hfs1').
     { destruct (decide (ζ = ζ1)) as [<-|Hneq'].
       + rewrite lookup_alter in HSome1.
@@ -633,7 +634,7 @@ Section model_state_lemmas.
       + rewrite lookup_alter_ne in HSome1; [|done].
         rewrite lookup_total_alt. eexists _.
         split; [done|by rewrite HSome1]. }
-    assert (∃ fs2', map_included (≤) fs2 fs2' ∧ ls_map δ !!! ζ2 = fs2')
+    assert (∃ fs2', map_included (fun _ => (≤)) fs2 fs2' ∧ ls_map δ !!! ζ2 = fs2')
       as (fs2' & Hle2 & Hfs2').
     { destruct (decide (ζ = ζ2)) as [<-|Hneq'].
       + rewrite lookup_alter in HSome2.
@@ -691,7 +692,7 @@ Section model_state_lemmas.
     intros ζ ρs δ ζ1 ζ2 fs1 fs2 Hneq HSome1 HSome2.
     simpl in *.
     pose proof δ.(ls_map_disj) as Hdisj.
-    assert (∃ fs1', map_included (≤) fs1 fs1' ∧ ls_map δ !!! ζ1 = fs1')
+    assert (∃ fs1', map_included (fun _ => (≤)) fs1 fs1' ∧ ls_map δ !!! ζ1 = fs1')
       as (fs1' & Hle1 & Hfs1').
     { destruct (decide (ζ = ζ1)) as [<-|Hneq'].
       + rewrite lookup_alter in HSome1.
@@ -703,7 +704,7 @@ Section model_state_lemmas.
       + rewrite lookup_alter_ne in HSome1; [|done].
         rewrite lookup_total_alt. eexists _.
         split; [done|by rewrite HSome1]. }
-    assert (∃ fs2', map_included (≤) fs2 fs2' ∧ ls_map δ !!! ζ2 = fs2')
+    assert (∃ fs2', map_included (fun _ => (≤)) fs2 fs2' ∧ ls_map δ !!! ζ2 = fs2')
       as (fs2' & Hle2 & Hfs2').
     { destruct (decide (ζ = ζ2)) as [<-|Hneq'].
       + rewrite lookup_alter in HSome2.
@@ -1198,7 +1199,7 @@ Section model_state_lemmas.
     δ2.(ls_map) = <[ζ := fs']> δ1.(ls_map) →
     ρ ∈ dom fs →
     fs' !! ρ = Some (LM.(lm_fl) (ls_under δ2)) →
-    map_included (<) (delete ρ fs') fs →
+    map_included (fun _ => (<)) (delete ρ fs') fs →
     (dom fs ∖ dom fs' ∩ M.(live_roles) δ1 = ∅) →
     ls_trans LM.(lm_fl) δ1 (Take_step ρ ζ) δ2.
   Proof.
@@ -1227,7 +1228,7 @@ Section model_state_lemmas.
       δ2.(ls_map) = <[ζ := fs']> δ1.(ls_map) ∧
       ρ ∈ dom fs ∧
       fs' !! ρ = Some (LM.(lm_fl) (ls_under δ2)) ∧
-      map_included (<) (delete ρ fs') fs ∧
+      map_included (fun _ => (<)) (delete ρ fs') fs ∧
       (dom fs ∖ dom fs' ∩ M.(live_roles) δ1 = ∅).
 
   Lemma model_can_model_step_trans ζ ρ (δ δ' : LiveState Λ M) :
@@ -1753,8 +1754,8 @@ Section model_state_lemmas.
       δ1.(ls_under) = δ2.(ls_under) ∧
       δ1.(ls_map) !! ζ = Some fs ∧ fs ≠ ∅ ∧
       δ2.(ls_map) = <[ζ := fs1]>(<[ζf := fs2]> δ1.(ls_map)) ∧
-      map_included (<) fs1 fs ∧
-      map_included (<) fs2 fs ∧
+      map_included (fun _ => (<)) fs1 fs ∧
+      map_included (fun _ => (<)) fs2 fs ∧
       (dom fs ∖ (dom fs1 ∪ dom fs2) ∩ M.(live_roles) δ1 = ∅) ∧
       (dom fs1 ∩ dom fs2 = ∅) ∧
       ζf ∉ dom δ1.(ls_map).
@@ -1763,8 +1764,8 @@ Section model_state_lemmas.
         (fs fs1 fs2 : gmap _ nat) ζ ζf :
     δ.(ls_map) !! ζ = Some fs →
     fs ≠ ∅ →
-    map_included (<) fs1 fs →
-    map_included (<) fs2 fs →
+    map_included (fun _ => (<)) fs1 fs →
+    map_included (fun _ => (<)) fs2 fs →
     (dom fs ∖ (dom fs1 ∪ dom fs2)) ∩ M.(live_roles) δ = ∅ →
     (dom fs1 ∩ dom fs2 = ∅) →
     ζf ∉ dom δ.(ls_map) →
@@ -1787,8 +1788,8 @@ Section model_state_lemmas.
     δ.(ls_map) !! ζ = Some fs →
     δ'.(ls_map) = <[ζ := fs1]>(<[ζf := fs2]> δ.(ls_map)) →
     fs ≠ ∅ →
-    map_included (<) fs1 fs →
-    map_included (<) fs2 fs →
+    map_included (fun _ => (<)) fs1 fs →
+    map_included (fun _ => (<)) fs2 fs →
     (dom fs ∖ (dom fs1 ∪ dom fs2)) ∩ M.(live_roles) δ = ∅ →
     (dom fs1 ∩ dom fs2 = ∅) →
     ζf ∉ dom δ.(ls_map) →
@@ -2010,7 +2011,7 @@ Section model_state_lemmas.
 
   Lemma model_state_interp_has_fuels_agree es δ ζ (fs : gmap (fmrole M) nat) :
     model_state_interp es δ -∗ has_fuels ζ fs -∗
-    ⌜∃ fs', δ.(ls_map) !! ζ = Some fs' ∧ map_included (≤) fs fs'⌝.
+    ⌜∃ fs', δ.(ls_map) !! ζ = Some fs' ∧ map_included (fun _ => (≤)) fs fs'⌝.
   Proof.
     iIntros "Hm Hf".
     iDestruct "Hm" as (fm [Hfmle _] Hfmdead Htp) "(Hm & Hfm)".

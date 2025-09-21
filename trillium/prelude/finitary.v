@@ -1,5 +1,5 @@
-From Coq.Unicode Require Import Utf8.
-From Coq.micromega Require Import Lia.
+From Stdlib.Unicode Require Import Utf8.
+From Stdlib.micromega Require Import Lia.
 From trillium.prelude Require Import
      classical quantifiers sigma classical_instances.
 From stdpp Require Import finite fin_sets gmap list.
@@ -86,7 +86,7 @@ Section smaller_card_nat_finite.
       length (no_fin_make_list l n) = length l + n.
     Proof.
       induction n as [|n IHn]; [simpl; lia|].
-      simpl; rewrite app_length, IHn; simpl; lia.
+      simpl; rewrite length_app, IHn; simpl; lia.
     Qed.
 
     Lemma no_fin_make_list_prefix l n1 n2 :
@@ -362,8 +362,8 @@ Section in_list_finite.
 
 End in_list_finite.
 
-Require Import Coq.Logic.Epsilon.
-Require Import Coq.Sorting.Permutation.
+Require Import Stdlib.Logic.Epsilon.
+Require Import Stdlib.Sorting.Permutation.
 
 Section finite_range_gmap.
   Context `{!EqDecision K, !Countable K}.

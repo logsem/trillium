@@ -3,65 +3,69 @@
 Trillium is a higher-order concurrent separation logic for proving trace
 refinements between programs and models. The logic is
 built using the [Iris](https://iris-project.org) program logic framework and
-mechanized in the [Coq proof assistant](https://coq.inria.fr/).
+mechanized in the [Rocq proof assistant](https://rocq-prover.org/).
 
 ## Directory Structure
 
 - [`trillium/`](trillium/): The Trillium program logic framework
 
-- [`fairis/`](fairis/): The Fairis instantiation of Trillium for reasoning
-  about fair termination of concurrent programs.
-  + [`heap_lang/`](fairis/heap_lang/): HeapLang instantiation with fuel model
-    * [`examples/`](fairis/heap_lang/examples/): Examples and case studies
+- [`heap_lang/`](heap_lang/) - a variation of HeapLang language (most notably - enriched with locales)
 
-- [`external/`](external/): External dependencies
+- [`fairness/`](fairness/) - a number of various trace and model utilities; most notably - a uniform definition of trace and model fairness.
+
+- [`fairis/`](fairis/) - The Fairis program logic - an instantiation of Trillium for reasoning about fair termination of HeapLang programs.
+
 
 ## Compiling
 
-The project maintains compatibility with Coq 8.17 and relies on `coqc` being
-available in your shell. Clone the external git submodule dependencies using
+    # create a new opam environment
+    opam switch create trillium_env 5.2.0
+    # switch into the new environment
+    eval $(opam env --switch=trillium_env)
+	
+    # set up repository for Rocq packages
+    opam repo add rocq-released https://rocq-prover.github.io/opam/released/
 
-    git submodule update --init --recursive
+    # install all dependencies of Trillium
+    opam install . --deps-only
+    # build Trillium; adjust the number of jobs as needed
+    make -j 5
 
-Alternatively, clone the repository using the `--recurse-submodules` flag.
+## Using Trillium in your project
 
-Run `make -jN` to build the full development, where `N` is the number of your
-CPU cores.
+The instruction below applies until Trillium is released as a publicly available opam package.
 
-Note that the compilation of the external dependencies is known to print
-a lot of warning messages when compiled with Coq 8.17.
+Your project should be set up as an opam package. 
+With that, add the Trillium dependency to its `.opam` file:
 
-## Git submodule dependencies
+    depends: [
+      # ...
+      "trillium" { (= "2.2.0") }
+    ]
 
-This project uses git submodules to manage dependencies with other Coq
-libraries. By default, when working with a repository that uses submodules, the
-submodules will *not* be populated and updated automatically, and it is often
-necessary to invoke `git submodule update --init --recursive` or use the
-`--recurse-submodules` flag. However, this can be automated by setting the
-`submodule.recurse` setting to `true` in your git config by running
+Then, clone the Trillium repo at some local path TRILLIUM_PATH.
+After that, execute the following in the root of your project:
+    
+    # create a new opam environment for your project
+    opam switch create project-env 5.2.0
+    # switch into the new environment
+    eval $(opam env --switch=project-env)
+	
+    # set up repository for Rocq packages
+    opam repo add rocq-released https://rocq-prover.github.io/opam/released/
+    # set up the local repository for Trillium
+    opam pin add trillium TRILLIUM_PATH --no-action
 
-    git config --global submodule.recurse true
-
-This will make `git clone`, `git checkout`, `git pull`, etc. work as you would
-expect and it should rarely be necessary to invoke any `git submodule update`
-commands.
-
-A git submodule is pinned to a particular commit of an external (remote)
-repository. If new commits have been pushed to the remote repository and you
-wish to integrate these in to the development, invoke
-
-    git submodule update --remote
-
-to fetch the new commits and apply them to your local repository. This changes
-which commit your *local* submodule is pinned to. Remember to commit and push
-the submodule update to make it visible to other users of the repository.
-
-Read more about git submodules in [this
-tutorial](https://git-scm.com/book/en/v2/Git-Tools-Submodules).
+    # install all dependencies of your project; Trillium will be installed as a part of it
+    opam install . --deps-only
+    # build your project
+    make -j 5	
+	
 
 ## Publications
 
-A [preprint](https://iris-project.org/pdfs/2021-submitted-trillium.pdf) is
-available describing Trillium, a program logic framework for both proving
-partial correctness properties and trace properties; Aneris is now an
-instantiation of the Trillium framework.
+- Trillium: Higher-Order Concurrent and Distributed Separation Logic for Intensional Refinement.
+ 
+  Amin Timany, Simon Oddershede Gregersen, Léo Stefanesco, Jonas Kastberg Hinrichsen, Léon Gondelman, Abel Nieto, Lars Birkedal.
+  
+  In POPL 2024: ACM SIGPLAN Symposium on Principles of Programming Languages

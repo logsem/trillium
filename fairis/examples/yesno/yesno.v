@@ -6,8 +6,8 @@ From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Export finitary quantifiers sigma classical_instances.
 From trillium.program_logic Require Export weakestpre.
-From trillium.fairness Require Import fairness fair_termination.
-From trillium.fairness.heap_lang Require Export lang lifting tactics proofmode  notation.
+From fairness Require Import fairness. 
+From fairis Require Import fuel lifting fair_termination proofmode heap_lang_lm. 
 
 Import derived_laws_later.bi.
 
@@ -92,12 +92,12 @@ Definition the_model: LiveModel heap_lang the_fair_model :=
 Class yesnoG Σ := YesnoG {
   yes_name: gname;
   no_name: gname;
-  yesno_n_G :> inG Σ (excl_authR natO);
-  yesno_f_G :> inG Σ (excl_authR boolO);
+  yesno_n_G :: inG Σ (excl_authR natO);
+  yesno_f_G :: inG Σ (excl_authR boolO);
  }.
 Class yesnoPreG Σ := {
-  yesno_PreG :> inG Σ (excl_authR natO);
-  yesno_f_PreG :> inG Σ (excl_authR boolO);
+  yesno_PreG :: inG Σ (excl_authR natO);
+  yesno_f_PreG :: inG Σ (excl_authR boolO);
  }.
 Definition yesnoΣ : gFunctors :=
   #[ heapΣ the_fair_model; GFunctor (excl_authR natO) ; GFunctor (excl_authR boolO) ].

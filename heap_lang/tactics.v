@@ -1,4 +1,4 @@
-From trillium.fairness.heap_lang Require Export lang.
+From heap_lang Require Export lang.
 Set Default Proof Using "Type".
 Import heap_lang.
 

@@ -1,0 +1,23 @@
+#!/bin/bash
+# A simplified version of Iris project build script.
+set -e
+
+PROJECT="$1"
+shift
+
+COQFILE="_CoqProject.$PROJECT"
+MAKEFILE="Makefile.package.$PROJECT"
+
+# Generate _CoqProject file and Makefile
+rm -f "$COQFILE"
+cp _CoqProject "$COQFILE"
+# Get the files.
+find "$PROJECT/" -type f -name "*.v" >> "$COQFILE"
+# Now we can run coq_makefile.
+"${COQBIN}coq_makefile" -f "$COQFILE" -o "$MAKEFILE"
+
+# Run build
+make -f "$MAKEFILE" "$@"
+
+# Cleanup
+rm -f ".$MAKEFILE.d" "$MAKEFILE"*
