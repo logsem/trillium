@@ -1,4 +1,4 @@
-From Coq Require Import ssreflect.
+From Stdlib Require Import ssreflect.
 From stdpp Require Import gmap.
 
 (* TODO: Make context, and generalise lemmas to canonical representation *)

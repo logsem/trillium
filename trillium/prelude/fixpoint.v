@@ -1,5 +1,5 @@
-From Coq.Unicode Require Import Utf8.
-From Coq.ssr Require Import ssreflect.
+From Stdlib.Unicode Require Import Utf8.
+From Stdlib.ssr Require Import ssreflect.
 
 Definition monotone {A} (Ψ : (A → Prop) → (A → Prop)) :=
   ∀ (P Q : A → Prop), (∀ x, P x → Q x) → ∀ x, Ψ P x → Ψ Q x.

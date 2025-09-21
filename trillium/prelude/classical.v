@@ -1,4 +1,4 @@
-From Coq.Unicode Require Import Utf8.
+From Stdlib.Unicode Require Import Utf8.
 
 Axiom FunExt :
   ∀ (A : Type) (B : A → Type) (f g : ∀ x, B x), (∀ x, f x = g x) → f = g.

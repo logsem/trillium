@@ -1,5 +1,5 @@
 From stdpp Require Export base prelude finite.
-From Coq.ssr Require Import ssreflect.
+From Stdlib.ssr Require Import ssreflect.
 From trillium.traces Require Import infinite_trace trace.
 
 Import InfListNotations.

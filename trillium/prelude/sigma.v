@@ -1,7 +1,7 @@
-From Coq.Unicode Require Import Utf8.
+From Stdlib.Unicode Require Import Utf8.
 From stdpp Require Import base list.
 From trillium.prelude Require Import classical.
-From Coq.ssr Require Import ssreflect.
+From Stdlib.ssr Require Import ssreflect.
 
 Lemma sig_eq {A} (P : A → Prop) (x y : sig P) :
   proj1_sig x = proj1_sig y → x = y.

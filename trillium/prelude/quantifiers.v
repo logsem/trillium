@@ -1,5 +1,5 @@
-From Coq.Unicode Require Import Utf8.
-From Coq.micromega Require Import Lia.
+From Stdlib.Unicode Require Import Utf8.
+From Stdlib.micromega Require Import Lia.
 From trillium.prelude Require Import classical sigma.
 
 Definition injective {A B} (f : A → B) := ∀ x y, f x = f y → x = y.

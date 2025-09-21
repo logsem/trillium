@@ -1,4 +1,4 @@
-From Coq.ssr Require Import ssreflect.
+From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import prelude.
 
 Set Default Proof Using "Type".
@@ -12,7 +12,7 @@ CoInductive inflist (A : Type) : Type :=
 Bind Scope inflist_scope with inflist.
 
 Arguments infnil {_}, _.
-Arguments infcons {_} _ _%inflist.
+Arguments infcons {_} _ %_inflist.
 
 Module InfListNotations.
 Notation "[ ]" := infnil (format "[ ]") : inflist_scope.
