@@ -148,7 +148,7 @@ Proof.
     rewrite /trace_ends_in in Hexend. rewrite Hexend.
     split; first by list_simplifier.
     apply heap_lang_locales_equiv_length. simpl.
-    rewrite !app_length //=. }
+    rewrite !length_app //=. }
   iModIntro. iSplit. iPureIntro; first by eauto. iNext.
   iIntros (e2 σ2 efs Hstep).
   have [-> [-> ->]] : σ2 = σ1 ∧ efs = [e] ∧ e2 = Val $ LitV LitUnit by inv_head_step.

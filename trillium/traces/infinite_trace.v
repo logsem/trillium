@@ -131,7 +131,7 @@ Global Instance ilist_fmap : FMap inflist :=
 Section inflist_fmap.
   Context {A B} (f : A → B).
 
-  Lemma inflist_fmap_length (il : inflist A) : inflist_same_length il (f <$> il).
+  Lemma inflist_flength_map (il : inflist A) : inflist_same_length il (f <$> il).
   Proof.
     intros n; revert il; induction n; intros il.
     - rewrite (inflist_unfold_fold (f <$> il)).

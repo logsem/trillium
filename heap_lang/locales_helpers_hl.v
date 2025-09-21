@@ -133,7 +133,7 @@ Proof.
   revert es10 es20 es2.
   induction es1 as [|e es1 IHes1]; intros es10 es20 es2 Hlen; [by destruct es2|].
   destruct es2; [done|]=> /=. constructor; [done|].
-  apply IHes1; [by rewrite !app_length=> /=;f_equiv|lia].
+  apply IHes1; [by rewrite !length_app=> /=;f_equiv|lia].
 Qed.
 
 Lemma heap_lang_locales_equiv_length (es1 es2 : list expr) :

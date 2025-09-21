@@ -14,7 +14,7 @@ Lemma step_tp_length {Λ} c c' oζ:
   locale_step (Λ := Λ) c oζ c' → length c.1 ≤ length c'.1.
 Proof.
   inversion 1; simplify_eq; last done.
-  rewrite !app_length /= !app_length; lia.
+  rewrite !length_app /= !length_app; lia.
 Qed.
 
 Lemma valid_exec_length {Λ} ex (tp1 tp2 : list $ expr Λ) σ1 σ2:
@@ -149,10 +149,10 @@ Section locales_helpers.
     - destruct t2; first done.
       revert e a t0 t0' t1 t2' t2 IHt2' Hlen Hequiv. induction t1'; intros x y t0 t0' t1 t2' t2 IHt2' Hlen Hequiv.
       + destruct t1; first by simpl; constructor; list_simplifier.
-        apply Forall2_length in Hequiv. rewrite !prefixes_from_length app_length /= in Hequiv.
+        apply Forall2_length in Hequiv. rewrite !prefixes_from_length length_app /= in Hequiv.
         simpl in Hlen. lia.
       + destruct t1.
-        { apply Forall2_length in Hequiv. rewrite !prefixes_from_length !app_length /= in Hequiv.
+        { apply Forall2_length in Hequiv. rewrite !prefixes_from_length !length_app /= in Hequiv.
           simpl in Hlen. lia. }
         assert (H: locales_equiv_from (t0 ++ e :: t1) (t0' ++ a :: t1')
                     (x :: t2) (y :: t2')).
@@ -224,7 +224,7 @@ Section locales_helpers.
     intros H. inversion H as [? ? e1 ? e2 ? efs t1 t2|]; simplify_eq; simpl.
     - replace (t1 ++ e2 :: t2 ++ efs) with ((t1 ++ e2 :: t2) ++ efs); last by list_simplifier.
       replace (length (t1 ++ e1 :: t2)) with (length (t1 ++ e2 :: t2)); last first.
-      { rewrite !app_length //=. }
+      { rewrite !length_app //=. }
       rewrite take_app_length. apply locales_equiv_middle.
       eapply locale_step_preserve =>//.
     - rewrite take_ge =>//. apply locales_equiv_refl.
@@ -539,7 +539,7 @@ Section locales_utils.
     intros Hprefix1 Hprefix2 Hequiv.
     apply locales_equiv_from_impl.
     { apply Forall2_length in Hequiv. rewrite !prefixes_from_length in Hequiv.
-      by rewrite !skipn_length Hequiv. }
+      by rewrite !length_skipn Hequiv. }
     apply locales_equiv_prefix_from_drop in Hprefix1.
     apply locales_equiv_prefix_from_drop in Hprefix2.
     apply locales_equiv_from_comm in Hprefix1.
@@ -803,7 +803,7 @@ Section adequacy_helper_lemmas.
       + simpl; f_equal; first erewrite locale_equiv=> //.
         specialize (IHt (t0 ++ [a]) (t0' ++ [a]) _ _ Hlen1).
         simpl in IHt. rewrite !drop_0 in IHt. apply IHt.
-        * rewrite !app_length. lia.
+        * rewrite !length_app. lia.
         * apply locales_equiv_snoc =>//. list_simplifier. apply locale_equiv =>//.
       + simpl. apply IHt =>//. simpl in Hlen1. lia.
   Qed.
@@ -845,7 +845,7 @@ Section adequacy_helper_lemmas.
     (* TODO: factorize the two halves *)
     rewrite big_sepL2_alt; iSplit.
     - iIntros "H". iSplit.
-      { rewrite drop_app_length // map_length !prefixes_from_length //. }
+      { rewrite drop_app_length // length_map !prefixes_from_length //. }
       iInduction efs as [|ef efs] "IH" forall (t); first done.
       rewrite /= !drop_app_length //=.
       iDestruct "H" as "[H1 H]". rewrite (right_id [] (++)). iFrame.

@@ -86,7 +86,7 @@ Section smaller_card_nat_finite.
       length (no_fin_make_list l n) = length l + n.
     Proof.
       induction n as [|n IHn]; [simpl; lia|].
-      simpl; rewrite app_length, IHn; simpl; lia.
+      simpl; rewrite length_app, IHn; simpl; lia.
     Qed.
 
     Lemma no_fin_make_list_prefix l n1 n2 :
