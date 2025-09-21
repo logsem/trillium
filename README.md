@@ -3,7 +3,7 @@
 Trillium is a higher-order concurrent separation logic for proving trace
 refinements between programs and models. The logic is
 built using the [Iris](https://iris-project.org) program logic framework and
-mechanized in the [Coq proof assistant](https://rocq-prover.org/).
+mechanized in the [Rocq proof assistant](https://rocq-prover.org/).
 
 ## Directory Structure
 
@@ -65,5 +65,7 @@ After that, execute the following in the root of your project:
 ## Publications
 
 - Trillium: Higher-Order Concurrent and Distributed Separation Logic for Intensional Refinement.
-  Amin Timany, Simon Oddershede Gregersen, Léo Stefanesco, Jonas Kastberg Hinrichsen, Léon Gondelman, Abel Nieto, Lars Birkedal
+ 
+  Amin Timany, Simon Oddershede Gregersen, Léo Stefanesco, Jonas Kastberg Hinrichsen, Léon Gondelman, Abel Nieto, Lars Birkedal.
+  
   In POPL 2024: ACM SIGPLAN Symposium on Principles of Programming Languages
