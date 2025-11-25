@@ -284,7 +284,11 @@ Section adequacy.
     : ProgressResource state_interp (fun _ _ => ⌜ True ⌝%I) fork_post C :=
     {| pr_pr := (fun s etr Φs => wptp s (trace_last etr).1 Φs) |}. 
   Next Obligation. 
-    intros. apply wptp_of_val_post.
+    intros. simpl.
+    iIntros "WPS TI".
+    iPoseProof (wptp_of_val_post with "WPS") as "PP".
+    iMod (pre_step_elim with "[$TI] [$]") as "(TI & POSTS & CLOS)".
+    iModIntro. iFrame.  
   Qed.
   Next Obligation. 
     clear R FILTER_PCL C_DEC.

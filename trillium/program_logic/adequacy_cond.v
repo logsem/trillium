@@ -184,10 +184,12 @@ Record ProgressResource {Λ} {M} {Σ} {Hinv : invGS_gen HasNoLc Σ}
   pr_pr :> stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ;
 
   pr_irisG := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ;
-  pr_has_posts: forall s ex Φs,
+  pr_has_posts: forall s ex mtr Φs,
       C ex ->      
       let Ps := posts_of (trace_last ex).1 Φs in 
-      pr_pr s ex Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr s ex Φs);
+      (* pr_pr s ex Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr s ex Φs); *)
+      (** we might require both PR and SI for the exact trace *)
+      pr_pr s ex Φs -∗ state_interp ex mtr ={⊤}=∗ Ps ∗ state_interp ex mtr ∗ (Ps -∗ pr_pr s ex Φs); 
   pr_not_stuck: forall s ex Φs σ atr tp trest,
           valid_exec ex → trace_ends_in ex (tp ++ trest, σ) →
           C ex ->
@@ -333,15 +335,10 @@ Section StrongAdequacyHelpers.
       ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
   Proof using.
     iIntros "Hstep (HSI & HTI & WPS) FB". simpl. 
-    iPoseProof (pr_has_posts with "WPS") as "WPS"; [done| ].
-    (* replace stateI with state_interp by done. *)
-    iPoseProof (pre_step_elim with "[$HSI] WPS") as "foo".
-    (* rewrite /steps_from_inv. simpl. *)
-    (* iSpecialize ("HTI" with "[] []"). *)
-    (* 1, 2: by iPureIntro; red; eauto. *)
+    iPoseProof (pr_has_posts with "WPS HSI") as "WPS"; [done| ].
 
     iApply (f2b_helper with "[$]").
-    iMod "foo" as "[HSI [POSTS WPS']]". iModIntro. iIntros "FB".
+    iMod "WPS" as "(POSTS & HSI & CLOS)". iModIntro. iIntros "FB".
 
     iDestruct ("Hstep" with "[] [] [] HSI") as "H"; [iPureIntro..|].
     - repeat split; eauto. 
@@ -393,13 +390,12 @@ Section StrongAdequacyHelpers.
       
     iIntros "(Hstep & PRE & _)".
     iDestruct "PRE" as "(HSI & HTI & Htp)".
-      
-    iPoseProof (pr_has_posts with "Htp") as "Htp"; [done| ]. 
-    replace stateI with state_interp by done.
-    iMod (pre_step_elim with "[$HSI] Htp") as "[HSI Htp]".
-    iDestruct ("Htp") as "(Hpost & Hback)".
+
+    replace stateI with state_interp by done. 
+    iPoseProof (pr_has_posts with "Htp HSI") as "Htp"; [done| ]. 
+    iMod "Htp"  as "(POSTS & HSI & CLOS)".
     
-    iDestruct ("Hstep" with "[] [] [] HSI [Hpost] [$]") as "Hξ"; eauto.
+    iDestruct ("Hstep" with "[] [] [] HSI [POSTS] [$]") as "Hξ"; eauto.
     { erewrite first_eq_trace_starts_in; eauto. }
     iApply fupd_plain_mask. done. 
   Qed.
@@ -556,8 +552,9 @@ Section StrongAdequacyHelpers.
   iDestruct "H" as (δ'' ℓ) "(HSI & #HTI' & Hpost)"; simpl in *.
 
   replace stateI with state_interp by done.
-  iPoseProof (pr_has_posts with "Hpost") as "Hpost"; [done| ].
-  iMod (pre_step_elim with "[$HSI] Hpost") as "[HSI Hback]".
+  iPoseProof (pr_has_posts with "Hpost HSI") as "Hpost"; [done| ].
+  iMod "Hpost"  as "(POSTS & HSI & Hback)".
+  iSpecialize ("Hback" with "[$]"). 
 
   iModIntro. iIntros "HFtB".
  
@@ -568,8 +565,8 @@ Section StrongAdequacyHelpers.
     iPoseProof (ref_preserved' with "[$] [HSI HTI Hback] [$]") as "#Hextend"; eauto.
     { iFrame. iFrame "HTI'".
         
-      iDestruct "Hback" as "[X Y]".
-      iSpecialize ("Y" with "X").
+      (* iDestruct "Hback" as "[X Y]". *)
+      (* iSpecialize ("Y" with "X"). *)
       subst c. rewrite Hc1 in Hstep. 
       opose proof (locales_rewrite _ _ _ Htake Htakelen _ _ _) as Hlocales.
       { rewrite <- surjective_pairing. eauto. }
@@ -586,8 +583,8 @@ Section StrongAdequacyHelpers.
     rewrite -Hc1 in Hlocales.
     (* subst c. *)
     (* rewrite Hc. *)
-    iDestruct "Hback" as "(Hpost & Hwptp)".
-    iSpecialize ("Hwptp" with "[$]").
+    (* iDestruct "Hback" as "(Hpost & Hwptp)". *)
+    (* iSpecialize ("Hwptp" with "[$]"). *)
     rewrite Hc. simpl.
     simpl in Hlocales. 
     rewrite -app_assoc.
