@@ -161,6 +161,88 @@ Section AdequacyGen.
     do 2 (erewrite inflist_drop_next in CIH; eauto).
   Qed.
 
+  (* TODO: move *)
+  Lemma from_trace_cons_simpl {St L: Type} tr (s: St) (l: L):
+    from_trace (s -[l]-> tr) = infcons (l, trfirst tr) (from_trace tr). 
+  Proof using.
+    by rewrite (inflist_unfold_fold (from_trace (s -[ l ]-> tr))).
+  Qed.
+
+  (* TODO: move *)
+  Lemma trace_take_fwd_short {St L: Type} (tr: trace St L) j
+    (SHORT: inflist_drop j (from_trace tr) = infnil):
+  trace_take_fwd (S j) tr = trace_take_fwd j tr.
+  Proof using.
+    clear -SHORT.
+    revert SHORT. generalize dependent tr. induction j.
+    { intros. rewrite inflist_drop_0 in SHORT.
+      destruct tr; try done.
+      simpl in SHORT. by rewrite from_trace_cons_simpl in SHORT. }
+    intros. destruct tr; try done.
+    rewrite trace_take_fwd_step. rewrite IHj.
+    2: { done. }
+    simpl. done.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma trace_take_fwd_short' {St L: Type} (tr: trace St L) j i
+    (SHORT: inflist_drop j (from_trace tr) = infnil)
+    (LE: j <= i):
+  trace_take_fwd i tr = trace_take_fwd j tr.
+  Proof using.
+    clear -SHORT LE. apply Nat.le_sum in LE as [d ->].    
+    generalize dependent j. induction d.
+    { intros. by rewrite Nat.add_0_r. }
+    intros.
+
+    specialize (IHd j ltac:(eauto)).
+    rewrite -IHd.
+    rewrite Nat.add_succ_r. apply trace_take_fwd_short.
+    rewrite Nat.add_comm inflist_drop_add SHORT.
+    destruct d; done. 
+  Qed.
+
+  (* TODO: move, find existing? *)
+  Definition int_ref_inf {St1 L1 St2 L2}  (tr1: trace St1 L1) (tr2: trace St2 L2)
+    (R: finite_trace St1 L1 -> finite_trace St2 L2 -> Prop) :=
+    forall i, R (trace_take_fwd i tr1) (trace_take_fwd i tr2).    
+
+  (* TODO: ? move *)
+  Lemma vist_int_ref_inf etr mtr
+    (MATCH:
+    valid_inf_system_trace
+      (λ (etr : execution_trace Λ) (atr : auxiliary_trace M), R etr atr)
+      (trace_take_fwd 0 etr) (trace_take_fwd 0 mtr) (from_trace etr)
+      (from_trace mtr)):
+    int_ref_inf etr mtr R.
+  Proof using.
+    red. 
+    intros. clear -i MATCH.
+
+    revert MATCH.
+    replace (from_trace etr) with (inflist_drop 0 (from_trace etr)) by done.
+    replace (from_trace mtr) with (inflist_drop 0 (from_trace mtr)) by done.
+    
+    remember 0 as j. assert (j <= i) by lia. clear Heqj.
+    apply Nat.le_sum in H as [d ->].
+    
+    generalize dependent etr.
+    generalize dependent mtr. 
+    generalize dependent j.
+    induction d.
+    - intros. rewrite Nat.add_0_r.
+      eapply valid_inf_system_trace_inv; eauto. 
+    - intros. inversion MATCH; subst; try done.
+      + do 2 (erewrite trace_take_fwd_short' with (i := j + S d); [| by eauto| lia]).
+        done.           
+      + replace (j + S d) with (S j + d) by lia.
+        erewrite <- ttf_inf_prepend_rewrite in H6; [| done]. 
+        erewrite <- ttf_inf_prepend_rewrite in H6; [| done].
+        apply inflist_drop_next in H, H0.
+        subst.
+        eauto.
+  Qed.
+
   Theorem PR_strong_simulation_adequacy_traces_multiple Σ
     `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) 
     es σ1 (s1: M)
@@ -188,7 +270,10 @@ Section AdequacyGen.
     em_is_init_st (es, σ1) s1 ->
     (PR_premise_multiple Σ s es σ1 s1 p) ->
     (∃ (mtr : trace (mstate M) (mlabel M)), 
-      traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ trfirst mtr = s1) \/
+      traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ 
+      trfirst mtr = s1 /\
+      int_ref_inf extr mtr R
+    ) \/
     exists k, ¬ C (trace_take_fwd k extr). 
   Proof.
     intros ? Hfin INIT Hwp.
@@ -229,6 +314,9 @@ Section AdequacyGen.
 
     apply vist_strenghten in MATCH.
     2: { intros. apply NNP_P. eauto. }
+
+    apply and_assoc. split.
+    2: { by apply vist_int_ref_inf. }
 
     eapply (valid_inf_system_trace_implies_traces_match
                        valid_step                       
@@ -353,7 +441,9 @@ Section adequacy.
     em_is_init_st (es, σ1) s1 ->
     (wp_premise_multiple Σ s es σ1 s1 p) ->
     (∃ (mtr : trace (mstate M) (mlabel M)), 
-      traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ trfirst mtr = s1) \/
+      traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\
+      trfirst mtr = s1 /\
+      int_ref_inf extr mtr R) \/
     exists k, ¬ C (trace_take_fwd k extr). 
   Proof.
     intros. apply wp_PR_premise in H2.
