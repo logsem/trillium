@@ -258,8 +258,43 @@ Section TraceTake.
     destruct d; done. 
   Qed.
 
-End TraceTake.
+  Lemma ft_prepend_lookup_0 (tr: finite_trace S L) s l:
+    ft_prepend tr s l !! 0 = Some s.
+  Proof using.
+    induction tr.
+    { done. }
+    simpl.
+    rewrite trace_lookup_extend_lt; [done| ]. 
+    by apply trace_lookup_lt_Some.
+  Qed.
 
+  Lemma ft_prepend_length (tr: finite_trace S L) s l:
+    trace_length (ft_prepend tr s l) = Datatypes.S (trace_length tr).
+  Proof using.
+    generalize dependent s. generalize dependent l. induction tr.
+    { simpl. lia. }
+    intros. simpl. rewrite IHtr. lia.
+  Qed.
+
+  Lemma ft_prepend_lookup_S (tr: finite_trace S L) s l i:
+    ft_prepend tr s l !! (Datatypes.S i) = tr !! i.
+  Proof using.
+    generalize dependent i. induction tr.
+    { simpl. rewrite /lookup /trace_lookup. simpl.
+      destruct i; done. }
+    intros. simpl.
+    
+    simpl. rewrite /lookup. rewrite /trace_lookup. simpl.
+    replace (trace_length (ft_prepend tr s l)) with (Datatypes.S (trace_length tr)).
+    2: { by rewrite ft_prepend_length. } 
+
+    destruct (decide (trace_length tr = i)). 
+    - rewrite !bool_decide_true; try lia. done.
+    - rewrite !bool_decide_false; try lia.
+      erewrite IHtr. done.      
+  Qed.
+
+End TraceTake.
 
 
 Fixpoint trace_filter {S L} (f : S → L → Prop)

@@ -587,6 +587,47 @@ Section TracesMatch.
 
 End TracesMatch. 
 
+Section LookupFinTrace.
+  Context {S L: Type}. 
+
+  Lemma trace_take_fwd_lookup_Some (tr: trace S L) n i c
+    (ITH: trace_take_fwd n tr !! i = Some c):
+    tr S!! i = Some c.
+  Proof using.
+    generalize dependent c. generalize dependent n. generalize dependent tr.
+    induction i.
+    { intros [|] ??; destruct n; simpl; try done.
+      rewrite state_lookup_0. simpl.
+      by rewrite ft_prepend_lookup_0. } 
+    intros. destruct tr.
+    { destruct n; done. }
+    simpl. destruct n; [done| ].
+    rewrite state_lookup_cons.
+    simpl in ITH.
+    rewrite ft_prepend_lookup_S in ITH. eauto.
+  Qed.
+
+  Lemma trace_take_fwd_lookup_Some' (tr: trace S L) n i c
+    (ITH: tr S!! i = Some c)
+    (LE: i <= n):
+    trace_take_fwd n tr !! i = Some c. 
+  Proof using.
+    generalize dependent c. generalize dependent n. generalize dependent tr.
+    induction i.
+    { intros [|] ??; destruct n; simpl; try done.
+      rewrite state_lookup_0. simpl.
+      by rewrite ft_prepend_lookup_0. } 
+    intros. destruct tr.
+    { destruct n; done. }
+    simpl. destruct n.
+    { lia. }
+    rewrite state_lookup_cons in ITH.
+    simpl. 
+    rewrite ft_prepend_lookup_S.
+    eapply IHi; eauto. lia. 
+  Qed.
+
+End LookupFinTrace.
 
 Section UptoStutter.
   Context {St S' L L' : Type}.
@@ -697,4 +738,4 @@ Section ValidTracesProperties.
     apply state_label_lookup. eauto.
   Qed.      
   
-End ValidTracesProperties. 
+End ValidTracesProperties.

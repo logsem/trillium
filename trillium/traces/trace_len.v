@@ -1,6 +1,6 @@
 From stdpp Require Import decidable option ssreflect.
 From Stdlib Require Import Arith.
-From trillium.traces Require Import my_omega inftraces utils_logic.
+From trillium.traces Require Import my_omega inftraces utils_logic trace_utils trace.
 Import numbers.
 
 Section TraceLen.
@@ -166,6 +166,56 @@ Section TraceLen.
   Qed. 
 
 End TraceLen.
+
+
+Section TraceTakeLen.
+  Context {St L: Type}. 
+ 
+  Lemma trace_take_fwd_length n (tr: trace St L) len
+    (LEN: trace_len_is tr len):
+    trace_length (trace_take_fwd n tr) = 
+    match len with | my_omega.NOnum l => min l (S n) | my_omega.NOinfinity => S n end.
+  Proof using.
+    clear -LEN. 
+    destruct len; simpl.
+    { generalize dependent tr. 
+      induction n.
+      { simpl. destruct tr; simpl; lia. }
+      intros tr INF. 
+      simpl.
+      destruct tr.
+      { pose proof (@trace_len_singleton _ L s).
+        eapply trace_len_uniq in INF; eauto. done. }
+      simpl. rewrite ft_prepend_length.
+      f_equal. apply IHn.
+      eapply trace_infinite_cons; eauto. }
+    generalize dependent n0. generalize dependent tr.
+    induction n.
+    { intros. simpl.
+      apply trace_len_gt_0 in LEN. simpl in LEN.
+      destruct tr; simpl; lia. }
+    intros tr l LEN.
+    pose proof LEN as NZ%trace_len_gt_0. simpl in NZ. destruct l; [lia| ].  
+    destruct tr.
+    2: { simpl. rewrite ft_prepend_length.
+         f_equal. apply IHn.
+         apply trace_len_tail in LEN. eauto. }
+    simpl.
+    pose proof (@trace_len_singleton _ L s) as LEN'. 
+    eapply trace_len_uniq in LEN; eauto.
+    inversion LEN. subst. lia.
+  Qed.
+
+  Lemma trace_take_fwd_length_bound n (tr: trace St L):
+    trace_length (trace_take_fwd n tr) <= S n. 
+  Proof using.
+    clear -tr. 
+    pose proof (trace_has_len tr) as [??].
+    erewrite trace_take_fwd_length; eauto.
+    destruct x; lia.
+  Qed.  
+
+End TraceTakeLen.
 
 
 Section TracesMatch.
