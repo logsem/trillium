@@ -115,6 +115,16 @@ Section ectxi_language.
     head_step (fill_item Ki e) σ1 e2 σ2 efs → is_Some (to_val e).
   Proof. apply ectxi_language_mixin. Qed.
 
+  (* TODO: upstream *)
+  Lemma fill_item_not_val i e
+    (NVAL: to_val e = None):
+    to_val (fill_item i e) = None.
+  Proof using.
+    destruct (to_val (fill_item _ _)) eqn:V; [| done].
+    apply mk_is_Some, fill_item_val in V.
+    destruct V. set_solver.
+  Qed.
+
   Definition fill (K : ectx) (e : expr Λ) : expr Λ := foldl (flip fill_item) e K.
 
   Lemma fill_app (K1 K2 : ectx) e : fill (K1 ++ K2) e = fill K2 (fill K1 e).

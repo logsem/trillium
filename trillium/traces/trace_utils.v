@@ -221,6 +221,43 @@ Section TraceTake.
     done.
   Qed.
 
+  Lemma from_trace_cons_simpl tr (s: S) (l: L):
+    from_trace (s -[l]-> tr) = infcons (l, trfirst tr) (from_trace tr). 
+  Proof using.
+    by rewrite (inflist_unfold_fold (from_trace (s -[ l ]-> tr))).
+  Qed.
+
+  Lemma trace_take_fwd_short tr j
+    (SHORT: inflist_drop j (from_trace tr) = infnil):
+  trace_take_fwd (Datatypes.S j) tr = trace_take_fwd j tr.
+  Proof using.
+    revert SHORT. generalize dependent tr. induction j.
+    { intros. rewrite inflist_drop_0 in SHORT.
+      destruct tr; try done.
+      simpl in SHORT. by rewrite from_trace_cons_simpl in SHORT. }
+    intros. destruct tr; try done.
+    rewrite trace_take_fwd_step. rewrite IHj.
+    2: { done. }
+    simpl. done.
+  Qed. 
+
+  Lemma trace_take_fwd_short' tr j i
+    (SHORT: inflist_drop j (from_trace tr) = infnil)
+    (LE: j <= i):
+  trace_take_fwd i tr = trace_take_fwd j tr.
+  Proof using.
+    apply Nat.le_sum in LE as [d ->].
+    generalize dependent j. induction d.
+    { intros. by rewrite Nat.add_0_r. }
+    intros.
+
+    specialize (IHd j ltac:(eauto)).
+    rewrite -IHd.
+    rewrite Nat.add_succ_r. apply trace_take_fwd_short.
+    rewrite Nat.add_comm inflist_drop_add SHORT.
+    destruct d; done. 
+  Qed.
+
 End TraceTake.
 
 

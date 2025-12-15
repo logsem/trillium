@@ -517,6 +517,28 @@ Proof using.
   constructor; eauto.
 Qed.
 
+
+Lemma traces_match_impl_strong {S1 S2 L1 L2}
+  Rℓ1 Rs1 Rℓ2 Rs2
+  (trans1 trans1': S1 -> L1 -> S1 -> Prop)
+  (trans2 trans2': S2 -> L2 -> S2 -> Prop)
+  tr1 tr2:
+  (∀ ℓ1 ℓ2, Rℓ1 ℓ1 ℓ2 → Rℓ2 ℓ1 ℓ2) →
+  (∀ s1 s2, Rs1 s1 s2 → Rs2 s1 s2) →
+  (forall s ℓ s', trans1 s ℓ s' -> trans1' s ℓ s') ->
+  (forall s ℓ s', trans2 s ℓ s' -> trans2' s ℓ s') ->
+  traces_match Rℓ1 Rs1 trans1 trans2 tr1 tr2 →
+  traces_match Rℓ2 Rs2 trans1' trans2' tr1 tr2.
+Proof.
+  intros HRℓ HRs T1 T2. revert tr1 tr2. cofix IH. intros tr1 tr2 Hmatch.
+  inversion Hmatch; simplify_eq.
+  - constructor 1. by apply HRs.
+  - constructor 2; [by apply HRℓ|by apply HRs|..].
+    3: by apply IH.
+    all: eauto. 
+Qed.
+
+
 Definition oleq (a b : option nat) : Prop :=
   match a, b with
   | Some x, Some y => x ≤ y

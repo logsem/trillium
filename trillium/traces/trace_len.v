@@ -156,6 +156,15 @@ Section TraceLen.
     - intros -> ?. by apply LEN.
   Qed.     
 
+  Lemma trace_infinite_cons (tr: trace St L) s l:
+    trace_len_is tr my_omega.NOinfinity <-> trace_len_is (tr_cons s l tr) my_omega.NOinfinity.
+  Proof using.
+    clear. 
+    split; intros LEN. 
+    - eapply trace_len_cons in LEN; eauto.
+    - eapply trace_len_tail in LEN; eauto.
+  Qed. 
+
 End TraceLen.
 
 

@@ -805,6 +805,13 @@ Section trace_length_lookup.
     - rewrite /lookup /= bool_decide_eq_true_2; auto with lia.
   Qed.
 
+  Lemma ft_lookup_old (tr : finite_trace A L) s l i c
+    (ITH: tr !! i = Some c):
+    (tr :tr[ l ]: s) !! i = Some c.
+  Proof using. 
+    rewrite trace_lookup_extend_lt; [done| ]. 
+    by apply trace_lookup_lt_Some.
+  Qed.
 
   Lemma trace_lookup_append_list ft l i : i < trace_length ft → (ft +trl+ l) !! i = ft !! i.
   Proof.

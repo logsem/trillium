@@ -669,6 +669,13 @@ Section adequacy_helper_lemmas.
     ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
         (prefixes_from t (newelems t t'))).
 
+  Lemma newelems_app_drop {A: Type} (t1 t1' t2: list A)
+    (LEN: length t1' = length t1):
+    newelems t1 (t1' ++ t2) = t2.
+  Proof using.
+    rewrite /newelems. by list_simplifier.
+  Qed.
+
   Lemma newposts_locales_equiv_helper (t0 t0' t1 t1' t : list (expr Λ)):
     length t1 = length t1' ->
     locales_equiv t0 t0' ->
@@ -718,6 +725,16 @@ Section adequacy_helper_lemmas.
   Lemma newposts_same_empty t:
     newposts t t = [].
   Proof. rewrite /newposts /newelems. rewrite drop_ge //. Qed.
+
+  Lemma locales_of_list_from_app' (tp0 tp1 tp2: list (expr Λ)):
+    locales_of_list_from tp0 (tp1 ++ tp2) =
+    locales_of_list_from tp0 tp1 ++
+    locales_of_list_from (tp0 ++ tp1) tp2.
+  Proof using.
+    rewrite /adequacy_utils.locales_of_list_from.
+    rewrite !prefixes_from_app.
+    by rewrite !fmap_app.
+  Qed.
 
 End adequacy_helper_lemmas.
 

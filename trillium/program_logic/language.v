@@ -369,6 +369,16 @@ Section language.
     - destruct (decide (to_val e = None)); eauto using reducible_fill_inv.
   Qed.
 
+  Lemma not_stuck_fill (ec: expr Λ) K σ
+    (NS: not_stuck ec σ)
+    (NV: to_val ec = None):
+  not_stuck (ectx_fill K ec) σ.
+  Proof using.
+    destruct NS as [VAL | RED]. 
+    - simpl in VAL. rewrite NV in VAL. red in VAL. set_solver. 
+    - red. right. eapply reducible_fill; eauto.
+  Qed.
+
   Lemma stuck_fill K e σ :
     stuck e σ → stuck (ectx_fill K e) σ.
   Proof. rewrite -!not_not_stuck. eauto using not_stuck_fill_inv. Qed.

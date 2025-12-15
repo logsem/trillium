@@ -1,7 +1,7 @@
 From stdpp Require Import fin_maps.
 From iris.proofmode Require Import tactics.
 From trillium.traces Require Export traces_match trace_utils exec_traces trace_len.
-From trillium.program_logic Require Export weakestpre adequacy_cond iris_em.
+From trillium.program_logic Require Export weakestpre adequacy_cond iris_em int_ref.
 
 
 Section AdequacyGen.
@@ -161,52 +161,6 @@ Section AdequacyGen.
     do 2 (erewrite inflist_drop_next in CIH; eauto).
   Qed.
 
-  (* TODO: move *)
-  Lemma from_trace_cons_simpl {St L: Type} tr (s: St) (l: L):
-    from_trace (s -[l]-> tr) = infcons (l, trfirst tr) (from_trace tr). 
-  Proof using.
-    by rewrite (inflist_unfold_fold (from_trace (s -[ l ]-> tr))).
-  Qed.
-
-  (* TODO: move *)
-  Lemma trace_take_fwd_short {St L: Type} (tr: trace St L) j
-    (SHORT: inflist_drop j (from_trace tr) = infnil):
-  trace_take_fwd (S j) tr = trace_take_fwd j tr.
-  Proof using.
-    clear -SHORT.
-    revert SHORT. generalize dependent tr. induction j.
-    { intros. rewrite inflist_drop_0 in SHORT.
-      destruct tr; try done.
-      simpl in SHORT. by rewrite from_trace_cons_simpl in SHORT. }
-    intros. destruct tr; try done.
-    rewrite trace_take_fwd_step. rewrite IHj.
-    2: { done. }
-    simpl. done.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma trace_take_fwd_short' {St L: Type} (tr: trace St L) j i
-    (SHORT: inflist_drop j (from_trace tr) = infnil)
-    (LE: j <= i):
-  trace_take_fwd i tr = trace_take_fwd j tr.
-  Proof using.
-    clear -SHORT LE. apply Nat.le_sum in LE as [d ->].    
-    generalize dependent j. induction d.
-    { intros. by rewrite Nat.add_0_r. }
-    intros.
-
-    specialize (IHd j ltac:(eauto)).
-    rewrite -IHd.
-    rewrite Nat.add_succ_r. apply trace_take_fwd_short.
-    rewrite Nat.add_comm inflist_drop_add SHORT.
-    destruct d; done. 
-  Qed.
-
-  (* TODO: move, find existing? *)
-  Definition int_ref_inf {St1 L1 St2 L2}  (tr1: trace St1 L1) (tr2: trace St2 L2)
-    (R: finite_trace St1 L1 -> finite_trace St2 L2 -> Prop) :=
-    forall i, R (trace_take_fwd i tr1) (trace_take_fwd i tr2).    
-
   (* TODO: ? move *)
   Lemma vist_int_ref_inf etr mtr
     (MATCH:
@@ -214,7 +168,7 @@ Section AdequacyGen.
       (λ (etr : execution_trace Λ) (atr : auxiliary_trace M), R etr atr)
       (trace_take_fwd 0 etr) (trace_take_fwd 0 mtr) (from_trace etr)
       (from_trace mtr)):
-    int_ref_inf etr mtr R.
+    int_ref_inf R etr mtr.
   Proof using.
     red. 
     intros. clear -i MATCH.
@@ -272,7 +226,7 @@ Section AdequacyGen.
     (∃ (mtr : trace (mstate M) (mlabel M)), 
       traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ 
       trfirst mtr = s1 /\
-      int_ref_inf extr mtr R
+      int_ref_inf R extr mtr
     ) \/
     exists k, ¬ C (trace_take_fwd k extr). 
   Proof.
@@ -443,7 +397,7 @@ Section adequacy.
     (∃ (mtr : trace (mstate M) (mlabel M)), 
       traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\
       trfirst mtr = s1 /\
-      int_ref_inf extr mtr R) \/
+      int_ref_inf R extr mtr) \/
     exists k, ¬ C (trace_take_fwd k extr). 
   Proof.
     intros. apply wp_PR_premise in H2.
