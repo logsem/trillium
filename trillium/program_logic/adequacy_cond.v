@@ -181,34 +181,35 @@ Record ProgressResource {Λ} {M} {Σ} {Hinv : invGS_gen HasNoLc Σ}
   (post : locale Λ → val Λ → iProp Σ)
   (C: execution_trace Λ → Prop)
   := {  
-  pr_pr :> stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ;
+  pr_pr :> stuckness -> forks_bit -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ;
 
   pr_irisG := {| iris_invGS := Hinv; state_interp := stateI; fork_post := post |} : irisG Λ M Σ;
-  pr_has_posts: forall s ex mtr Φs,
+  pr_has_posts: forall s f ex mtr Φs,
       C ex ->      
       let Ps := posts_of (trace_last ex).1 Φs in 
       (* pr_pr s ex Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr s ex Φs); *)
       (** we might require both PR and SI for the exact trace *)
-      pr_pr s ex Φs -∗ state_interp ex mtr ={⊤}=∗ Ps ∗ state_interp ex mtr ∗ (Ps -∗ pr_pr s ex Φs); 
-  pr_not_stuck: forall s ex Φs σ atr tp trest,
+      pr_pr s f ex Φs -∗ state_interp ex mtr ={⊤}=∗ Ps ∗ state_interp ex mtr ∗ (Ps -∗ pr_pr s f ex Φs); 
+  pr_not_stuck: forall s f ex Φs σ atr tp trest,
           valid_exec ex → trace_ends_in ex (tp ++ trest, σ) →
           C ex ->
-          state_interp ex atr -∗ pr_pr s ex Φs ={⊤}=∗
-          state_interp ex atr ∗ pr_pr s ex Φs ∗
+          state_interp ex atr -∗ pr_pr s f ex Φs ={⊤}=∗
+          state_interp ex atr ∗ pr_pr s f ex Φs ∗
           ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝;
-  pr_take_step: forall s ex Φs c oζ c' atr,
+  pr_take_step: forall s f ex Φs c oζ c' atr,
     valid_exec ex → trace_ends_in ex c → locale_step c oζ c' →
     config_wp -∗
     state_interp ex atr -∗
     trace_inv ex atr -∗
-    pr_pr s ex Φs -∗
+    pr_pr s f ex Φs -∗
     ⌜ C (ex :tr[ oζ ]: c') ⌝
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length ex)) |={∅,⊤}=>
     ⌜∀ e2, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
+    ⌜ f = CannotFork -> length c'.1 = length c.1 ⌝ ∗ 
     ∃ δ' ℓ,
       state_interp (trace_extend ex oζ c') (trace_extend atr ℓ δ') ∗
       trace_inv (trace_extend ex oζ c') (trace_extend atr ℓ δ') ∗
-      pr_pr s (trace_extend ex oζ c') (Φs ++ newposts c.1 c'.1);
+      pr_pr s f (trace_extend ex oζ c') (Φs ++ newposts c.1 c'.1);
 
   (** pr_take_step requires inv for current traces and returns inv for extended ones.
       At some point in the proofs, we need the former again.
@@ -240,29 +241,29 @@ Section StrongAdequacyHelpers.
 
   Context (PR: ProgressResource stateI trace_inv post C).
 
-  Definition cur_tr_repr_impl s Φs ex atr: iProp Σ :=
+  Definition cur_tr_repr_impl s f Φs ex atr: iProp Σ :=
     let c0 := trace_first ex in 
     let c1 := trace_last ex in 
     stateI ex atr ∗ 
     (* steps_from_inv trace_inv ex atr ∗  *)
     trace_inv ex atr ∗
-    PR s ex (all_posts c1.1 c0.1 Φs).
+    PR s f ex (all_posts c1.1 c0.1 Φs).
 
-  Definition cur_tr_repr s Φs ex atr: iProp Σ :=
-    ⌜ C ex ⌝ → cur_tr_repr_impl s Φs ex atr.
+  Definition cur_tr_repr s f Φs ex atr: iProp Σ :=
+    ⌜ C ex ⌝ → cur_tr_repr_impl s f Φs ex atr.
 
   Lemma init_st_into_trace
-    s es σ δ
+    s f es σ δ
     (Hes : length es ≥ 1)
     (Φs : list (val Λ → iProp Σ)):
     stateI {tr[ (es, σ) ]} {tr[ δ ]} -∗ 
-    PR s {tr[ (es, σ) ]} Φs -∗
+    PR s f {tr[ (es, σ) ]} Φs -∗
     trace_inv {tr[ (es, σ) ]} {tr[ δ ]} -∗
     ∃ (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ)) (atr : auxiliary_trace M)
       (c1 : list (expr Λ) * state Λ) (δ1 : M),
       ⌜{tr[ (es, σ) ]} = ex⌝ ∗ ⌜{tr[ δ ]} = atr⌝ ∗
     ⌜(es, σ) = c1⌝ ∗ ⌜δ = δ1⌝ ∗ ⌜length c1.1 ≥ 1⌝ ∗
-    cur_tr_repr s Φs ex atr
+    cur_tr_repr s f Φs ex atr
   .
   Proof using.
     iIntros "? ? ?". 
@@ -311,7 +312,7 @@ Section StrongAdequacyHelpers.
   Qed.
 
   Lemma ref_preserved'
-    (s : stuckness) (es : list (expr Λ)) (σ : state Λ) (δ : M)    
+    (s : stuckness) f (es : list (expr Λ)) (σ : state Λ) (δ : M)    
     (Φs : list (val Λ → iProp Σ))    
     ex atr
   (Hv : valid_system_trace ex atr)
@@ -330,7 +331,7 @@ Section StrongAdequacyHelpers.
   (ℓ : mlabel M)
   (FIT: C (ex :tr[ oζ ]: c')):
       rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-      cur_tr_repr_impl s Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') -∗
+      cur_tr_repr_impl s f Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') -∗
       fupd_to_bupd ⊤ -∗
       ▷ ⌜ξ (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'')⌝.
   Proof using.
@@ -357,17 +358,17 @@ Section StrongAdequacyHelpers.
   Qed.
 
   Lemma get_current_facts
-    s es σ δ
+    s f es σ δ
     (Φs : list (val Λ → iProp Σ))    
   (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ))
   (atr : auxiliary_trace M)
   (Hextras : tr_extras ξ (es, σ) δ ex atr)
   (FITS: C ex):
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-  cur_tr_repr_impl s Φs ex atr ={⊤}=∗
+  cur_tr_repr_impl s f Φs ex atr ={⊤}=∗
   ⌜ξ ex atr⌝ ∗
   rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ ∗
-  cur_tr_repr_impl s Φs ex atr ∗
+  cur_tr_repr_impl s f Φs ex atr ∗
   ⌜ ∀ e, e ∈ (trace_last ex).1 → s = NotStuck → not_stuck e (trace_last ex).2 ⌝.
   Proof using.
     iIntros "Hstep PRE". iDestruct "PRE" as "(HSI & HTI & Htp)".
@@ -452,7 +453,7 @@ Section StrongAdequacyHelpers.
       subst. eauto. 
   Qed.
 
-  Lemma strong_adequacy_trace s es σ δ
+  Lemma strong_adequacy_trace s f es σ δ
     (Hes : length es ≥ 1)
     (Φs : list (val Λ → iProp Σ))    
   (ex : finite_trace (list (expr Λ) * state Λ) (olocale Λ))
@@ -462,7 +463,7 @@ Section StrongAdequacyHelpers.
   {ML_INH: Inhabited (mlabel M)}:
     config_wp -∗ 
     rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ -∗
-    cur_tr_repr s Φs ex atr
+    cur_tr_repr s f Φs ex atr
     -∗
     |={⊤}=> fupd_to_bupd ⊤ -∗ Gsim_cond Σ M s ξ C ex atr.
   Proof using C_DEC.
@@ -548,7 +549,7 @@ Section StrongAdequacyHelpers.
     iApply ("IHlen" with "[$]"); done. }
 
   iApply (f2b_helper with "[$]"). 
-  iMod "Hstp" as "(% & H)".
+  iMod "Hstp" as "(% & %FF & H)".
   iDestruct "H" as (δ'' ℓ) "(HSI & #HTI' & Hpost)"; simpl in *.
 
   replace stateI with state_interp by done.
@@ -558,7 +559,7 @@ Section StrongAdequacyHelpers.
 
   iModIntro. iIntros "HFtB".
  
-  iAssert (cur_tr_repr s Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') ∗ fupd_to_bupd ⊤ ∗ rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ)%I
+  iAssert (cur_tr_repr s f Φs (ex :tr[ oζ ]: c') (atr :tr[ ℓ ]: δ'') ∗ fupd_to_bupd ⊤ ∗ rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ)%I
     with "[Hstep HSI HTI Hback HFtB]" as "(PRE' & HFtB & Hstep)".
   { pose proof Hextras as Htake%tr_extras_locales_equiv.
     pose proof Hextras as Htakelen%tr_extras_length_le.
@@ -605,7 +606,7 @@ End StrongAdequacyHelpers.
 
 
 Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
-        (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        (s: stuckness) (f: forks_bit) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         (C: execution_trace Λ → Prop)
         (* (PR: stuckness -> execution_trace Λ -> list (val Λ → iProp Σ) -> iProp Σ) *)
         `{forall ex, Decision (C ex)}
@@ -623,7 +624,7 @@ Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
        trace_inv (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       PR s (trace_singleton (es, σ)) Φs ∗
+       PR s f (trace_singleton (es, σ)) Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es, σ) δ
   ) →
   ⊢ Gsim_cond Σ M s ξ C (trace_singleton (es, σ)) (trace_singleton δ).
@@ -750,7 +751,7 @@ Theorem simulation_correspondence Λ M Σ `{!invGpreS Σ}
 Proof. by apply simulation_correspondence_multiple. Qed.
 
 Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         C
         `{forall ex, Decision (C ex)}
@@ -769,7 +770,7 @@ Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
        trace_inv (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       PR s (trace_singleton (es, σ)) Φs ∗
+       PR s f (trace_singleton (es, σ)) Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ) δ) →
   continued_simulation_cond ξ C (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
@@ -782,7 +783,7 @@ Qed.
 (* (same but for one initial thread)  *)
 
 Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         C
         `{forall ex, Decision (C ex)}
@@ -799,7 +800,7 @@ Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       PR s (trace_singleton (es, σ)) Φs ∗
+       PR s f (trace_singleton (es, σ)) Φs ∗
        rel_always_holds s Φs ξ (es, σ) δ) →
   continued_simulation_cond ξ C (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.

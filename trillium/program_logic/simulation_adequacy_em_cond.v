@@ -15,7 +15,8 @@ Section AdequacyGen.
                        
   Definition PR_premise_multiple
     (Σ: gFunctors)
-    (s: stuckness) es σ1 (s1: mstate M)
+    (s: stuckness) (f: forks_bit)
+    es σ1 (s1: mstate M)
     (p: em_init_param)
     := 
     (∀ `{Hinv : @IEMGS _ _ LG_EM EM Σ},
@@ -27,7 +28,7 @@ Section AdequacyGen.
               ∃ trace_inv
                 (PR: ProgressResource state_interp trace_inv fork_post C),
               config_wp ∗
-              PR s (trace_singleton (es, σ1)) Φs ∗
+              PR s f (trace_singleton (es, σ1)) Φs ∗
               trace_inv {tr[ (es, σ1) ]} {tr[ s1 ]} ∗
               rel_always_holds_with_trace_inv s trace_inv Φs R (es, σ1) s1)).
 
@@ -47,18 +48,19 @@ Section AdequacyGen.
   (* TODO: ? move this and PR_premise_multiple to adequacy_cond *)
   Theorem PR_strong_simulation_adequacy_general_multiple
     `{hPre: @IEMGpreS _ _ LG_EM EM Σ}
-    (s: stuckness) es σ1 (s1: M)
+    (s: stuckness) f
+    es σ1 (s1: M)
     (p: em_init_param)    
     :
     length es ≥ 1 ->
     rel_finitary R →
     em_is_init_st (es, σ1) s1 ->
     em_valid_state_evolution_fairness {tr[ (es, σ1) ]} {tr[ s1 ]} ->
-    (PR_premise_multiple Σ s es σ1 s1 p) ->
+    (PR_premise_multiple Σ s f es σ1 s1 p) ->
     continued_simulation_cond R C (trace_singleton (es, σ1)) (trace_singleton s1).
   Proof.
     intros LEN Hfin INIT VALID1 PRP.
-    apply (wp_strong_adequacy_multiple_with_trace_inv Λ M Σ s); try done.
+    apply (wp_strong_adequacy_multiple_with_trace_inv Λ M Σ s f); try done.
 
     iIntros (?) "".
 
@@ -80,7 +82,7 @@ Section AdequacyGen.
   Qed.
 
   Theorem strong_simulation_adequacy_inftraces_multiple Σ
-    `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) 
+    `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) f
     es σ1 (s1: M)
     (p: em_init_param)
     (iex : inf_execution_trace Λ)
@@ -89,7 +91,7 @@ Section AdequacyGen.
     length es ≥ 1 ->
     rel_finitary R →
     em_is_init_st (es, σ1) s1 ->
-    (PR_premise_multiple Σ s es σ1 s1 p) ->
+    (PR_premise_multiple Σ s f es σ1 s1 p) ->
     exists iatr,
       @valid_inf_system_trace _ M
         (@continued_simulation_cond Λ M R C)
@@ -198,7 +200,7 @@ Section AdequacyGen.
   Qed.
 
   Theorem PR_strong_simulation_adequacy_traces_multiple Σ
-    `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) 
+    `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) f
     es σ1 (s1: M)
     (p: em_init_param)
     extr
@@ -222,7 +224,7 @@ Section AdequacyGen.
     length es ≥ 1 ->
     rel_finitary R →
     em_is_init_st (es, σ1) s1 ->
-    (PR_premise_multiple Σ s es σ1 s1 p) ->
+    (PR_premise_multiple Σ s f es σ1 s1 p) ->
     (∃ (mtr : trace (mstate M) (mlabel M)), 
       traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ 
       trfirst mtr = s1 /\
@@ -308,7 +310,7 @@ Section adequacy.
                        
   Definition wp_premise_multiple
     (Σ: gFunctors)
-    (s: stuckness) es σ1 (s1: mstate M)
+    (s: stuckness) f es σ1 (s1: mstate M)
     (p: em_init_param)
     := 
     (∀ `{Hinv : @IEMGS _ _ LG_EM EM Σ},
@@ -318,13 +320,13 @@ Section adequacy.
            ={⊤}=∗
               let Φs := map (em_thread_post (em_GS0 := iem_fairnessGS _ _)) (locales_of_list es) in
               config_wp ∗
-              wptp s es Φs ∗
+              wptp s f es Φs ∗
               rel_always_holds s Φs R (es, σ1) s1)).
   
   Program Definition WptpPR {Σ} {Hinv : @IEMGS _ _ LG_EM EM Σ}
     (iG := IEM_irisG LG_EM EM)
     : ProgressResource state_interp (fun _ _ => ⌜ True ⌝%I) fork_post C :=
-    {| pr_pr := (fun s etr Φs => wptp s (trace_last etr).1 Φs) |}. 
+    {| pr_pr := (fun s f etr Φs => wptp s f (trace_last etr).1 Φs) |}. 
   Next Obligation. 
     intros. simpl.
     iIntros "WPS TI".
@@ -357,8 +359,8 @@ Section adequacy.
     setoid_rewrite bi.True_sep'. by rewrite H0.
   Qed.
 
-  Lemma wp_PR_premise Σ s es σ1 s1 p:
-    wp_premise_multiple Σ s es σ1 s1 p -> PR_premise_multiple R C Σ s es σ1 s1 p.
+  Lemma wp_PR_premise Σ s f es σ1 s1 p:
+    wp_premise_multiple Σ s f es σ1 s1 p -> PR_premise_multiple R C Σ s f es σ1 s1 p.
   Proof using.
     rewrite /wp_premise_multiple /PR_premise_multiple.
     iIntros (WPS ?) "(?&?)".
@@ -369,7 +371,7 @@ Section adequacy.
   Qed.
 
   Theorem strong_simulation_adequacy_traces_multiple Σ
-    `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) 
+    `{hPre: @IEMGpreS _ _ LG_EM EM Σ} (s: stuckness) f
     es σ1 (s1: M)
     (p: em_init_param)
     extr
@@ -393,7 +395,7 @@ Section adequacy.
     length es ≥ 1 ->
     rel_finitary R →
     em_is_init_st (es, σ1) s1 ->
-    (wp_premise_multiple Σ s es σ1 s1 p) ->
+    (wp_premise_multiple Σ s f es σ1 s1 p) ->
     (∃ (mtr : trace (mstate M) (mlabel M)), 
       traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\
       trfirst mtr = s1 /\

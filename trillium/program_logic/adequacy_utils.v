@@ -571,22 +571,23 @@ Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
 Section adequacy_helper_lemmas.
   Context `{!irisG Λ M Σ}.
 
-  Lemma wp_ctx_take_step s Φ ex atr tp1 K e1 tp2 σ1 e2 σ2 efs ζ:
+  Lemma wp_ctx_take_step s f Φ ex atr tp1 K e1 tp2 σ1 e2 σ2 efs ζ:
     let (E1, E2) := (ectx_fill K e1, ectx_fill K e2) in
     valid_exec ex →
     prim_step e1 σ1 e2 σ2 efs →
     trace_ends_in ex (tp1 ++ E1 :: tp2, σ1) →
     locale_of tp1 E1 = ζ ->
     state_interp ex atr -∗
-    WP e1 @ s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
+    WP e1 @ f; s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
                                              |={∅,⊤}=>
     ∃ δ' ℓ,
       state_interp (trace_extend ex (Some ζ) (tp1 ++ E2 :: tp2 ++ efs, σ2))
                    (trace_extend atr ℓ δ') ∗
-      WP e2 @ s; ζ; ⊤ {{ v, Φ v } } ∗
+      WP e2 @ f; s; ζ; ⊤ {{ v, Φ v } } ∗
       ([∗ list] i↦ef ∈ efs,
-        WP ef @ s; locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef; ⊤
-        {{ v, fork_post (locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef) v }}).
+        WP ef @ f; s; locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef; ⊤
+        {{ v, fork_post (locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef) v }}) ∗
+      ⌜ f = CannotFork -> efs = [] ⌝.
   Proof.
     iIntros (Hex Hstp Hei Hlocale) "HSI Hwp".
     rewrite wp_unfold /wp_pre.
@@ -603,35 +604,36 @@ Section adequacy_helper_lemmas.
     iModIntro; iExists _, _; iFrame; done.
   Qed.
 
-  Lemma wp_take_step s Φ ex atr tp1 e1 tp2 σ1 e2 σ2 efs ζ:
+  Lemma wp_take_step s f Φ ex atr tp1 e1 tp2 σ1 e2 σ2 efs ζ:
     valid_exec ex →
     prim_step e1 σ1 e2 σ2 efs →
     trace_ends_in ex (tp1 ++ e1 :: tp2, σ1) →
     locale_of tp1 e1 = ζ ->
     state_interp ex atr -∗
-    WP e1 @ s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
+    WP e1 @ f; s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
                                              |={∅,⊤}=>
     ∃ δ' ℓ,
       state_interp (trace_extend ex (Some ζ) (tp1 ++ e2 :: tp2 ++ efs, σ2))
                    (trace_extend atr ℓ δ') ∗
-      WP e2 @ s; ζ; ⊤ {{ v, Φ v } } ∗
+      WP e2 @ f; s; ζ; ⊤ {{ v, Φ v } } ∗
       ([∗ list] i↦ef ∈ efs,
-        WP ef @ s; locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef; ⊤
-        {{ v, fork_post (locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef) v }}).
+        WP ef @ f; s; locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef; ⊤
+        {{ v, fork_post (locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef) v }}) ∗
+      ⌜ f = CannotFork -> efs = [] ⌝.
   Proof.
     iIntros "**".
-    iPoseProof (wp_ctx_take_step _ _ _ _ _ ectx_emp with "[$] [$]") as "STEP".
+    iPoseProof (wp_ctx_take_step _ _ _ _ _ _ ectx_emp with "[$] [$]") as "STEP".
     all: rewrite ?ectx_fill_emp; eauto.
   Qed.
 
-  Lemma wp_not_stuck ex atr K tp1 tp2 σ e s Φ ζ :
+  Lemma wp_not_stuck ex atr K tp1 tp2 σ e s f Φ ζ :
     valid_exec ex →
     trace_ends_in ex (tp1 ++ ectx_fill K e :: tp2, σ) →
     locale_of tp1 e = ζ ->
     state_interp ex atr -∗
-    WP e @ s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
+    WP e @ f; s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
     state_interp ex atr ∗
-    WP e @ s; ζ; ⊤ {{ v, Φ v }} ∗
+    WP e @ f; s; ζ; ⊤ {{ v, Φ v }} ∗
     ⌜s = NotStuck → not_stuck e (trace_last ex).2⌝.
   Proof.
     iIntros (???) "HSI Hwp".
@@ -647,11 +649,11 @@ Section adequacy_helper_lemmas.
       iModIntro; destruct s; [iDestruct "Hs" as %?|]; iPureIntro; by eauto.
   Qed.
 
-  Lemma wp_of_val_post e s Φ ζ:
-    WP e @ s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
+  Lemma wp_of_val_post e s f Φ ζ:
+    WP e @ f; s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
     from_option (λ v, |~{⊤}~| Φ v) True (to_val e) ∗
     (from_option (λ v, |~{⊤}~| Φ v) True (to_val e) -∗
-     WP e @ s; ζ; ⊤ {{ v, Φ v }}).
+     WP e @ f; s; ζ; ⊤ {{ v, Φ v }}).
   Proof.
     iIntros "Hwp".
     rewrite wp_unfold /wp_pre.
@@ -795,8 +797,8 @@ Proof using.
 Qed.
 
 
-Notation wptp_from t0 s t Φs := ([∗ list] tp1_e;Φ ∈ (prefixes_from t0 t);Φs, WP tp1_e.2 @ s; locale_of tp1_e.1 tp1_e.2; ⊤ {{ Φ }})%I.
-Notation wptp s t Φs := (wptp_from [] s t Φs).
+Notation wptp_from t0 s f t Φs := ([∗ list] tp1_e;Φ ∈ (prefixes_from t0 t);Φs, WP tp1_e.2 @ f; s; locale_of tp1_e.1 tp1_e.2; ⊤ {{ Φ }})%I.
+Notation wptp s f t Φs := (wptp_from [] s f t Φs).
 
 Definition config_wp `{!irisG Λ M Σ} : iProp Σ :=
   □ ∀ ex atr c1 σ2 ,
@@ -815,9 +817,9 @@ Proof. apply _. Qed.
 Section Wptp.
   Context `{!irisG Λ M Σ}.
 
-  Lemma wptp_from_same_locales t0' t0 s tp Φs:
+  Lemma wptp_from_same_locales t0' t0 s f tp Φs:
     locales_equiv t0 t0' ->
-    wptp_from t0' s tp Φs -∗ wptp_from t0 s tp Φs.
+    wptp_from t0' s f tp Φs -∗ wptp_from t0 s f tp Φs.
   Proof.
     revert Φs t0 t0'. induction tp; intros Φs t0 t0'; iIntros (Hequiv) "H" =>//.
     simpl.
@@ -827,12 +829,12 @@ Section Wptp.
     apply locale_equiv =>//.
   Qed.
 
-  Lemma wptp_not_stuck ex atr σ tp t0 t0' trest s Φs :
+  Lemma wptp_not_stuck ex atr σ tp t0 t0' trest s f Φs :
     Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0') ->
     valid_exec ex →
     trace_ends_in ex (t0 ++ tp ++ trest, σ) →
-    state_interp ex atr -∗ wptp_from t0' s tp Φs ={⊤}=∗
-    state_interp ex atr ∗ wptp_from t0 s tp Φs ∗
+    state_interp ex atr -∗ wptp_from t0' s f tp Φs ={⊤}=∗
+    state_interp ex atr ∗ wptp_from t0 s f tp Φs ∗
     ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝.
   Proof.
     iIntros (Hsame Hexvalid Hex) "HSI Ht".
@@ -853,20 +855,20 @@ Section Wptp.
     - done.
   Qed.
 
-  Lemma wptp_not_stuck_same ex atr σ tp t0 trest s Φs :
+  Lemma wptp_not_stuck_same ex atr σ tp t0 trest s f Φs :
     valid_exec ex →
     trace_ends_in ex (t0 ++ tp ++ trest, σ) →
-    state_interp ex atr -∗ wptp_from t0 s tp Φs ={⊤}=∗
-    state_interp ex atr ∗ wptp_from t0 s tp Φs ∗
+    state_interp ex atr -∗ wptp_from t0 s f tp Φs ={⊤}=∗
+    state_interp ex atr ∗ wptp_from t0 s f tp Φs ∗
     ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝.
   Proof.
     iIntros (??) "??". iApply (wptp_not_stuck with "[$] [$]") =>//.
     eapply Forall2_lookup. intros i. destruct (prefixes t0 !! i) as [[??]|]; by constructor.
   Qed.
 
-  Lemma wptp_app' s t0 t1 Φs1 t2 Φs2
+  Lemma wptp_app' s f t0 t1 Φs1 t2 Φs2
     (MATCH1: length t1 = length Φs1):
-    wptp_from t0 s (t1 ++ t2) (Φs1 ++ Φs2) ⊢ wptp_from t0 s t1 Φs1 ∗ wptp_from (t0 ++ t1) s t2 Φs2. 
+    wptp_from t0 s f (t1 ++ t2) (Φs1 ++ Φs2) ⊢ wptp_from t0 s f t1 Φs1 ∗ wptp_from (t0 ++ t1) s f t2 Φs2. 
   Proof.
     rewrite prefixes_from_app.
     iIntros. iDestruct (big_sepL2_app_inv with "[$]") as "(?&?)".
@@ -874,33 +876,33 @@ Section Wptp.
     rewrite prefixes_from_length. tauto.  
   Qed.
 
-  Lemma wptp_app s t0 t1 t0t1 Φs1 t2 Φs2 :
+  Lemma wptp_app s f t0 t1 t0t1 Φs1 t2 Φs2 :
     t0t1 = t0 ++ t1 ->
-    wptp_from t0 s t1 Φs1 -∗ wptp_from t0t1 s t2 Φs2 -∗ wptp_from t0 s (t1 ++ t2) (Φs1 ++ Φs2).
+    wptp_from t0 s f t1 Φs1 -∗ wptp_from t0t1 s f t2 Φs2 -∗ wptp_from t0 s f (t1 ++ t2) (Φs1 ++ Φs2).
   Proof.
     iIntros (->) "H1 H2". rewrite prefixes_from_app.
     iApply (big_sepL2_app with "[H1] [H2]"); eauto.
   Qed.
 
-  Lemma wptp_cons_r s e Φ Φs t0 t1:
-    WP e @ s; locale_of (t0 ++ t1) e; ⊤ {{v, Φ v}} -∗ wptp_from t0 s t1 Φs
-                              -∗ wptp_from t0 s (t1 ++ [e]) (Φs ++ [Φ]).
+  Lemma wptp_cons_r s f e Φ Φs t0 t1:
+    WP e @ f; s; locale_of (t0 ++ t1) e; ⊤ {{v, Φ v}} -∗ wptp_from t0 s f t1 Φs
+                              -∗ wptp_from t0 s f (t1 ++ [e]) (Φs ++ [Φ]).
   Proof.
     iIntros "H1 H2". rewrite !prefixes_from_app.
     iApply (big_sepL2_app with "[H2] [H1]"); eauto.
     rewrite big_sepL2_singleton. done.
   Qed.
 
-  Lemma wptp_cons_l s e Φ t Φs t0:
-    WP e @ s; locale_of t0 e; ⊤ {{v, Φ v}} -∗
-    wptp_from (t0 ++[e]) s t Φs -∗
-    wptp_from t0 s (e :: t) (Φ :: Φs).
+  Lemma wptp_cons_l s f e Φ t Φs t0:
+    WP e @ f; s; locale_of t0 e; ⊤ {{v, Φ v}} -∗
+    wptp_from (t0 ++[e]) s f t Φs -∗
+    wptp_from t0 s f (e :: t) (Φ :: Φs).
   Proof. iIntros "? ?"; rewrite big_sepL2_cons; iFrame. Qed.
 
-  Lemma wptp_of_val_post t s Φs t0:
-    wptp_from t0 s t Φs -∗ |~{⊤}~|
+  Lemma wptp_of_val_post t s f Φs t0:
+    wptp_from t0 s f t Φs -∗ |~{⊤}~|
     posts_of t Φs ∗
-    (posts_of t Φs -∗ wptp_from t0 s t Φs).
+    (posts_of t Φs -∗ wptp_from t0 s f t Φs).
   Proof.
     iIntros "Ht"; simpl.
     iInduction t as [|e t IHt] "IH" forall (Φs t0); simpl.
@@ -926,11 +928,11 @@ Section Wptp.
       iSplitL "Hback"; [iApply "Hback"|iApply "Htback"]; iFrame; done.
   Qed.
 
-  Lemma new_threads_wptp_from s t efs:
+  Lemma new_threads_wptp_from s f t efs:
     (([∗ list] i ↦ ef ∈ efs,
-      WP ef @ s; locale_of (t ++ take i efs) ef ; ⊤
+      WP ef @ f; s; locale_of (t ++ take i efs) ef ; ⊤
       {{ v, fork_post (locale_of (t ++ take i efs) ef) v }})
-    ⊣⊢ wptp_from t s efs (newposts t (t ++ efs))).
+    ⊣⊢ wptp_from t s f efs (newposts t (t ++ efs))).
   Proof.
     (* TODO: factorize the two halves *)
     rewrite big_sepL2_alt; iSplit.
@@ -964,18 +966,19 @@ Section Wptp.
         rewrite /newposts /newelems. rewrite drop_app_length //.
   Qed.
 
-  Lemma take_step s Φs ex atr c c' oζ:
+  Lemma take_step s f Φs ex atr c c' oζ:
     valid_exec ex →
     trace_ends_in ex c →
     locale_step c oζ c' →
     config_wp -∗
     state_interp ex atr -∗
-    wptp s c.1 Φs ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length ex))
+    wptp s f c.1 Φs ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length ex))
                                              |={∅,⊤}=>
     ⌜∀ e2, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
+    ⌜ f = CannotFork -> length c'.1 = length c.1 ⌝ ∗ 
     ∃ δ' ℓ,
       state_interp (trace_extend ex oζ c') (trace_extend atr ℓ δ') ∗
-      wptp s  c'.1 (Φs ++ newposts c.1 c'.1). 
+      wptp s f c'.1 (Φs ++ newposts c.1 c'.1). 
   Proof.
     iIntros (Hexvalid Hexe Hstep) "config_wp HSI Hc1".
     inversion Hstep as
@@ -990,8 +993,8 @@ Section Wptp.
       iMod "He" as "He". iModIntro.
       iApply (step_fupdN_wand with "[He]"); first by iApply "He".
       iIntros "He".
-      iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs) /=".
-      iAssert (wptp_from (t1 ++ e2 :: t2) s efs (newposts (t1 ++ e2 :: t2) ((t1 ++ e2 :: t2) ++ efs)))
+      iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs & %FF) /=".
+      iAssert (wptp_from (t1 ++ e2 :: t2) s f efs (newposts (t1 ++ e2 :: t2) ((t1 ++ e2 :: t2) ++ efs)))
         with "[Hefs]" as "Hefs".
       { rewrite -new_threads_wptp_from. iApply (big_sepL_impl with "Hefs").
         iIntros "!#" (i e Hin) "Hwp". list_simplifier.
@@ -1021,6 +1024,9 @@ Section Wptp.
       iModIntro; simpl in *.
       iSplit.
       { iPureIntro; set_solver. }
+      iSplitR.
+      { iIntros (->). iPureIntro. rewrite FF; [| done].
+        by rewrite app_nil_r !length_app /=. } 
       iExists δ', ℓ.
       rewrite -!app_assoc.
       iFrame.
@@ -1044,6 +1050,7 @@ Section Wptp.
       iMod (pre_step_elim with "HSI Hc1") as "[HSI [Hc1posts Hc1back]]".
       iModIntro.
       iSplit; first by auto.
+      iSplitR; [done| ]. 
       iExists δ2, ℓ.
       rewrite newposts_same_empty. list_simplifier.
       iFrame.

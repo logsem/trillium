@@ -131,7 +131,7 @@ Section lemmas.
     ∀ Φ, ∀.. x, α x -∗ ▷ (∀.. y, β x y -∗ Φ (f x y)) -∗ WP e @ ζ {{ Φ }}.
   Proof.
     iIntros (?) "H"; iIntros (Φ x) "Hα HΦ".
-    iApply (wp_step_fupd _ _ ⊤ _ _ (∀.. y : TB, β x y -∗ Φ (f x y))
+    iApply (wp_step_fupd _ _ _ ⊤ _ _ (∀.. y : TB, β x y -∗ Φ (f x y))
       with "[$HΦ //]"); first done.
     iApply (atomic_wp_seq with "H Hα"); first done.
     iIntros (y) "Hβ HΦ". by iApply "HΦ".

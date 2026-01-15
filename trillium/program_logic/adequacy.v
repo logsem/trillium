@@ -32,8 +32,8 @@ Proof.
       rewrite ->Hends in Hlen. simpl in Hlen. lia.
 Qed.
 
-Notation wptp_from t0 s t Φs := ([∗ list] tp1_e;Φ ∈ (prefixes_from t0 t);Φs, WP tp1_e.2 @ s; locale_of tp1_e.1 tp1_e.2; ⊤ {{ Φ }})%I.
-Notation wptp s t Φs := (wptp_from [] s t Φs).
+Notation wptp_from t0 s f t Φs := ([∗ list] tp1_e;Φ ∈ (prefixes_from t0 t);Φs, WP tp1_e.2 @ f; s; locale_of tp1_e.1 tp1_e.2; ⊤ {{ Φ }})%I.
+Notation wptp s f t Φs := (wptp_from [] s f t Φs).
 
 Notation posts_of t Φs :=
   ([∗ list] vΦ ∈
@@ -55,6 +55,7 @@ Proof. apply _. Qed.
 #[global] Typeclasses Opaque config_wp.
 
 (* the guarded definition of simulation. *)
+(* TODO: remove unused stuckness bit*)
 Definition Gsim_pre Σ {Λ} (M : Model) (s : stuckness)
            (ξ : execution_trace Λ → auxiliary_trace M → Prop)
            (gsim : execution_trace Λ -d> auxiliary_trace M -d> iPropO Σ) :
@@ -614,21 +615,22 @@ Notation locales_equiv_prefix tp1 tp2 := (locales_equiv_prefix_from [] tp1 tp2).
 Section adequacy_helper_lemmas.
   Context `{!irisG Λ M Σ}.
 
-  Lemma wp_take_step s Φ ex atr tp1 e1 tp2 σ1 e2 σ2 efs ζ:
+  Lemma wp_take_step s f Φ ex atr tp1 e1 tp2 σ1 e2 σ2 efs ζ:
     valid_exec ex →
     prim_step e1 σ1 e2 σ2 efs →
     trace_ends_in ex (tp1 ++ e1 :: tp2, σ1) →
     locale_of tp1 e1 = ζ ->
     state_interp ex atr -∗
-    WP e1 @ s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
+    WP e1 @ f; s; ζ; ⊤ {{ v, Φ v } } ={⊤,∅}=∗ |={∅}▷=>^(S $ trace_length ex)
                                              |={∅,⊤}=>
     ∃ δ' ℓ,
       state_interp (trace_extend ex (Some ζ) (tp1 ++ e2 :: tp2 ++ efs, σ2))
                    (trace_extend atr ℓ δ') ∗
-      WP e2 @ s; ζ; ⊤ {{ v, Φ v } } ∗
+      WP e2 @ f; s; ζ; ⊤ {{ v, Φ v } } ∗
       ([∗ list] i↦ef ∈ efs,
-        WP ef @ s; locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef; ⊤
-        {{ v, fork_post (locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef) v }}).
+        WP ef @ f; s; locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef; ⊤
+        {{ v, fork_post (locale_of (tp1 ++ e1 :: tp2 ++ take i efs) ef) v }}) ∗
+      ⌜ f = CannotFork -> efs = [] ⌝.
   Proof.
     iIntros (Hex Hstp Hei Hlocale) "HSI Hwp".
     rewrite wp_unfold /wp_pre.
@@ -645,14 +647,14 @@ Section adequacy_helper_lemmas.
     iModIntro; iExists _, _; iFrame; done.
   Qed.
 
-  Lemma wp_not_stuck ex atr K tp1 tp2 σ e s Φ ζ :
+  Lemma wp_not_stuck ex atr K tp1 tp2 σ e s f Φ ζ :
     valid_exec ex →
     trace_ends_in ex (tp1 ++ ectx_fill K e :: tp2, σ) →
     locale_of tp1 e = ζ ->
     state_interp ex atr -∗
-    WP e @ s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
+    WP e @ f; s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
     state_interp ex atr ∗
-    WP e @ s; ζ; ⊤ {{ v, Φ v }} ∗
+    WP e @ f; s; ζ; ⊤ {{ v, Φ v }} ∗
     ⌜s = NotStuck → not_stuck e (trace_last ex).2⌝.
   Proof.
     iIntros (???) "HSI Hwp".
@@ -668,9 +670,9 @@ Section adequacy_helper_lemmas.
       iModIntro; destruct s; [iDestruct "Hs" as %?|]; iPureIntro; by eauto.
   Qed.
 
-  Lemma wptp_from_same_locales t0' t0 s tp Φs:
+  Lemma wptp_from_same_locales t0' t0 s f tp Φs:
     locales_equiv t0 t0' ->
-    wptp_from t0' s tp Φs -∗ wptp_from t0 s tp Φs.
+    wptp_from t0' s f tp Φs -∗ wptp_from t0 s f tp Φs.
   Proof.
     revert Φs t0 t0'. induction tp; intros Φs t0 t0'; iIntros (Hequiv) "H" =>//.
     simpl.
@@ -680,12 +682,12 @@ Section adequacy_helper_lemmas.
     apply locale_equiv =>//.
   Qed.
 
-  Lemma wptp_not_stuck ex atr σ tp t0 t0' trest s Φs :
+  Lemma wptp_not_stuck ex atr σ tp t0 t0' trest s f Φs :
     Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0') ->
     valid_exec ex →
     trace_ends_in ex (t0 ++ tp ++ trest, σ) →
-    state_interp ex atr -∗ wptp_from t0' s tp Φs ={⊤}=∗
-    state_interp ex atr ∗ wptp_from t0 s tp Φs ∗
+    state_interp ex atr -∗ wptp_from t0' s f tp Φs ={⊤}=∗
+    state_interp ex atr ∗ wptp_from t0 s f tp Φs ∗
     ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝.
   Proof.
     iIntros (Hsame Hexvalid Hex) "HSI Ht".
@@ -706,22 +708,22 @@ Section adequacy_helper_lemmas.
     - done.
   Qed.
 
-  Lemma wptp_not_stuck_same ex atr σ tp t0 trest s Φs :
+  Lemma wptp_not_stuck_same ex atr σ tp t0 trest s f Φs :
     valid_exec ex →
     trace_ends_in ex (t0 ++ tp ++ trest, σ) →
-    state_interp ex atr -∗ wptp_from t0 s tp Φs ={⊤}=∗
-    state_interp ex atr ∗ wptp_from t0 s tp Φs ∗
+    state_interp ex atr -∗ wptp_from t0 s f tp Φs ={⊤}=∗
+    state_interp ex atr ∗ wptp_from t0 s f tp Φs ∗
     ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝.
   Proof.
     iIntros (??) "??". iApply (wptp_not_stuck with "[$] [$]") =>//.
     eapply Forall2_lookup. intros i. destruct (prefixes t0 !! i) as [[??]|]; by constructor.
   Qed.
 
-  Lemma wp_of_val_post e s Φ ζ:
-    WP e @ s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
+  Lemma wp_of_val_post e s f Φ ζ:
+    WP e @ f; s; ζ; ⊤ {{ v, Φ v }} ={⊤}=∗
     from_option (λ v, |~{⊤}~| Φ v) True (to_val e) ∗
     (from_option (λ v, |~{⊤}~| Φ v) True (to_val e) -∗
-     WP e @ s; ζ; ⊤ {{ v, Φ v }}).
+     WP e @ f; s; ζ; ⊤ {{ v, Φ v }}).
   Proof.
     iIntros "Hwp".
     rewrite wp_unfold /wp_pre.
@@ -734,33 +736,33 @@ Section adequacy_helper_lemmas.
       iIntros "_"; done.
   Qed.
 
-  Lemma wptp_app s t0 t1 t0t1 Φs1 t2 Φs2 :
+  Lemma wptp_app s f t0 t1 t0t1 Φs1 t2 Φs2 :
     t0t1 = t0 ++ t1 ->
-    wptp_from t0 s t1 Φs1 -∗ wptp_from t0t1 s t2 Φs2 -∗ wptp_from t0 s (t1 ++ t2) (Φs1 ++ Φs2).
+    wptp_from t0 s f t1 Φs1 -∗ wptp_from t0t1 s f t2 Φs2 -∗ wptp_from t0 s f (t1 ++ t2) (Φs1 ++ Φs2).
   Proof.
     iIntros (->) "H1 H2". rewrite prefixes_from_app.
     iApply (big_sepL2_app with "[H1] [H2]"); eauto.
   Qed.
 
-  Lemma wptp_cons_r s e Φ Φs t0 t1:
-    WP e @ s; locale_of (t0 ++ t1) e; ⊤ {{v, Φ v}} -∗ wptp_from t0 s t1 Φs
-                              -∗ wptp_from t0 s (t1 ++ [e]) (Φs ++ [Φ]).
+  Lemma wptp_cons_r s f e Φ Φs t0 t1:
+    WP e @ f; s; locale_of (t0 ++ t1) e; ⊤ {{v, Φ v}} -∗ wptp_from t0 s f t1 Φs
+                              -∗ wptp_from t0 s f (t1 ++ [e]) (Φs ++ [Φ]).
   Proof.
     iIntros "H1 H2". rewrite !prefixes_from_app.
     iApply (big_sepL2_app with "[H2] [H1]"); eauto.
     rewrite big_sepL2_singleton. done.
   Qed.
 
-  Lemma wptp_cons_l s e Φ t Φs t0:
-    WP e @ s; locale_of t0 e; ⊤ {{v, Φ v}} -∗
-    wptp_from (t0 ++[e]) s t Φs -∗
-    wptp_from t0 s (e :: t) (Φ :: Φs).
+  Lemma wptp_cons_l s f e Φ t Φs t0:
+    WP e @ f; s; locale_of t0 e; ⊤ {{v, Φ v}} -∗
+    wptp_from (t0 ++[e]) s f t Φs -∗
+    wptp_from t0 s f (e :: t) (Φ :: Φs).
   Proof. iIntros "? ?"; rewrite big_sepL2_cons; iFrame. Qed.
 
-  Lemma wptp_of_val_post t s Φs t0:
-    wptp_from t0 s t Φs -∗ |~{⊤}~|
+  Lemma wptp_of_val_post t s f Φs t0:
+    wptp_from t0 s f t Φs -∗ |~{⊤}~|
     posts_of t Φs ∗
-    (posts_of t Φs -∗ wptp_from t0 s t Φs).
+    (posts_of t Φs -∗ wptp_from t0 s f t Φs).
   Proof.
     iIntros "Ht"; simpl.
     iInduction t as [|e t IHt] "IH" forall (Φs t0); simpl.
@@ -836,11 +838,11 @@ Section adequacy_helper_lemmas.
     newposts t t = [].
   Proof. rewrite drop_ge //. Qed.
 
-  Lemma new_threads_wptp_from s t efs:
+  Lemma new_threads_wptp_from s f t efs:
     (([∗ list] i ↦ ef ∈ efs,
-      WP ef @ s; locale_of (t ++ take i efs) ef ; ⊤
+      WP ef @ f ; s; locale_of (t ++ take i efs) ef ; ⊤
       {{ v, fork_post (locale_of (t ++ take i efs) ef) v }})
-    ⊣⊢ wptp_from t s efs (newposts t (t ++ efs))).
+    ⊣⊢ wptp_from t s f efs (newposts t (t ++ efs))).
   Proof.
     (* TODO: factorize the two halves *)
     rewrite big_sepL2_alt; iSplit.
@@ -873,20 +875,22 @@ Section adequacy_helper_lemmas.
         rewrite drop_app_length //.
   Qed.
 
-  Lemma take_step s Φs ex atr c c' oζ:
+  Lemma take_step s f Φs ex atr c c' oζ:
     valid_exec ex →
     trace_ends_in ex c →
     locale_step c oζ c' →
     config_wp -∗
     state_interp ex atr -∗
-    wptp s c.1 Φs ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length ex))
+    wptp s f c.1 Φs ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length ex))
                                              |={∅,⊤}=>
     ⌜∀ e2, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
+    (** This is also provable, but we don't change the lemma to avoid changing proofs below *)
+    (* ⌜ f = CannotFork -> length c'.1 = length c.1 ⌝ ∗  *)
     ∃ δ' ℓ,
       state_interp (trace_extend ex oζ c') (trace_extend atr ℓ δ') ∗
       posts_of  c'.1 (Φs ++ newposts c.1 c'.1) ∗
       (posts_of c'.1 (Φs ++ newposts c.1 c'.1) -∗
-        wptp s  c'.1 (Φs ++ newposts c.1 c'.1)).
+        wptp s f  c'.1 (Φs ++ newposts c.1 c'.1)).
   Proof.
     iIntros (Hexvalid Hexe Hstep) "config_wp HSI Hc1".
     inversion Hstep as
@@ -900,10 +904,10 @@ Section adequacy_helper_lemmas.
       iMod "He" as "He". iModIntro.
       iApply (step_fupdN_wand with "[He]"); first by iApply "He".
       iIntros "He".
-      iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs) /=".
+      iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs & %FF) /=".
       have Heq: forall a b c d, a ++ e1 :: c ++ d = (a ++ e1 :: c) ++ d.
       { intros **. by list_simplifier. }
-      iAssert (wptp_from (t1 ++ e2 :: t2) s efs (newposts (t1 ++ e2 :: t2) ((t1 ++ e2 :: t2) ++ efs)))
+      iAssert (wptp_from (t1 ++ e2 :: t2) s f efs (newposts (t1 ++ e2 :: t2) ((t1 ++ e2 :: t2) ++ efs)))
         with "[Hefs]" as "Hefs".
       { rewrite -new_threads_wptp_from. iApply (big_sepL_impl with "Hefs").
         iIntros "!#" (i e Hin) "Hwp". list_simplifier.
@@ -1007,7 +1011,7 @@ Lemma fupd_to_bupd_soundness_no_lc' `{!invGpreS Σ} (Q : iProp Σ) `{!Plain Q} :
 Proof. iIntros; iMod fupd_to_bupd_soundness_no_lc; done. Qed.
 
 Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
-        (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        (s: stuckness) (f: forks_bit) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         es σ δ:
   length es ≥ 1 →
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
@@ -1019,7 +1023,7 @@ Theorem wp_strong_adequacy_multiple_helper Σ Λ M `{!invGpreS Σ}
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       wptp s es Φs ∗
+       wptp s f es Φs ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
          ⌜valid_system_trace ex atr⌝ -∗
          ⌜trace_starts_in ex (es, σ)⌝ -∗
@@ -1064,7 +1068,7 @@ Proof.
               (∀ ex' atr' oζ ℓ,
                   ⌜trace_contract ex oζ ex'⌝ →
                   ⌜trace_contract atr ℓ atr'⌝ → trace_inv ex' atr') ∗
-              wptp s c1.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
+              wptp s f c1.1 (Φs ++ ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
                                   (prefixes_from es (drop (length es) c1.1)))))%I
     with "[HSI Hwp]" as "Hex".
   { iExists (trace_singleton (es, σ)), (trace_singleton δ), (es, σ), δ; simpl.
@@ -1257,7 +1261,7 @@ Proof.
 Qed.
 
 Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
-        (s: stuckness) (ξ : execution_trace Λ → auxiliary_trace M → Prop)
+        (s: stuckness) f (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ:
   (∀ `{Hinv : !invGS_gen HasNoLc Σ},
     ⊢ |={⊤}=> ∃
@@ -1268,7 +1272,7 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ) ∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
+       WP e1 @ f; s; locale_of [] e1; ⊤ {{ Φ }} ∗
        (∀ (ex : execution_trace Λ) (atr : auxiliary_trace M) c,
          ⌜valid_system_trace ex atr⌝ -∗
          ⌜trace_starts_in ex ([e1], σ1)⌝ -∗
@@ -1287,7 +1291,7 @@ Theorem wp_strong_adequacy_helper Σ Λ M `{!invGpreS Σ}
           ={⊤, ∅}=∗ ⌜ξ ex atr⌝))) →
   ⊢ Gsim Σ M s ξ (trace_singleton ([e1], σ1)) (trace_singleton δ).
 Proof.
-  intros Hwp. apply wp_strong_adequacy_multiple_helper; [done|simpl;lia|].
+  intros Hwp. apply wp_strong_adequacy_multiple_helper with (f := f); [done|simpl;lia|].
   iIntros (Hinv).
   iMod (Hwp Hinv) as (stateI trace_inv Φs fork_post)
                        "(#config_wp & HSI & Hwp & Hstep)".
@@ -1421,7 +1425,7 @@ Definition rel_always_holds `{!irisG Λ M Σ}
          |={⊤, ∅}=> ⌜ξ ex atr⌝).
 
 Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
-        (s: stuckness)
+        (s: stuckness) (f: forks_bit)
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         es σ δ :
   length es ≥ 1 →
@@ -1435,7 +1439,7 @@ Theorem wp_strong_adequacy_multiple_with_trace_inv Λ M Σ `{!invGpreS Σ}
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       wptp s es Φs ∗
+       wptp s f es Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ) δ) →
   continued_simulation ξ (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
@@ -1444,7 +1448,7 @@ Proof.
 Qed.
 
 Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
@@ -1457,7 +1461,7 @@ Theorem wp_strong_adequacy_with_trace_inv Λ M Σ `{!invGpreS Σ}
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
+       WP e1 @ f; s; locale_of [] e1; ⊤ {{ Φ }} ∗
        rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1], σ1) δ1) →
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
 Proof.
@@ -1466,7 +1470,7 @@ Proof.
 Qed.
 
 Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         es σ δ :
   length es ≥ 1 →
@@ -1479,7 +1483,7 @@ Theorem wp_strong_adequacy_multiple Λ M Σ `{!invGpreS Σ}
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton (es, σ)) (trace_singleton δ) ∗
-       wptp s es Φs ∗
+       wptp s f es Φs ∗
        rel_always_holds s Φs ξ (es, σ) δ) →
   continued_simulation ξ (trace_singleton (es, σ)) (trace_singleton δ).
 Proof.
@@ -1526,7 +1530,7 @@ Definition rel_always_holds0 `{irisG Λ M Σ}
     ={⊤,∅}=∗ ⌜ξ ex atr⌝.
 
 Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         e1 σ1 δ1 :
   rel_finitary ξ →
@@ -1538,7 +1542,7 @@ Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
        let _ : irisG Λ M Σ := IrisG _ _ _ Hinv stateI fork_post in
        config_wp ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
+       WP e1 @ f; s; locale_of [] e1; ⊤ {{ Φ }} ∗
        (* rel_always_holds s [Φ] ξ ([e1], σ1) δ1) → *)
        rel_always_holds0 ξ s stateI Φ e1 σ1 δ1) ->
   continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1).
@@ -1558,7 +1562,7 @@ Qed.
 (** Since the full adequacy statement is quite a mouthful, we prove some more
 intuitive and simpler corollaries. These lemmas are morover stated in terms of
 [rtc erased_step] so one does not have to provide the trace. *)
-Record adequate_multiple {Λ} (s : stuckness) (es : list $ expr Λ) (σ1 : state Λ)
+Record adequate_multiple {Λ} (s : stuckness) (* (f: forks_bit) *) (es : list $ expr Λ) (σ1 : state Λ)
        (φs : list (val Λ → state Λ → Prop)) : Prop := {
   adequate_result ex t2 σ2 i v :
     i < length es →
@@ -1651,7 +1655,7 @@ Proof.
 Qed.
 
 Corollary adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         (φs : list (val Λ → Prop))
         es σ1 δ1 :
@@ -1668,14 +1672,14 @@ Corollary adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), 
        config_wp ∗
        ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
-       wptp s es Φs ∗
+       wptp s f es Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ1) δ1) →
   adequate_multiple s es σ1 ((λ φ v _, φ v) <$> φs).
 Proof.
   pose (ξ' := λ ex aux, ξ ex aux ∧ wp_adequacy_relation Λ M s φs ex aux).
   intros ?? Hwp; apply (wp_adequacy_relation_adequacy_multiple (M := M) _ _ _ δ1 _ ξ').
   { by intros ??[??]. }
-  apply (wp_strong_adequacy_multiple_with_trace_inv Λ M Σ s); [done|..].
+  apply (wp_strong_adequacy_multiple_with_trace_inv Λ M Σ s f); [done|..].
   { apply (rel_finitary_impl ξ' ξ) =>//. by intros ??[??]. }
   iIntros (?) "".
   iMod Hwp as (stateI post Φs fork_post) "(%Hlen & config_wp & HΦs & HSI & Hwp & H)".
@@ -1711,7 +1715,7 @@ Proof.
 Qed.
 
 Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         (φ : val Λ → Prop)
         e1 σ1 δ1 :
@@ -1726,7 +1730,7 @@ Corollary adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecisio
        config_wp ∗
        (∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
+       WP e1 @ f; s; locale_of [] e1; ⊤ {{ Φ }} ∗
        rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1],σ1) δ1) →
   adequate s e1 σ1 (λ v _, φ v).
 Proof.
@@ -1745,7 +1749,7 @@ Proof.
 Qed.
 
 Corollary sim_and_adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         (φs : list (val Λ → Prop))
         es σ1 δ1 :
@@ -1762,7 +1766,7 @@ Corollary sim_and_adequacy_multiple_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mla
        config_wp ∗
        ([∗ list] Φ;φ ∈ Φs;φs, ∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton (es, σ1)) (trace_singleton δ1) ∗
-       wptp s es Φs ∗
+       wptp s f es Φs ∗
        rel_always_holds_with_trace_inv s trace_inv Φs ξ (es,σ1) δ1) →
   (continued_simulation ξ (trace_singleton (es, σ1)) (trace_singleton δ1) ∧
      adequate_multiple s es σ1 ((λ φ v _, φ v) <$> φs)).
@@ -1774,7 +1778,7 @@ Proof.
 Qed.
 
 Corollary sim_and_adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), EqDecision M}
-        (s: stuckness)
+        (s: stuckness) f
         (ξ : execution_trace Λ → auxiliary_trace M → Prop)
         (φ : val Λ → Prop)
         e1 σ1 δ1 :
@@ -1789,7 +1793,7 @@ Corollary sim_and_adequacy_xi Λ M Σ `{!invGpreS Σ} `{EqDecision (mlabel M), E
        config_wp ∗
        (∀ v, Φ v -∗ ⌜φ v⌝) ∗
        stateI (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∗
-       WP e1 @ s; locale_of [] e1; ⊤ {{ Φ }} ∗
+       WP e1 @ f; s; locale_of [] e1; ⊤ {{ Φ }} ∗
        rel_always_holds_with_trace_inv s trace_inv [Φ] ξ ([e1],σ1) δ1) →
   (continued_simulation ξ (trace_singleton ([e1], σ1)) (trace_singleton δ1) ∧
      adequate s e1 σ1 (λ v _, φ v)).

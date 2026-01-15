@@ -8,6 +8,7 @@ Set Default Proof Using "Type".
 Section lifting.
 Context `{!irisG Λ M Σ}.
 Implicit Types s : stuckness.
+Implicit Types f : forks_bit.
 Implicit Types v : val Λ.
 Implicit Types e : expr Λ.
 Implicit Types σ : state Λ.
@@ -15,7 +16,7 @@ Implicit Types δ : mstate M.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
 
-Lemma wp_lift_step_fupdN s E Φ e1 ζ:
+Lemma wp_lift_step_fupdN s f E Φ e1 ζ:
   to_val e1 = None →
   (∀ (extr : execution_trace Λ) (atr : auxiliary_trace M) K tp1 tp2 σ1,
     ⌜valid_exec extr⌝ -∗
@@ -28,10 +29,12 @@ Lemma wp_lift_step_fupdN s E Φ e1 ζ:
        state_interp
          (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
          (trace_extend atr ℓ δ2) ∗
-        WP e2 @ s; ζ; E {{ Φ }} ∗
-        [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
-           {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }})
-  ⊢ WP e1 @ s; ζ; E {{ Φ }}.
+        WP e2 @ f; s; ζ; E {{ Φ }} ∗
+        ([∗ list] i ↦ef ∈ efs, WP ef @ f; s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
+           {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }}) ∗
+        ⌜ f = CannotFork -> efs = [] ⌝
+  )
+  ⊢ WP e1 @ f; s; ζ; E {{ Φ }}.
 Proof.
   rewrite wp_unfold /wp_pre=>->.
   iIntros "H" (exre atr K tp1 tp2 σ1 Hexvald Hlocale Hexe) "Hsi".
@@ -42,7 +45,7 @@ Proof.
   iApply "H".
 Qed.
 
-Lemma wp_lift_step_fupd s E Φ e1 ζ:
+Lemma wp_lift_step_fupd s f E Φ e1 ζ:
   to_val e1 = None →
   (∀ (extr : execution_trace Λ) (atr : auxiliary_trace M) K tp1 tp2 σ1,
     ⌜valid_exec extr⌝ -∗
@@ -55,22 +58,23 @@ Lemma wp_lift_step_fupd s E Φ e1 ζ:
        state_interp
          (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
          (trace_extend atr ℓ δ2) ∗
-        WP e2 @ s; ζ; E {{ Φ }} ∗
-        [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
-           {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }})
-  ⊢ WP e1 @ s; ζ; E {{ Φ }}.
+        WP e2 @ f; s; ζ; E {{ Φ }} ∗
+        ([∗ list] i ↦ef ∈ efs, WP ef @ f; s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
+           {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }}) ∗
+        ⌜ f = CannotFork -> efs = [] ⌝ )
+  ⊢ WP e1 @ f; s; ζ; E {{ Φ }}.
 Proof.
     intros ?. rewrite -wp_lift_step_fupdN; [|done]. simpl. do 26 f_equiv.
     rewrite -step_fupdN_intro; [|done]. rewrite -bi.laterN_intro. auto.
 Qed.
 
-Lemma wp_lift_stuck E Φ e ζ:
+Lemma wp_lift_stuck f E Φ e ζ:
   to_val e = None →
   (∀ (extr : execution_trace Λ) (atr : auxiliary_trace M) K tp1 tp2 σ,
     ⌜valid_exec extr⌝ -∗
     ⌜trace_ends_in extr (tp1 ++ ectx_fill K e :: tp2, σ)⌝ →
     state_interp extr atr ={E,∅}=∗ ⌜stuck e σ⌝)
-  ⊢ WP e @ ζ; E ?{{ Φ }}.
+  ⊢ WP e @ f; MaybeStuck ; ζ; E {{ Φ }}.
 Proof.
   rewrite wp_unfold /wp_pre=>->.
   iIntros "H" (ex atr K tp1 tp2 σ Hexvalid Hlocale  Hex) "Hsi".
@@ -80,7 +84,7 @@ Proof.
  Qed.
 
 (** Derived lifting lemmas. *)
-Lemma wp_lift_step s E Φ e1 ζ:
+Lemma wp_lift_step s f E Φ e1 ζ:
   to_val e1 = None →
   (∀ (extr : execution_trace Λ) (atr : auxiliary_trace M) K tp1 tp2 σ1,
     ⌜valid_exec extr⌝ -∗
@@ -93,10 +97,11 @@ Lemma wp_lift_step s E Φ e1 ζ:
         state_interp
           (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
-      WP e2 @ s; ζ; E {{ Φ }} ∗
-      [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
-         {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }})
-  ⊢ WP e1 @ s; ζ; E {{ Φ }}.
+      WP e2 @ f; s; ζ; E {{ Φ }} ∗
+      ([∗ list] i ↦ef ∈ efs, WP ef @ f; s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
+         {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }}) ∗
+        ⌜ f = CannotFork -> efs = [] ⌝)
+  ⊢ WP e1 @ f; s; ζ; E {{ Φ }}.
 Proof.
   iIntros (?) "H". iApply wp_lift_step_fupd; [done|]. iIntros (?????????) "Hsi".
   iMod ("H" with "[//] [//] [//] Hsi") as "[$ H]".
@@ -104,11 +109,11 @@ Proof.
 Qed.
 
 Lemma wp_lift_pure_step_no_fork
-      `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} s E E' Φ e1 ζ:
+      `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} s f E E' Φ e1 ζ:
   (∀ σ1, if s is NotStuck then reducible e1 σ1 else to_val e1 = None) →
   (∀ σ1 e2 σ2 efs, prim_step e1 σ1 e2 σ2 efs → σ2 = σ1 ∧ efs = []) →
-  (|={E}[E']▷=> ∀ e2 efs σ, ⌜prim_step e1 σ e2 σ efs⌝ → WP e2 @ s; ζ; E {{ Φ }})
-  ⊢ WP e1 @ s; ζ; E {{ Φ }}.
+  (|={E}[E']▷=> ∀ e2 efs σ, ⌜prim_step e1 σ e2 σ efs⌝ → WP e2 @ f; s; ζ; E {{ Φ }})
+  ⊢ WP e1 @ f; s; ζ; E {{ Φ }}.
 Proof.
   iIntros (Hsafe Hstep) "H". iApply wp_lift_step.
   { specialize (Hsafe inhabitant). destruct s; eauto using reducible_not_val. }
@@ -128,9 +133,9 @@ Proof.
   iExists (trace_last atr), pure_label; iSplit; eauto.
 Qed.
 
-Lemma wp_lift_pure_stuck `{!Inhabited (state Λ)} E Φ e :
+Lemma wp_lift_pure_stuck `{!Inhabited (state Λ)} f ζ E Φ e :
   (∀ σ, stuck e σ) →
-  ⊢ WP e @ E ?{{ Φ }}.
+  ⊢ WP e @ f; MaybeStuck; ζ; E {{ Φ }}.
 Proof.
   iIntros (Hstuck). iApply wp_lift_stuck.
   - destruct(to_val e) as [v|] eqn:He; last done.
@@ -141,7 +146,7 @@ Qed.
 
 (* Atomic steps don't need any mask-changing business here, one can
    use the generic lemmas here. *)
-Lemma wp_lift_atomic_step_fupd {s E1 E2 Φ} e1 ζ:
+Lemma wp_lift_atomic_step_fupd {s f E1 E2 Φ} e1 ζ:
   to_val e1 = None →
   (∀ (extr : execution_trace Λ) (atr : auxiliary_trace M) K tp1 tp2 σ1,
     ⌜valid_exec extr⌝ -∗
@@ -155,12 +160,13 @@ Lemma wp_lift_atomic_step_fupd {s E1 E2 Φ} e1 ζ:
           (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       from_option Φ False (to_val e2) ∗
-      [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
-           {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }})
-  ⊢ WP e1 @ s; ζ; E1 {{ Φ }}.
+      ([∗ list] i ↦ef ∈ efs, WP ef @ f; s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
+           {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }}) ∗
+        ⌜ f = CannotFork -> efs = [] ⌝)
+  ⊢ WP e1 @ f; s; ζ; E1 {{ Φ }}.
 Proof.
   iIntros (?) "H".
-  iApply (wp_lift_step_fupd s E1 _ e1); first done.
+  iApply (wp_lift_step_fupd s _ E1 _ e1); first done.
   iIntros (ex atr K tp1 tp2 σ1 Hvalidex ? Hloc) "Hsi".
   iMod ("H" with "[//] [//] [] Hsi") as "[$ H]".
   { iPureIntro. by erewrite <-locale_fill. }
@@ -175,7 +181,7 @@ Proof.
   iApply wp_value; last done. by apply of_to_val.
 Qed.
 
-Lemma wp_lift_atomic_step {s E Φ} e1 ζ:
+Lemma wp_lift_atomic_step {s f E Φ} e1 ζ:
   to_val e1 = None →
   (∀ (extr : execution_trace Λ) (atr : auxiliary_trace M) K tp1 tp2 σ1,
     ⌜valid_exec extr⌝ -∗
@@ -189,9 +195,10 @@ Lemma wp_lift_atomic_step {s E Φ} e1 ζ:
           (trace_extend extr (Some ζ) (tp1 ++ ectx_fill K e2 :: tp2 ++ efs, σ2))
           (trace_extend atr ℓ δ2) ∗
       from_option Φ False (to_val e2) ∗
-      [∗ list] i ↦ef ∈ efs, WP ef @ s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
-           {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }})
-  ⊢ WP e1 @ s; ζ; E {{ Φ }}.
+      ([∗ list] i ↦ef ∈ efs, WP ef @ f; s; locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef; ⊤
+           {{ fork_post (locale_of (tp1 ++ ectx_fill K e1 :: tp2 ++ (take i efs)) ef) }}) ∗
+        ⌜ f = CannotFork -> efs = [] ⌝)
+  ⊢ WP e1 @ f; s; ζ; E {{ Φ }}.
 Proof.
   iIntros (?) "H". iApply wp_lift_atomic_step_fupd; [done|].
   iIntros (?????????) "?". iMod ("H" with "[//] [//] [//] [$]") as "[$ H]".
@@ -200,23 +207,23 @@ Proof.
 Qed.
 
 Lemma wp_lift_pure_det_step_no_fork
-      `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} {s E E' Φ} e1 e2 ζ:
+      `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} {s f E E' Φ} e1 e2 ζ:
   (∀ σ1, if s is NotStuck then reducible e1 σ1 else to_val e1 = None) →
   (∀ σ1 e2' σ2 efs', prim_step e1 σ1 e2' σ2 efs' →
     σ2 = σ1 ∧ e2' = e2 ∧ efs' = []) →
-  (|={E}[E']▷=> WP e2 @ s; ζ; E {{ Φ }}) ⊢ WP e1 @ s; ζ; E {{ Φ }}.
+  (|={E}[E']▷=> WP e2 @ f; s; ζ; E {{ Φ }}) ⊢ WP e1 @ f; s; ζ; E {{ Φ }}.
 Proof.
-  iIntros (? Hpuredet) "H". iApply (wp_lift_pure_step_no_fork s E E'); try done.
+  iIntros (? Hpuredet) "H". iApply (wp_lift_pure_step_no_fork s _ E E'); try done.
   { naive_solver. }
   iApply (step_fupd_wand with "H"); iIntros "H".
   iIntros (e' efs' σ (?&->&?)%Hpuredet); auto.
 Qed.
 
 Lemma wp_pure_step_fupd
-      `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} s E E' ζ e1 e2 φ n Φ :
+      `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} s f E E' ζ e1 e2 φ n Φ :
   PureExec φ n e1 e2 →
   φ →
-  (|={E}[E']▷=>^n WP e2 @ s; ζ; E {{ Φ }}) ⊢ WP e1 @ s; ζ; E {{ Φ }}.
+  (|={E}[E']▷=>^n WP e2 @ f; s; ζ; E {{ Φ }}) ⊢ WP e1 @ f; s; ζ; E {{ Φ }}.
 Proof.
   iIntros (Hexec Hφ) "Hwp". specialize (Hexec Hφ).
   iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?]] "IH"; simpl; first done.
@@ -227,10 +234,10 @@ Proof.
 Qed.
 
 Lemma wp_pure_step_later
-      `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} s E ζ e1 e2 φ n Φ :
+      `{!AllowsPureStep M Σ} `{!Inhabited (state Λ)} s f E ζ e1 e2 φ n Φ :
   PureExec φ n e1 e2 →
   φ →
-  ▷^n WP e2 @ s; ζ; E {{ Φ }} ⊢ WP e1 @ s; ζ; E {{ Φ }}.
+  ▷^n WP e2 @ f; s; ζ; E {{ Φ }} ⊢ WP e1 @ f; s; ζ; E {{ Φ }}.
 Proof.
   intros Hexec ?. rewrite -wp_pure_step_fupd //. clear Hexec.
   induction n as [|n IH]; by rewrite //= -step_fupd_intro // IH.
