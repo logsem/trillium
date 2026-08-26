@@ -1,14 +1,16 @@
 opam-version: "2.0"
-name: "trillium"
+name: "trillium-wfree"
 version: "2.3.0"
-synopsis: "Coq development of the Trillium framework"
+synopsis: "Rocq development of the Trillium framework. This is a fork for Lawyer and wait-freedom projects."
 maintainer: "Trillium Team"
 authors: "Trillium Team"
 license: "MIT"
 build: ["./make-package" "trillium" "-j%{jobs}%"]
 install: ["./make-package" "trillium" "install"]
 depends: [
-  "coq" { (= "9.0.0") }
+  "rocq-runtime" { (= "9.0.0") }
+  "rocq-stdlib"
   "coq-iris" { (= "4.3.0") }
   "coq-stdpp" { (="1.11.0") }
+  "coq-paco" { (= "4.2.3") }
 ]
